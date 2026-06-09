@@ -1,0 +1,53 @@
+<!-- Partial: incluir con {{< include _unidad_1_5.qmd >}}. Sin YAML.
+     Andamiaje de evaluación: actividades, instrucciones de la tarea y rúbricas.
+     Los criterios exactos deben cuadrar con la §8 de la guía docente. -->
+
+# 5 · Estudio de caso, exposición y evaluación {#sec-u15}
+
+::: {.callout-note}
+## Sobre esta unidad
+Cierre del Caso 1: trabajo acompañado del estudio de caso y **exposiciones** con
+Q&A individual. No hay teoría nueva; se integra y se evalúa todo lo anterior.
+Esta unidad reúne la **maquinaria de evaluación** (actividades, instrucciones,
+rúbricas). **RA implicados:** RA8 (desarrollar, presentar y defender estudios de
+caso reproducibles) y, de forma acumulativa, RA1–RA7.
+:::
+
+## El estudio de caso (entregable) {#sec-u15-caso}
+
+<!-- TODO: enunciado del estudio de caso del grupo, que debe atravesar las tres
+     "lentes" del Caso 1 sobre datos propios o asignados:
+       - respuesta binaria (logística + interpretación + evaluación),
+       - agrupamiento (intercepto aleatorio / extensión politómica),
+       - tiempo-a-evento discreto (persona-periodo + cloglog).
+     Indicar datos admisibles (origen y licencia) o el uso de la cohorte simulada. -->
+
+## Componentes de evaluación {#sec-u15-componentes}
+
+Alineados con los instrumentos de la guía:
+
+- **Informe (P).** Documento reproducible (`.qmd`) con el ciclo dato → modelo →
+  diagnóstico → interpretación, en la escala correcta.
+- **Reflexión (R).** Documento breve sobre decisiones de modelización y sus
+  límites.
+- **Exposición (E).** Presentación del estudio de caso.
+- **Q&A individual (w).** Defensa individual ante preguntas.
+
+## Actividades a completar (cuestiones evaluables) {#sec-u15-actividades}
+
+<!-- TODO: lista de cuestiones evaluables que el material deja "abiertas" a lo
+     largo de 1.1-1.4 (las "Tarea del estudiante"), reorganizadas como entregables
+     del caso. Conectar cada cuestión con el RA y el componente (P/R/E/w). -->
+
+## Rúbricas {#sec-u15-rubricas}
+
+<!-- TODO: insertar las rúbricas EXACTAS de la guía docente (§8: informe P,
+     reflexión R, exposición E, Q&A w). NO se reproducen aquí de memoria; se
+     copian de la fuente. Pendiente: confirmar criterios y pesos con la guía. -->
+
+::: {.callout-important}
+## Pendiente de la fuente
+Los criterios, niveles y pesos de las rúbricas deben tomarse literalmente de la
+§8 de la guía docente. Este andamiaje deja los huecos marcados para rellenarlos
+con esa fuente.
+:::

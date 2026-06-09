@@ -1,0 +1,27 @@
+# --- R / RStudio ---
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# --- renv (librerías locales, no se versionan) ---
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+
+# --- Quarto: artefactos de render (se regeneran) ---
+/.quarto/
+/_site/
+/_book/
+*_files/
+*_cache/
+*.html
+
+# --- Bibliografía: PDFs de terceros con copyright -> NO subir a GitHub ---
+bibliografia/*.pdf
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db

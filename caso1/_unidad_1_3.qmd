@@ -1,0 +1,144 @@
+<!-- Partial: incluir con {{< include _unidad_1_3.qmd >}}. Sin YAML.
+     Chunks prefijados u13-. Usa la cohorte simulada (ever, clase_nom, sever_ord)
+     con verdad conocida en attr(cohorte, "verdad"). -->
+
+# 3 · Efectos aleatorios y respuestas politómicas {#sec-u13}
+
+::: {.callout-note}
+## Sobre esta unidad
+Primer contacto con los **efectos mixtos** (hilo en espiral: se reactiva en el
+Caso 2). Introducimos los **efectos aleatorios** sobre el GLMM logístico binario
+y, desde ahí, damos el salto a respuestas con más de dos categorías: el
+**multinomial nominal** (efectos fijos) y el **ordinal mixto**. Trabajamos sobre
+la cohorte simulada, cuya **verdad conocida** permite contrastar lo estimado.
+**RA implicados:** RA6 (efectos mixtos) y la extensión politómica del marco.
+[@bates2015; @agresti2015, caps. 6–7]
+:::
+
+## Qué son los efectos aleatorios {#sec-u13-que-son}
+
+Hasta ahora cada coeficiente era un **efecto fijo**: un parámetro único que vale
+para toda la población. Pero los datos vienen **agrupados** —pacientes dentro de
+centros, en la cohorte—, y las observaciones de un mismo grupo se parecen entre
+sí más de lo que el azar explicaría. Hay tres maneras de tratar el centro:
+
+- **Ignorarlo** (*complete pooling*): un solo intercepto para todos. Subestima la
+  incertidumbre y puede sesgar los efectos (lo vimos: el ajuste *pooled* atenuó
+  $\beta_2$ en la cohorte).
+- **Un parámetro por centro** (*no pooling*): tantos interceptos como centros.
+  Gasta muchos grados de libertad y no generaliza a centros nuevos.
+- **Efecto aleatorio** (*partial pooling*): tratamos los interceptos de centro
+  como **extracciones de una distribución**, $u_j\sim\mathcal{N}(0,\sigma_u^2)$.
+  No estimamos cada $u_j$ como parámetro, sino su **varianza** $\sigma_u^2$. Los
+  interceptos de centro se "encogen" (*shrinkage*) hacia la media global, tanto
+  más cuanto menos información aporta el centro.
+
+El modelo, para la binaria de la cohorte, es un **GLMM logístico**:
+$$
+\operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_j,
+\qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
+$$
+
+## Cuándo se usan {#sec-u13-cuando}
+
+Cuando hay **estructura jerárquica o de medidas repetidas** (centros, médicos,
+sujetos medidos varias veces) y (i) interesa cuantificar la variabilidad entre
+grupos, (ii) se quiere generalizar más allá de los grupos observados, o (iii)
+hay grupos con pocos datos que se benefician del *partial pooling*.
+
+## Cómo se interpretan {#sec-u13-interpretar}
+
+- **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos. En
+  escala latente logística, el **coeficiente de correlación intraclase** es
+  $\text{ICC}=\sigma_u^2/(\sigma_u^2+\pi^2/3)$ (en la cohorte, $\approx 0{,}13$).
+- **Condicional vs marginal.** En un GLMM **no lineal**, los efectos fijos son
+  **condicionales** (específicos de grupo: "para un centro dado"), y **difieren**
+  de los **marginales** (poblacionales, promediados sobre los centros). Por eso
+  el ajuste *pooled* —que estima algo marginal— atenuaba los coeficientes frente
+  a la verdad condicional del DGP. No es un error: son dos cantidades distintas.
+- **Shrinkage.** Los interceptos de centro estimados (`ranef`) están encogidos
+  hacia 0; los centros pequeños se encogen más.
+
+## Laboratorio: GLMM logístico binario {#sec-u13-glmm}
+
+```{r}
+#| label: u13-glmm
+#| eval: false
+library(lme4)
+m_pool <- glm  (ever ~ x1 + x2,              family = binomial, data = cohorte)
+m_glmm <- glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte)
+
+# Contraste contra la verdad conocida del DGP:
+attr(cohorte, "verdad")$binaria$beta     # b1 = 0.85, b2 = -0.65 (condicional)
+fixef(m_glmm)                            # debe acercarse más que coef(m_pool)
+VarCorr(m_glmm)                          # estima sigma_u (verdad: 0.70)
+```
+
+## Del binario al politómico {#sec-u13-politomico}
+
+El efecto aleatorio y el marco logístico se generalizan a respuestas con **más de
+dos categorías**. La forma del modelo depende de si las categorías tienen orden.
+
+### Multinomial nominal (sin orden), efectos fijos {#sec-u13-nominal}
+
+Para la respuesta `clase_nom` (categorías A/B/C sin orden), el **logit de
+categoría base** compara cada categoría con una de referencia (aquí, A):
+$$
+\log\frac{\Pr(Y=k)}{\Pr(Y=A)}=\gamma_{0k}+\gamma_{1k}x_1+\gamma_{2k}x_2,
+\qquad k\in\{B,C\}.
+$$
+Hay un juego de coeficientes **por cada categoría** frente a la referencia. Lo
+ajustamos con efectos fijos (el tratamiento "breve" del marco politómico):
+
+```{r}
+#| label: u13-nominal
+#| eval: false
+library(nnet)
+m_nom <- multinom(clase_nom ~ x1 + x2, data = cohorte, trace = FALSE)
+summary(m_nom)
+attr(cohorte, "verdad")$nominal          # gamma_B y gamma_C verdaderos
+# Interpretación: exp(coef) = odds ratio relativo (categoría k vs A).
+```
+
+::: {.callout-note}
+## El multinomial *mixto* queda como frontera
+Añadir un efecto aleatorio a un multinomial nominal sale de la pila estándar
+(`nnet`/`VGAM` son de efectos fijos; `lme4`/`glmmTMB` no ajustan multinomial) y
+exige herramientas especializadas (`mclogit`, `brms`). Lo dejamos señalado como
+extensión avanzada, no como ejercicio.
+:::
+
+### Ordinal (con orden natural), mixto {#sec-u13-ordinal}
+
+Para la respuesta `sever_ord` (Leve < Moderado < Grave) **sí** hacemos el salto a
+mixto de forma limpia, con el modelo de **odds proporcionales** (cumulative
+logit) y un intercepto aleatorio por centro:
+$$
+\operatorname{logit}\Pr(S_{ij}\le k)=\theta_k-(\beta_1 x_{1ij}+\beta_2 x_{2ij}+w_j),
+\qquad w_j\sim\mathcal{N}(0,\sigma_w^2),
+$$
+con umbrales ordenados $\theta_1<\theta_2$ y **un único** vector de efectos
+(supuesto de proporcionalidad de odds). Lo ajustamos con `ordinal::clmm`:
+
+```{r}
+#| label: u13-ordinal
+#| eval: false
+library(ordinal)
+m_ord <- clmm(sever_ord ~ x1 + x2 + (1 | centro), data = cohorte)
+summary(m_ord)
+attr(cohorte, "verdad")$ordinal          # theta, beta y sigma_w verdaderos
+# El mixto recupera mejor los umbrales/efectos que la versión de efectos fijos
+# (polr), que ignora w_j y atenúa: ese contraste es la lección de la unidad.
+```
+
+::: {.callout-important}
+## Tarea del estudiante (1.3)
+<!-- TODO: (a) ajustar pooled vs GLMM en la binaria y contrastar fixef y sigma_u
+     con la verdad; interpretar el ICC. (b) Interpretar un odds ratio relativo del
+     multinomial nominal. (c) Ajustar el ordinal mixto, interpretar el efecto bajo
+     odds proporcionales y comentar la diferencia con la versión de efectos fijos. -->
+:::
+
+<!-- NOTA editorial: para tratar a fondo el contraste condicional vs marginal
+     puede convenir una referencia adicional (no está en la §9 de la guía).
+     Pendiente de validar/aprobar antes de citarla. -->

@@ -1,0 +1,832 @@
+<!-- Partial: incluir con {{< include _unidad_1_2.qmd >}}. Sin YAML.
+     Chunks prefijados u12-. Hereda de la madre: glow, fractura01, fit_glm
+     (glm(fracture ~ age + priorfrac, binomial)), y la pila base (tidyverse,
+     broom, performance, DHARMa, arm, see, patchwork). Esta unidad carga además
+     marginaleffects, car, pROC, emmeans, ggeffects, MASS. -->
+
+# 2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación {#sec-u12}
+
+::: {.callout-note}
+## Sobre esta unidad
+Unidad de **fundamentación** y la más extensa del caso: cierra la teoría abierta
+en 1.1 y consolida el marco GLM completo. Se imparte en el tiempo que requiera
+(varios días); las subsecciones marcan el ritmo. Toda la teoría se **ilustra
+sobre GLOW** con el modelo logístico que arrancamos en la [Unidad 1.1](#sec-u11).
+**RA implicados:** RA2 (ajuste), RA3 (interpretación en la escala correcta), RA4
+(diagnóstico, separación, calibración), RA5 (comparación de modelos).
+[@nelder1972; @mccullagh1989; @dobson2018; @agresti2015; @hosmer2013; @fox2016]
+:::
+
+En la [Unidad 1.1](#sec-u11) dimos por buenos, sin justificarlos, cuatro
+ingredientes: que la Bernoulli pertenece a la **familia exponencial**, que el
+**logit** es su enlace canónico, que `glm()` estima por **máxima verosimilitud**
+y que la **deviance** mide el ajuste. Esta unidad abre esa caja negra y la cierra
+con lo que de verdad se hace en la práctica: estimar, hacer inferencia, comparar
+modelos, interpretarlos en la escala correcta y evaluarlos como clasificadores.
+
+```{r}
+#| label: u12-setup
+#| include: false
+
+# La madre ya cargó tidyverse, broom, performance, DHARMa, arm, see, patchwork.
+# Esta unidad añade lo suyo:
+library(marginaleffects)   # efectos marginales / predicciones (Arel-Bundock et al., 2024)
+library(car)               # Anova tipo II/III (Fox & Weisberg, 2019)
+library(pROC)              # curva ROC y AUC (Robin et al., 2011)
+library(emmeans)           # medias marginales estimadas
+library(ggeffects)         # predicciones para graficar
+library(MASS)              # confint por perfil, stepAIC (recommended package)
+
+# Recuperamos el ajuste de 1.1 por si esta unidad se compila aislada:
+if (!exists("fit_glm")) {
+  fit_glm <- glm(fracture ~ age + priorfrac, family = binomial, data = glow)
+}
+```
+
+## Familia exponencial y relación media–varianza {#sec-u12-familia}
+
+Un GLM exige que la respuesta siga una distribución de la **familia exponencial
+de dispersión**, cuya densidad (o función de masa) se escribe en la forma canónica
+
+$$
+f(y;\theta,\phi)=\exp\!\left\{\frac{y\theta-b(\theta)}{a(\phi)}+c(y,\phi)\right\},
+$$
+
+donde $\theta$ es el **parámetro natural** (o canónico), $b(\theta)$ la **función
+cumulante**, $\phi$ el **parámetro de dispersión** y $a(\phi)$, $c(y,\phi)$
+funciones conocidas [@mccullagh1989; @dobson2018]. Esta forma no es un capricho
+notacional: de ella se derivan, derivando la cumulante, los dos momentos que
+gobiernan todo el marco.
+
+::: {.callout-note}
+## Quién vive en esta familia (y para qué sirve)
+La misma forma canónica agrupa distribuciones muy distintas; cada una es la
+herramienta natural para un tipo de fenómeno del mundo real:
+
+- **Bernoulli / Binomial** — sucesos sí/no: ¿hay fractura? (GLOW), abandono de
+  cliente (*churn*), impago de un crédito, resultado de un test diagnóstico.
+- **Poisson** — recuentos por unidad de tiempo o espacio: reclamaciones de un
+  asegurado al año, visitas a urgencias, fallos de una máquina, llamadas por hora.
+- **Exponencial** — tiempo continuo hasta un evento con riesgo constante (sin
+  memoria): vida útil de un componente; abre el hilo de supervivencia (Caso 3).
+- **Geométrica** — número de intentos hasta el primer éxito: envíos hasta la
+  primera respuesta, ciclos hasta el primer fallo.
+- **Gaussiana** — magnitudes continuas sin restricción de signo: estatura, error
+  de medida. Es el OLS que ya conoces, subsumido en el marco.
+- **Gamma** — magnitudes positivas y asimétricas con variabilidad proporcional a
+  la media: coste de un siniestro, gasto sanitario por paciente, duración de una
+  sesión (Caso 3).
+- **Inversa gaussiana / Tweedie** — duraciones de cola pesada, o datos con masa en
+  cero y parte continua positiva a la vez (coste agregado de siniestros,
+  precipitación diaria).
+:::
+
+Partiendo de que $\int f\,\mathrm{d}y=1$ y derivando bajo el signo integral se
+obtiene el resultado central:
+
+$$
+\mathbb{E}[Y]=\mu=b'(\theta),\qquad
+\operatorname{Var}(Y)=b''(\theta)\,a(\phi).
+$$
+
+La media depende solo de $\theta$ y la varianza se **factoriza** en dos piezas:
+$a(\phi)$, común a la familia, y $b''(\theta)$, que reescrita en función de la
+media define la **función de varianza** $V(\mu)=b''(\theta(\mu))$. Esa $V(\mu)$ es
+la **huella digital** de cada familia: es lo que distingue una Bernoulli de una
+Poisson o una Gamma, y lo que en 1.1 «absorbía los problemas 2 y 3» de OLS
+(varianza no constante y error no normal).
+
+::: {.callout-note}
+## El otro factor de la varianza: $a(\phi)$ y los pesos a priori
+En los modelos GLM estándar el primer factor de
+$\operatorname{Var}(Y_i)=a(\phi)\,V(\mu_i)$ toma **habitualmente** la forma
+$$a(\phi)=\frac{\phi}{m_i},$$
+con $\phi$ el **parámetro de dispersión** (común a la familia) y $m_i$ un **peso a
+priori conocido** que registra cuántas unidades elementales hay detrás de cada fila.
+En general $a(\phi)$ es solo *alguna* función de $\phi$; la forma $\phi/m_i$ es la
+convención que surge cuando cada observación resume $m_i$ unidades i.i.d.
+
+Con datos **individuales** —una fila, una observación— se tiene $m_i=1$ y por tanto
+$a(\phi)=\phi$. Es la situación de todo el Caso 1: cada mujer de GLOW aporta un único
+ensayo Bernoulli.
+
+El peso $m_i\neq1$ aparece cuando el dato llega **agregado**:
+
+- **Binomial como proporción.** Si $y_i$ es la fracción de éxitos sobre $m_i$ ensayos,
+  $m_i$ es el denominador binomial y $\operatorname{Var}(\bar Y_i)=\mu_i(1-\mu_i)/m_i$.
+  En R: respuesta `cbind(éxitos, fracasos)` o bien `weights = m`.
+- **Gaussiana o Gamma sobre medias de grupo.** Si $y_i$ es el promedio de $m_i$
+  mediciones, $m_i$ es el tamaño del grupo.
+
+No conviene confundir las dos piezas: $\phi$ es la **escala libre** de la familia
+(recuadro siguiente), mientras que $m_i$ refleja la **estructura de los datos**
+(réplicas o agregación), no la distribución.
+:::
+
+::: {.callout-note}
+## ¿Uno o dos parámetros? El papel de $\phi$
+En **Bernoulli, Poisson, exponencial y geométrica** el parámetro de dispersión es
+**conocido y fijo, $\phi=1$**: no hay escala libre que estimar, y un **único
+parámetro $\theta$** (equivalentemente, la media $\mu$) gobierna a la vez la media
+y la varianza. Por eso $V(\mu)$ las liga de forma rígida —$\mu(1-\mu)$, $\mu$…—.
+Son familias exponenciales **lineales** (un solo parámetro).
+
+El resto de variantes —**Gaussiana, Gamma, inversa gaussiana, Tweedie**— añaden un
+parámetro de **dispersión propio** que se estima de los datos: el **escalamiento se
+modeliza con independencia de la media**, lo que permite describir situaciones más
+ricas (varianza constante en la Gaussiana, coeficiente de variación constante en la
+Gamma…). Son los **modelos de dispersión exponencial**.
+
+Ese mando $\phi$ no es ornamental: reaparece como **sobredispersión** en los
+conteos del Caso 2 (quasi-Poisson, binomial negativa) y como las **continuas
+positivas** del Caso 3. En el Caso 1, al ser todo Bernoulli/Binomial, $\phi=1$ y no
+hay nada que estimar.
+:::
+
+| | Bernoulli | Poisson | Gaussiana | Gamma |
+|---|---|---|---|---|
+| **Parametrización** | $\mathrm{Br}(\mu)$ | $\mathrm{Pois}(\mu)$ | $\mathcal{N}(\mu,\sigma^2)$ | $\mathrm{Ga}\!\left(\nu,\tfrac{\mu}{\nu}\right)$ |
+| $\theta(\mu)$ | $\log\frac{\mu}{1-\mu}$ | $\log\mu$ | $\mu$ | $-1/\mu$ |
+| $b(\theta)$ | $\log(1+e^\theta)$ | $e^\theta$ | $\theta^2/2$ | $-\log(-\theta)$ |
+| $b'(\theta)$ | $\dfrac{e^\theta}{1+e^\theta}$ | $e^\theta$ | $\theta$ | $-1/\theta$ |
+| $b''(\theta)$ | $\dfrac{e^\theta}{(1+e^\theta)^2}$ | $e^\theta$ | $1$ | $1/\theta^2$ |
+| $a(\phi)$ | $1$ | $1$ | $\phi=\sigma^2$ | $\phi=\nu^{-1}$ |
+| $c(y,\phi)$ | $0$ | $-\log y!$ | $-\tfrac{1}{2}\!\left(\tfrac{y^2}{\phi}+\log(2\pi\phi)\right)$ | $\tfrac{1-\phi}{\phi}\log y-\tfrac{\log\phi}{\phi}-\log\Gamma\!\left(\tfrac{1}{\phi}\right)$ |
+| $V(\mu)$ | $\mu(1-\mu)$ | $\mu$ | $1$ | $\mu^2$ |
+| **Enlace canónico** | logit | log | identidad | inversa |
+
+: Familias de la exponencial: parametrización e ingredientes canónicos. {#tbl-familias}
+
+La fila $V(\mu)$ explica de un vistazo por qué OLS (Gaussiana, $V\equiv 1$)
+fracasa en binaria: para la Bernoulli, $V(\mu)=\mu(1-\mu)$ **no** es constante. El
+objeto `family()` de R expone exactamente estas piezas, y cada familia permite recuperar sus ingredientes canónicos:
+
+```{r}
+#| label: u12-familia
+family(fit_glm)              # familia y enlace del ajuste de 1.1
+binomial()$variance          # función de varianza V(mu) = mu(1-mu)
+binomial()$linkfun(0.25)     # logit(0.25): de la media al predictor
+binomial()$linkinv(-1.0986)  # sigmoide: del predictor a la media
+```
+
+La varianza de una sola respuesta binaria no se observa: un 0/1 no tiene dispersión
+propia. Para *verla*, agrupamos GLOW en diez tramos (deciles) según la probabilidad
+ajustada $\hat\mu$; dentro de cada tramo el riesgo es parecido, así que podemos medir
+allí la varianza empírica de la respuesta. Confrontamos ese valor con la parábola
+$\mu(1-\mu)$: si los puntos la siguen, confirmamos —solo con datos— que en la Bernoulli
+la varianza la **dicta la media** (máxima en $\mu=0{,}5$, casi nula cerca de 0 o 1), no
+una constante como supondría OLS. La @fig-u12-varianza-mu muestra que los puntos siguen la parábola.
+
+```{r}
+#| label: fig-u12-varianza-mu
+#| fig-cap: "Relación media–varianza en GLOW. La varianza empírica de la respuesta por tramos de probabilidad ajustada (puntos) sigue la parábola teórica $V(\\mu)=\\mu(1-\\mu)$ (línea), no una constante: justo lo que OLS no puede reproducir."
+
+glow |>
+  mutate(p_hat = fitted(fit_glm),
+         tramo = ntile(p_hat, 10)) |>
+  group_by(tramo) |>
+  summarise(mu = mean(p_hat),
+            var_emp = var(fractura01), .groups = "drop") |>
+  ggplot(aes(mu, var_emp)) +
+  geom_function(fun = \(m) m * (1 - m), linewidth = 1, color = "firebrick") +
+  geom_point(size = 2) +
+  labs(x = expression(hat(mu)), y = "Varianza empírica de Y por tramo",
+       caption = expression("Curva: V(" * mu * ") = " * mu * "(1 - " * mu * ")"))
+```
+
+## El enlace: canónico y alternativas {#sec-u12-enlace}
+
+El **enlace** o *función link* $g$ conecta la media con el predictor lineal, $g(\mu)=\eta=\mathbf{x}^\top
+\boldsymbol\beta$. Una misma familia puede utilizar cualquier enlaces $g$ que sea una función monótona y diferenciable, pero el **enlace canónico** es aquel que iguala el parámetro natural al predictor lineal, esto es, $\theta=\eta$. Este enlace canónico simplemente aporta ventajas formales en las matemáticas, como estadísticos suficientes de dimensión mínima o simplificación de las ecuaciones de verosimilitud.
+
+En el caso binario de la familia binomial, las tres alternativas que re-escalan un predictor lineal -teóricamente definido en toda la recta real- a la escala de una probabilidad -en el rango [0,1]- son el enlace logit, el probit y el complementario log-log -cloglog-, que reproducen la forma de S invertida a la hora de relacionar el predictor lineal con la probabilidad, como se aprecia en la @fig-u12-enlaces. Logit y probit son **simétricos** (casi intercambiables tras reescalar: el
+coeficiente probit ≈ logit/1,6); el **cloglog** (complementario log-log) es **asimétrico** y será el enlace
+natural de la supervivencia en tiempo discreto en la [Unidad 1.4](#sec-u14)
+[@agresti2015].
+
+$$
+\text{logit: }\log\tfrac{\pi}{1-\pi}=\eta,\qquad
+\text{probit: }\Phi^{-1}(\pi)=\eta,\qquad
+\text{cloglog: }\log(-\log(1-\pi))=\eta .
+$$
+
+```{r}
+#| label: fig-u12-enlaces
+#| fig-cap: "Funciones enlace en la familia binomial. Las tres inversas devuelven η a (0,1). logit y probit son simétricas (casi intercambiables tras reescalar); el cloglog es asimétrico."
+tibble(eta = seq(-5, 5, by = 0.02)) |>
+  mutate(logit   = plogis(eta),
+         probit  = pnorm(eta),
+         cloglog = 1 - exp(-exp(eta))) |>
+  pivot_longer(c(logit, probit, cloglog), names_to = "enlace", values_to = "p") |>
+  ggplot(aes(eta, p, color = enlace)) +
+  geom_line(linewidth = 1) +
+  geom_hline(yintercept = c(0, 1), linetype = "dotted") +
+  labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
+```
+
+Para ver el efecto de utilizar diferentes enlaces, ajustamos GLOW con los tres y comparamos:
+
+```{r}
+#| label: u12-enlaces
+ajustes <- list(
+  logit   = glm(fracture ~ age + priorfrac, binomial("logit"),   glow),
+  probit  = glm(fracture ~ age + priorfrac, binomial("probit"),  glow),
+  cloglog = glm(fracture ~ age + priorfrac, binomial("cloglog"), glow))
+
+map_dfr(ajustes, \(m) glance(m) |> select(deviance, AIC), .id = "enlace")
+map_dfr(ajustes, tidy, .id = "enlace") |>
+  select(enlace, term, estimate) |>
+  pivot_wider(names_from = enlace, values_from = estimate)
+```
+
+Los coeficientes estimados **no** son directamente comparables entre enlaces (viven en
+escalas distintas y como veremos, se interpretan de forma distinta), pero el ajuste global, calibrado en términos del AIC -que ya conocemos del modelo lineal- y la deviance -que presentaremos más tarde-, es muy parecido, con lo cual en este caso concluiríamos que **la elección de enlace apenas cambia las conclusiones**. Esto es lo habitual salvo en comportamientos extremos en las colas o en datos con mucha asimetría. Por interpretabilidad solemos utilizar el logit en la familia binomial.
+
+Esta equivalencia entre enlaces se aprecia en la escala de la
+**probabilidad**, en la @fig-u12-enlaces-prob, que superpone las curvas edad–probabilidad de
+los tres enlaces, separando en dos paneles las predicciones según el antecedente de fractura previa. Con el fin de ver la variación que se produce en las colas, y a pesar de que no es pertinente la extrapolación de la predicción fuera del rango observado, se han punteado las predicciones prolongadas fuera de dicho rango, para visualizar la forma de S invertida completa, y las diferencias en dichas colas.
+
+```{r}
+#| label: fig-u12-enlaces-prob
+#| fig-width: 9.5
+#| fig-height: 4.3
+#| out-width: "100%"
+#| fig-cap: "Probabilidad de fractura predicha por los tres enlaces (logit, probit, cloglog) sobre `age + priorfrac`, en paneles por antecedente de fractura previa. Trazo sólido y franja sombreada: rango observado en GLOW (55–90 años); punteado: extrapolación para apreciar la forma en S."
+
+rango_obs <- range(glow$age)
+grid <- expand_grid(
+  age       = seq(40, 105, length.out = 300),
+  priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
+
+# Predicción en probabilidad de cada uno de los tres modelos de `ajustes`
+pred_enlaces <- map_dfr(ajustes, \(m) {
+  grid |> mutate(p_hat = predict(m, newdata = grid, type = "response"))
+}, .id = "enlace") |>
+  mutate(enlace = factor(enlace, levels = c("logit", "probit", "cloglog")))
+pred_obs <- filter(pred_enlaces, age >= rango_obs[1], age <= rango_obs[2])
+
+etiq_pf <- c(No = "Sin fractura previa", Yes = "Con fractura previa")
+
+ggplot(pred_enlaces, aes(age, p_hat, color = enlace)) +
+  annotate("rect", xmin = rango_obs[1], xmax = rango_obs[2],
+           ymin = -Inf, ymax = Inf, alpha = 0.05) +
+  geom_line(linewidth = 0.7, linetype = "22") +          # extrapolación
+  geom_line(data = pred_obs, linewidth = 1.1) +          # rango observado
+  facet_wrap(~ priorfrac, labeller = labeller(priorfrac = etiq_pf)) +
+  scale_y_continuous(limits = c(0, 1), labels = scales::label_percent()) +
+  labs(x = "Edad (años)", y = "P(fractura)", color = "Enlace") +
+  theme(legend.position = "bottom")
+```
+
+En el rango de edad **realmente observado** (zona sombreada, 55–90 años) las tres
+curvas son prácticamente **indistinguibles**: la elección de enlace no mueve ni las
+probabilidades predichas ni, por tanto, las conclusiones, en línea con la deviance
+y el AIC casi idénticos de la tabla anterior. Las diferencias solo asoman al
+**extrapolar** hacia las colas, donde el `cloglog` —asimétrico— se despega un poco
+de logit y probit (simétricos, casi superpuestos entre sí). Es el comportamiento
+típico: el enlace importa en las colas y bajo fuerte asimetría, no en el grueso de
+los datos, lo que respalda quedarnos con el logit por interpretabilidad.
+
+## Interpretación: del coeficiente a la media (odds y escalas) {#sec-u12-interpretacion}
+
+Acabamos de ajustar el **mismo** modelo con tres enlaces (@sec-u12-enlace). Antes
+de ver cómo se estima, leamos lo que ya tenemos: ¿cómo actúan los coeficientes y
+qué dicen sobre la media $\mu$? Es el corazón del **RA3**.
+
+**Lo que da el modelo por defecto.** El resumen del ajuste (`summary`, o
+`broom::tidy`) devuelve los coeficientes en la escala del **predictor lineal**, es
+decir, en **log-odds** (no en probabilidad):
+
+```{r}
+#| label: u12-coef
+tidy(fit_glm)   # coeficientes en escala log-odds: lo que da summary() por defecto
+```
+
+Su **signo** ya informa (positivo eleva el log-odds, y con él la probabilidad;
+negativo la baja), pero su **magnitud no se interpreta** como el cambio que un
+incremento unitario de la predictora provoca en la probabilidad.
+
+**Por qué necesitamos otra escala.** El motivo es que la relación entre la
+probabilidad y las predictoras **no es lineal**: la misma diferencia en el
+predictor mueve mucho la probabilidad en el centro de la curva y casi nada en las
+colas. Por eso se consideran parámetros **derivados de los coeficientes** —ante
+todo, el *odds ratio*— que permiten una interpretación práctica más sencilla.
+
+**Odds.** El **odds** de un suceso es el cociente entre la probabilidad de que
+ocurra (éxito) y la de que no ocurra (fracaso); la *ventaja* de ocurrencia frente
+a no ocurrencia:
+$$
+\text{odds}=\frac{\pi}{1-\pi}.
+$$
+Si el odds es 2, el evento es **el doble de probable** que su ausencia.
+
+**Log-odds y predictor lineal.** En un modelo logístico simple con una única
+predictora $x$, el **logaritmo del odds** es justo el predictor lineal:
+$$
+\log(\text{odds}(x))=\eta(x)=\beta_0+\beta x.
+$$
+El log-odds (el *logit*) es la escala en la que el modelo es lineal y donde viven
+los coeficientes.
+
+**Del coeficiente al odds ratio.** Aumentar $x$ en una unidad ($x\to x+1$) cambia
+el predictor lineal —el log-odds— en exactamente $\beta$:
+$$
+\beta=\eta(x+1)-\eta(x)=\log\!\left(\frac{\text{odds}(x+1)}{\text{odds}(x)}\right).
+$$
+Ese cociente de odds es el **odds ratio** (OR), la exponencial del coeficiente:
+$$
+\text{OR}=\frac{\text{odds}(x+1)}{\text{odds}(x)}
+=\frac{\pi(x+1)/(1-\pi(x+1))}{\pi(x)/(1-\pi(x))}=e^{\beta}.
+$$
+Es **constante** en toda la escala (no depende de dónde estés en la curva): de ahí
+lo cómodo de comunicarlo. Su interpretación es directa:
+
+- $\beta>0$, esto es $\text{OR}=e^{\beta}>1$: incrementar $x$ en una unidad
+  **aumenta** la ventaja del evento.
+- $\beta<0$, esto es $\text{OR}=e^{\beta}<1$: incrementar $x$ en una unidad la
+  **reduce**.
+
+Por ejemplo, $\text{OR}=3$ significa tres veces más ventaja del evento al subir la
+predictora una unidad; $\text{OR}=0{,}5$, que se reduce a la mitad.
+
+::: {.callout-warning}
+## Odds ratio no es riesgo relativo
+Conviene leerlo con rigor: el OR es un cociente de *odds*, **no** de
+probabilidades. El **riesgo relativo** compara probabilidades,
+$\text{RR}=\pi(x+1)/\pi(x)$, y en general $\text{OR}\neq\text{RR}$. Ambos se
+relacionan por
+$$
+\text{OR}=\text{RR}\cdot\frac{1-\pi(x)}{1-\pi(x+1)},
+$$
+de modo que el OR **se aleja de 1 más que el RR** y exagera el efecto cuando el
+evento es frecuente. Solo si el evento es **raro** ($\pi$ pequeña) se cumple
+$1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$. Por eso decir «el riesgo
+se triplica» al leer un $\text{OR}=3$ es una aproximación cómoda pero informal: la
+lectura exacta es en términos de *odds* (ventaja), o bien en probabilidad mediante
+los efectos marginales (más abajo).
+:::
+
+**En GLOW** (ya con las dos predictoras): la fractura previa multiplica las odds
+de fractura por $\text{OR}\approx 2{,}31$ (IC 95 %: 1,46–3,66) y cada año de edad
+por $\approx 1{,}04$ (IC 95 %: 1,02–1,07):
+
+```{r}
+#| label: u12-or
+exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR con IC por perfil de verosimilitud
+```
+
+(El IC procede del perfil de verosimilitud, que detallamos en @sec-u12-inferencia;
+por ahora basta leer que un intervalo que no contiene 1 señala efecto.)
+
+```{r}
+#| label: fig-u12-forest
+#| fig-cap: "Odds ratios con IC 95 % (escala log). La línea en OR = 1 es la hipótesis nula; un intervalo que no la cruza señala efecto."
+
+tidy(fit_glm, conf.int = TRUE, exponentiate = TRUE) |>
+  filter(term != "(Intercept)") |>
+  ggplot(aes(estimate, term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
+  scale_x_log10() +
+  labs(x = "Odds ratio (escala log)", y = NULL)
+```
+
+**La misma idea, otras escalas.** El predictor lineal $\eta$ es **idéntico** en los
+tres enlaces; lo que cambia es qué *representa* $\eta$ y, por tanto, cómo se lee el
+coeficiente:
+
+| Enlace | $\eta$ es… | $\eta=g(\mu)$ | $\mu=g^{-1}(\eta)$ |
+|---|---|---|---|
+| **logit** | el **log-odds** | $\log\dfrac{\mu}{1-\mu}$ | $\dfrac{e^{\eta}}{1+e^{\eta}}$ |
+| **probit** | el cuantil normal ($z$) | $\Phi^{-1}(\mu)$ | $\Phi(\eta)$ |
+| **cloglog** | el log-riesgo (log del *hazard* acumulado) | $\log\!\big(-\log(1-\mu)\big)$ | $1-e^{-e^{\eta}}$ |
+
+: Relación entre el predictor lineal $\eta$ —donde actúan los coeficientes— y la media $\mu$ en los tres enlaces. En el logit, $\eta$ es exactamente el log-odds; cada enlace «lee» $\eta$ en una escala distinta. {#tbl-enlaces-eta-mu}
+
+Por eso el mismo coeficiente cambia de significado con el enlace, aunque el ajuste
+sea casi idéntico:
+
+- **logit:** $e^{\beta}$ = **odds ratio** (multiplica las odds). La lectura
+  habitual en clínica y epidemiología.
+- **probit:** $\beta$ es un **desplazamiento en la escala latente normal** ($z$);
+  no hay lectura multiplicativa de odds. Como guía, $\beta_{\text{probit}}\approx
+  \beta_{\text{logit}}/1{,}6\text{–}1{,}8$.
+- **cloglog:** $e^{\beta}$ es una **razón de riesgos** (*hazard ratio*); por su
+  asimetría no coincide con el OR, y es la lectura natural en supervivencia
+  (@sec-u14).
+
+```{r}
+#| label: u12-coef-enlaces
+# Mismos datos, distinta escala del coeficiente según el enlace
+map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
+  pivot_wider(names_from = enlace, values_from = estimate) |>
+  mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
+```
+
+**De los odds a la probabilidad: efectos marginales.** Si lo que interesa es la
+**escala de probabilidad**, el efecto de subir $x_k$ una unidad,
+$$
+\frac{\partial \mu}{\partial x_k}
+=\underbrace{\frac{\mathrm{d}g^{-1}}{\mathrm{d}\eta}}_{\text{pendiente de la curva}}\cdot\,\beta_k,
+$$
+**depende de $\eta$** (grande en el centro de la sigmoide, casi nulo en las
+colas), así que no es un número único. Se resume con el **efecto marginal medio**
+(AME), ya en puntos de probabilidad:
+
+```{r}
+#| label: u12-ame
+avg_slopes(fit_glm)   # cambio medio en P(fractura) por unidad de cada covariable
+```
+
+En GLOW, el AME de `age` $\approx 0{,}007$: unos 0,7 puntos porcentuales por año
+**en promedio**. La alternativa clásica es el efecto «en valores representativos»
+(MEM), que evalúa la derivada en un perfil fijado; el AME suele preferirse por
+promediar sobre la población observada [@arelbundock2024]. Detalle didáctico: el
+AME en escala de probabilidad es **casi invariante al enlace** (los tres ajustes
+dan AME parecidos aunque sus coeficientes difieran), porque lo que cambia es la
+parametrización, no el ajuste. Moraleja: interpreta en la escala que importa.
+
+**La edad en dos escalas (síntesis).** Lo más comunicable de un GLM es la
+**probabilidad predicha**; ponerla junto a la escala **log-odds** reúne en una sola
+imagen todo lo anterior. A la izquierda, en log-odds, los dos perfiles son **rectas
+paralelas**: la edad entra de forma lineal y `priorfrac` solo desplaza la recta una
+cantidad **constante**, $\log(\text{OR})\approx 0{,}84$ —ahí vive el odds ratio—. A
+la derecha, en probabilidad, esas mismas rectas se vuelven **curvas en S**: el
+efecto de `priorfrac` (la distancia entre curvas) es máximo en el centro y se
+desvanece en los extremos, **aunque el OR sea constante**. Es, de un vistazo, la
+diferencia entre «constante en los *odds*» y «variable en la probabilidad».
+
+```{r}
+#| label: fig-u12-dos-escalas
+#| fig-width: 11
+#| fig-height: 4.8
+#| out-width: "100%"
+#| fig-cap: "El mismo modelo en dos escalas. Izquierda (log-odds): rectas paralelas, separación constante ≈ 0,84 (logaritmo del OR). Derecha (probabilidad): curvas en S, con separación variable. Trazo sólido y franja sombreada: rango de edad observado en GLOW (55–90 años); fuera, extrapolación (punteado). Bandas: IC 95 %."
+
+rango_obs <- range(glow$age)        # ~55–90: edad observada en GLOW
+grid <- expand_grid(
+  age       = seq(40, 105, length.out = 300),
+  priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
+pr   <- predict(fit_glm, newdata = grid, type = "link", se.fit = TRUE)
+grid <- grid |>
+  mutate(eta = pr$fit, se = pr$se.fit,
+         lo_eta = eta - 1.96 * se, hi_eta = eta + 1.96 * se,   # IC 95 % en log-odds
+         p_hat  = plogis(eta),
+         lo_p   = plogis(lo_eta), hi_p = plogis(hi_eta))       # IC 95 % en probabilidad
+grid_obs <- filter(grid, age >= rango_obs[1], age <= rango_obs[2])
+
+pA <- ggplot(grid, aes(age, eta, color = priorfrac, fill = priorfrac)) +
+  annotate("rect", xmin = rango_obs[1], xmax = rango_obs[2],
+           ymin = -Inf, ymax = Inf, alpha = 0.06) +
+  geom_ribbon(aes(ymin = lo_eta, ymax = hi_eta), alpha = 0.15, color = NA) +
+  geom_line(linewidth = 0.7, linetype = "22") +          # extrapolación
+  geom_line(data = grid_obs, linewidth = 1.2) +          # rango observado
+  labs(x = "Edad (años)", y = "log-odds (η)",
+       color = "Fractura previa", fill = "Fractura previa",
+       title = "Escala log-odds", subtitle = "rectas paralelas (separación ≈ 0,84)")
+
+pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
+  annotate("rect", xmin = rango_obs[1], xmax = rango_obs[2],
+           ymin = -Inf, ymax = Inf, alpha = 0.06) +
+  geom_ribbon(aes(ymin = lo_p, ymax = hi_p), alpha = 0.15, color = NA) +
+  geom_line(linewidth = 0.7, linetype = "22") +
+  geom_line(data = grid_obs, linewidth = 1.2) +
+  scale_y_continuous(limits = c(0, 1), labels = scales::label_percent()) +
+  labs(x = "Edad (años)", y = "P(fractura)",
+       color = "Fractura previa", fill = "Fractura previa",
+       title = "Escala probabilidad", subtitle = "curvas en S (separación variable)")
+
+(pA + pB) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom",
+        plot.title    = element_text(size = 11, face = "bold"),
+        plot.subtitle = element_text(size = 8.5))
+```
+
+## Estimación: máxima verosimilitud e IWLS {#sec-u12-iwls}
+
+No hay fórmula cerrada para $\hat{\boldsymbol\beta}$ como en OLS: se maximiza la
+log-verosimilitud numéricamente. La log-verosimilitud de un GLM con enlace
+canónico tiene **ecuaciones de score** de forma especialmente limpia,
+
+$$
+\frac{\partial \ell}{\partial\boldsymbol\beta}
+=\sum_{i=1}^{n}\frac{(y_i-\mu_i)}{a(\phi)\,V(\mu_i)}\,
+\frac{\partial\mu_i}{\partial\eta_i}\,\mathbf{x}_i=\mathbf{0}.
+$$
+
+Resolverlas por **Newton–Raphson con la matriz de información esperada** (Fisher
+scoring) resulta ser equivalente a iterar una **regresión por mínimos cuadrados
+ponderados** (IWLS, *iteratively weighted least squares*) [@nelder1972;
+@mccullagh1989]. En cada paso se construye una **respuesta de trabajo** $z$ y unos
+**pesos** $w$,
+
+$$
+z_i=\eta_i+(y_i-\mu_i)\frac{\mathrm{d}\eta_i}{\mathrm{d}\mu_i},
+\qquad
+w_i=\frac{(\mathrm{d}\mu_i/\mathrm{d}\eta_i)^2}{V(\mu_i)},
+$$
+
+y se actualiza $\boldsymbol\beta\leftarrow(\mathbf{X}^\top\mathbf{W}\mathbf{X})^{-1}
+\mathbf{X}^\top\mathbf{W}\mathbf{z}$ hasta convergencia. Esto **desmitifica la caja
+negra**: un GLM se ajusta resolviendo una sucesión de regresiones lineales
+ponderadas. Lo reproducimos «a mano» sobre GLOW usando las piezas que el propio
+objeto `family()` proporciona, y comprobamos que coincide con `glm()`:
+
+```{r}
+#| label: u12-iwls
+X   <- model.matrix(fit_glm)          # matriz de diseño (1, age, priorfracYes)
+y   <- glow$fractura01
+fam <- binomial()                     # genérico: linkinv, mu.eta, variance
+
+beta <- rep(0, ncol(X)); traza <- list()
+for (it in 1:25) {
+  eta <- as.vector(X %*% beta)
+  mu  <- fam$linkinv(eta)             # mu = g^{-1}(eta)
+  mep <- fam$mu.eta(eta)              # dmu/deta
+  z   <- eta + (y - mu) / mep         # respuesta de trabajo
+  w   <- mep^2 / fam$variance(mu)     # pesos IWLS
+  WX  <- X * w
+  beta_new <- as.vector(solve(crossprod(WX, X), crossprod(WX, z)))
+  traza[[it]] <- beta_new
+  if (max(abs(beta_new - beta)) < 1e-10) { beta <- beta_new; break }
+  beta <- beta_new
+}
+cat("Convergió en", it, "iteraciones\n")
+cbind(IWLS_a_mano = beta, glm = coef(fit_glm))   # deben coincidir
+```
+
+```{r}
+#| label: fig-u12-iwls-convergencia
+#| fig-cap: "Convergencia del IWLS «a mano». Cada coeficiente se estabiliza en su valor de máxima verosimilitud (líneas punteadas, las de `glm()`) en muy pocas iteraciones."
+
+do.call(rbind, traza) |>
+  as.data.frame() |>
+  setNames(colnames(X)) |>
+  mutate(iter = row_number()) |>
+  pivot_longer(-iter, names_to = "coef", values_to = "valor") |>
+  ggplot(aes(iter, valor, color = coef)) +
+  geom_line() + geom_point(size = 1.5) +
+  geom_hline(data = enframe(coef(fit_glm), "coef", "obj"),
+             aes(yintercept = obj, color = coef), linetype = "dashed") +
+  labs(x = "Iteración IWLS", y = "Coeficiente", color = NULL)
+```
+
+## Deviance y bondad de ajuste {#sec-u12-deviance}
+
+La **deviance** mide cuánto peor ajusta nuestro modelo frente al **modelo
+saturado** (un parámetro por observación, ajuste perfecto):
+
+$$
+D=-2\bigl[\ell(\hat{\boldsymbol\beta})-\ell_{\text{sat}}\bigr].
+$$
+
+Es el análogo GLM de la suma de cuadrados residual: cuanto menor, mejor ajuste.
+La **deviance nula** corresponde al modelo solo con intercepto y la **deviance
+residual** al modelo ajustado; su diferencia cuantifica lo que explican los
+predictores. `glance()` las muestra:
+
+```{r}
+#| label: u12-deviance
+glance(fit_glm) |>
+  select(null.deviance, df.null, deviance, df.residual, logLik, AIC, BIC)
+```
+
+En GLOW, la deviance baja de **562,3** (nula) a **528,5** (residual) al añadir
+`age` y `priorfrac`: esa reducción de ≈ 33,8 puntos con 2 grados de libertad es la
+que contrastaremos formalmente a continuación. Una nota importante: con datos
+**no agrupados** (una fila por sujeto, $y_i\in\{0,1\}$) la deviance residual **no**
+sirve como test absoluto de bondad de ajuste contra la $\chi^2$ —su distribución
+no es la esperada—; sí sirve, en cambio, para **comparar modelos anidados**
+[@agresti2015; @hosmer2013]. Para el ajuste absoluto usaremos calibración y los
+residuos de @sec-u12-evaluacion.
+
+## Inferencia: Wald, razón de verosimilitudes, AIC/BIC {#sec-u12-inferencia}
+
+Tres herramientas, tres usos:
+
+- **Test de Wald** ($\hat\beta_k/\widehat{\text{EE}}$, comparado con la normal):
+  el que imprime `summary()`. Cómodo, pero **poco fiable** con muestras pequeñas o
+  coeficientes grandes (y catastrófico bajo separación, @sec-u12-evaluacion).
+- **Razón de verosimilitudes (LRT)**: para modelos **anidados**, la diferencia de
+  deviances se distribuye $\sim\chi^2_{\Delta\text{gl}}$. Es el contraste de
+  referencia para «¿aporta este bloque de variables?».
+- **AIC/BIC**: penalizan la verosimilitud por complejidad y permiten comparar
+  modelos **no anidados**. $\text{AIC}=-2\ell+2k$ [@akaike1974];
+  $\text{BIC}=-2\ell+k\log n$ [@schwarz1978], que penaliza más y por tanto favorece
+  modelos más parsimoniosos.
+
+```{r}
+#| label: u12-inferencia
+# Wald (el de summary) en escala log-odds
+tidy(fit_glm)
+
+# LRT del bloque completo frente al modelo nulo
+anova(glm(fracture ~ 1, binomial, glow), fit_glm, test = "LRT")
+
+# Anova tipo II: aporte de cada término ajustando por el resto
+car::Anova(fit_glm, type = "II")
+```
+
+Los **intervalos de confianza** admiten dos vías: el IC de **Wald**
+($\hat\beta\pm 1{,}96\,\text{EE}$) y el IC por **perfil de verosimilitud**, más
+fiable porque no asume normalidad de $\hat\beta$. `confint()` usa el perfil;
+`confint.default()`, el de Wald. En GLOW, bien comportado, casi coinciden:
+
+```{r}
+#| label: u12-confint
+list(perfil = confint(fit_glm),
+     wald   = confint.default(fit_glm)) |>
+  map(\(m) round(m, 4))
+```
+
+## Construcción y comparación escalonada de modelos {#sec-u12-modelos}
+
+Comparar modelos no es elegir entre dos: es **recorrer una escalera** de
+especificaciones, de menos a más compleja, decidiendo en cada peldaño si la
+complejidad añadida se paga con ajuste. Partimos del nulo y vamos añadiendo
+efectos principales, después **interacciones** —entre un factor y una continua
+(`age:priorfrac`) y entre dos factores (`priorfrac:momfrac`)—:
+
+```{r}
+#| label: u12-escalera
+mod_0   <- glm(fracture ~ 1,                              binomial, glow)
+mod_age <- glm(fracture ~ age,                            binomial, glow)
+mod_2   <- glm(fracture ~ age + priorfrac,               binomial, glow)  # = fit_glm
+mod_3   <- glm(fracture ~ age + priorfrac + momfrac + bmi, binomial, glow)
+mod_ac  <- glm(fracture ~ age * priorfrac + momfrac + bmi, binomial, glow) # factor × continua
+mod_ff  <- glm(fracture ~ age + priorfrac * momfrac + bmi, binomial, glow) # factor × factor
+
+tibble(modelo = c("nulo","age","+ priorfrac","+ momfrac + bmi",
+                  "+ age:priorfrac","+ priorfrac:momfrac")) |>
+  bind_cols(map_dfr(list(mod_0, mod_age, mod_2, mod_3, mod_ac, mod_ff),
+                    \(m) glance(m) |> select(df = df.residual, deviance, AIC, BIC)))
+```
+
+La tabla cuenta una historia con matiz. Los efectos principales **bajan la
+deviance con claridad**; las interacciones, menos. Lo contrastamos peldaño a
+peldaño con LRT:
+
+```{r}
+#| label: u12-lrt-escalera
+anova(mod_2, mod_3,  test = "LRT")   # ¿aportan momfrac + bmi?
+anova(mod_3, mod_ac, test = "LRT")   # ¿aporta la interacción age:priorfrac?
+anova(mod_3, mod_ff, test = "LRT")   # ¿aporta la interacción priorfrac:momfrac?
+```
+
+Resultados: añadir `momfrac + bmi` mejora (LRT: $\Delta D\approx 6{,}6$, gl = 2,
+$p\approx 0{,}04$); la interacción **`age:priorfrac` es significativa**
+($\Delta D\approx 5{,}8$, gl = 1, $p\approx 0{,}016$), mientras que
+`priorfrac:momfrac` no lo es ($p\approx 0{,}13$). Y aquí aparece la lección que
+queríamos: **AIC y BIC discrepan**. El AIC mínimo lo alcanza el modelo *con* la
+interacción `age:priorfrac` (≈ 528,1), pero el **BIC mínimo** lo alcanza el modelo
+**sin** interacción `age + priorfrac` (≈ 547,2), porque el BIC, al penalizar con
+$\log n$, premia la parsimonia. No hay un único «modelo correcto»: el AIC apunta a
+mejor predicción, el BIC a un modelo más simple y estable, y el LRT confirma que
+la interacción es real aunque modesta. La decisión final es **del analista**, y
+debe argumentarse (será parte de la tarea).
+
+::: {.callout-warning}
+## Sobre la selección automática (`step`)
+Existe la búsqueda automática por AIC (`MASS::stepAIC`, `step`), pero **úsese con
+cautela**: la selección paso a paso invalida los $p$-valores posteriores
+(sobreajuste, inferencia post-selección) y puede ser inestable. En este curso la
+preferimos como *exploración*, no como árbitro; las decisiones se justifican con
+LRT/AIC/BIC y conocimiento del problema [@harrell2015].
+
+```{r}
+#| label: u12-step
+#| eval: false
+MASS::stepAIC(mod_ac, direction = "both", trace = FALSE) |> formula()
+```
+:::
+
+Interpretar una interacción exige cuidado: el coeficiente de `priorfrac` ya **no**
+es «el efecto de la fractura previa», sino su efecto **a edad 0** (sin sentido sin
+centrar). Por eso, con interacciones, la interpretación se hace en la escala de
+**efectos marginales o predicciones** (ya vista en @sec-u12-interpretacion), no leyendo coeficientes
+crudos.
+
+```{r}
+#| label: u12-interaccion-coef
+tidy(mod_ac)   # el signo de age:priorfracYes indica cómo se modula el efecto de la edad
+```
+
+## Evaluación y comparación de clasificadores {#sec-u12-evaluacion}
+
+Un modelo logístico puede ajustar bien los coeficientes y aun así **clasificar o
+calibrar mal**. Evaluamos dos cosas distintas: **discriminación** (¿separa eventos
+de no-eventos?) y **calibración** (¿son fiables las probabilidades?).
+
+**Discriminación: ROC y AUC.** Variando el umbral de clasificación, la curva ROC
+traza sensibilidad frente a 1 − especificidad; el **AUC** resume su área (0,5 =
+azar, 1 = perfecto). Es invariante al umbral y a la prevalencia.
+
+```{r}
+#| label: fig-u12-roc
+#| fig-cap: "Curva ROC del modelo logístico en GLOW. El AUC resume la capacidad de discriminación agregada sobre todos los umbrales."
+
+roc_obj <- pROC::roc(glow$fracture, fitted(fit_glm), quiet = TRUE)
+pROC::auc(roc_obj)
+pROC::ggroc(roc_obj) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed") +
+  labs(x = "Especificidad", y = "Sensibilidad")
+```
+
+El AUC ≈ **0,68**: discriminación **modesta**, coherente con que la fractura
+depende de muchos factores no incluidos. Un AUC alto no garantiza buenas
+probabilidades: por eso miramos también la calibración.
+
+**Calibración.** Confronta probabilidad predicha con frecuencia observada. El
+**test de Hosmer–Lemeshow** [@hosmer1980] agrupa por deciles de riesgo y compara
+observado con esperado vía $\chi^2$; un $p$ alto indica **ausencia** de evidencia
+de mala calibración.
+
+```{r}
+#| label: u12-hosmer
+performance::performance_hosmer(fit_glm, n_bins = 10)
+```
+
+En GLOW, $p\approx 0{,}21$: no hay evidencia de mala calibración. Pero el HL tiene
+**limitaciones conocidas** —es sensible al número de grupos y poco potente—, por
+lo que la práctica moderna lo **acompaña de un gráfico de calibración** y de los
+residuos por tramos [@agresti2015; @harrell2015]:
+
+```{r}
+#| label: fig-u12-calibracion
+#| fig-cap: "Diagnóstico visual. Izquierda: residuos por tramos (`arm::binnedplot`), que deberían caer dentro de las bandas. Derecha: curva de calibración (performance), que debería seguir la diagonal."
+
+p_hat <- fitted(fit_glm)
+arm::binnedplot(p_hat, glow$fractura01 - p_hat,
+                main = "Residuos por tramos", xlab = "Probabilidad ajustada")
+plot(performance::check_predictions(fit_glm))   # comprobación predictiva posterior
+```
+
+**Separación.** Es el patológico que vuelve inútil al Wald. Ocurre cuando una
+combinación de covariables **predice perfectamente** el resultado en algún
+subgrupo: la verosimilitud sigue creciendo al alejar el coeficiente hacia
+$\pm\infty$, así que `glm()` devuelve estimaciones **enormes con errores estándar
+gigantescos** [@albert1984]. GLOW lo exhibe de forma natural: entre las fumadoras
+que autoperciben su riesgo como «menor» (`smoke = Yes`, `raterisk = Less`) **no hay
+ninguna fractura** (0 de 12), lo que separa ese grupo.
+
+```{r}
+#| label: u12-separacion
+glow |> count(smoke, raterisk, fracture) |>
+  filter(smoke == "Yes", raterisk == "Less")        # celda con 0 fracturas
+
+fit_sep <- glm(fracture ~ smoke * raterisk, binomial, glow)
+tidy(fit_sep) |> filter(str_detect(term, "smoke"))  # coef enorme, EE descomunal
+```
+
+El coeficiente de `smokeYes` ronda **−15 con un EE de varios cientos**: síntoma
+inequívoco de cuasi-separación, no un efecto «protector» real. El Wald carece de
+sentido aquí. Soluciones: detectarla (`detectseparation::detect_separation`) y, si
+aparece, estimar por **verosimilitud penalizada de Firth** [@firth1993;
+@heinze2002], que produce estimaciones finitas:
+
+```{r}
+#| label: u12-firth
+#| eval: false
+# install.packages("logistf")  # o brglm2::brglm_fit
+logistf::logistf(fracture ~ smoke * raterisk, data = glow)   # estimación de Firth
+```
+
+## Coda: respuestas politómicas {#sec-u12-politomicas}
+
+::: {.callout-note}
+## Más de dos categorías
+La extensión del marco a respuestas con **más de dos categorías** —multinomial
+nominal y ordinal— se desarrolla en la [Unidad 1.3](#sec-u13), aprovechando el
+salto a efectos aleatorios. Basta anticipar que el logit binario se generaliza de
+dos maneras según haya o no orden entre las categorías.
+:::
+
+::: {.callout-important}
+## Tarea del estudiante (1.2) — alineada con RA3–RA5
+1. **Interpretación (RA3).** Elige **dos** covariables del modelo e interpreta su
+   efecto en **dos escalas**: odds ratio (con IC) y efecto marginal medio (AME),
+   en lenguaje clínico. Explica por qué el coeficiente crudo no es un efecto sobre
+   la probabilidad.
+2. **Comparación escalonada (RA5).** Construye una escalera de al menos cuatro
+   modelos que incluya **una interacción** (factor×continua o factor×factor).
+   Compáralos por **LRT, AIC y BIC**, documenta dónde discrepan AIC y BIC y
+   **justifica tu modelo final** (no basta con el AIC mínimo).
+3. **Evaluación (RA4).** Para tu modelo elegido, reporta **AUC** y evalúa la
+   **calibración** (gráfico + Hosmer–Lemeshow, con su salvedad). Comprueba además
+   si hay **separación** en algún subgrupo y, si la hubiera, explica cómo la
+   tratarías.
+
+*Formato:* fragmento reproducible en el `.qmd` del grupo. Alimenta los apartados
+«Diagnóstico y validación», «Selección y comparación» e «Interpretación» de la
+rúbrica del informe (ver [Unidad 1.5](#sec-u15)).
+:::
+
+## Puente a la Unidad 1.3 {#sec-u12-puente}
+
+Hasta aquí, cada coeficiente es un **efecto fijo** común a toda la población. Pero
+GLOW tiene pacientes anidadas en **6 centros**, y la cohorte simulada del caso, en
+24: las observaciones de un mismo centro se parecen más de lo que el azar
+explicaría. La [Unidad 1.3](#sec-u13) introduce los **efectos aleatorios** (GLMM)
+para tratar ese agrupamiento, y desde ahí da el salto a las **respuestas
+politómicas** que acabamos de aplazar.

@@ -1,0 +1,296 @@
+<!-- Partial: incluir con {{< include _unidad_1_1.qmd >}}. Sin YAML. Hereda el
+     entorno de la madre (glow, fractura01, cohorte, pp). Chunks prefijados u11-. -->
+
+# 1 · Cuando la recta no llega: del dato binario al marco GLM {#sec-u11}
+
+::: {.callout-note}
+## Sobre esta unidad
+Arrancamos **problema-primero**: mostramos que OLS falla sobre la respuesta
+binaria de GLOW y dejamos que esa insuficiencia *motive* el marco GLM. La
+maquinaria formal (familia exponencial, IWLS, *deviance*, inferencia) se
+desarrolla en la [Unidad 1.2](#sec-u12); aquí montamos el **andamiaje
+conceptual** y damos el primer `glm()`. **RA implicados:** RA1 y, en su primer
+contacto, RA2.
+:::
+
+## Objetivos {#sec-u11-objetivos}
+
+Al terminar, el estudiante será capaz de: (1) enumerar y **demostrar
+empíricamente** los cuatro modos en que OLS falla sobre una respuesta binaria;
+(2) describir los **tres componentes** de un GLM y qué fallo resuelve cada uno;
+(3) situar cualquier respuesta en el **mapa familia–enlace** y reconocer OLS como
+el caso *Gaussiana + identidad*; (4) ajustar un primer `glm(family = binomial)` y
+leerlo con `broom`.
+
+## Por qué OLS no sirve para una respuesta binaria {#sec-u11-ols-falla}
+
+Codifiquemos $Y=1$ si hay fractura y $Y=0$ si no. El modelo OLS postula
+$Y = \beta_0 + \beta_1 x_1 + \dots + \varepsilon$ con $\varepsilon \sim
+\mathcal{N}(0,\sigma^2)$. Como $Y\in\{0,1\}$, su esperanza condicional es
+directamente la probabilidad de éxito, $\mathbb{E}[Y\mid x]=\Pr(Y=1\mid
+x)=\pi(x)$: OLS estaría modelando una **probabilidad como función lineal**.
+Cuatro problemas, ninguno cosmético [@dobson2018, caps. 1–3; @fox2016, cap. 14]:
+
+1. **Predicciones fuera de rango.** El predictor lineal recorre toda la recta
+   real, pero una probabilidad vive en $[0,1]$. Para valores extremos de las
+   covariables, OLS predice probabilidades **negativas o mayores que 1**.
+2. **Varianza no constante.** Si $Y$ es Bernoulli con media $\pi(x)$, entonces
+   $\operatorname{Var}(Y\mid x)=\pi(x)[1-\pi(x)]$: la varianza **depende de la
+   media**. El supuesto de homocedasticidad se viola por construcción.
+3. **Error no normal.** Fijado un $x$ concreto, $\pi(x)$ es una **constante** e
+   $Y\in\{0,1\}$, así que $\varepsilon=Y-\pi(x)$ solo puede tomar **dos valores**:
+   $-\pi(x)$ con probabilidad $1-\pi(x)$, o $1-\pi(x)$ con probabilidad $\pi(x)$.
+   La distribución **condicional** del error (dado $x$) es de **dos puntos**, no
+   una campana gaussiana. Al variar $x$ esos dos valores se desplazan —de ahí las
+   dos bandas de residuos del laboratorio—, pero el supuesto de normalidad de OLS
+   recae sobre la distribución condicional, que es la que aquí es falsa.
+4. **Linealidad implausible.** OLS impone que el efecto de una covariable sobre
+   la probabilidad sea **constante**: la misma pendiente $\beta$ tanto si $\pi$
+   ronda $0{,}5$ como si ya está pegada a 0 o a 1. Eso no es creíble, porque en
+   los extremos apenas queda margen para moverse: si una paciente tiene una
+   probabilidad de fractura casi nula (o casi segura), un año más de edad casi no
+   puede cambiarla; en cambio, en la zona central ese mismo año desplaza mucho la
+   probabilidad. Lo razonable es entonces una relación **en forma de S**:
+   pronunciada en el centro y **aplanada (saturada) en los extremos**. La inversa
+   del logit dibuja exactamente esa curva y, de paso, mantiene $\pi$ dentro de
+   $(0,1)$.
+   
+::: {.callout-tip}
+## La idea clave
+No transformamos $Y$ (discreta), sino que **modelamos su media** $\mu=\pi(x)$ y
+**enlazamos una función de esa media** con un predictor lineal. Esa es la receta
+del GLM.
+:::
+
+## Los tres componentes de un GLM {#sec-u11-tres-componentes}
+
+@nelder1972 unificaron regresión lineal, logística, de Poisson, etc., bajo una
+estructura de **tres piezas**:
+
+1. **Componente aleatoria.** $Y$ sigue una distribución de la **familia
+   exponencial**. Para GLOW, $Y\mid x \sim \text{Bernoulli}(\pi(x))$. Esta pieza
+   fija la relación media–varianza y **absorbe los problemas 2 y 3**.
+2. **Componente sistemática.** Un **predictor lineal** $\eta=\mathbf{x}^\top
+   \boldsymbol\beta$, lineal en los parámetros.
+3. **Función de enlace** $g$, monótona y diferenciable, con $g(\mu)=\eta$ y
+   $\mu=g^{-1}(\eta)$. Para binaria, el enlace por defecto es el **logit**:
+   $$
+   g(\pi)=\log\frac{\pi}{1-\pi}, \qquad \pi=g^{-1}(\eta)=\frac{e^{\eta}}{1+e^{\eta}}.
+   $$
+   Esto **resuelve los problemas 1 y 4**: el logit lleva $(0,1)$ a toda la recta
+   real (nunca fuera de rango) y su inversa es la sigmoide que da la saturación.
+
+```{r}
+#| label: fig-u11-logit-inversa
+#| fig-cap: "Función logit y sigmoide: las dos direcciones. El logit lleva (0,1) a toda la recta real; su inversa (la sigmoide) devuelve cualquier η a (0,1)."
+library(patchwork)
+g1 <- tibble(p = seq(0.001, 0.999, by = 0.001)) |>
+  mutate(y = qlogis(p)) |>
+  ggplot(aes(p, y)) +
+  geom_line(linewidth = 1, color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "logit:\n estira (0,1) sobre la recta real",
+       x = expression(pi), y = expression(log(pi/(1 - pi))))
+
+g2 <- tibble(eta = seq(-6, 6, by = 0.05)) |>
+  mutate(p = plogis(eta)) |>
+  ggplot(aes(eta, p)) +
+  geom_line(linewidth = 1, color = "firebrick") +
+  geom_hline(yintercept = c(0, 1), linetype = "dotted") +
+  labs(title = "sigmoide:\n devuelve el predictor a (0,1)",
+       x = expression(eta), y = expression(e^eta/(1 + e^eta)))
+
+g1 + g2
+```
+
+
+## Tipología de respuestas: el mapa que iremos rellenando {#sec-u11-mapa}
+
+| Tipo de respuesta | Ejemplo | Familia (por defecto) | Enlace canónico | Unidad |
+|---|---|---|---|---|
+| Binaria | fractura sí/no | Binomial | logit | **1.1** |
+| Categórica nominal | perfil A/B/C | Multinomial | logit (gen.) | 1.3 |
+| Categórica ordinal | severidad Leve/Mod/Grave | Multinomial ordinal | logit acumulado | 1.3 |
+| Conteo / tasa | nº de eventos | Poisson | log | Caso 2 |
+| Continua positiva | coste, duración | Gamma, IG | log | Caso 3 |
+| Continua sin restricción | medida cualquiera | Gaussiana | **identidad** | — (OLS) |
+
+::: {.callout-important}
+## OLS es un GLM
+La regresión lineal es el caso particular **Gaussiana + identidad**. No
+abandonamos OLS: lo **subsumimos**. Por eso `lm(y ~ x)` y `glm(y ~ x)` se parecen
+tanto.
+:::
+
+## Laboratorio: el experimento que delata a OLS {#sec-u11-lab}
+
+```{r}
+#| label: fig-u11-eda
+#| fig-cap: "Proporción observada de fractura por tramos de edad y antecedente previo."
+glow |>
+  mutate(edad_grupo = cut(age, breaks = seq(55, 95, by = 5))) |>
+  filter(!is.na(edad_grupo)) |>
+  group_by(edad_grupo, priorfrac) |>
+  summarise(p_fractura = mean(fractura01), n = n(), .groups = "drop") |>
+  ggplot(aes(edad_grupo, p_fractura, color = priorfrac, group = priorfrac)) +
+  geom_line() + geom_point(aes(size = n)) +
+  labs(x = "Tramo de edad", y = "Proporción de fractura",
+       color = "Fractura previa", size = "n")
+```
+
+```{r}
+#| label: u11-ols
+fit_ols <- lm(fractura01 ~ age + priorfrac, data = glow)
+glow |>
+  mutate(p_hat = predict(fit_ols)) |>
+  summarise(min_pred = min(p_hat), max_pred = max(p_hat))
+```
+
+::: {.callout-warning}
+## Fallo 1: nada garantiza el rango [0,1]
+En este ajuste las predicciones caen dentro de $[0,1]$, así que el problema no se
+"ve" aquí. Pero es una casualidad de este modelo y de este rango de covariables,
+no una propiedad del OLS: el predictor lineal recorre toda la recta real y **nada
+impide** que produzca probabilidades negativas o mayores que 1. El defecto es
+estructural y aflora en cuanto las covariables toman valores más extremos o se
+extrapola fuera del rango observado.
+:::
+
+```{r}
+#| label: fig-u11-ols-vs-logistica
+#| fig-cap: "Predicciones de los modelos (`age` + `priorfrac`) frente a las proporciones de fractura observadas por grupo de edad (el tamaño de los puntos representa el nº de casos). Ajustes OLS (izquierda) y logístico (derecha) deberían pasar cerca de los puntos del mismo color. En el rango observado ambos se mantienen en [0,1]."
+fit_ols <- lm(fractura01 ~ age + priorfrac, data = glow)
+fit_glm <- glm(fracture ~ age + priorfrac, family = binomial, data = glow)
+
+# Rejilla de predicción de los modelos 
+grid <- expand_grid(
+  age       = seq(min(glow$age), max(glow$age), length.out = 100),
+  priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac))
+)
+grid$OLS <- predict(fit_ols, newdata = grid)                    # escala probabilidad
+grid$GLM <- predict(fit_glm, newdata = grid, type = "response") # escala probabilidad
+grid_long <- pivot_longer(grid, c(OLS, GLM),
+                          names_to = "modelo", values_to = "p_hat") |>
+  mutate(modelo = factor(modelo, levels = c("OLS", "GLM")))
+
+# Proporciones observadas por grupo de edad y priorfrac (las de la EDA),
+# situadas en la edad media de cada grupo
+grupos <- glow |>
+  mutate(edad_grupo = cut(age, breaks = seq(55, 95, by = 5))) |>
+  filter(!is.na(edad_grupo)) |>
+  group_by(edad_grupo, priorfrac) |>
+  summarise(age = mean(age), p_fractura = mean(fractura01), n = n(), .groups = "drop")
+
+ggplot() +
+  geom_point(data = grupos,
+             aes(age, p_fractura, color = priorfrac, size = n)) +
+  geom_line(data = grid_long,
+            aes(age, p_hat, color = priorfrac), linewidth = 1) +
+  geom_hline(yintercept = c(0, 1), linetype = "dashed") +
+  facet_wrap(~ modelo) +
+  labs(x = "Edad", y = "Proporción / probabilidad de fractura",
+       color = "Fractura previa", size = "n")
+```
+
+Tras ajustar el modelo OLS, falla claramente el diagnóstico de los residuos: a la izquierda apreciamos que los residuos, para un x dado, toman solo dos valores posibles (no son normales), hecho que se ratifica con el gráfico de percentiles a la derecha.
+
+```{r}
+#| label: fig-u11-diagnostico-ols
+#| fig-width: 10
+#| fig-height: 4
+#| out-width: "100%"
+#| fig-cap: "Diagnóstico del ajuste OLS sobre respuesta binaria. Izquierda: residuos frente a ajustados, desencajados de la envolvente ±√(μ̂(1−μ̂)) (punteada); señal de heterocedasticidad. Derecha: distribución de los residuos frente a la Normal de igual media y desviación; fallo de normalidad."
+fit_ols <- lm(fractura01 ~ age + priorfrac, data = glow)
+
+g_res <- tibble(ajustado = fitted(fit_ols),
+                residuo  = glow$fractura01 - fitted(fit_ols),
+                y = factor(glow$fractura01, labels = c("No fractura (y=0)", "Fractura (y=1)"))) |>
+  ggplot(aes(ajustado, residuo, color = y)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(x = "Valores ajustados", y = "Residuo de respuesta (y − μ̂)",
+       title = "Residuos vs ajustados (OLS)", color = NULL)
+
+g_qplot <- tibble(residuo = residuals(fit_ols)) |>
+  ggplot(aes(sample = residuo)) +
+  stat_qq(alpha = 0.4, size = 0.6) +
+  stat_qq_line(color = "firebrick") +
+  labs(x = "Cuantiles teóricos (Normal)", y = "Cuantiles de los residuos de OLS")
+
+g_hist <- tibble(residuo = residuals(fit_ols)) |>
+  ggplot(aes(residuo)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30,
+                 fill = "grey85", color = "white") +
+  stat_function(fun = dnorm, args = list(mean = 0, sd = sd(residuals(fit_ols))),
+                color = "firebrick", linewidth = 1) +
+  labs(x = "Residuos de OLS", y = "Densidad",
+       title = "Distribución de residuos vs Normal")
+
+patchwork::wrap_plots(g_res, g_qplot, ncol = 2)
+```
+
+Al comparar los residuos medios por tramos (*binned residuals*) para el ajuste OLS y el GLM, apreciamos mejor rendimiento en el GLM.
+
+```{r}
+#| label: fig-u11-residuos-ols-glm
+#| fig-width: 10
+#| fig-height: 6
+#| out-width: "100%"
+#| fig-cap: "Residuos medios por tramos para los ajustes OLS y GLM."
+
+p_ols <- plot(performance::binned_residuals(fit_ols)) +
+  labs(title = "OLS (modelo lineal de probabilidad)")
+p_glm <- plot(performance::binned_residuals(fit_glm)) +
+  labs(title = "GLM logístico")
+patchwork::wrap_plots( p_ols, p_glm, nrow = 2) +
+  patchwork::plot_annotation(title = "Residuos medios por tramos: OLS vs GLM")
+```
+
+
+Un primer ajuste a estos datos binarios lo planteamos con `glm(binomial)`, asumiendo una distribución binomial para la respuesta y un enlace logit con el predictor lineal:
+
+```{r}
+#| label: u11-primer-glm
+fit_glm <- glm(fracture ~ age + priorfrac, family = binomial, data = glow)
+summary(fit_glm)
+```
+
+Mostramos el ajuste de un modo ordenado con `broom`: coeficientes, bondad del ajuste, y predicción de probabilidad de fractura para cada sujeto en la muestra:
+
+```{r}
+#| label: u11-broom
+tidy(fit_glm)                                     # coeficientes (escala log-odds)
+glance(fit_glm)                                   # deviance, AIC, BIC, gl...
+augment(fit_glm, type.predict = "response") |>    # ajustes en escala probabilidad
+  dplyr::select(fracture, age, priorfrac, .fitted) |>
+  slice_head(n = 5)
+```
+
+::: {.callout-tip}
+## Cómo leer esto hoy
+- Los coeficientes de `tidy()` están en escala **log-odds**: su **signo** ya
+  informa. La conversión a **odds ratios** y **efectos marginales** es 1.2.
+- `augment(..., type.predict = "response")` da ajustes en `[0,1]` SIEMPRE (cosa que no podemos garantizar con OLS).
+- `glance()` te da la **deviance** y el **AIC**, con las que evaluamos la calidad del ajuste y podremos hacer comparaciones con otros ajustes. 
+:::
+
+::: {.callout-important}
+## Tarea del estudiante (1.1) — alineada con RA1
+1. **Demuestra el fallo de OLS con tu propio gráfico.** Elige una covariable
+   continua distinta de `age` (p. ej. `bmi` o `height`), ajusta
+   `lm(fractura01 ~ covariable)` y construye **un** gráfico que evidencie a la
+   vez predicciones fuera de $[0,1]$ y el patrón de residuos en dos bandas.
+2. **Mapea fallo → componente.** Tabla de dos columnas: los cuatro fallos de OLS
+   y qué componente del GLM (aleatoria / predictor lineal / enlace) resuelve cada
+   uno, con una frase de porqué.
+
+*Formato:* fragmento reproducible en el `.qmd` del grupo. Alimenta el apartado
+«Planteamiento y EDA» del informe (rúbrica de la guía, ver [Unidad 1.5](#sec-u15)).
+:::
+
+## Puente a la Unidad 1.2 {#sec-u11-puente}
+
+Hoy dimos por buenos, sin justificarlos, varios ingredientes: que Bernoulli
+pertenece a la familia exponencial, que el logit es el enlace canónico, que
+`glm()` estima por máxima verosimilitud y que la `deviance` mide el ajuste. La
+[Unidad 1.2](#sec-u12) abre esa caja negra.
