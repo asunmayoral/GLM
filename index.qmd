@@ -1,0 +1,42 @@
+---
+title: "Modelos Lineales Generalizados con R"
+subtitle: "Del dato al modelo, del modelo al diagnóstico, del diagnóstico a la interpretación"
+lang: es
+toc: false
+---
+
+## Sobre este material
+
+Material docente de la asignatura **Modelos Lineales Generalizados con R**, de
+tercer curso del **Grado en Ciencia de Datos e Inteligencia Artificial** de la
+Universidad Miguel Hernández (6 ECTS, 14 semanas). El enfoque es
+**problema-primero**: se parte de un caso real, se elige y ajusta el modelo, se
+diagnostica y se interpreta en la escala que importa para decidir.
+
+El curso se articula en tres estudios de caso que recorren las familias de la
+exponencial y mantienen dos hilos en espiral —efectos mixtos y supervivencia—
+que se introducen pronto y reaparecen en cada bloque.
+
+## Los tres casos
+
+- **Caso 1 · ¿Ocurre el evento? ¿Y cuándo?** Respuestas binarias y tiempo hasta
+  el evento en tiempo discreto: regresión logística, evaluación de
+  clasificadores, intercepto aleatorio y enlace complementario log-log.
+- **Caso 2 · ¿Cuántas veces?** *(en preparación)* Conteos y tasas: Poisson,
+  *offset* e IRR, sobredispersión, exceso de ceros y GLMM de Poisson.
+- **Caso 3 · ¿Cuánto?** *(en preparación)* Continuas positivas: Gamma, inversa
+  gaussiana, regularización y modelos de tiempo de fallo acelerado.
+
+## Cómo usar estas páginas
+
+Cada caso se lee como un cuaderno reproducible: teoría al servicio del problema,
+**código R visible** (puedes desplegarlo y copiarlo para estudiar y reproducir
+los análisis) e interpretación de los resultados. Empieza por el
+[Caso 1](caso1/caso1_binaria_tiempo_evento.qmd).
+
+## Software
+
+R con `stats::glm`, el `tidyverse` y `broom`; para interpretación y diagnóstico,
+`marginaleffects`, `emmeans`, `ggeffects`, `car`, `DHARMa`, `performance` y
+`pROC`; y, según el caso, `MASS`, `pscl`, `glmmTMB`, `lme4`, `survival` y
+`flexsurv`.

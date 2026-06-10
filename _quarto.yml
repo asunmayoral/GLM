@@ -1,0 +1,37 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - caso1/caso1_binaria_tiempo_evento.qmd
+    # A medida que cierres los casos siguientes, añade aquí su documento maestro:
+    # - caso2/caso2_conteos_tasas.qmd
+    # - caso3/caso3_continuas_positivas.qmd
+
+website:
+  title: "Modelos Lineales Generalizados con R"
+  description: "Curso de GLM · Grado en Ciencia de Datos e IA · UMH"
+  reader-mode: true
+  navbar:
+    background: primary
+    search: true
+    left:
+      - href: index.qmd
+        text: Inicio
+      - href: caso1/caso1_binaria_tiempo_evento.qmd
+        text: "Caso 1 · Binaria y tiempo-a-evento"
+  page-footer:
+    center: "Material docente · Grado en Ciencia de Datos e IA · Universidad Miguel Hernández"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: show      # código visible pero plegable: los estudiantes lo leen y copian
+    code-tools: false    # sin menú "ver/descargar fuente": no se expone el .qmd
+    code-copy: true
+    df-print: paged
+    embed-resources: false
+
+lang: es
