@@ -201,7 +201,7 @@ El **enlace** o *función link* $g$ conecta la media con el predictor lineal, $g
 
 En el caso binario de la familia binomial, las tres alternativas que re-escalan un predictor lineal -teóricamente definido en toda la recta real- a la escala de una probabilidad -en el rango [0,1]- son el enlace logit, el probit y el complementario log-log -cloglog-, que reproducen la forma de S invertida a la hora de relacionar el predictor lineal con la probabilidad, como se aprecia en la @fig-u12-enlaces. Logit y probit son **simétricos** (casi intercambiables tras reescalar: el
 coeficiente probit ≈ logit/1,6); el **cloglog** (complementario log-log) es **asimétrico** y será el enlace
-natural de la supervivencia en tiempo discreto en la [Unidad 1.4](#sec-u14)
+natural de la supervivencia en tiempo discreto en la [Unidad 1.5](#sec-u15)
 [@agresti2015].
 
 $$
@@ -407,7 +407,7 @@ exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR e IC: exponencial del IC
 La fractura previa multiplica las odds de fractura por $\text{OR}\approx 2{,}31$
 (IC 95 %: 1,46–3,66) y cada año de edad por $\approx 1{,}04$ (IC 95 %: 1,02–1,07);
 ninguno cruza 1, de modo que ambos efectos son claros. (El IC de $\beta$ procede del
-perfil de verosimilitud, [Sección 2.6](#sec-u12-inferencia).)
+perfil de verosimilitud, [Sección 2.5](#sec-u12-inferencia).)
 
 **La misma idea en otros enlaces.** El predictor lineal $\eta$ es **idéntico** en los
 tres enlaces; cambia qué *representa* y, con ello, cómo se lee el coeficiente:
@@ -427,7 +427,7 @@ De ahí que el mismo $\beta$ signifique cosas distintas aunque el ajuste apenas 
 - **probit:** $\beta$ **desplaza la escala latente normal** ($z$), sin lectura de odds;
   como guía, $\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$.
 - **cloglog:** $e^{\beta}$ = **razón de riesgos** (*hazard ratio*); lectura natural en
-  supervivencia ([Unidad 1.4](#sec-u14)).
+  supervivencia ([Unidad 1.5](#sec-u15)).
 
 ```{r}
 #| label: u12-coef-enlaces
@@ -664,19 +664,25 @@ do.call(rbind, traza) |>          # apila la lista en matriz: filas = iteracione
 ```
 
 
-## 2.5 Deviance y bondad de ajuste {#sec-u12-deviance}
+## 2.5 Inferencia y selección de modelos {#sec-u12-inferencia}
 
-La **deviance** mide cuánto peor ajusta nuestro modelo frente al **modelo
-saturado** (un parámetro por observación, ajuste perfecto):
+Ya tenemos $\hat{\boldsymbol\beta}$ (2.4). Toca interrogar al modelo en tres niveles, de
+lo particular a lo global: **¿es real el efecto de cada coeficiente?**, **¿aporta un
+bloque de variables?** y **¿qué modelo elijo** entre varias especificaciones? Las tres
+se responden con la misma moneda —la verosimilitud— y su sombra operativa, la **deviance**.
 
+**La deviance y el modelo saturado.** Para medir cuánto se aleja un ajuste del mejor
+posible, se le compara con el **modelo saturado**: el que tiene un parámetro por
+observación, reproduce los datos exactamente ($\hat\mu_i=y_i$) y alcanza la
+log-verosimilitud máxima $\ell_{\text{sat}}$. La **deviance** es esa distancia, en
+unidades de log-verosimilitud:
 $$
 D=-2\bigl[\ell(\hat{\boldsymbol\beta})-\ell_{\text{sat}}\bigr].
 $$
-
-Es el análogo GLM de la suma de cuadrados residual: cuanto menor, mejor ajuste.
-La **deviance nula** corresponde al modelo solo con intercepto y la **deviance
-residual** al modelo ajustado; su diferencia cuantifica lo que explican los
-predictores. `glance()` las muestra:
+Es el análogo GLM de la suma de cuadrados residual: cuanto menor, mejor ajuste. La
+**deviance nula** $D_0$ es la del modelo solo con intercepto; la **deviance residual**
+$D$, la del modelo ajustado. (Detalle útil: con datos binarios **individuales**,
+$\ell_{\text{sat}}=0$, de modo que $D=-2\,\ell(\hat{\boldsymbol\beta})$.) `glance()` las muestra:
 
 ```{r}
 #| label: u12-deviance
@@ -684,46 +690,23 @@ glance(fit_glm) |>
   select(null.deviance, df.null, deviance, df.residual, logLik, AIC, BIC)
 ```
 
-En GLOW, la deviance baja de **562,3** (nula) a **528,5** (residual) al añadir
-`age` y `priorfrac`: esa reducción de ≈ 33,8 puntos con 2 grados de libertad es la
-que contrastaremos formalmente a continuación. Una nota importante: con datos
-**no agrupados** (una fila por sujeto, $y_i\in\{0,1\}$) la deviance residual **no**
-sirve como test absoluto de bondad de ajuste contra la $\chi^2$ —su distribución
-no es la esperada—; sí sirve, en cambio, para **comparar modelos anidados**
-[@agresti2015; @hosmer2013]. Para el ajuste absoluto usaremos calibración y los
-residuos de la [Sección 2.8](#sec-u12-evaluacion).
+En GLOW, la deviance baja de **562,3** (nula) a **528,5** (residual) al añadir `age` y
+`priorfrac`: esa reducción de ≈ 33,8 puntos es la materia prima de los contrastes que
+siguen. (Que la deviance residual **no** valga como test *absoluto* de ajuste con datos
+individuales lo veremos en la [Sección 2.6](#sec-u12-diagnostico); aquí la usamos solo
+para **comparar** modelos.)
 
-## 2.6 Inferencia: Wald, razón de verosimilitudes, AIC/BIC {#sec-u12-inferencia}
-
-Tres herramientas, tres usos:
-
-- **Test de Wald** ($\hat\beta_k/\widehat{\text{EE}}$, comparado con la normal):
-  el que imprime `summary()`. Cómodo, pero **poco fiable** con muestras pequeñas o
-  coeficientes grandes (y catastrófico bajo separación, [Sección 2.8](#sec-u12-evaluacion)).
-- **Razón de verosimilitudes (LRT)**: para modelos **anidados**, la diferencia de
-  deviances se distribuye $\sim\chi^2_{\Delta\text{gl}}$. Es el contraste de
-  referencia para «¿aporta este bloque de variables?».
-- **AIC/BIC**: penalizan la verosimilitud por complejidad y permiten comparar
-  modelos **no anidados**. $\text{AIC}=-2\ell+2k$ [@akaike1974];
-  $\text{BIC}=-2\ell+k\log n$ [@schwarz1978], que penaliza más y por tanto favorece
-  modelos más parsimoniosos.
-
-```{r}
-#| label: u12-inferencia
-# Wald (el de summary) en escala log-odds
-tidy(fit_glm)
-
-# LRT del bloque completo frente al modelo nulo
-anova(glm(fracture ~ 1, binomial, glow), fit_glm, test = "LRT")
-
-# Anova tipo II: aporte de cada término ajustando por el resto
-car::Anova(fit_glm, type = "II")
-```
-
-Los **intervalos de confianza** admiten dos vías: el IC de **Wald**
-($\hat\beta\pm 1{,}96\,\text{EE}$) y el IC por **perfil de verosimilitud**, más
-fiable porque no asume normalidad de $\hat\beta$. `confint()` usa el perfil;
-`confint.default()`, el de Wald. En GLOW, bien comportado, casi coinciden:
+**Inferencia sobre cada coeficiente: el test de Wald.** Es el análogo directo de los
+tests $t$ del modelo lineal: se divide el coeficiente por su error estándar,
+$$
+z_k=\frac{\hat\beta_k}{\widehat{\text{EE}}(\hat\beta_k)},
+$$
+y se compara con la normal (asintótica, de ahí $z$ y no $t$). Es el que imprime
+`summary()`/`tidy()`. Cómodo, pero **poco fiable** con muestras pequeñas o coeficientes
+grandes, y **engañoso bajo separación** ([Sección 2.6](#sec-u12-diagnostico)). Por eso los
+**intervalos de confianza** se prefieren por **perfil de verosimilitud** (no asume
+normalidad de $\hat\beta$) frente al de Wald ($\hat\beta\pm1{,}96\,\text{EE}$); en GLOW,
+bien comportado, casi coinciden:
 
 ```{r}
 #| label: u12-confint
@@ -732,13 +715,42 @@ list(perfil = confint(fit_glm),
   map(\(m) round(m, 4))
 ```
 
-## 2.7 Construcción y comparación escalonada de modelos {#sec-u12-modelos}
+**Inferencia sobre bloques: la razón de verosimilitudes (LRT).** Para preguntar "¿aporta
+este conjunto de variables?" se comparan dos modelos **anidados** por la diferencia de sus
+deviances, que sigue una $\chi^2$:
+$$
+\Lambda=D_{\text{reducido}}-D_{\text{completo}}\;\sim\;\chi^2_{\Delta\text{gl}}.
+$$
+El caso clave es el **contraste ómnibus** (¿aporta *algo* el modelo?): nulo vs completo,
+$D_0-D\sim\chi^2_{p}$, el análogo del **test $F$ global** del modelo lineal. Y para el
+aporte de *cada término ajustando por el resto*, el `Anova` de tipo II:
 
-Comparar modelos no es elegir entre dos: es **recorrer una escalera** de
-especificaciones, de menos a más compleja, decidiendo en cada peldaño si la
-complejidad añadida se paga con ajuste. Partimos del nulo y vamos añadiendo
-efectos principales, después **interacciones** —entre un factor y una continua
-(`age:priorfrac`) y entre dos factores (`priorfrac:momfrac`)—:
+```{r}
+#| label: u12-inferencia
+# Wald (el de summary) en escala log-odds
+tidy(fit_glm)
+
+# LRT ómnibus: bloque completo frente al modelo nulo
+anova(glm(fracture ~ 1, binomial, glow), fit_glm, test = "LRT")
+
+# Anova tipo II: aporte de cada término ajustando por el resto
+car::Anova(fit_glm, type = "II")
+```
+
+**Comparar modelos no anidados: AIC y BIC.** El LRT solo vale entre modelos anidados.
+Para comparar especificaciones cualesquiera se usan criterios que penalizan la
+verosimilitud por complejidad,
+$$
+\text{AIC}=-2\ell+2k,\qquad \text{BIC}=-2\ell+k\log n,
+$$
+con $k$ parámetros y $n$ observaciones [@akaike1974; @schwarz1978]. Menor es mejor; el
+**BIC penaliza más** y por tanto **favorece la parsimonia**. Son medidas **relativas**:
+ordenan modelos, no dicen si alguno ajusta bien en términos absolutos.
+
+**La escalera de modelos.** Seleccionar no es elegir entre dos, sino **recorrer una
+escalera** de menos a más compleja, decidiendo en cada peldaño si la complejidad añadida
+se paga con ajuste. Del nulo a las interacciones —factor × continua (`age:priorfrac`) y
+factor × factor (`priorfrac:momfrac`)—:
 
 ```{r}
 #| label: u12-escalera
@@ -755,9 +767,8 @@ tibble(modelo = c("nulo","age","+ priorfrac","+ momfrac + bmi",
                     \(m) glance(m) |> select(df = df.residual, deviance, AIC, BIC)))
 ```
 
-La tabla cuenta una historia con matiz. Los efectos principales **bajan la
-deviance con claridad**; las interacciones, menos. Lo contrastamos peldaño a
-peldaño con LRT:
+Los efectos principales **bajan la deviance con claridad**; las interacciones, menos. Lo
+contrastamos peldaño a peldaño con LRT:
 
 ```{r}
 #| label: u12-lrt-escalera
@@ -766,25 +777,33 @@ anova(mod_3, mod_ac, test = "LRT")   # ¿aporta la interacción age:priorfrac?
 anova(mod_3, mod_ff, test = "LRT")   # ¿aporta la interacción priorfrac:momfrac?
 ```
 
-Resultados: añadir `momfrac + bmi` mejora (LRT: $\Delta D\approx 6{,}6$, gl = 2,
-$p\approx 0{,}04$); la interacción **`age:priorfrac` es significativa**
-($\Delta D\approx 5{,}8$, gl = 1, $p\approx 0{,}016$), mientras que
-`priorfrac:momfrac` no lo es ($p\approx 0{,}13$). Y aquí aparece la lección que
-queríamos: **AIC y BIC discrepan**. El AIC mínimo lo alcanza el modelo *con* la
-interacción `age:priorfrac` (≈ 528,1), pero el **BIC mínimo** lo alcanza el modelo
-**sin** interacción `age + priorfrac` (≈ 547,2), porque el BIC, al penalizar con
-$\log n$, premia la parsimonia. No hay un único «modelo correcto»: el AIC apunta a
-mejor predicción, el BIC a un modelo más simple y estable, y el LRT confirma que
-la interacción es real aunque modesta. La decisión final es **del analista**, y
-debe argumentarse (será parte de la tarea).
+Añadir `momfrac + bmi` mejora (LRT: $\Delta D\approx 6{,}6$, gl = 2, $p\approx 0{,}04$); la
+interacción **`age:priorfrac` es significativa** ($\Delta D\approx 5{,}8$, gl = 1,
+$p\approx 0{,}016$), y `priorfrac:momfrac` no ($p\approx 0{,}13$). Aquí la lección: **AIC y
+BIC discrepan**. El AIC mínimo lo logra el modelo *con* `age:priorfrac` (≈ 528,1); el **BIC
+mínimo**, el modelo *sin* interacción, `age + priorfrac` (≈ 547,2), porque su penalización
+$\log n$ premia la simplicidad. No hay un único "modelo correcto": el AIC apunta a mejor
+predicción, el BIC a un modelo más simple y estable, y el LRT confirma que la interacción
+es real aunque modesta. La decisión final es **del analista**, y debe argumentarse (será
+parte de la tarea).
+
+Interpretar una interacción exige cuidado: el coeficiente de `priorfrac` ya **no** es "el
+efecto de la fractura previa", sino su efecto **a edad 0** (sin sentido sin centrar). Por
+eso, con interacciones, la lectura se hace en **efectos marginales o predicciones** (ya
+vista en la [Sección 2.3](#sec-u12-interpretacion)), no en coeficientes crudos:
+
+```{r}
+#| label: u12-interaccion-coef
+tidy(mod_ac)   # el signo de age:priorfracYes indica cómo se modula el efecto de la edad
+```
 
 :::: {.callout-warning}
 ## Sobre la selección automática (`step`)
-Existe la búsqueda automática por AIC (`MASS::stepAIC`, `step`), pero **úsese con
-cautela**: la selección paso a paso invalida los $p$-valores posteriores
-(sobreajuste, inferencia post-selección) y puede ser inestable. En este curso la
-preferimos como *exploración*, no como árbitro; las decisiones se justifican con
-LRT/AIC/BIC y conocimiento del problema [@harrell2015].
+Existe la búsqueda automática por AIC (`MASS::stepAIC`, `step`), pero **úsese con cautela**:
+la selección paso a paso invalida los $p$-valores posteriores (sobreajuste, inferencia
+post-selección) y puede ser inestable. En este curso la preferimos como *exploración*, no
+como árbitro; las decisiones se justifican con LRT/AIC/BIC y conocimiento del problema
+[@harrell2015].
 
 ```{r}
 #| label: u12-step
@@ -793,74 +812,97 @@ MASS::stepAIC(mod_ac, direction = "both", trace = FALSE) |> formula()
 ```
 ::::
 
-Interpretar una interacción exige cuidado: el coeficiente de `priorfrac` ya **no**
-es «el efecto de la fractura previa», sino su efecto **a edad 0** (sin sentido sin
-centrar). Por eso, con interacciones, la interpretación se hace en la escala de
-**efectos marginales o predicciones** (ya vista en la [Sección 2.3](#sec-u12-interpretacion)), no leyendo coeficientes
-crudos.
+::: {.callout-tip}
+## Protocolo de inferencia y selección
+1. **¿Aporta algo el modelo?** Contraste ómnibus (LRT nulo vs completo).
+2. **¿Aporta cada término?** LRT / `Anova` tipo II por término, con Wald e IC (mejor por
+   perfil) como lectura individual.
+3. **¿Qué especificación?** LRT entre anidados; AIC/BIC entre cualesquiera (AIC → predicción,
+   BIC → parsimonia).
+4. **Selección de variables.** Recorre la escalera **guiada por el problema**, no a ciegas;
+   combina LRT/AIC/BIC; evita la búsqueda automática como árbitro; **valida y argumenta** la
+   elección.
+:::
+
+## 2.6 Bondad de ajuste y diagnóstico {#sec-u12-diagnostico}
+
+En 2.5 preguntamos si el modelo **aporta** y **cuál** elegir. Ahora la pregunta es
+otra: el modelo elegido, **¿ajusta bien a los datos?** Es la **bondad de ajuste**, y la
+bibliografía la trata de la mano del **análisis de residuos** [@hosmer2013; @faraway2016;
+@agresti2015], porque ambos responden a lo mismo desde dos ángulos: un **contraste
+global** y una **mirada caso a caso**.
+
+**El contraste global de ji-cuadrado… y por qué falla en binaria.** La idea natural es
+comparar el modelo ajustado con el **saturado** (2.5) mediante la deviance residual $D$
+—o el estadístico de Pearson $X^2=\sum_i r_{P,i}^2$, con
+$r_{P,i}=(y_i-\hat\mu_i)/\sqrt{V(\hat\mu_i)}$—, que **asintóticamente** se distribuyen
+$\chi^2_{n-p}$ si el modelo ajusta; un $p$ bajo señalaría falta de ajuste. El problema es
+que esa aproximación **solo vale con datos agrupados** (binomial con $m_i$ grande por
+celda). Con respuesta **binaria individual** ($y_i\in\{0,1\}$), el saturado tiene tantos
+parámetros como observaciones, las asintóticas fallan y la deviance residual **no** sigue
+una $\chi^2$: el contraste **carece de valor** (de hecho, en GLOW $D=-2\ell(\hat{\boldsymbol\beta})$,
+que no informa del ajuste absoluto) [@agresti2015; @hosmer2013]. Para datos **binomiales**
+(proporciones agrupadas) este ji-cuadrado **sí** es útil —lo desarrollaremos con un ejemplo
+binomial, y su análogo multinomial, en la [Unidad 1.3](#sec-u13)—; para GLOW
+recurrimos a residuos y calibración.
+
+(No confundir con el contraste **ómnibus** de utilidad de 2.5, nulo vs ajustado: aquél
+pregunta si el modelo **aporta**; éste, si **ajusta**. Son dos ji-cuadrados distintos.)
+
+**Residuos: por qué los crudos no sirven y cuáles usar.** El residuo crudo $y_i-\hat\mu_i$
+apenas informa en binaria: para cada $\hat\mu_i$ solo toma dos valores y se ordena en **dos
+bandas**. Los residuos de **Pearson** y de **deviance** estandarizan, pero con datos
+individuales tampoco son aproximadamente $N(0,1)$. Dos remedios estándar:
+
+- **Residuos por tramos** (*binned*): se agrupan las observaciones por probabilidad
+  ajustada y se promedia el residuo de cada tramo; ese promedio sí debería caer dentro de
+  las bandas de error [@faraway2016].
+- **Residuos simulados / de cuantil** (DHARMa): se simula muchas veces del modelo ajustado
+  y se sitúa cada observación en la distribución simulada; si el modelo es correcto, esos
+  residuos son **uniformes** $(0,1)$, comparables con un Q–Q y un test de
+  Kolmogorov–Smirnov. Funcionan para cualquier GLM, también binario
+  [@dunnsmyth1996; @hartig2022].
 
 ```{r}
-#| label: u12-interaccion-coef
-tidy(mod_ac)   # el signo de age:priorfracYes indica cómo se modula el efecto de la edad
+#| label: fig-u12-dharma
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Residuos simulados (DHARMa) del modelo logístico en GLOW. Izquierda: Q–Q de los residuos, que deberían seguir la diagonal uniforme. Derecha: residuos frente a predicción, sin patrón si el ajuste es adecuado."
+sim <- DHARMa::simulateResiduals(fit_glm, plot = FALSE)
+plot(sim)
 ```
 
-## 2.8 Evaluación y comparación de clasificadores {#sec-u12-evaluacion}
-
-Un modelo logístico puede ajustar bien los coeficientes y aun así **clasificar o
-calibrar mal**. Evaluamos dos cosas distintas: **discriminación** (¿separa eventos
-de no-eventos?) y **calibración** (¿son fiables las probabilidades?).
-
-**Discriminación: ROC y AUC.** Variando el umbral de clasificación, la curva ROC
-traza sensibilidad frente a 1 − especificidad; el **AUC** resume su área (0,5 =
-azar, 1 = perfecto). Es invariante al umbral y a la prevalencia.
-
-```{r}
-#| label: fig-u12-roc
-#| fig-cap: "Curva ROC del modelo logístico en GLOW. El AUC resume la capacidad de discriminación agregada sobre todos los umbrales."
-
-roc_obj <- pROC::roc(glow$fracture, fitted(fit_glm), quiet = TRUE)
-pROC::auc(roc_obj)
-pROC::ggroc(roc_obj) +
-  geom_abline(slope = 1, intercept = 1, linetype = "dashed") +
-  labs(x = "Especificidad", y = "Sensibilidad")
-```
-
-El AUC ≈ **0,68**: discriminación **modesta**, coherente con que la fractura
-depende de muchos factores no incluidos. Un AUC alto no garantiza buenas
-probabilidades: por eso miramos también la calibración.
-
-**Calibración.** Confronta probabilidad predicha con frecuencia observada. El
-**test de Hosmer–Lemeshow** [@hosmer1980] agrupa por deciles de riesgo y compara
-observado con esperado vía $\chi^2$; un $p$ alto indica **ausencia** de evidencia
-de mala calibración.
+**Calibración: ¿son fiables las probabilidades?** Confronta la probabilidad predicha con
+la frecuencia observada. El **test de Hosmer–Lemeshow** [@hosmer1980] agrupa por deciles
+de riesgo y compara observado con esperado vía $\chi^2$; un $p$ alto indica **ausencia** de
+evidencia de mala calibración.
 
 ```{r}
 #| label: u12-hosmer
 performance::performance_hosmer(fit_glm, n_bins = 10)
 ```
 
-En GLOW, $p\approx 0{,}21$: no hay evidencia de mala calibración. Pero el HL tiene
-**limitaciones conocidas** —es sensible al número de grupos y poco potente—, por
-lo que la práctica moderna lo **acompaña de un gráfico de calibración** y de los
-residuos por tramos [@agresti2015; @harrell2015]:
+En GLOW, $p\approx 0{,}21$: sin evidencia de mala calibración. Pero el HL tiene
+**limitaciones conocidas** —sensible al número de grupos y poco potente—, así que la
+práctica moderna lo **acompaña de un gráfico de calibración** y de los residuos por tramos
+[@agresti2015; @harrell2015]:
 
 ```{r}
 #| label: fig-u12-calibracion
-#| fig-cap: "Diagnóstico visual. Izquierda: residuos por tramos (`arm::binnedplot`), que deberían caer dentro de las bandas. Derecha: curva de calibración (performance), que debería seguir la diagonal."
-
+#| fig-cap: "Diagnóstico visual. Izquierda: residuos por tramos (`arm::binnedplot`), que deberían caer dentro de las bandas. Derecha: curva de calibración (`performance`), que debería seguir la diagonal."
 p_hat <- fitted(fit_glm)
 arm::binnedplot(p_hat, glow$fractura01 - p_hat,
                 main = "Residuos por tramos", xlab = "Probabilidad ajustada")
 plot(performance::check_predictions(fit_glm))   # comprobación predictiva posterior
 ```
 
-**Separación.** Es el patológico que vuelve inútil al Wald. Ocurre cuando una
-combinación de covariables **predice perfectamente** el resultado en algún
-subgrupo: la verosimilitud sigue creciendo al alejar el coeficiente hacia
-$\pm\infty$, así que `glm()` devuelve estimaciones **enormes con errores estándar
-gigantescos** [@albert1984]. GLOW lo exhibe de forma natural: entre las fumadoras
-que autoperciben su riesgo como «menor» (`smoke = Yes`, `raterisk = Less`) **no hay
-ninguna fractura** (0 de 12), lo que separa ese grupo.
+**Separación: cuando el ajuste "perfecto" rompe la inferencia.** Es el patológico que
+vuelve inútil al Wald. Ocurre cuando una combinación de covariables **predice
+perfectamente** el resultado en algún subgrupo: la verosimilitud sigue creciendo al alejar
+el coeficiente hacia $\pm\infty$, así que `glm()` devuelve estimaciones **enormes con
+errores estándar gigantescos** [@albert1984]. GLOW lo exhibe de forma natural: entre las
+fumadoras que autoperciben su riesgo como «menor» (`smoke = Yes`, `raterisk = Less`) **no
+hay ninguna fractura** (0 de 12), lo que separa ese grupo.
 
 ```{r}
 #| label: u12-separacion
@@ -871,11 +913,11 @@ fit_sep <- glm(fracture ~ smoke * raterisk, binomial, glow)
 tidy(fit_sep) |> filter(str_detect(term, "smoke"))  # coef enorme, EE descomunal
 ```
 
-El coeficiente de `smokeYes` ronda **−15 con un EE de varios cientos**: síntoma
-inequívoco de cuasi-separación, no un efecto «protector» real. El Wald carece de
-sentido aquí. Soluciones: detectarla (`detectseparation::detect_separation`) y, si
-aparece, estimar por **verosimilitud penalizada de Firth** [@firth1993;
-@heinze2002], que produce estimaciones finitas:
+El coeficiente de `smokeYes` ronda **−15 con un EE de varios cientos**: síntoma inequívoco
+de cuasi-separación, no un efecto «protector» real. El Wald carece de sentido aquí.
+Soluciones: detectarla (`detectseparation::detect_separation`) y, si aparece, estimar por
+**verosimilitud penalizada de Firth** [@firth1993; @heinze2002], que produce estimaciones
+finitas:
 
 ```{r}
 #| label: u12-firth
@@ -884,14 +926,106 @@ aparece, estimar por **verosimilitud penalizada de Firth** [@firth1993;
 logistf::logistf(fracture ~ smoke * raterisk, data = glow)   # estimación de Firth
 ```
 
-## 2.9 Coda: respuestas politómicas {#sec-u12-politomicas}
+## 2.7 Evaluación como clasificador {#sec-u12-evaluacion}
+
+El modelo entrega **probabilidades**; convertirlo en un **clasificador** (predecir sí/no)
+exige un **umbral** y abre un tercer eje de evaluación, la **discriminación** —¿separa
+eventos de no-eventos?—, distinta del ajuste (2.6) y de la utilidad inferencial (2.5).
+
+**Del umbral a la matriz de confusión.** Fijado un umbral $c$, clasificamos
+$\hat y_i=\mathbf{1}[\hat\pi_i\ge c]$ (por defecto $c=0{,}5$). El cruce de lo predicho con
+lo observado es la **matriz de confusión**, punto de partida de todas las métricas:
+
+```{r}
+#| label: u12-confusion
+umbral <- 0.5
+pred   <- factor(ifelse(fitted(fit_glm) >= umbral, "Yes", "No"),
+                 levels = c("No", "Yes"))
+cm <- table(Predicho = pred, Observado = glow$fracture)
+cm
+
+TP <- cm["Yes", "Yes"]; FP <- cm["Yes", "No"]
+FN <- cm["No",  "Yes"]; TN <- cm["No",  "No"]
+c(exactitud     = (TP + TN) / sum(cm),     # accuracy
+  sensibilidad  = TP / (TP + FN),          # sensitivity / recall
+  especificidad = TN / (TN + FP),          # specificity
+  precision     = TP / (TP + FP)) |> round(3)   # precision / PPV
+```
 
 ::: {.callout-note}
-## Más de dos categorías
-La extensión del marco a respuestas con **más de dos categorías** —multinomial
-nominal y ordinal— se desarrolla en la [Unidad 1.3](#sec-u13), aprovechando el
-salto a efectos aleatorios. Basta anticipar que el logit binario se generaliza de
-dos maneras según haya o no orden entre las categorías.
+## La matriz de confusión y sus cuatro métricas
+Con un umbral, cada caso cae en una de cuatro celdas según coincidan predicción y realidad:
+**verdadero positivo** (TP, *true positive*), **falso positivo** (FP, *false positive*),
+**falso negativo** (FN, *false negative*) y **verdadero negativo** (TN, *true negative*).
+De ahí salen las cuatro métricas más habituales (doy el nombre en inglés, que es como las
+nombra casi todo el software):
+
+- **Exactitud** — *accuracy*: $\dfrac{TP+TN}{\text{total}}$. Proporción global de aciertos.
+- **Sensibilidad** o *recall* — *sensitivity / true positive rate*: $\dfrac{TP}{TP+FN}$. De
+  los eventos reales, cuántos detecta.
+- **Especificidad** — *specificity / true negative rate*: $\dfrac{TN}{TN+FP}$. De los
+  no-eventos reales, cuántos descarta.
+- **Precisión** o valor predictivo positivo — *precision / positive predictive value (PPV)*:
+  $\dfrac{TP}{TP+FP}$. De los que predice como eventos, cuántos lo son de verdad.
+
+Sensibilidad y precisión suelen estar **en tensión** (bajar el umbral detecta más eventos
+pero genera más falsas alarmas); el **F1** (*F1-score*), su media armónica
+$2\,\dfrac{\text{precisión}\cdot\text{recall}}{\text{precisión}+\text{recall}}$, las resume
+cuando ambas importan.
+:::
+
+Cuidado con la **exactitud** si las clases están desbalanceadas: cuando la fractura es poco
+frecuente, «clasificar a todas como No» logra una exactitud alta y es inútil. Por eso se
+miran sensibilidad, especificidad y precisión por separado, y métricas invariantes a la
+prevalencia como el AUC.
+
+**ROC y AUC.** Como cada umbral da un par (sensibilidad, especificidad), conviene resumir
+**todos** los umbrales a la vez:
+
+::: {.callout-note}
+## ROC y AUC, en una frase
+La **curva ROC** (*receiver operating characteristic*) recorre todos los umbrales y dibuja
+la **sensibilidad** frente a **1 − especificidad**: cada punto es un clasificador posible.
+La **diagonal** es el azar; cuanto más se arrima la curva a la esquina superior izquierda,
+mejor separa. El **AUC** (*area under the curve*) es el área bajo esa curva —0,5 = azar,
+1 = perfecto— y tiene una lectura elegante: es la **probabilidad de que el modelo asigne más
+riesgo a un evento que a un no-evento** tomados al azar. Al promediar sobre todos los
+umbrales, mide la **discriminación** con independencia de dónde pongas el corte.
+:::
+
+```{r}
+#| label: fig-u12-roc
+#| fig-cap: "Curva ROC del modelo logístico en GLOW. El AUC resume la capacidad de discriminación agregada sobre todos los umbrales."
+roc_obj <- pROC::roc(glow$fracture, fitted(fit_glm), quiet = TRUE)
+pROC::auc(roc_obj)
+pROC::ggroc(roc_obj) +
+  geom_abline(slope = 1, intercept = 1, linetype = "dashed") +
+  labs(x = "Especificidad", y = "Sensibilidad")
+```
+
+El AUC ≈ **0,68**: discriminación **modesta**, coherente con que la fractura depende de
+muchos factores no incluidos. Un AUC alto no garantiza buenas probabilidades: eso es
+**calibración**, ya vista en la [Sección 2.6](#sec-u12-diagnostico).
+
+**Elegir el umbral es una decisión, no un dato.** El 0,5 por defecto rara vez es óptimo:
+depende del **coste relativo** de un falso positivo frente a un falso negativo. Un criterio
+habitual es el **índice de Youden** (maximiza sensibilidad + especificidad − 1); con costes
+explícitos, se elige el umbral que minimiza el coste esperado.
+
+```{r}
+#| label: u12-umbral
+pROC::coords(roc_obj, "best", best.method = "youden",
+             ret = c("threshold", "sensitivity", "specificity"))
+```
+
+::: {.callout-tip}
+## Tres preguntas, tres herramientas
+- **¿Aporta? ¿qué modelo?** (utilidad e inferencia) → Wald, LRT ómnibus, AIC/BIC (2.5).
+- **¿Ajusta bien?** (bondad de ajuste) → residuos, calibración, Hosmer–Lemeshow (2.6).
+- **¿Discrimina bien?** (clasificación) → matriz de confusión, ROC/AUC, umbral (2.7).
+
+Un modelo puede ser **significativo** y aun así **calibrar mal** o **discriminar poco**:
+son preguntas independientes.
 :::
 
 ::: {.callout-important}
@@ -911,14 +1045,15 @@ dos maneras según haya o no orden entre las categorías.
 
 *Formato:* fragmento reproducible en el `.qmd` del grupo. Alimenta los apartados
 «Diagnóstico y validación», «Selección y comparación» e «Interpretación» de la
-rúbrica del informe (ver [Unidad 1.5](#sec-u15)).
+rúbrica del informe (ver [Unidad 1.6](#sec-u16)).
 :::
 
 ## Puente a la Unidad 1.3 {#sec-u12-puente}
 
-Hasta aquí, cada coeficiente es un **efecto fijo** común a toda la población. Pero
-GLOW tiene pacientes anidadas en **6 centros**, y la cohorte simulada del caso, en
-24: las observaciones de un mismo centro se parecen más de lo que el azar
-explicaría. La [Unidad 1.3](#sec-u13) introduce los **efectos aleatorios** (GLMM)
-para tratar ese agrupamiento, y desde ahí da el salto a las **respuestas
-politómicas** que acabamos de aplazar.
+Hasta aquí, una respuesta **binaria** modelada con **efectos fijos**. Las próximas
+unidades generalizan en dos frentes. La [Unidad 1.3](#sec-u13) amplía el **tipo de
+respuesta**: datos **agrupados** (binomial) y **más de dos categorías** (multinomial
+nominal y ordinal). La [Unidad 1.4](#sec-u14) introduce los **efectos aleatorios**
+(GLMM) para el agrupamiento por centro —GLOW tiene pacientes anidadas en 6 centros y
+la cohorte simulada, en 24—, donde las observaciones de un mismo centro se parecen
+más de lo que el azar explicaría.

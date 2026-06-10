@@ -285,7 +285,7 @@ augment(fit_glm, type.predict = "response") |>    # ajustes en escala probabilid
    uno, con una frase de porqué.
 
 *Formato:* fragmento reproducible en el `.qmd` del grupo. Alimenta el apartado
-«Planteamiento y EDA» del informe (rúbrica de la guía, ver [Unidad 1.5](#sec-u15)).
+«Planteamiento y EDA» del informe (rúbrica de la guía, ver [Unidad 1.6](#sec-u16)).
 :::
 
 ## Puente a la Unidad 1.2 {#sec-u11-puente}

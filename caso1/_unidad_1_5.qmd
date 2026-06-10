@@ -1,53 +1,174 @@
-<!-- Partial: incluir con {{< include _unidad_1_5.qmd >}}. Sin YAML.
-     Andamiaje de evaluación: actividades, instrucciones de la tarea y rúbricas.
-     Los criterios exactos deben cuadrar con la §8 de la guía docente. -->
+<!-- Partial: incluir con {{< include _unidad_1_4.qmd >}}. Sin YAML.
+     Chunks prefijados u15-. Usa la cohorte simulada y su expansión pp.
+     Esta unidad absorbe la fundamentación que antes vivía en el apéndice. -->
 
-# 5 · Estudio de caso, exposición y evaluación {#sec-u15}
+# 5 · Supervivencia: del hazard al GLM en tiempo discreto {#sec-u15}
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Cierre del Caso 1: trabajo acompañado del estudio de caso y **exposiciones** con
-Q&A individual. No hay teoría nueva; se integra y se evalúa todo lo anterior.
-Esta unidad reúne la **maquinaria de evaluación** (actividades, instrucciones,
-rúbricas). **RA implicados:** RA8 (desarrollar, presentar y defender estudios de
-caso reproducibles) y, de forma acumulativa, RA1–RA7.
+Abre el **hilo de censura y supervivencia** (en espiral: se reactiva en los Casos
+2 y 3). Aquí está **toda la fundamentación** —función de supervivencia, hazard,
+riesgos proporcionales, modelo de Cox y enlace `cloglog`— y se muestra que el
+tiempo-a-evento discreto **es un GLM** sobre datos persona-periodo. Es también la
+referencia teórica del simulador de la cohorte ([Los datos del caso](#sec-datos)). **RA implicados:**
+RA7 (censura y tiempo-a-evento como casos del marco GLM).
+[@dobson2018, cap. de supervivencia; @prentice1978; @allison1982; @cox1972;
+@aitkin1980]
 :::
 
-## 5.1 El estudio de caso (entregable) {#sec-u15-caso}
+## 5.1 La función de supervivencia y la función de riesgo {#sec-u15-hazard}
 
-<!-- TODO: enunciado del estudio de caso del grupo, que debe atravesar las tres
-     "lentes" del Caso 1 sobre datos propios o asignados:
-       - respuesta binaria (logística + interpretación + evaluación),
-       - agrupamiento (intercepto aleatorio / extensión politómica),
-       - tiempo-a-evento discreto (persona-periodo + cloglog).
-     Indicar datos admisibles (origen y licencia) o el uso de la cohorte simulada. -->
+Sea $T\ge 0$ el **tiempo hasta que ocurre el evento**. Toda la información sobre
+$T$ se expresa de cuatro formas equivalentes; conocer una determina las demás.
 
-## 5.2 Componentes de evaluación {#sec-u15-componentes}
+**Función de supervivencia.** $S(t)=\Pr(T>t)$, la probabilidad de "seguir sin
+evento" pasado $t$. Se interpreta directamente ($S(5)=0{,}8$: el 80 % llega sin
+evento más allá de 5), cumple $S(0)=1$, es **no creciente** y $S(t)\to 0$.
 
-Alineados con los instrumentos de la guía:
+**Función de riesgo (hazard), en tiempo continuo.** Riesgo *instantáneo* de que
+el evento ocurra en $t$, **condicionado a no haber ocurrido antes**:
+$$
+h(t)=\frac{f(t)}{S(t)}=-\frac{\mathrm{d}}{\mathrm{d}t}\log S(t).
+$$
+Es una **tasa** (no acotada por 1), no una probabilidad.
 
-- **Informe (P).** Documento reproducible (`.qmd`) con el ciclo dato → modelo →
-  diagnóstico → interpretación, en la escala correcta.
-- **Reflexión (R).** Documento breve sobre decisiones de modelización y sus
-  límites.
-- **Exposición (E).** Presentación del estudio de caso.
-- **Q&A individual (w).** Defensa individual ante preguntas.
+**Hazard acumulado.** $H(t)=\int_0^t h(u)\,\mathrm{d}u=-\log S(t)$, de donde
+$S(t)=\exp\{-H(t)\}$: la supervivencia es la exponencial de menos el riesgo
+acumulado.
 
-## 5.3 Actividades a completar (cuestiones evaluables) {#sec-u15-actividades}
+**Versión en tiempo discreto** (la del simulador). Con periodos $t=1,2,\dots$, el
+hazard es una **probabilidad condicional**:
+$$
+h_t=\Pr(T=t\mid T\ge t)\in[0,1],
+$$
+y la supervivencia se reconstruye periodo a periodo, $S_t=\prod_{k=1}^{t}(1-h_k)$.
+El conjunto de sujetos que llegan en riesgo a $t$ es el **conjunto de riesgo**.
 
-<!-- TODO: lista de cuestiones evaluables que el material deja "abiertas" a lo
-     largo de 1.1-1.4 (las "Tarea del estudiante"), reorganizadas como entregables
-     del caso. Conectar cada cuestión con el RA y el componente (P/R/E/w). -->
+::: {.callout-warning}
+## Tasa vs probabilidad
+El hazard continuo $h(t)$ es una **tasa** (puede superar 1); el hazard discreto
+$h_t$ es una **probabilidad** ($\in[0,1]$).
+:::
 
-## 5.4 Rúbricas {#sec-u15-rubricas}
+La consecuencia operativa: **cada periodo en riesgo es un ensayo de Bernoulli**
+con probabilidad $h_t$. Un sujeto **censurado** deja de aportar ensayos al salir
+de observación, sin generar evento; así la censura no informativa se maneja sin
+maquinaria extra. Disponer los datos con **una fila por sujeto y periodo en
+riesgo** (persona-periodo) convierte el problema en una secuencia de Bernoulli:
+justo lo que un GLM binomial ajusta.
 
-<!-- TODO: insertar las rúbricas EXACTAS de la guía docente (§8: informe P,
-     reflexión R, exposición E, Q&A w). NO se reproducen aquí de memoria; se
-     copian de la fuente. Pendiente: confirmar criterios y pesos con la guía. -->
+## 5.2 Riesgos proporcionales y el modelo de Cox {#sec-u15-ph}
+
+¿Cómo depende el riesgo de las covariables? El modelo de **riesgos
+proporcionales** lo separa en dos factores:
+$$
+h(t;\mathbf{x})=h_0(t)\,\exp(\mathbf{x}'\boldsymbol\beta).
+$$
+$h_0(t)$ es el **hazard base** (la forma del riesgo en el tiempo para
+$\mathbf{x}=\mathbf{0}$) y $\exp(\mathbf{x}'\boldsymbol\beta)$ un **factor
+multiplicativo** que lo escala, **igual en todos los instantes**.
+
+**Qué significa "proporcional".** El cociente de riesgos entre dos sujetos,
+$h(t;\mathbf{x}_a)/h(t;\mathbf{x}_b)=\exp((\mathbf{x}_a-\mathbf{x}_b)'\boldsymbol\beta)$,
+**no depende de $t$**: las curvas de riesgo son proporcionales en todo momento.
+
+**Interpretación.** En la escala log-riesgo el modelo es aditivo,
+$\log h(t;\mathbf{x})=\log h_0(t)+\mathbf{x}'\boldsymbol\beta$, y cada
+$\exp(\beta_k)$ es un **hazard ratio** (factor por el que se multiplica el riesgo
+ante un aumento unitario de $x_k$; $>1$ aumenta el riesgo, $<1$ protege).
+
+**El modelo de Cox** [@cox1972] es la versión **semiparamétrica**: deja $h_0(t)$
+sin especificar y estima $\boldsymbol\beta$ por verosimilitud parcial. Es muy
+flexible, pero **no es un GLM**; en este curso se presenta como la **frontera**
+semiparamétrica del marco y se trata en el Caso 3. El simulador, en cambio, fija
+una forma del riesgo base (por periodo), lo que lo mantiene dentro del GLM.
+
+## 5.3 El enlace complementary log-log {#sec-u15-cloglog}
+
+Para modelar el hazard discreto $h_t$ con un predictor lineal usamos el
+**complementary log-log**, que lleva una probabilidad a toda la recta real:
+$$
+\operatorname{cloglog}(p)=\log(-\log(1-p))=\eta,\qquad p=1-\exp(-\exp(\eta)).
+$$
+Esa inversa es la línea `h <- 1 - exp(-exp(eta))` del simulador. A diferencia del
+logit y el probit, es **asimétrico** (se aproxima a 1 más despacio que a 0), y esa
+asimetría es justo lo que lo hace natural para supervivencia.
+
+```{r}
+#| label: fig-u15-enlaces
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-cap: "De los enlaces comparados en la Unidad 1.1, aquí retenemos solo logit y cloglog —los relevantes en supervivencia discreta—. La asimetría del cloglog (se aproxima a 1 más despacio que a 0) es lo que lo hace el enlace natural de los riesgos proporcionales."
+
+tibble(eta = seq(-4, 4, by = 0.02)) |>
+  mutate(logit   = plogis(eta),
+         cloglog = 1 - exp(-exp(eta))) |>
+  pivot_longer(c(logit, cloglog), names_to = "enlace", values_to = "p") |>
+  ggplot(aes(eta, p, color = enlace)) +
+  geom_line(linewidth = 1) +
+  labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
+```
+
+## 5.4 Por qué cloglog es el enlace natural del hazard discreto {#sec-u15-puente}
+
+Si el tiempo de un modelo de riesgos proporcionales solo se observa **agrupado en
+intervalos**, la probabilidad de fallar en el intervalo $t$ habiendo llegado en
+riesgo es, usando $S(t)=\exp\{-H(t)\}$,
+$$
+h_t(\mathbf{x})=1-\exp\!\bigl(-\Delta H_0(t)\,e^{\mathbf{x}'\boldsymbol\beta}\bigr).
+$$
+Despejando $1-h_t$, tomando $-\log$ y luego $\log$:
+$$
+\underbrace{\log(-\log(1-h_t))}_{\operatorname{cloglog}(h_t)}
+=\underbrace{\log\Delta H_0(t)}_{\alpha_t}+\mathbf{x}'\boldsymbol\beta.
+$$
+Es decir: **al agrupar en el tiempo un modelo de riesgos proporcionales, el
+hazard discreto satisface exactamente un modelo lineal con enlace cloglog**, con
+un intercepto por periodo $\alpha_t$ que absorbe el riesgo base [@prentice1978;
+@allison1982]. Con `logit` se obtiene la aproximación "logística discreta", pero
+solo el `cloglog` preserva los riesgos proporcionales subyacentes.
+
+## 5.5 Anatomía del simulador {#sec-u15-anatomia}
+
+El proceso generador (`R/dgp_cohorte.R`) se lee ahora línea a línea:
+$$
+\operatorname{cloglog}(h_{ijt})=\alpha_t+\beta_1 x_{1i}+\beta_2 x_{2i}+u_j,
+\qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
+$$
+
+- **$\alpha_t$** (`alpha_base`): riesgo base por periodo, creciente en la cohorte.
+- **$\beta_1,\beta_2$**: efectos de `x1`, `x2`; cada $\exp(\beta_k)$ es un hazard
+  ratio.
+- **$u_j$** (`rnorm(..., sigma_u)`): intercepto aleatorio por centro; el análogo
+  en supervivencia de un término de *fragilidad*, y la conexión con los efectos
+  mixtos de 1.3.
+- **Generación del tiempo**: recorre periodos con $h=1-\exp(-\exp(\eta))$ y
+  `rbinom(1,1,h)` hasta evento o **censura administrativa** $C_i$ (no informativa).
+- **Persona-periodo**: `expandir_persona_periodo()` da una fila por sujeto y
+  periodo en riesgo, con `y = 1` solo en el último periodo si hubo evento.
+
+## 5.6 Laboratorio: ajuste en tiempo discreto y su relación con el GLM {#sec-u15-lab}
+
+```{r}
+#| label: u15-ajuste
+#| eval: false
+# Supervivencia discreta = GLM binomial con enlace cloglog sobre persona-periodo
+m_pp <- glm(y ~ periodo + x1 + x2, family = binomial("cloglog"), data = pp)
+summary(m_pp)
+
+# Recuperación de la verdad:
+attr(cohorte, "verdad")$binaria$beta     # b1 = 0.85, b2 = -0.65
+coef(m_pp)[c("x1", "x2")]                # efectos
+# Los coeficientes de `periodo` estiman el riesgo base alpha_t (creciente).
+
+# Extensión mixta (fragilidad): intercepto aleatorio por centro
+# lme4::glmer(y ~ periodo + x1 + x2 + (1 | centro),
+#             family = binomial("cloglog"), data = pp)
+```
 
 ::: {.callout-important}
-## Pendiente de la fuente
-Los criterios, niveles y pesos de las rúbricas deben tomarse literalmente de la
-§8 de la guía docente. Este andamiaje deja los huecos marcados para rellenarlos
-con esa fuente.
+## Tarea del estudiante (1.5)
+<!-- TODO: (a) ajustar el modelo persona-periodo cloglog y contrastar b1, b2 con
+     la verdad; (b) representar e interpretar el riesgo base por periodo (alpha_t);
+     (c) discutir el papel de la censura y por qué no sesga si es no informativa. -->
 :::

@@ -61,9 +61,10 @@ introducen aquí y se reactivan en los Casos 2 y 3.
 |------------------------|------------------------|------------------------|
 | **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. | — |
 | **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores. | — |
-| **1.3** | Efectos aleatorios (GLMM logístico) y respuestas politómicas: multinomial nominal (efectos fijos) y ordinal mixto. | Mixtos |
-| **1.4** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). | Censura |
-| **1.5** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas). | — |
+| **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). | — |
+| **1.4** | Efectos aleatorios (GLMM logístico, intercepto aleatorio); reactivación del ordinal mixto. | Mixtos |
+| **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). | Censura |
+| **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas). | — |
 :::
 
 # Presentación del caso {#sec-presentacion}
@@ -93,7 +94,7 @@ El caso combina **dos fuentes** con papeles distintos: un conjunto
 **cohorte simulada** con proceso generador conocido que vertebra los
 hilos en espiral y las tareas evaluables.
 
-### a) Dato real — GLOW (ejemplo logístico, Unidades 1.1–1.2) {#sec-datos-glow}
+### a) Dato real — GLOW (ejemplo logístico, Unidades 1.1–1.3) {#sec-datos-glow}
 
 `glow500` procede del estudio **GLOW** (*Global Longitudinal Study of
 Osteoporosis in Women*) y se distribuye en el paquete `aplore3`
@@ -131,25 +132,25 @@ mixtos—. Estas son las variables de la cohorte:
 | Variable | Significado | Tipo | Se usa en |
 |------------------|------------------|------------------|------------------|
 | `id` | Identificador del individuo | — | — |
-| `centro` | Centro al que pertenece (grupo del efecto aleatorio) | Factor | 1.3, 1.4 |
+| `centro` | Centro al que pertenece (grupo del efecto aleatorio) | Factor | 1.4, 1.5 |
 | `x1` | Covariable **continua** estandarizada (p. ej. edad tipificada) | Continua | todas |
 | `x2` | Covariable **binaria** 0/1 (p. ej. brazo de tratamiento) | Binaria | todas |
-| `tiempo` | Periodo de seguimiento (1–6) en que termina la observación | Entero | 1.4 |
-| `evento` | 1 = el evento se observó; 0 = censura administrativa | Binaria | 1.4 |
-| `ever` | ¿Ocurrió el evento durante el seguimiento? (= `evento`) | Binaria | 1.3 |
+| `tiempo` | Periodo de seguimiento (1–6) en que termina la observación | Entero | 1.5 |
+| `evento` | 1 = el evento se observó; 0 = censura administrativa | Binaria | 1.5 |
+| `ever` | ¿Ocurrió el evento durante el seguimiento? (= `evento`) | Binaria | 1.4 |
 | `clase_nom` | Respuesta **nominal** sin orden: perfil **A/B/C** | Factor (3) | 1.3 |
-| `sever_ord` | Respuesta **ordinal**: severidad **Leve \< Moderado \< Grave** | Factor ordenado (3) | 1.3 |
+| `sever_ord` | Respuesta **ordinal**: severidad **Leve \< Moderado \< Grave** | Factor ordenado (3) | 1.3, 1.4 |
 
 Las cuatro respuestas se generan así (la fundamentación teórica del
-bloque de supervivencia está en la [Unidad 1.4](#sec-u14)):
+bloque de supervivencia está en la [Unidad 1.5](#sec-u15)):
 
 - **Binaria y tiempo-a-evento** (`ever`, `tiempo`, `evento`). Surgen de
   un modelo de **riesgo en tiempo discreto** con enlace `cloglog`,
   $\text{cloglog}(h_{ijt})=\alpha_t+\beta_1 x_1+\beta_2 x_2+u_j$, con un
   intercepto aleatorio por centro $u_j\sim\mathcal{N}(0,\sigma_u^2)$ y
   **censura administrativa no informativa**. De ahí salen tanto la
-  binaria «¿ocurrió el evento?» (para el GLMM logístico de 1.3) como el
-  reloj de supervivencia (para el modelo persona-periodo de 1.4).
+  binaria «¿ocurrió el evento?» (para el GLMM logístico de 1.4) como el
+  reloj de supervivencia (para el modelo persona-periodo de 1.5).
 - **Nominal** (`clase_nom`, categorías A/B/C **sin orden**). Se genera
   con un **logit de categoría base** (multinomial) de **efectos fijos**
   sobre `x1` y `x2`. Sirve para el multinomial logit de 1.3.
@@ -158,7 +159,7 @@ bloque de supervivencia está en la [Unidad 1.4](#sec-u14)):
   con un **cumulative logit** (odds proporcionales) sobre `x1`, `x2` y
   un **intercepto aleatorio por centro**
   $w_j\sim\mathcal{N}(0,\sigma_w^2)$. Sirve para el modelo ordinal mixto
-  de 1.3. Interpretación posible: un grado de severidad basal.
+  de 1.4. Interpretación posible: un grado de severidad basal.
 
 Las respuestas categóricas (`clase_nom`, `sever_ord`) son
 **independientes** del reloj de supervivencia: comparten covariables y
@@ -188,7 +189,7 @@ casos):
 #| label: cohorte-sim
 source("R/dgp_cohorte.R")                        # define simular_cohorte(), expandir_persona_periodo()
 cohorte <- simular_cohorte()                     # nivel individuo (binaria, nominal, ordinal)
-pp      <- expandir_persona_periodo(cohorte)     # persona-periodo (supervivencia, 1.4)
+pp      <- expandir_persona_periodo(cohorte)     # persona-periodo (supervivencia, 1.5)
 ```
 
 ```{r}
@@ -212,6 +213,8 @@ str(attr(cohorte, "verdad"))                     # "verdad conocida" para el dia
 {{< include _unidad_1_4.qmd >}}
 
 {{< include _unidad_1_5.qmd >}}
+
+{{< include _unidad_1_6.qmd >}}
 
 # Reproducibilidad {#sec-repro}
 
