@@ -43,7 +43,7 @@ if (!exists("fit_glm")) {
 }
 ```
 
-## Familia exponencial y relación media–varianza {#sec-u12-familia}
+## 2.1 Familia exponencial y relación media–varianza {#sec-u12-familia}
 
 Un GLM exige que la respuesta siga una distribución de la **familia exponencial
 de dispersión**, cuya densidad (o función de masa) se escribe en la forma canónica
@@ -194,7 +194,7 @@ glow |>
        caption = expression("Curva: V(" * mu * ") = " * mu * "(1 - " * mu * ")"))
 ```
 
-## El enlace: canónico y alternativas {#sec-u12-enlace}
+## 2.2 El enlace: canónico y alternativas {#sec-u12-enlace}
 
 El **enlace** o *función link* $g$ conecta la media con el predictor lineal, $g(\mu)=\eta=\mathbf{x}^\top
 \boldsymbol\beta$. Una misma familia puede utilizar cualquier enlaces $g$ que sea una función monótona y diferenciable, pero el **enlace canónico** es aquel que iguala el parámetro natural al predictor lineal, esto es, $\theta=\eta$. Este enlace canónico simplemente aporta ventajas formales en las matemáticas, como estadísticos suficientes de dimensión mínima o simplificación de las ecuaciones de verosimilitud.
@@ -287,113 +287,130 @@ de logit y probit (simétricos, casi superpuestos entre sí). Es el comportamien
 típico: el enlace importa en las colas y bajo fuerte asimetría, no en el grueso de
 los datos, lo que respalda quedarnos con el logit por interpretabilidad.
 
-## Interpretación: del coeficiente a la media (odds y escalas) {#sec-u12-interpretacion}
+## 2.3 Interpretación: del coeficiente a la probabilidad {#sec-u12-interpretacion}
 
-Acabamos de ajustar el **mismo** modelo con tres enlaces (@sec-u12-enlace). Antes
-de ver cómo se estima, leamos lo que ya tenemos: ¿cómo actúan los coeficientes y
-qué dicen sobre la media $\mu$? Es el corazón del **RA3**.
+**El enlace rompió la línea recta.** En OLS, $\beta$ era el cambio en la respuesta
+por cada unidad de $x$: una lectura directa. Aquí ya no. El modelo es lineal en el
+**predictor** $\eta=\beta_0+\beta x$, pero la respuesta es $\mu=g^{-1}(\eta)$, una
+transformación **no lineal** de $\eta$. Por eso $\beta$ ya **no** mide el cambio en
+la probabilidad, sino el cambio en $\eta$: la misma diferencia en $x$ mueve mucho la
+probabilidad en el centro de la curva y casi nada en las colas. Para interpretar,
+leeremos los coeficientes en la escala donde el modelo **sí** es lineal —y le
+pondremos nombre.
 
-**Lo que da el modelo por defecto.** El resumen del ajuste (`summary`, o
-`broom::tidy`) devuelve los coeficientes en la escala del **predictor lineal**, es
-decir, en **log-odds** (no en probabilidad):
+**Lo que da el modelo:** `summary()` (o `broom::tidy`) devuelve los coeficientes en
+la escala del predictor lineal:
 
 ```{r}
 #| label: u12-coef
 tidy(fit_glm)   # coeficientes en escala log-odds: lo que da summary() por defecto
 ```
 
-Su **signo** ya informa (positivo eleva el log-odds, y con él la probabilidad;
-negativo la baja), pero su **magnitud no se interpreta** como el cambio que un
-incremento unitario de la predictora provoca en la probabilidad.
+Su **signo** ya informa —positivo sube $\eta$ y con él la probabilidad; negativo la
+baja—, pero su **magnitud** no es un cambio en probabilidad. ¿Qué es, entonces, esa
+escala?
 
-**Por qué necesitamos otra escala.** El motivo es que la relación entre la
-probabilidad y las predictoras **no es lineal**: la misma diferencia en el
-predictor mueve mucho la probabilidad en el centro de la curva y casi nada en las
-colas. Por eso se consideran parámetros **derivados de los coeficientes** —ante
-todo, el *odds ratio*— que permiten una interpretación práctica más sencilla.
+### Interpretación en la escala de los odds y log-odds
 
-**Odds.** El **odds** de un suceso es el cociente entre la probabilidad de que
-ocurra (éxito) y la de que no ocurra (fracaso); la *ventaja* de ocurrencia frente
-a no ocurrencia:
-$$
-\text{odds}=\frac{\pi}{1-\pi}.
-$$
-Si el odds es 2, el evento es **el doble de probable** que su ausencia.
+Aparecen en la ecuación los **odds y log-odds**, que provienen del enlace canónico de la Bernoulli. 
 
-**Log-odds y predictor lineal.** En un modelo logístico simple con una única
-predictora $x$, el **logaritmo del odds** es justo el predictor lineal:
-$$
-\log(\text{odds}(x))=\eta(x)=\beta_0+\beta x.
-$$
-El log-odds (el *logit*) es la escala en la que el modelo es lineal y donde viven
-los coeficientes.
+- El *odds* de un suceso es su **ventaja**, la probabilidad de que ocurra frente a la de que no: un odds de 2 dice que el evento es el doble de probable que su ausencia.
+$$\text{odds}(x)=\frac{\pi(x)}{1-\pi(x)}$$
+- Su logaritmo —el **log-odds** o *logit*— es precisamente el enlace canónico, y por tanto
+**es** el predictor lineal:
+$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x)=\beta_0+\beta x.$$
+La escala de los log.odds es donde viven los coeficientes y donde el modelo es una recta.
+$$ \log.\text{odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
 
-**Del coeficiente al odds ratio.** Aumentar $x$ en una unidad ($x\to x+1$) cambia
-el predictor lineal —el log-odds— en exactamente $\beta$:
-$$
-\beta=\eta(x+1)-\eta(x)=\log\!\left(\frac{\text{odds}(x+1)}{\text{odds}(x)}\right).
-$$
-Ese cociente de odds es el **odds ratio** (OR), la exponencial del coeficiente:
-$$
-\text{OR}=\frac{\text{odds}(x+1)}{\text{odds}(x)}
-=\frac{\pi(x+1)/(1-\pi(x+1))}{\pi(x)/(1-\pi(x))}=e^{\beta}.
-$$
-Es **constante** en toda la escala (no depende de dónde estés en la curva): de ahí
-lo cómodo de comunicarlo. Su interpretación es directa:
+**Qué dice $\beta$ ahí, y el odds ratio:** 
 
-- $\beta>0$, esto es $\text{OR}=e^{\beta}>1$: incrementar $x$ en una unidad
-  **aumenta** la ventaja del evento.
-- $\beta<0$, esto es $\text{OR}=e^{\beta}<1$: incrementar $x$ en una unidad la
-  **reduce**.
+- Subir $x$ una unidad **suma** $\beta$ al log-odds: el efecto es **aditivo**
+$$\beta=\eta(x+1)-\eta(x) \rightarrow \log.odds(x+1)= \beta +\log.odds(x)$$
+- Al deshacer el logaritmo surge el **odds ratio** ($OR$), como un cociente de odds: 
+$$\beta=\log\frac{\text{odds}(x+1)}{\text{odds}(x)} = log(OR) \rightarrow OR=e^{\beta}$$
+de modo que el efecto en los **odds** es multiplicativo, y cada unidad de $x$ multiplica los odds por el odds ratio:
+$$\text{odds}(x+1)=e^{\eta(x)+\beta} = \text{odds}(x) \cdot e^{\beta}= \text{odds}(x) \cdot OR$$
 
-Por ejemplo, $\text{OR}=3$ significa tres veces más ventaja del evento al subir la
-predictora una unidad; $\text{OR}=0{,}5$, que se reduce a la mitad.
+
+Por eso, si bien el log-odds depende de $x$, el OR es un factor **constante** que aplica a toda la curva, y de ahí su interpretabilidad: cada movimiento de una unidad en $x$, sea cual sea el $x$, multiplica los odds por el mismo factor $e^{\beta}$. La relación entre el signo de los coeficientes, el OR y el efecto que genera en las probabilidades, es ahora más patente:
+
+- $\beta>0\Leftrightarrow\text{OR}>1$: aumenta la ventaja del evento;
+- $\beta<0\Leftrightarrow\text{OR}<1$: reduce la ventaja del evento. 
+
+La @fig-u12-tres-escalas lo resume. Utiliza los valores $\beta=1$ (en azul) y $\beta=-1$ (en rojo), y muestra el efecto de variar el predictor $x$ (en el eje X) sobre el log-odds, el odds y la probabilidad del evento. A la izquierda, el log-odds η = β₀ + βx identifica una recta cuya pendiente es β (efecto aditivo, constante). En el centro, se aprecia la curva exponencial del odds = e^η: cada unidad de x multiplica las odds por e^β. A la derecha, la relación entre el predictor x y la probabilidad = 1/(1+e^(−η)) viene representada en forma de S, creciente o decreciente, con efecto máximo en el centro y casi nulo en las colas. Esa no linealidad de la derecha es justo lo que impide leer β como un cambio de probabilidad.
+
+```{r}
+#| label: fig-u12-tres-escalas
+#| fig-width: 11
+#| fig-height: 3.8
+#| out-width: "100%"
+#| fig-cap: "Efecto de la variación en un predictor genérico x (β₀ = 0) sobre el log-odds, el odds y la probabilidad del evento. En azul un coeficiente positivo (β = +1); en rojo uno negativo (β = −1)."
+
+betas <- c("β = +1 (positivo)" = 1, "β = −1 (negativo)" = -1)
+demo <- expand_grid(x = seq(-3, 3, length.out = 300), signo = names(betas)) |>
+  mutate(beta = betas[signo],
+         `log-odds` = beta * x,          # β0 = 0
+         odds       = exp(beta * x),
+         prob       = plogis(beta * x))
+
+col <- c("β = +1 (positivo)" = "#2c7fb8", "β = −1 (negativo)" = "#d7301f")
+escala <- function(y, ylab, titulo, y0)
+  ggplot(demo, aes(x, .data[[y]], color = signo)) +
+    geom_hline(yintercept = y0, linetype = "dotted", color = "grey60") +
+    geom_line(linewidth = 1.1) +
+    scale_color_manual(values = col) +
+    labs(x = "predictor x", y = ylab, color = NULL, title = titulo)
+
+p1 <- escala("log-odds", "log-odds (η)", "η = β₀ + βx  ·  recta (pendiente β)", 0)
+p2 <- escala("odds",     "odds = e^η",   "odds  ·  multiplica e^β por unidad",            1)
+p3 <- escala("prob",     "P(evento)",    "probabilidad  ·  forma en S",        0.5) +
+        scale_y_continuous(limits = c(0, 1), labels = scales::label_percent())
+
+(p1 + p2 + p3) + plot_layout(guides = "collect") &
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 9.5, face = "bold"))
+```
 
 ::: {.callout-warning}
-## Odds ratio no es riesgo relativo
-Conviene leerlo con rigor: el OR es un cociente de *odds*, **no** de
-probabilidades. El **riesgo relativo** compara probabilidades,
-$\text{RR}=\pi(x+1)/\pi(x)$, y en general $\text{OR}\neq\text{RR}$. Ambos se
+## Odds ratio y riesgo relativo
+Puntualizar que odds-ratio OR no es lo mismo que riesgo relativo RR. El riesgo relativo es útil para comparar probabilidades, luego en el contexto del modelo lineal cabría valorar el efecto, sobre la probabilidad, de añadir una unidad a la $x$
+$$\text{RR}=\pi(x+1)/\pi(x)$$
+En general $\text{OR}\neq\text{RR}$, si bien ambos se
 relacionan por
 $$
 \text{OR}=\text{RR}\cdot\frac{1-\pi(x)}{1-\pi(x+1)},
 $$
 de modo que el OR **se aleja de 1 más que el RR** y exagera el efecto cuando el
 evento es frecuente. Solo si el evento es **raro** ($\pi$ pequeña) se cumple
-$1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$. Por eso decir «el riesgo
+$1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$. 
+
+Por eso decir «el riesgo
 se triplica» al leer un $\text{OR}=3$ es una aproximación cómoda pero informal: la
 lectura exacta es en términos de *odds* (ventaja), o bien en probabilidad mediante
 los efectos marginales (más abajo).
 :::
 
-**En GLOW** (ya con las dos predictoras): la fractura previa multiplica las odds
-de fractura por $\text{OR}\approx 2{,}31$ (IC 95 %: 1,46–3,66) y cada año de edad
-por $\approx 1{,}04$ (IC 95 %: 1,02–1,07):
+**Intervalos de confianza.** Como $\text{OR}=e^{\beta}$ y la exponencial es
+**monótona creciente**, el IC del OR es la **exponencial de los extremos** del IC del
+coeficiente, sin recalcular nada:
+$$\text{IC}_{95\%}(\text{OR})=\big[e^{\beta_{\text{inf}}},\,e^{\beta_{\text{sup}}}\big].$$
+Y como $e^{0}=1$, que el IC de $\beta$ **no contenga 0** equivale a que el del OR **no
+contenga 1**: la misma señal de efecto en las dos escalas.
+
+**En GLOW.** Aplicado a las dos predictoras:
 
 ```{r}
 #| label: u12-or
-exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR con IC por perfil de verosimilitud
+exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR e IC: exponencial del IC de beta
 ```
 
-(El IC procede del perfil de verosimilitud, que detallamos en @sec-u12-inferencia;
-por ahora basta leer que un intervalo que no contiene 1 señala efecto.)
+La fractura previa multiplica las odds de fractura por $\text{OR}\approx 2{,}31$
+(IC 95 %: 1,46–3,66) y cada año de edad por $\approx 1{,}04$ (IC 95 %: 1,02–1,07);
+ninguno cruza 1, de modo que ambos efectos son claros. (El IC de $\beta$ procede del
+perfil de verosimilitud, [Sección 2.6](#sec-u12-inferencia).)
 
-```{r}
-#| label: fig-u12-forest
-#| fig-cap: "Odds ratios con IC 95 % (escala log). La línea en OR = 1 es la hipótesis nula; un intervalo que no la cruza señala efecto."
-
-tidy(fit_glm, conf.int = TRUE, exponentiate = TRUE) |>
-  filter(term != "(Intercept)") |>
-  ggplot(aes(estimate, term)) +
-  geom_vline(xintercept = 1, linetype = "dashed") +
-  geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
-  scale_x_log10() +
-  labs(x = "Odds ratio (escala log)", y = NULL)
-```
-
-**La misma idea, otras escalas.** El predictor lineal $\eta$ es **idéntico** en los
-tres enlaces; lo que cambia es qué *representa* $\eta$ y, por tanto, cómo se lee el
-coeficiente:
+**La misma idea en otros enlaces.** El predictor lineal $\eta$ es **idéntico** en los
+tres enlaces; cambia qué *representa* y, con ello, cómo se lee el coeficiente:
 
 | Enlace | $\eta$ es… | $\eta=g(\mu)$ | $\mu=g^{-1}(\eta)$ |
 |---|---|---|---|
@@ -403,17 +420,14 @@ coeficiente:
 
 : Relación entre el predictor lineal $\eta$ —donde actúan los coeficientes— y la media $\mu$ en los tres enlaces. En el logit, $\eta$ es exactamente el log-odds; cada enlace «lee» $\eta$ en una escala distinta. {#tbl-enlaces-eta-mu}
 
-Por eso el mismo coeficiente cambia de significado con el enlace, aunque el ajuste
-sea casi idéntico:
+De ahí que el mismo $\beta$ signifique cosas distintas aunque el ajuste apenas varíe:
 
-- **logit:** $e^{\beta}$ = **odds ratio** (multiplica las odds). La lectura
-  habitual en clínica y epidemiología.
-- **probit:** $\beta$ es un **desplazamiento en la escala latente normal** ($z$);
-  no hay lectura multiplicativa de odds. Como guía, $\beta_{\text{probit}}\approx
-  \beta_{\text{logit}}/1{,}6\text{–}1{,}8$.
-- **cloglog:** $e^{\beta}$ es una **razón de riesgos** (*hazard ratio*); por su
-  asimetría no coincide con el OR, y es la lectura natural en supervivencia
-  (@sec-u14).
+- **logit:** $e^{\beta}$ = **odds ratio** (multiplica las odds); la lectura habitual
+  en clínica y epidemiología.
+- **probit:** $\beta$ **desplaza la escala latente normal** ($z$), sin lectura de odds;
+  como guía, $\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$.
+- **cloglog:** $e^{\beta}$ = **razón de riesgos** (*hazard ratio*); lectura natural en
+  supervivencia ([Unidad 1.4](#sec-u14)).
 
 ```{r}
 #| label: u12-coef-enlaces
@@ -423,38 +437,65 @@ map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
   mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
 ```
 
-**De los odds a la probabilidad: efectos marginales.** Si lo que interesa es la
-**escala de probabilidad**, el efecto de subir $x_k$ una unidad,
-$$
-\frac{\partial \mu}{\partial x_k}
-=\underbrace{\frac{\mathrm{d}g^{-1}}{\mathrm{d}\eta}}_{\text{pendiente de la curva}}\cdot\,\beta_k,
-$$
-**depende de $\eta$** (grande en el centro de la sigmoide, casi nulo en las
-colas), así que no es un número único. Se resume con el **efecto marginal medio**
-(AME), ya en puntos de probabilidad:
+### Interpretación en la escala de la probabilidad: efectos marginales
+
+Cuando queremos interpretar un ajuste directamente en términos de las probabilidades, acudimos a los **efectos marginales**. El odds ratio es constante, pero el cambio en **probabilidad** no: un año más de `age` apenas mueve nada en las colas y
+mucho en el centro de la S. Para resumirlo en un número, el **efecto marginal medio
+(AME)** responde a la pregunta que de verdad importa:
+
+**"¿Cuántos puntos de probabilidad sube el evento, en promedio, por una unidad más de la covariable?**
+
+En GLOW, el AME de `age` es ≈ **0,007**: unos **0,7 puntos porcentuales de riesgo de fractura por año**.
+
+**¿De dónde sale ese número?** 
+
+Para calcular el AME o efecto medio marginal asociado a un predictor continuo $x_k$ (con coeficiente $\beta_k$ en el predictor lineal), se considera el efecto de cada individuo a través de la pendiente de su propia curva, y dado que la derivada del logit es $\mu(1-\mu)$, esta pendiente es:
+$$\frac{\partial\mu_i}{\partial x_k}=\hat\pi_i(1-\hat\pi_i)\,\beta_k.$$
+El AME es el promedio sobre las pendientes para las $n$ personas observadas: literalmente, el
+coeficiente por la pendiente media de la sigmoide.
+$$\text{AME}_k=\beta_k\cdot\frac{1}{n}\sum_i \hat\pi_i(1-\hat\pi_i)$$ 
 
 ```{r}
 #| label: u12-ame
-avg_slopes(fit_glm)   # cambio medio en P(fractura) por unidad de cada covariable
+# AME de cada covariable, en puntos de probabilidad
+avg_slopes(fit_glm)                       
+
+# Reproducción "a mano" para `age`:
+p <- fitted(fit_glm)                      # pi_hat de cada individuo
+mean(p * (1 - p)) * coef(fit_glm)["age"]  # = AME de age
 ```
 
-En GLOW, el AME de `age` $\approx 0{,}007$: unos 0,7 puntos porcentuales por año
-**en promedio**. La alternativa clásica es el efecto «en valores representativos»
-(MEM), que evalúa la derivada en un perfil fijado; el AME suele preferirse por
-promediar sobre la población observada [@arelbundock2024]. Detalle didáctico: el
-AME en escala de probabilidad es **casi invariante al enlace** (los tres ajustes
-dan AME parecidos aunque sus coeficientes difieran), porque lo que cambia es la
-parametrización, no el ajuste. Moraleja: interpreta en la escala que importa.
+Cuando se trata de evaluar el AME para un factor como `priorfrac`, el coeficiente no es una pendiente (derivada) sino una **diferencia contrafactual**. El AME entonces se calcula con el efecto diferencial sobre la categoría de referencia : $\hat\pi$ con `Yes` menos con `No`, promediada entre individuos, es decir:
+$$
+\text{AME}_{\text{priorfrac}}=\frac{1}{n}\sum_{i=1}^{n}\Big[\hat\pi\big(\texttt{Yes},\,x_i\big)-\hat\pi\big(\texttt{No},\,x_i\big)\Big],
+$$
+donde $\hat\pi(\texttt{nivel},x_i)$ se evalúa para todos los sujetos en la muestra en los dos niveles: Yes y No
+$$
+\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\beta_0+\hat\beta_{\text{age}}\,\text{age}_i+\hat\beta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\beta_{\text{pf}}^{\,\text{ref}}=0.
+$$
 
-**La edad en dos escalas (síntesis).** Lo más comunicable de un GLM es la
-**probabilidad predicha**; ponerla junto a la escala **log-odds** reúne en una sola
-imagen todo lo anterior. A la izquierda, en log-odds, los dos perfiles son **rectas
-paralelas**: la edad entra de forma lineal y `priorfrac` solo desplaza la recta una
+```{r}
+#| label: u12-ame-factor
+g_yes <- transform(glow, priorfrac = factor("Yes", levels = levels(glow$priorfrac)))
+g_no  <- transform(glow, priorfrac = factor("No",  levels = levels(glow$priorfrac)))
+
+mean(predict(fit_glm, g_yes, type = "response") -
+     predict(fit_glm, g_no,  type = "response"))   # = AME de priorfrac
+```
+
+El AME en probabilidad es, además, **casi invariante al enlace** (los tres ajustes lo dan
+parecido pese a coeficientes distintos) y se prefiere al efecto en un perfil fijo (MEM)
+por promediar sobre la población observada [@arelbundock2024]. En una frase: el **OR**
+comunica la fuerza del efecto; el **AME**, su impacto absoluto en probabilidad.
+
+
+En la @fig-u12-dos-escalas se visualiza el efecto de la edad en dos escalas. A la izquierda, en escala log-odds, 
+los dos perfiles son **rectas paralelas**: la edad entra de forma lineal y `priorfrac` solo desplaza la recta una
 cantidad **constante**, $\log(\text{OR})\approx 0{,}84$ —ahí vive el odds ratio—. A
 la derecha, en probabilidad, esas mismas rectas se vuelven **curvas en S**: el
 efecto de `priorfrac` (la distancia entre curvas) es máximo en el centro y se
-desvanece en los extremos, **aunque el OR sea constante**. Es, de un vistazo, la
-diferencia entre «constante en los *odds*» y «variable en la probabilidad».
+desvanece en los extremos, **aunque el OR sea constante**. Claramente se aprecia la diferencia constante en
+los odds y variable en las probabilidades. 
 
 ```{r}
 #| label: fig-u12-dos-escalas
@@ -503,23 +544,40 @@ pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
         plot.subtitle = element_text(size = 8.5))
 ```
 
-## Estimación: máxima verosimilitud e IWLS {#sec-u12-iwls}
+## 2.4 Estimación: máxima verosimilitud e IWLS {#sec-u12-iwls}
 
-No hay fórmula cerrada para $\hat{\boldsymbol\beta}$ como en OLS: se maximiza la
-log-verosimilitud numéricamente. La log-verosimilitud de un GLM con enlace
-canónico tiene **ecuaciones de score** de forma especialmente limpia,
+A diferencia de OLS, **no hay fórmula cerrada** para $\hat{\boldsymbol\beta}$: se maximiza
+la log-verosimilitud numéricamente. Pero ese "numéricamente" no es una caja negra; al
+abrirlo aparece algo muy reconocible —una sucesión de regresiones lineales ponderadas—.
+Veámoslo en tres pasos: las ecuaciones que hay que resolver, el algoritmo que las
+resuelve y su reproducción a mano sobre GLOW.
+
+**Las ecuaciones de score: ¿dónde están los $\boldsymbol\beta$?** Maximizar
+$\ell(\boldsymbol\beta)=\sum_i \ell_i$ exige anular su gradiente. La clave es que los
+coeficientes **solo entran a través del predictor lineal**, $\eta_i=\mathbf{x}_i^\top\boldsymbol\beta$,
+de modo que $\partial\eta_i/\partial\boldsymbol\beta=\mathbf{x}_i$. Aplicando la regla de
+la cadena por la ruta $\ell_i\to\mu_i\to\eta_i\to\boldsymbol\beta$:
 
 $$
 \frac{\partial \ell}{\partial\boldsymbol\beta}
+=\sum_{i=1}^{n}
+\underbrace{\frac{\partial \ell_i}{\partial\mu_i}}_{\textstyle \frac{y_i-\mu_i}{a(\phi)V(\mu_i)}}\;
+\underbrace{\frac{\partial\mu_i}{\partial\eta_i}}_{\text{enlace}}\;
+\underbrace{\frac{\partial\eta_i}{\partial\boldsymbol\beta}}_{\textstyle \mathbf{x}_i}
 =\sum_{i=1}^{n}\frac{(y_i-\mu_i)}{a(\phi)\,V(\mu_i)}\,
-\frac{\partial\mu_i}{\partial\eta_i}\,\mathbf{x}_i=\mathbf{0}.
+\frac{\mathrm{d}\mu_i}{\mathrm{d}\eta_i}\,\mathbf{x}_i=\mathbf{0}.
 $$
 
-Resolverlas por **Newton–Raphson con la matriz de información esperada** (Fisher
-scoring) resulta ser equivalente a iterar una **regresión por mínimos cuadrados
-ponderados** (IWLS, *iteratively weighted least squares*) [@nelder1972;
-@mccullagh1989]. En cada paso se construye una **respuesta de trabajo** $z$ y unos
-**pesos** $w$,
+El sistema iguala a cero una **suma ponderada de residuos** $(y_i-\mu_i)$, y el vector
+$\mathbf{x}_i$ aparece justamente al derivar $\eta_i$ respecto a $\boldsymbol\beta$. Salvo
+en OLS, no tiene solución cerrada: hay que **iterar**.
+
+**Del sistema al algoritmo: Fisher scoring = IWLS.** El método de **Newton–Raphson**,
+usando la **información esperada** (*Fisher scoring*), resuelve ese sistema, y tiene una
+lectura preciosa: **cada iteración equivale a una regresión por mínimos cuadrados
+ponderados** (IWLS) [@nelder1972; @mccullagh1989]. En cada paso se fabrican una
+**respuesta de trabajo** $z_i$ (una linealización del enlace alrededor del ajuste actual)
+y unos **pesos** $w_i$ (que dan más voz a las observaciones más precisas):
 
 $$
 z_i=\eta_i+(y_i-\mu_i)\frac{\mathrm{d}\eta_i}{\mathrm{d}\mu_i},
@@ -528,51 +586,85 @@ w_i=\frac{(\mathrm{d}\mu_i/\mathrm{d}\eta_i)^2}{V(\mu_i)},
 $$
 
 y se actualiza $\boldsymbol\beta\leftarrow(\mathbf{X}^\top\mathbf{W}\mathbf{X})^{-1}
-\mathbf{X}^\top\mathbf{W}\mathbf{z}$ hasta convergencia. Esto **desmitifica la caja
-negra**: un GLM se ajusta resolviendo una sucesión de regresiones lineales
-ponderadas. Lo reproducimos «a mano» sobre GLOW usando las piezas que el propio
-objeto `family()` proporciona, y comprobamos que coincide con `glm()`:
+\mathbf{X}^\top\mathbf{W}\mathbf{z}$ —la fórmula de WLS— hasta que deja de cambiar. Así,
+**estimar un GLM es resolver una sucesión de regresiones lineales ponderadas**.
+
+::: {.callout-note}
+## Recordatorio: Newton–Raphson y Fisher scoring
+Para hallar la raíz de la ecuación de score $\partial\ell/\partial\boldsymbol\beta=\mathbf{0}$,
+**Newton–Raphson** itera $\boldsymbol\beta\leftarrow\boldsymbol\beta-\mathbf{H}^{-1}\mathbf{s}$,
+con $\mathbf{s}$ el score (gradiente) y $\mathbf{H}$ el hessiano (segunda derivada).
+**Fisher scoring** sustituye $\mathbf{H}$ por su valor esperado, la **información esperada**
+$\mathcal{I}=\mathbb{E}[-\mathbf{H}]$: más estable y, en un GLM, lo que convierte cada paso
+en una regresión ponderada.
+:::
+
+::: {.callout-note}
+## Recordatorio: mínimos cuadrados ponderados (WLS)
+OLS minimiza $\sum_i (z_i-\mathbf{x}_i^\top\boldsymbol\beta)^2$ tratando todas las
+observaciones por igual. **WLS** asigna a cada una un peso $w_i$ y minimiza
+$\sum_i w_i\,(z_i-\mathbf{x}_i^\top\boldsymbol\beta)^2$, dando más influencia a las de
+menor varianza; su solución es $\hat{\boldsymbol\beta}=(\mathbf{X}^\top\mathbf{W}\mathbf{X})^{-1}
+\mathbf{X}^\top\mathbf{W}\mathbf{z}$, con $\mathbf{W}=\operatorname{diag}(w_i)$. El IWLS no
+es más que aplicarla una y otra vez, recalculando $z$ y $w$ en cada vuelta.
+:::
+
+**A mano sobre GLOW.** Reproducimos el bucle con las piezas que el propio objeto
+`family()` proporciona (`linkinv`, `mu.eta`, `variance`) y comprobamos que coincide con
+`glm()`:
 
 ```{r}
 #| label: u12-iwls
-X   <- model.matrix(fit_glm)          # matriz de diseño (1, age, priorfracYes)
-y   <- glow$fractura01
-fam <- binomial()                     # genérico: linkinv, mu.eta, variance
+X   <- model.matrix(fit_glm)          # matriz de diseño: columnas (Intercept), age, priorfracYes
+y   <- glow$fractura01                # respuesta binaria 0/1
+fam <- binomial()                     # la familia expone las piezas: linkinv, mu.eta, variance
 
-beta <- rep(0, ncol(X)); traza <- list()
+beta  <- rep(0, ncol(X))              # arranque: todos los coeficientes a 0
+traza <- list()                       # aquí guardaremos beta de cada iteración (para la figura)
+
 for (it in 1:25) {
-  eta <- as.vector(X %*% beta)
-  mu  <- fam$linkinv(eta)             # mu = g^{-1}(eta)
-  mep <- fam$mu.eta(eta)              # dmu/deta
-  z   <- eta + (y - mu) / mep         # respuesta de trabajo
-  w   <- mep^2 / fam$variance(mu)     # pesos IWLS
-  WX  <- X * w
+  eta <- as.vector(X %*% beta)        # predictor lineal      eta = X beta
+  mu  <- fam$linkinv(eta)             # media ajustada        mu  = g^{-1}(eta) = plogis(eta)
+  mep <- fam$mu.eta(eta)              # derivada del enlace    dmu/deta = mu(1-mu)
+  z   <- eta + (y - mu) / mep         # respuesta de trabajo  (linealización de un paso)
+  w   <- mep^2 / fam$variance(mu)     # pesos IWLS             w = (dmu/deta)^2 / V(mu)
+  WX  <- X * w                        # cada fila de X escalada por su peso
+  # paso de mínimos cuadrados ponderados: beta = (X'WX)^{-1} X'W z
   beta_new <- as.vector(solve(crossprod(WX, X), crossprod(WX, z)))
-  traza[[it]] <- beta_new
-  if (max(abs(beta_new - beta)) < 1e-10) { beta <- beta_new; break }
-  beta <- beta_new
+  traza[[it]] <- beta_new             # registramos el beta de esta vuelta
+  if (max(abs(beta_new - beta)) < 1e-10) { beta <- beta_new; break }  # ¿convergió?
+  beta <- beta_new                    # si no, otra iteración partiendo del nuevo beta
 }
 cat("Convergió en", it, "iteraciones\n")
-cbind(IWLS_a_mano = beta, glm = coef(fit_glm))   # deben coincidir
+cbind(IWLS_a_mano = beta, glm = coef(fit_glm))   # deben coincidir con glm()
 ```
+
+**La trayectoria hasta la convergencia.** En cada vuelta hemos ido guardando el vector de
+coeficientes en la lista `traza`; ahora `do.call(rbind, traza)` **apila** esos vectores en
+una **matriz** —una fila por iteración, una columna por coeficiente—, que pasamos a formato
+largo para dibujar cómo evoluciona cada coeficiente. La @fig-u12-iwls-convergencia lo
+muestra: partiendo de cero, los tres coeficientes alcanzan su valor de máxima verosimilitud
+—las líneas punteadas de `glm()`— en apenas un puñado de iteraciones. Esa convergencia casi
+inmediata es la marca del Fisher scoring cerca del óptimo.
 
 ```{r}
 #| label: fig-u12-iwls-convergencia
 #| fig-cap: "Convergencia del IWLS «a mano». Cada coeficiente se estabiliza en su valor de máxima verosimilitud (líneas punteadas, las de `glm()`) en muy pocas iteraciones."
 
-do.call(rbind, traza) |>
+do.call(rbind, traza) |>          # apila la lista en matriz: filas = iteraciones, columnas = coeficientes
   as.data.frame() |>
-  setNames(colnames(X)) |>
-  mutate(iter = row_number()) |>
-  pivot_longer(-iter, names_to = "coef", values_to = "valor") |>
+  setNames(colnames(X)) |>        # nombra las columnas como los coeficientes
+  mutate(iter = row_number()) |>  # índice de iteración
+  pivot_longer(-iter, names_to = "coef", values_to = "valor") |>   # formato largo para ggplot
   ggplot(aes(iter, valor, color = coef)) +
   geom_line() + geom_point(size = 1.5) +
-  geom_hline(data = enframe(coef(fit_glm), "coef", "obj"),
+  geom_hline(data = enframe(coef(fit_glm), "coef", "obj"),         # valores de glm() como referencia
              aes(yintercept = obj, color = coef), linetype = "dashed") +
   labs(x = "Iteración IWLS", y = "Coeficiente", color = NULL)
 ```
 
-## Deviance y bondad de ajuste {#sec-u12-deviance}
+
+## 2.5 Deviance y bondad de ajuste {#sec-u12-deviance}
 
 La **deviance** mide cuánto peor ajusta nuestro modelo frente al **modelo
 saturado** (un parámetro por observación, ajuste perfecto):
@@ -599,15 +691,15 @@ que contrastaremos formalmente a continuación. Una nota importante: con datos
 sirve como test absoluto de bondad de ajuste contra la $\chi^2$ —su distribución
 no es la esperada—; sí sirve, en cambio, para **comparar modelos anidados**
 [@agresti2015; @hosmer2013]. Para el ajuste absoluto usaremos calibración y los
-residuos de @sec-u12-evaluacion.
+residuos de la [Sección 2.8](#sec-u12-evaluacion).
 
-## Inferencia: Wald, razón de verosimilitudes, AIC/BIC {#sec-u12-inferencia}
+## 2.6 Inferencia: Wald, razón de verosimilitudes, AIC/BIC {#sec-u12-inferencia}
 
 Tres herramientas, tres usos:
 
 - **Test de Wald** ($\hat\beta_k/\widehat{\text{EE}}$, comparado con la normal):
   el que imprime `summary()`. Cómodo, pero **poco fiable** con muestras pequeñas o
-  coeficientes grandes (y catastrófico bajo separación, @sec-u12-evaluacion).
+  coeficientes grandes (y catastrófico bajo separación, [Sección 2.8](#sec-u12-evaluacion)).
 - **Razón de verosimilitudes (LRT)**: para modelos **anidados**, la diferencia de
   deviances se distribuye $\sim\chi^2_{\Delta\text{gl}}$. Es el contraste de
   referencia para «¿aporta este bloque de variables?».
@@ -640,7 +732,7 @@ list(perfil = confint(fit_glm),
   map(\(m) round(m, 4))
 ```
 
-## Construcción y comparación escalonada de modelos {#sec-u12-modelos}
+## 2.7 Construcción y comparación escalonada de modelos {#sec-u12-modelos}
 
 Comparar modelos no es elegir entre dos: es **recorrer una escalera** de
 especificaciones, de menos a más compleja, decidiendo en cada peldaño si la
@@ -686,7 +778,7 @@ mejor predicción, el BIC a un modelo más simple y estable, y el LRT confirma q
 la interacción es real aunque modesta. La decisión final es **del analista**, y
 debe argumentarse (será parte de la tarea).
 
-::: {.callout-warning}
+:::: {.callout-warning}
 ## Sobre la selección automática (`step`)
 Existe la búsqueda automática por AIC (`MASS::stepAIC`, `step`), pero **úsese con
 cautela**: la selección paso a paso invalida los $p$-valores posteriores
@@ -699,12 +791,12 @@ LRT/AIC/BIC y conocimiento del problema [@harrell2015].
 #| eval: false
 MASS::stepAIC(mod_ac, direction = "both", trace = FALSE) |> formula()
 ```
-:::
+::::
 
 Interpretar una interacción exige cuidado: el coeficiente de `priorfrac` ya **no**
 es «el efecto de la fractura previa», sino su efecto **a edad 0** (sin sentido sin
 centrar). Por eso, con interacciones, la interpretación se hace en la escala de
-**efectos marginales o predicciones** (ya vista en @sec-u12-interpretacion), no leyendo coeficientes
+**efectos marginales o predicciones** (ya vista en la [Sección 2.3](#sec-u12-interpretacion)), no leyendo coeficientes
 crudos.
 
 ```{r}
@@ -712,7 +804,7 @@ crudos.
 tidy(mod_ac)   # el signo de age:priorfracYes indica cómo se modula el efecto de la edad
 ```
 
-## Evaluación y comparación de clasificadores {#sec-u12-evaluacion}
+## 2.8 Evaluación y comparación de clasificadores {#sec-u12-evaluacion}
 
 Un modelo logístico puede ajustar bien los coeficientes y aun así **clasificar o
 calibrar mal**. Evaluamos dos cosas distintas: **discriminación** (¿separa eventos
@@ -792,7 +884,7 @@ aparece, estimar por **verosimilitud penalizada de Firth** [@firth1993;
 logistf::logistf(fracture ~ smoke * raterisk, data = glow)   # estimación de Firth
 ```
 
-## Coda: respuestas politómicas {#sec-u12-politomicas}
+## 2.9 Coda: respuestas politómicas {#sec-u12-politomicas}
 
 ::: {.callout-note}
 ## Más de dos categorías

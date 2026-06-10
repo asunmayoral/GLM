@@ -3,7 +3,7 @@
 .Rhistory
 .RData
 .Ruserdata
-*.Rproj
+# El .Rproj SÍ se versiona: así cualquiera que clone el repo abre el proyecto igual
 
 # --- renv (librerías locales, no se versionan) ---
 renv/library/

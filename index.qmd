@@ -9,8 +9,9 @@ toc: false
 
 Material docente de la asignatura **Modelos Lineales Generalizados con R**, de
 tercer curso del **Grado en Ciencia de Datos e Inteligencia Artificial** de la
-Universidad Miguel Hernández (6 ECTS, 14 semanas). El enfoque es
-**problema-primero**: se parte de un caso real, se elige y ajusta el modelo, se
+Universidad Miguel Hernández (6 ECTS, 60 horas de clase). 
+
+El enfoque es **problema-primero**: se parte de un caso real, se elige y ajusta el modelo, se
 diagnostica y se interpreta en la escala que importa para decidir.
 
 El curso se articula en tres estudios de caso que recorren las familias de la

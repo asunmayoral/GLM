@@ -10,7 +10,9 @@ format:
     toc-depth: 3
     number-sections: false      # numeración MANUAL (1.1, 1.2, ...) en los títulos
     code-fold: show
-    code-tools: true
+    code-tools: 
+      source: false # quita "View source"; no se expone el qmd
+      toggle: true # mantiene show all/hide all code
     theme: cosmo
     df-print: paged
   pdf:

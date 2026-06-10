@@ -1,0 +1,18 @@
+Para la publicación del sitio web:
+(1) Desde la consola de R, ejecutar:
+quarto::quarto_preview()        # vista previa del sitio con recarga en vivo
+quarto::quarto_render()         # genera el sitio completo en _site/
+quarto::quarto_publish_site()   # publica (equivale a quarto publish)
+
+(2) Desde la Terminal:
+cd ~/Claude/Projects/GLM
+quarto preview        # vista previa local con recarga en vivo (para ir viendo)
+quarto render         # genera el sitio completo en _site/
+quarto publish gh-pages   # publica solo el HTML a la rama gh-pages (repo fuente privado)
+
+(3) Publicación en Github Pages
+Creas el repositorio privado en GitHub y conectas el repo local que ya tienes 
+(git remote add origin … + git push, o desde GitHub Desktop). 
+Luego, una sola vez, quarto publish gh-pages desde la Terminal de RStudio: 
+te configura la rama y te devuelve la URL https://TU_USUARIO.github.io/curso-glm/. 
+A partir de ahí, cada actualización es repetir quarto publish gh-pages.

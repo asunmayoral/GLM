@@ -29,7 +29,9 @@ format:
     toc: true
     toc-depth: 3
     code-fold: show      # código visible pero plegable: los estudiantes lo leen y copian
-    code-tools: false    # sin menú "ver/descargar fuente": no se expone el .qmd
+    code-tools: 
+      source: false # quita "View source"; no se expone el qmd
+      toggle: true # mantiene show all/hide all code
     code-copy: true
     df-print: paged
     embed-resources: false

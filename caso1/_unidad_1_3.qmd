@@ -15,7 +15,7 @@ la cohorte simulada, cuya **verdad conocida** permite contrastar lo estimado.
 [@bates2015; @agresti2015, caps. 6–7]
 :::
 
-## Qué son los efectos aleatorios {#sec-u13-que-son}
+## 3.1 Qué son los efectos aleatorios {#sec-u13-que-son}
 
 Hasta ahora cada coeficiente era un **efecto fijo**: un parámetro único que vale
 para toda la población. Pero los datos vienen **agrupados** —pacientes dentro de
@@ -39,14 +39,14 @@ $$
 \qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
 $$
 
-## Cuándo se usan {#sec-u13-cuando}
+## 3.2 Cuándo se usan {#sec-u13-cuando}
 
 Cuando hay **estructura jerárquica o de medidas repetidas** (centros, médicos,
 sujetos medidos varias veces) y (i) interesa cuantificar la variabilidad entre
 grupos, (ii) se quiere generalizar más allá de los grupos observados, o (iii)
 hay grupos con pocos datos que se benefician del *partial pooling*.
 
-## Cómo se interpretan {#sec-u13-interpretar}
+## 3.3 Cómo se interpretan {#sec-u13-interpretar}
 
 - **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos. En
   escala latente logística, el **coeficiente de correlación intraclase** es
@@ -59,7 +59,7 @@ hay grupos con pocos datos que se benefician del *partial pooling*.
 - **Shrinkage.** Los interceptos de centro estimados (`ranef`) están encogidos
   hacia 0; los centros pequeños se encogen más.
 
-## Laboratorio: GLMM logístico binario {#sec-u13-glmm}
+## 3.4 Laboratorio: GLMM logístico binario {#sec-u13-glmm}
 
 ```{r}
 #| label: u13-glmm
@@ -74,7 +74,7 @@ fixef(m_glmm)                            # debe acercarse más que coef(m_pool)
 VarCorr(m_glmm)                          # estima sigma_u (verdad: 0.70)
 ```
 
-## Del binario al politómico {#sec-u13-politomico}
+## 3.5 Del binario al politómico {#sec-u13-politomico}
 
 El efecto aleatorio y el marco logístico se generalizan a respuestas con **más de
 dos categorías**. La forma del modelo depende de si las categorías tienen orden.

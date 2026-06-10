@@ -10,13 +10,13 @@ Abre el **hilo de censura y supervivencia** (en espiral: se reactiva en los Caso
 2 y 3). Aquí está **toda la fundamentación** —función de supervivencia, hazard,
 riesgos proporcionales, modelo de Cox y enlace `cloglog`— y se muestra que el
 tiempo-a-evento discreto **es un GLM** sobre datos persona-periodo. Es también la
-referencia teórica del simulador de la cohorte (@sec-datos). **RA implicados:**
+referencia teórica del simulador de la cohorte ([Los datos del caso](#sec-datos)). **RA implicados:**
 RA7 (censura y tiempo-a-evento como casos del marco GLM).
 [@dobson2018, cap. de supervivencia; @prentice1978; @allison1982; @cox1972;
 @aitkin1980]
 :::
 
-## La función de supervivencia y la función de riesgo {#sec-u14-hazard}
+## 4.1 La función de supervivencia y la función de riesgo {#sec-u14-hazard}
 
 Sea $T\ge 0$ el **tiempo hasta que ocurre el evento**. Toda la información sobre
 $T$ se expresa de cuatro formas equivalentes; conocer una determina las demás.
@@ -57,7 +57,7 @@ maquinaria extra. Disponer los datos con **una fila por sujeto y periodo en
 riesgo** (persona-periodo) convierte el problema en una secuencia de Bernoulli:
 justo lo que un GLM binomial ajusta.
 
-## Riesgos proporcionales y el modelo de Cox {#sec-u14-ph}
+## 4.2 Riesgos proporcionales y el modelo de Cox {#sec-u14-ph}
 
 ¿Cómo depende el riesgo de las covariables? El modelo de **riesgos
 proporcionales** lo separa en dos factores:
@@ -83,7 +83,7 @@ flexible, pero **no es un GLM**; en este curso se presenta como la **frontera**
 semiparamétrica del marco y se trata en el Caso 3. El simulador, en cambio, fija
 una forma del riesgo base (por periodo), lo que lo mantiene dentro del GLM.
 
-## El enlace complementary log-log {#sec-u14-cloglog}
+## 4.3 El enlace complementary log-log {#sec-u14-cloglog}
 
 Para modelar el hazard discreto $h_t$ con un predictor lineal usamos el
 **complementary log-log**, que lleva una probabilidad a toda la recta real:
@@ -109,7 +109,7 @@ tibble(eta = seq(-4, 4, by = 0.02)) |>
   labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
 ```
 
-## Por qué cloglog es el enlace natural del hazard discreto {#sec-u14-puente}
+## 4.4 Por qué cloglog es el enlace natural del hazard discreto {#sec-u14-puente}
 
 Si el tiempo de un modelo de riesgos proporcionales solo se observa **agrupado en
 intervalos**, la probabilidad de fallar en el intervalo $t$ habiendo llegado en
@@ -128,7 +128,7 @@ un intercepto por periodo $\alpha_t$ que absorbe el riesgo base [@prentice1978;
 @allison1982]. Con `logit` se obtiene la aproximación "logística discreta", pero
 solo el `cloglog` preserva los riesgos proporcionales subyacentes.
 
-## Anatomía del simulador {#sec-u14-anatomia}
+## 4.5 Anatomía del simulador {#sec-u14-anatomia}
 
 El proceso generador (`R/dgp_cohorte.R`) se lee ahora línea a línea:
 $$
@@ -147,7 +147,7 @@ $$
 - **Persona-periodo**: `expandir_persona_periodo()` da una fila por sujeto y
   periodo en riesgo, con `y = 1` solo en el último periodo si hubo evento.
 
-## Laboratorio: ajuste en tiempo discreto y su relación con el GLM {#sec-u14-lab}
+## 4.6 Laboratorio: ajuste en tiempo discreto y su relación con el GLM {#sec-u14-lab}
 
 ```{r}
 #| label: u14-ajuste

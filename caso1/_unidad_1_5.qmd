@@ -13,7 +13,7 @@ rúbricas). **RA implicados:** RA8 (desarrollar, presentar y defender estudios d
 caso reproducibles) y, de forma acumulativa, RA1–RA7.
 :::
 
-## El estudio de caso (entregable) {#sec-u15-caso}
+## 5.1 El estudio de caso (entregable) {#sec-u15-caso}
 
 <!-- TODO: enunciado del estudio de caso del grupo, que debe atravesar las tres
      "lentes" del Caso 1 sobre datos propios o asignados:
@@ -22,7 +22,7 @@ caso reproducibles) y, de forma acumulativa, RA1–RA7.
        - tiempo-a-evento discreto (persona-periodo + cloglog).
      Indicar datos admisibles (origen y licencia) o el uso de la cohorte simulada. -->
 
-## Componentes de evaluación {#sec-u15-componentes}
+## 5.2 Componentes de evaluación {#sec-u15-componentes}
 
 Alineados con los instrumentos de la guía:
 
@@ -33,13 +33,13 @@ Alineados con los instrumentos de la guía:
 - **Exposición (E).** Presentación del estudio de caso.
 - **Q&A individual (w).** Defensa individual ante preguntas.
 
-## Actividades a completar (cuestiones evaluables) {#sec-u15-actividades}
+## 5.3 Actividades a completar (cuestiones evaluables) {#sec-u15-actividades}
 
 <!-- TODO: lista de cuestiones evaluables que el material deja "abiertas" a lo
      largo de 1.1-1.4 (las "Tarea del estudiante"), reorganizadas como entregables
      del caso. Conectar cada cuestión con el RA y el componente (P/R/E/w). -->
 
-## Rúbricas {#sec-u15-rubricas}
+## 5.4 Rúbricas {#sec-u15-rubricas}
 
 <!-- TODO: insertar las rúbricas EXACTAS de la guía docente (§8: informe P,
      reflexión R, exposición E, Q&A w). NO se reproducen aquí de memoria; se
