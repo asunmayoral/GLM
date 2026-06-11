@@ -1,37 +1,72 @@
 <!-- Partial: incluir con {{< include _unidad_1_4.qmd >}}. Sin YAML.
-     Chunks prefijados u14-. Usa la cohorte simulada (ever, sever_ord, centro)
-     con verdad conocida en attr(cohorte, "verdad"). -->
+     Chunks prefijados u14-. Efectos aleatorios (intercepto y pendiente) sobre la
+     cohorte simulada (ever, sever_ord, centro) con verdad en attr(cohorte, "verdad"). -->
 
 # 4 · Efectos aleatorios {#sec-u14}
+
+Hasta aquí, cada coeficiente ha sido un **efecto fijo**: un único número válido para toda la
+población. Pero los datos rara vez son una masa homogénea —los pacientes se agrupan en centros,
+los alumnos en aulas, las medidas repetidas en cada sujeto—, y los grupos **difieren entre sí**,
+tanto en su nivel de partida como en cómo responden a las covariables. Ignorar ese agrupamiento
+(o gastarse un parámetro por grupo) lleva a problemas conocidos; los **efectos aleatorios** son la
+vía intermedia: modelar la **variación entre grupos** como una distribución de la que cada grupo
+es una muestra. Es el primero de los dos hilos en espiral del curso —los efectos mixtos—, que
+abrimos aquí sobre el GLMM logístico y reactivaremos en cada caso.
 
 ::: {.callout-note}
 ## Sobre esta unidad
 Primer contacto con los **efectos mixtos** (hilo en espiral: se reactiva en el Caso 2).
-Introducimos los **efectos aleatorios** sobre el GLMM logístico binario de la cohorte y,
-al cierre, reactivamos la respuesta **ordinal** de la [Unidad 1.3](#sec-u13) en su versión
-**mixta**. Trabajamos sobre la cohorte simulada, cuya **verdad conocida** permite contrastar
-lo estimado.
+Introducimos los **efectos aleatorios** —de intercepto y de pendiente— sobre el GLMM logístico
+binario de la cohorte y, al cierre, reactivamos la respuesta **ordinal** de la
+[Unidad 1.3](#sec-u13) en su versión **mixta**. Trabajamos sobre la cohorte simulada, cuya
+**verdad conocida** permite contrastar lo estimado.
 **RA implicados:** RA6 (efectos mixtos).
 [@bates2015; @agresti2015]
 :::
 
-## 4.1 Qué son los efectos aleatorios {#sec-u14-que-son}
+## 4.1 Qué son y para qué sirven {#sec-u14-que-son}
 
-Hasta ahora cada coeficiente era un **efecto fijo**: un parámetro único que vale
-para toda la población. Pero los datos vienen **agrupados** —pacientes dentro de
-centros, en la cohorte—, y las observaciones de un mismo grupo se parecen entre
-sí más de lo que el azar explicaría. Hay tres maneras de tratar el centro:
+La idea central es un cambio de pregunta. Un efecto **fijo** responde *«¿cuál es el efecto?»* con
+**un número para toda la población**. Un efecto **aleatorio** no estima un número por grupo, sino
+la **distribución** de la que esos números proceden: en lugar de *«¿cuál es la interceptación del
+centro 7?»*, pregunta *«¿cuánto varían los interceptos entre centros?»* —su **varianza**—. Se
+modela la **dispersión** entre grupos, no cada grupo por separado.
 
-- **Ignorarlo** (*complete pooling*): un solo intercepto para todos. Subestima la
-  incertidumbre y puede sesgar los efectos (lo vimos: el ajuste *pooled* atenuó
-  $\beta_2$ en la cohorte).
-- **Un parámetro por centro** (*no pooling*): tantos interceptos como centros.
-  Gasta muchos grados de libertad y no generaliza a centros nuevos.
-- **Efecto aleatorio** (*partial pooling*): tratamos los interceptos de centro
-  como **extracciones de una distribución**, $u_j\sim\mathcal{N}(0,\sigma_u^2)$.
-  No estimamos cada $u_j$ como parámetro, sino su **varianza** $\sigma_u^2$. Los
-  interceptos de centro se "encogen" (*shrinkage*) hacia la media global, tanto
-  más cuanto menos información aporta el centro.
+**Dos cosas pueden variar de un grupo a otro:**
+
+- El **nivel de base** → un **intercepto aleatorio** $u_{0j}$: cada centro parte de un riesgo
+  basal distinto (la curva se **desplaza** arriba o abajo).
+- La **sensibilidad a una covariable** → una **pendiente aleatoria** $u_{1j}$: en cada centro, el
+  efecto de (digamos) la edad es distinto (la curva se **inclina** de forma diferente).
+
+**¿Para qué sirven?** Cuatro cosas concretas:
+
+1. **Respetar la no independencia.** Las observaciones de un mismo grupo se parecen entre sí;
+   ignorarlo da errores estándar **demasiado pequeños** (falsa precisión). El efecto aleatorio
+   modela esa correlación intragrupo correctamente.
+2. **Partial pooling (tomar prestado).** Las estimaciones de cada grupo se **encogen** hacia la
+   media global, tanto más cuanto menos datos aporta el grupo: estabiliza los grupos pequeños sin
+   imponer a todos un único valor rígido.
+3. **Cuantificar la heterogeneidad.** Las **varianzas** $\sigma^2$ son, ellas mismas, la respuesta
+   a una pregunta sustantiva: ¿cuánto difieren los grupos en su nivel, o en el efecto de una
+   covariable?
+4. **Generalizar.** Al tratar los grupos como una **muestra** de una población de grupos, las
+   conclusiones valen para grupos **no observados**, no solo para los de la muestra.
+
+En una frase: el efecto fijo dice *cuánto*; el efecto aleatorio dice *cuánto varía ese cuánto entre
+grupos* —y lo resume en una varianza—.
+
+## 4.2 Intercepto aleatorio {#sec-u14-intercepto}
+
+Empecemos por dejar variar el **nivel de base**. Para tratar el centro hay tres estrategias:
+
+- **Ignorarlo** (*complete pooling*): un solo intercepto para todos. Subestima la incertidumbre y
+  puede sesgar los efectos.
+- **Un parámetro por centro** (*no pooling*): tantos interceptos como centros. Gasta muchos grados
+  de libertad y no generaliza a centros nuevos.
+- **Intercepto aleatorio** (*partial pooling*): los interceptos de centro son **extracciones de una
+  distribución**, $u_j\sim\mathcal{N}(0,\sigma_u^2)$; no estimamos cada $u_j$, sino su **varianza**
+  $\sigma_u^2$.
 
 El modelo, para la binaria de la cohorte, es un **GLMM logístico**:
 $$
@@ -39,72 +74,192 @@ $$
 \qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
 $$
 
-## 4.2 Cuándo se usan {#sec-u14-cuando}
+En **forma matricial** —la notación habitual de los modelos mixtos, que conviene reconocer desde
+ya—, el predictor lineal de todas las observaciones se escribe
+$$
+\boldsymbol\eta=\mathbf{X}\boldsymbol\beta+\mathbf{Z}\mathbf{u},\qquad
+\mathbf{u}\sim\mathcal{N}(\mathbf{0},\mathbf{G}),\qquad g(\boldsymbol\mu)=\boldsymbol\eta,
+$$
+donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**;
+$\mathbf{Z}$ ($n\times q$) y $\mathbf{u}$ son el diseño y los efectos **aleatorios**, con $\mathbf{G}$
+su matriz de covarianzas; y $g$ es el enlace (aquí, logit). Para el **intercepto aleatorio**,
+$\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, $\mathbf{Z}$ es la matriz
+**indicadora** que asigna cada observación a su centro, y $\mathbf{G}=\sigma_u^2\,\mathbf{I}_J$. La
+parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo nuevo es el término $\mathbf{Z}\mathbf{u}$.
 
-Cuando hay **estructura jerárquica o de medidas repetidas** (centros, médicos,
-sujetos medidos varias veces) y (i) interesa cuantificar la variabilidad entre
-grupos, (ii) se quiere generalizar más allá de los grupos observados, o (iii)
-hay grupos con pocos datos que se benefician del *partial pooling*.
+Se interpreta así:
 
-## 4.3 Cómo se interpretan {#sec-u14-interpretar}
+- **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos. En la escala latente
+  logística, el **coeficiente de correlación intraclase** $\text{ICC}=\sigma_u^2/(\sigma_u^2+\pi^2/3)$
+  mide qué fracción de la variación total es **entre** centros (en la cohorte, $\approx 0{,}13$).
+- **Condicional vs marginal.** En un GLMM **no lineal**, los efectos fijos son **condicionales**
+  (específicos de grupo: «para un centro dado») y **difieren** de los **marginales** (poblacionales,
+  promediados sobre los centros). Por eso un ajuste *pooled* —que estima algo marginal— **atenúa**
+  los coeficientes frente a la verdad condicional. No es un error: son dos cantidades distintas.
+- **Shrinkage.** Los interceptos de centro estimados (`ranef`) están **encogidos** hacia 0; los
+  centros con menos datos se encogen más.
 
-- **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos. En
-  escala latente logística, el **coeficiente de correlación intraclase** es
-  $\text{ICC}=\sigma_u^2/(\sigma_u^2+\pi^2/3)$ (en la cohorte, $\approx 0{,}13$).
-- **Condicional vs marginal.** En un GLMM **no lineal**, los efectos fijos son
-  **condicionales** (específicos de grupo: "para un centro dado"), y **difieren**
-  de los **marginales** (poblacionales, promediados sobre los centros). Por eso
-  el ajuste *pooled* —que estima algo marginal— atenuaba los coeficientes frente
-  a la verdad condicional del DGP. No es un error: son dos cantidades distintas.
-- **Shrinkage.** Los interceptos de centro estimados (`ranef`) están encogidos
-  hacia 0; los centros pequeños se encogen más.
+## 4.3 Pendiente aleatoria: cuando el efecto varía por grupo {#sec-u14-pendiente}
 
-## 4.4 Laboratorio: GLMM logístico binario {#sec-u14-glmm}
+El intercepto aleatorio deja que el **nivel** cambie por centro, pero asume que el **efecto** de
+cada covariable es el mismo en todos. A menudo no lo es: la edad, por ejemplo, puede pesar más en
+unos centros que en otros. Eso se modela con una **pendiente aleatoria**, añadiendo una desviación
+de grupo al coeficiente:
+$$
+\operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_{0j}+u_{1j}\,x_{1ij},
+\qquad
+\begin{pmatrix}u_{0j}\\ u_{1j}\end{pmatrix}\sim\mathcal{N}(\mathbf{0},\boldsymbol\Sigma).
+$$
+
+Cómo se lee:
+
+- $\beta_1$ es el efecto **medio** de $x_1$ en la población de centros; el efecto **en el centro
+  $j$** es $\beta_1+u_{1j}$.
+- $\sigma_{u_1}^2$ (la varianza de las pendientes) dice **cuánto varía** ese efecto entre centros:
+  si es $\approx 0$, $x_1$ actúa casi igual en todos; si es grande, en unos centros pesa mucho y en
+  otros poco.
+- La **correlación** $\rho$ entre $u_{0j}$ y $u_{1j}$ liga nivel y sensibilidad: $\rho>0$ indica que
+  los centros con mayor riesgo basal tienen, además, un efecto de $x_1$ más fuerte.
+
+Las pendientes aleatorias son **más exigentes** con los datos (necesitan suficientes grupos y
+variación de $x_1$ dentro de cada uno) y es frecuente que el ajuste no converja o resulte
+**singular**; por eso se empieza por el intercepto y se añade la pendiente solo si está justificada.
+
+En forma matricial, una pendiente aleatoria solo **añade columnas a $\mathbf{Z}$** (una por efecto
+aleatorio y grupo) y agranda $\mathbf{G}$, que pasa a tener un bloque $\boldsymbol\Sigma$ de
+$2\times2$ por grupo.
+
+## 4.4 Laboratorio: GLMM logístico {#sec-u14-glmm}
+
+::: {.callout-tip}
+## Cómo se ajusta en R: `glmer` y la sintaxis `( | )`
+Un GLMM binomial se ajusta con **`lme4::glmer`** (o `glmmTMB::glmmTMB`, más rápido y flexible),
+con `family = binomial`, **igual para datos individuales y agrupados** —solo cambia la respuesta,
+como en `glm`—:
+
+- **Individual** (0/1 por sujeto): `glmer(y ~ x1 + x2 + (1 | g), family = binomial, data = d)`.
+- **Agrupado** (éxitos/ensayos por fila): `glmer(cbind(exitos, fracasos) ~ x1 + x2 + (1 | g), family = binomial, data = d)` (o la proporción con `weights = m`).
+
+La parte `( ... | grupo )` declara **qué** varía por grupo:
+
+- `(1 | g)` — **intercepto** aleatorio por `g`.
+- `(1 + x | g)` (o `(x | g)`) — intercepto **y** pendiente de `x`, **correlados**.
+- `(0 + x | g)` — **solo** pendiente de `x` (sin intercepto aleatorio).
+- `(1 + x || g)` — intercepto y pendiente, **sin** correlación.
+- `(1 | g1) + (1 | g2)` — dos agrupamientos **cruzados**; `(1 | g1/g2)` para **anidados**.
+:::
 
 ```{r}
 #| label: u14-glmm
-#| eval: false
 library(lme4)
-m_pool <- glm  (ever ~ x1 + x2,              family = binomial, data = cohorte)
-m_glmm <- glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte)
+m_pool  <- glm  (ever ~ x1 + x2,                    family = binomial, data = cohorte)  # complete pooling
+m_int   <- glmer(ever ~ x1 + x2 + (1 | centro),      family = binomial, data = cohorte)  # intercepto aleatorio
+m_slope <- glmer(ever ~ x1 + x2 + (1 + x1 | centro), family = binomial, data = cohorte)  # + pendiente de x1
 
-# Contraste contra la verdad conocida del DGP:
-attr(cohorte, "verdad")$binaria$beta     # b1 = 0.85, b2 = -0.65 (condicional)
-fixef(m_glmm)                            # debe acercarse más que coef(m_pool)
-VarCorr(m_glmm)                          # estima sigma_u (verdad: 0.70)
+# Resumen de los modelos
+summary(m_pool)
+summary(m_int)
+summary(m_slope)
+
+# Contraste con la verdad conocida del DGP:
+attr(cohorte, "verdad")$binaria$beta   # b1 = 0.85, b2 = -0.65 (condicional)
+fixef(m_int)                           # se acerca más a la verdad que coef(m_pool)
+VarCorr(m_int)                         # estima sigma_u (verdad: 0.70)
+
+VarCorr(m_slope)                       # sigma_u0, sigma_u1 (pendientes de x1) y su correlación
+ranef(m_slope)$centro                  # desviaciones u_0j, u_1j por centro
 ```
+
+**Cómo se lee la salida de `glmer` (y en qué se distingue de `glm`).** El bloque de **efectos
+fijos** es idéntico al de `glm` —coeficientes con su error estándar, $z$ y $p$, que se interpretan
+igual (log-odds, $e^{\beta}$ = OR)—. La novedad es el bloque **`Random effects`**, encima: ahí están
+las **varianzas** y desviaciones típicas de los efectos aleatorios —en `m_int`, una sola fila,
+`centro (Intercept)` con $\hat\sigma_u=0{,}44$— y el número de grupos. `glm` no tiene ese bloque:
+estima un único intercepto y nada más. En `m_slope` el bloque crece a dos filas (`(Intercept)` y
+`x1`) más su **correlación**.
+
+**Efectos fijos: condicional vs marginal, y los errores estándar.** Los coeficientes de `m_int`
+($x_1=1{,}08$, $x_2=-0{,}66$) son algo **mayores** en magnitud que los del *pooled* (`m_pool`:
+$x_1=1{,}02$, $x_2=-0{,}63$): es la atenuación —leve aquí, porque $\sigma_u$ es pequeño— del efecto
+**marginal** frente al **condicional**. Y, sobre todo, los **errores estándar crecen** en el mixto
+(el del intercepto pasa de $0{,}106$ a $0{,}142$), porque `m_int` **tiene en cuenta** el agrupamiento
+por centro que el *pooled* ignoraba: el *pooled* daba una precisión **falsamente alta**. Frente a la
+verdad del DGP ($x_1=0{,}85$, $x_2=-0{,}65$, $\sigma_u=0{,}70$), `m_int` recupera bien `x2`, deja `x1`
+algo alto y **subestima** $\sigma_u$ (ICC latente $\approx0{,}06$ frente a $0{,}13$), algo habitual
+con respuesta binaria y pocos grupos.
+
+**¿Hace falta la pendiente aleatoria?** En `m_slope`, `VarCorr` da $\hat\sigma_{u_1}=0{,}40$ con una
+correlación casi extrema, $-0{,}80$; pero el **AIC apenas cambia** ($899{,}0\to898{,}1$, despreciable)
+y el LRT frente a `m_int` no es significativo ($p\approx0{,}08$, sobre 2 g.l.). Como el DGP **no**
+incluye pendiente aleatoria, ese $0{,}40$ es **ruido sobreajustado**: los datos dicen que no se
+justifica. Es exactamente cómo se decide —se añade, se compara por AIC/LRT y se descarta si no
+aporta—.
 
 ## 4.5 Reactivación: el ordinal mixto {#sec-u14-ordinal-mixto}
 
-En la [Sección 3.4](#sec-u13-ordinal) ajustamos la respuesta ordinal `sever_ord` con
-**efectos fijos** (`MASS::polr`). Como la cohorte está agrupada por centro, ahora añadimos
-un **intercepto aleatorio** y cerramos el modelo de odds proporcionales en su versión
-**mixta**:
+En la [Sección 3.4](#sec-u13-ordinal) ajustamos la respuesta ordinal `sever_ord` con **efectos
+fijos** (`MASS::polr`). Como la cohorte está agrupada por centro, ahora añadimos un **intercepto
+aleatorio** y cerramos el modelo de odds proporcionales en su versión **mixta**:
 $$
 \operatorname{logit}\Pr(S_{ij}\le k)=\theta_k-(\beta_1 x_{1ij}+\beta_2 x_{2ij}+w_j),
 \qquad w_j\sim\mathcal{N}(0,\sigma_w^2),
 $$
-con umbrales ordenados $\theta_1<\theta_2$ y un **único** vector de efectos (proporcionalidad
-de odds). Se ajusta con `ordinal::clmm`:
+con umbrales ordenados $\theta_1<\theta_2$ y un **único** vector de efectos (proporcionalidad de
+odds). Se ajusta con `ordinal::clmm`:
 
 ```{r}
 #| label: u14-ordinal-mixto
-#| eval: false
 library(ordinal)
 m_ord <- clmm(sever_ord ~ x1 + x2 + (1 | centro), data = cohorte)
 summary(m_ord)
+tidy(m_ord)
 attr(cohorte, "verdad")$ordinal          # theta, beta y sigma_w verdaderos
 # El mixto recupera mejor los umbrales/efectos que la versión de efectos fijos
 # (polr de 1.3), que ignora w_j y atenúa: ese contraste es la lección del hilo mixto.
 ```
 
+El contraste con la verdad es **excelente**: `clmm` recupera los **umbrales** ($\hat\theta_1=-0{,}64$,
+$\hat\theta_2=0{,}86$; verdad $-0{,}6$ y $0{,}9$), los **efectos** ($\hat\beta_{x_1}=0{,}91$,
+$\hat\beta_{x_2}=-0{,}50$; verdad $0{,}8$ y $-0{,}5$) y la **varianza entre centros**
+($\hat\sigma_w=0{,}62$; verdad $0{,}6$). Como el DGP **sí** incluye un intercepto aleatorio en el
+ordinal, el mixto estima cantidades **condicionales** próximas a la verdad; la versión de efectos
+fijos (`polr`), que ignora $w_j$, las **atenuaría** —ese es justo el contraste que se pide en la
+tarea—.
+
+::: {.callout-note}
+## El multinomial *nominal* mixto: una frontera
+El ordinal mixto ha sido directo porque el modelo de odds proporcionales tiene **un solo**
+predictor lineal, y añadirle un efecto aleatorio cabe en `ordinal::clmm`. El **nominal** no: el
+logit de categoría base tiene **$K-1$ predictores lineales a la vez**, y la pila habitual no lo
+cubre —`nnet`/`VGAM` son de efectos fijos, y `glmer`/`glmmTMB` no ajustan respuesta nominal—. Para
+hacerlo hacen falta herramientas especializadas: `mclogit::mblogit` (frecuentista) o, en enfoque
+bayesiano, `brms` (`family = categorical()`) o `MCMCglmm`. Queda fuera del alcance del curso; lo
+señalamos como extensión.
+:::
+
+::: {.callout-note}
+## Los efectos aleatorios encajan mejor en el enfoque bayesiano
+La distinción **fijo vs aleatorio** es, en parte, una incomodidad **frecuentista**: los aleatorios
+se tratan como variables latentes que hay que **integrar** de la verosimilitud (con aproximaciones
+—Laplace, cuadratura—), y su varianza puede quedar **pegada al borde** —los ajustes *singulares* o
+el $\hat\sigma_u$ subestimado que vimos—. En el marco **bayesiano** no hay tal dicotomía: **todos**
+los parámetros tienen distribución, y un efecto aleatorio es solo un parámetro con un **prior
+jerárquico** ($u_j\sim\mathcal{N}(0,\sigma_u^2)$, con su propio prior para $\sigma_u^2$). El
+*partial pooling* **emerge solo** de esa jerarquía, la incertidumbre de la varianza se propaga
+entera, los problemas de frontera se manejan con suavidad y estructuras complejas (como el nominal
+mixto) encajan sin forzar. Herramientas: `brms`, `rstanarm`, `MCMCglmm`.
+:::
+
 ::: {.callout-important}
 ## Tarea del estudiante (1.4)
 1. **Pooled vs GLMM (RA6).** Ajusta `ever ~ x1 + x2` en dos versiones: *pooled* (`glm`) y con
-   intercepto aleatorio (`glmer`, `(1 | centro)`). Compara `coef(m_pool)` con `fixef(m_glmm)`,
-   contrasta ambos con la **verdad** del DGP y explica por qué el *pooled* **atenúa** los
-   efectos (condicional vs marginal). Interpreta el **ICC**.
-2. **Ordinal mixto.** Ajusta el ordinal con `clmm` y compáralo con la versión de efectos fijos
-   (`polr`) de la [Sección 3.4](#sec-u13-ordinal): comenta qué cambia en umbrales y efectos, y
-   por qué.
+   intercepto aleatorio (`glmer`, `(1 | centro)`). Compara `coef(m_pool)` con `fixef(m_int)`,
+   contrasta ambos con la **verdad** del DGP y explica por qué el *pooled* **atenúa** los efectos
+   (condicional vs marginal). Interpreta el **ICC**.
+2. **Pendiente aleatoria.** Añade `(1 + x1 | centro)` y examina `VarCorr`: interpreta $\sigma_{u_1}$
+   y su correlación con el intercepto, y razona —a la vista de la varianza estimada, la correlación y la
+   convergencia— si los datos justifican la pendiente aleatoria.
+3. **Ordinal mixto.** Ajusta el ordinal con `clmm` y compáralo con la versión de efectos fijos
+   (`polr`) de la [Sección 3.4](#sec-u13-ordinal): comenta qué cambia en umbrales y efectos, y por
+   qué.
 :::

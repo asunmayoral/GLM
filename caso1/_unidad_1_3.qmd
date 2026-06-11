@@ -183,11 +183,15 @@ tidy(m_nom) # visualización ordenada
 exp(coef(m_nom))      # odds ratios relativos
 ```
 
-`multinom` devuelve **dos bloques**, `Less|Same` y `Greater|Same`. Por ejemplo, el coeficiente de
-`priorfracYes` en el bloque `Greater` se lee: una fractura previa multiplica por $e^{\hat\gamma}$
-las odds de percibirse en **mayor** riesgo (`Greater`) frente a **igual** (`Same`), a igualdad de
-edad; su signo da el sentido. (Al ser datos reales ya no hay una "verdad" del DGP con la que
-contrastar, como en la cohorte simulada: la lectura es directamente sustantiva.)
+`multinom` devuelve **dos bloques** de odds ratios relativos, `Less|Same` y `Greater|Same`. El
+motor es la **fractura previa**: tener una multiplica por **2,23** las odds de percibirse en
+**mayor** riesgo (`Greater`) frente a «igual» (`Same`) y, a la vez, las reduce a **0,65** (−35 %)
+para percibirse en **menor** riesgo (`Less`); es decir, empuja la percepción fuera de «Same» hacia
+«Greater» —clínicamente coherente y buena señal de que el modelo capta algo real—. La **edad**, en
+cambio, apenas influye (OR ≈ 1: 1,01 para `Less`, 0,98 para `Greater`). Dos matices: son odds
+**relativas a `Same`**, no frente a todas las categorías; y los interceptos (OR de `Less` ≈ 0,49 y
+`Greater` ≈ 2,93) corresponden a `age = 0`, una extrapolación sin sentido sustantivo —para leer en
+probabilidad por edades, la @fig-u13-pred-nominal—.
 
 Lo más comunicable es la **probabilidad predicha** de cada nivel. La @fig-u13-pred-nominal la
 traza frente a la edad:
