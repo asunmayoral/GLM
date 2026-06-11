@@ -969,7 +969,7 @@ Dos formas estándar de **estandarizar** el residuo crudo $y_i-\hat\mu_i$ en un 
 $$
 r_{P,i}=\frac{y_i-\hat\mu_i}{\sqrt{V(\hat\mu_i)}},
 $$
-y su suma de cuadrados es el estadístico $X^2=\sum_i r_{P,i}^2$. 
+y su suma de cuadrados es el estadístico de Pearson $X^2=\sum_i r_{P,i}^2$. 
 
 - El de **deviance** reparte la deviance total entre las observaciones,
 $$

@@ -1,26 +1,33 @@
 <!-- Partial: incluir con {{< include _unidad_1_3.qmd >}}. Sin YAML.
-     Chunks prefijados u13-. Binomial agrupado sobre GLOW; multinomial/ordinal
-     sobre la cohorte simulada (clase_nom, sever_ord) con verdad en attr(,"verdad"). -->
+     Chunks prefijados u13-. Binomial agrupado y multinomial/ordinal (raterisk) sobre GLOW. -->
 
 # 3 · Respuesta categórica generalizada: binomial agrupado y multinomial {#sec-u13}
 
+Cuando todas las predictoras son **categóricas**, dos sujetos con el mismo perfil de
+covariables son **intercambiables**: para el modelo son ensayos idénticos. Podemos entonces
+**colapsar** cada perfil en una sola fila que cuente *cuántos casos de cada tipo hay en el
+grupo*. Con respuesta **binaria**, agrupar convierte la Bernoulli individual ($y_i\in\{0,1\}$)
+en una **binomial**, $Y_i\sim\mathrm{Bin}(m_i,\pi_i)$, con $m_i$ el tamaño del grupo: es **el
+mismo modelo logístico**, solo cambia la disposición del dato (lo vemos en la [Sección 3.1](#sec-u13-binomial) y [Sección 3.2](#sec-u13-gof-binomial)). Con **más
+de dos categorías**, la respuesta es **categórica** (*multinoulli*) si la tratamos **individual**
+—una fila por sujeto— o **multinomial** $Y_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$ si la
+agrupamos en recuentos; en ambos casos el modelo es el mismo —el **logit de categoría base**
+(nominal) o el de **odds proporcionales** (ordinal)—, que tratamos en las Secciones
+[3.3](#sec-u13-nominal) y [3.4](#sec-u13-ordinal) sobre datos **individuales** de GLOW.
+
 ::: {.callout-note}
 ## Sobre esta unidad
-La logística de las unidades anteriores trataba una respuesta **binaria individual**.
-Aquí la generalizamos en dos direcciones independientes: hacia datos **agrupados**
-(binomial, varios ensayos por fila) y hacia **más de dos categorías** (multinomial
-nominal y ordinal). Seguimos sobre GLOW para no romper la narrativa.
 **RA implicados:** RA1–RA5 sobre un nuevo tipo de respuesta.
 :::
 
+
 ## 3.1 Del dato individual al binomial agrupado {#sec-u13-binomial}
 
-Cuando todas las predictoras son **categóricas**, dos sujetos con el mismo perfil de
-covariables son **intercambiables**: para el modelo son ensayos idénticos. Podemos
-entonces **colapsar** cada perfil en una sola fila que cuente *cuántos eventos hay de
-cuántos ensayos*. La respuesta deja de ser Bernoulli ($y_i\in\{0,1\}$) y pasa a ser
-**binomial**, $Y_i\sim\mathrm{Bin}(m_i,\pi_i)$, con $m_i$ el tamaño del grupo. **El modelo
-es el mismo**; solo cambia la disposición del dato.
+Apliquemos esa agrupación a GLOW. Como las predictoras que usaremos son **factores**, cada
+combinación de niveles reúne a mujeres intercambiables; al colapsarlas, la respuesta pasa de un
+$0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo
+llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia
+—y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
 
 Agrupamos GLOW por tres factores (`priorfrac`, `momfrac`, `raterisk`) y contamos fracturas:
 
@@ -55,9 +62,7 @@ a las del caso individual. Lo que cambia —y es la ganancia de agrupar— es la
 
 En la [Sección 2.6](#sec-u12-diagnostico) vimos que, con datos **individuales**, la deviance residual **no** sirve como test
 absoluto de ajuste. Con datos **agrupados** (y $m_i$ suficientemente grandes) la asintótica
-**se recupera**: bajo un modelo correcto, tanto la deviance residual $D$ como el estadístico
-de Pearson $X^2=\sum_i r_{P,i}^2$ se distribuyen $\chi^2_{n-p}$ [@agresti2015; @faraway2016].
-Ya podemos contrastar el ajuste de forma absoluta:
+**se recupera**: bajo un modelo correcto, tanto la deviance residual $D$ como el estadístico de Pearson $X^2=\sum_i r_{P,i}^2$ (definidos en la [Sección 2.6](#sec-u12-diagnostico)) se distribuyen $\chi^2_{n-p}$… [@agresti2015; @faraway2016]. Ya podemos contrastar el ajuste de forma absoluta:
 
 ```{r}
 #| label: u13-gof
@@ -73,65 +78,176 @@ c(p_deviance = pchisq(deviance(fit_bin), gl, lower.tail = FALSE),
 
 Un $p$ **alto** indica que no hay evidencia de falta de ajuste: el modelo reproduce
 razonablemente las proporciones por celda. (Cautela: la aproximación exige celdas no
-demasiado pequeñas; con muchos $m_i$ chicos vuelve a degradarse.) Es exactamente el
+demasiado pequeñas; con muchos $m_i$ pequeños vuelve a degradarse.) Es exactamente el
 contraste que en la [Sección 2.6](#sec-u12-diagnostico) no podíamos usar y que ahora, al agrupar, recupera su sentido.
+
+
+Agrupar trae, además, varias ventajas de diagnóstico que el caso individual no permitía: 
+
+- Los **residuos** por celda ya son informativos (con $m_i$ suficiente, aproximadamente normales), de
+modo que se leen directamente.
+- La **calibración es inmediata**, porque cada celda aporta su
+probabilidad predicha y su proporción observada —sin necesidad de agrupar por deciles—. 
+- De paso, la **sobredispersión** pasa a ser estimable ($\hat\phi=X^2/\text{gl}$): un valor claramente
+mayor que 1 indicaría que el binomial se queda corto y convendría un *quasi-binomial* (lo
+veremos con los conteos del Caso 2).
+
+```{r}
+#| label: u13-binomial-diag
+#| fig-width: 6
+#| fig-height: 4
+# Calibración DIRECTA: cada celda = (probabilidad predicha, proporción observada)
+calib_bin <- glow_agg |>
+  mutate(pred = fitted(fit_bin), obs = Yes / total)
+
+ggplot(calib_bin, aes(pred, obs, size = total)) +
+  geom_abline(linetype = "dashed") +                 # calibración perfecta
+  geom_point(alpha = 0.7) +
+  labs(x = "Probabilidad predicha", y = "Proporción observada (Yes/total)",
+       size = "n por celda")
+
+# Sobredispersión (ahora sí estimable): ~1 si el binomial basta, >1 sugiere quasi-binomial
+sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
+```
+
+En **todo lo demás**, el binomial agrupado se ajusta e interpreta **exactamente igual** que el
+logístico individual de la Unidad 2: misma estimación (máxima verosimilitud / IWLS), misma
+inferencia (Wald, LRT, IC por perfil) y misma selección de modelos (deviance, AIC/BIC, la
+escalera de la [Sección 2.5](#sec-u12-inferencia)). Y la **lectura de los resultados no cambia**:
+los coeficientes siguen siendo log-odds, $e^{\beta}$ es un odds ratio y las predicciones se
+interpretan en probabilidad igual que en la [Sección 2.3](#sec-u12-interpretacion). La única
+diferencia es la que acabamos de explotar: al agrupar, recuperamos los **diagnósticos de ajuste**
+(el $\chi^2$ de bondad de ajuste, los residuos y la calibración por celda) que en el caso
+individual no eran válidos.
+
 
 ## 3.3 Más de dos categorías sin orden: multinomial nominal {#sec-u13-nominal}
 
-Cuando la respuesta tiene **más de dos categorías sin orden**, el logit binario se
-generaliza al **logit de categoría base**: se fija una categoría de referencia y se modela,
-frente a ella, el log-odds de cada una de las demás. Para `clase_nom` (A/B/C, referencia A):
+Cuando la respuesta tiene **más de dos categorías sin orden**, el logit binario se generaliza al
+**logit de categoría base**: se fija una categoría de referencia y se modela, frente a ella, el
+log-odds de cada una de las demás. Usamos `raterisk` —el riesgo de fractura **autopercibido** en
+GLOW, con tres niveles `Less`/`Same`/`Greater`—, tomando `Same` como referencia:
 $$
-\log\frac{\Pr(Y=k)}{\Pr(Y=A)}=\gamma_{0k}+\gamma_{1k}x_1+\gamma_{2k}x_2,
-\qquad k\in\{B,C\}.
+\log\frac{\Pr(Y=k)}{\Pr(Y=\text{Same})}=\gamma_{0k}+\gamma_{1k}x_1+\gamma_{2k}x_2,
+\qquad k\in\{\text{Less},\text{Greater}\}.
 $$
-Hay **un juego de coeficientes por categoría** frente a la referencia, y $e^{\gamma}$ es un
-**odds ratio relativo** (categoría $k$ vs $A$). Lo ajustamos con efectos fijos —el tratamiento
-*breve* del marco politómico que pide la guía—:
+
+En el logit de categoría base cada coeficiente lleva **dos índices** que conviene no confundir:
+el del **regresor** $x_j$ (qué covariable; aquí $x_1=$ `age`, $x_2=$ `priorfrac`) y el de la
+**categoría de respuesta** $k$ (con cuál de las no-referencia comparamos; aquí
+$k\in\{\text{Less},\text{Greater}\}$). Así, $\gamma_{jk}$ es el efecto del regresor $x_j$ sobre el
+**log-odds de la categoría $k$ frente a la referencia `Same`**. Hay, por tanto, un **vector de
+coeficientes por cada categoría no-referencia** —uno para `Less` vs `Same` y otro para `Greater`
+vs `Same`—, cada uno con su intercepto $\gamma_{0k}$ y sus pendientes $\gamma_{1k},\gamma_{2k}$.
+
+Al exponenciar, $e^{\gamma_{jk}}$ es un **odds ratio relativo**: el factor por el que se
+multiplican las **odds de pertenecer a la categoría $k$ en lugar de a `Same`** cuando $x_j$
+aumenta una unidad, manteniendo el resto constante. Por ejemplo, $e^{\gamma_{1,\text{Greater}}}$
+es cuánto cambia la ventaja de percibirse en **mayor** riesgo (`Greater`) frente a **igual**
+(`Same`) por cada año más de edad. El **signo** ya orienta: $\gamma_{jk}>0$ inclina hacia $k$
+frente a `Same` al aumentar $x_j$; $\gamma_{jk}<0$, hacia `Same`.
+
+Es una comparación **por pares contra la referencia**: el OR de `Less` frente a `Greater` no
+aparece directamente —se obtiene combinando ambos juegos ($e^{\gamma_{jk}-\gamma_{jk'}}$) o
+reeligiendo la categoría base—. Cambiar la referencia cambia los coeficientes, pero **no** las
+probabilidades ajustadas.
+
+::: {.callout-note}
+## Individual o agrupado: qué cambia y qué no
+Tanto si la respuesta categórica es **individual** (una fila por sujeto, como aquí con
+`raterisk`) como **agrupada** (recuentos por perfil, multinomial), el **modelo y sus estimaciones
+son los mismos**: misma verosimilitud, misma interpretación de coeficientes, y la **selección de
+modelos** (LRT, AIC/BIC) funciona igual. Lo que **no** vale con datos individuales es el contraste
+**$\chi^2$ de bondad de ajuste** ni el análisis de **residuos**: como en el paso Bernoulli→binomial
+([Sección 3.2](#sec-u13-gof-binomial)), solo recuperan su sentido al **agrupar**. Por eso aquí
+valoramos el ajuste mirando las **probabilidades predichas**, no un $\chi^2$.
+:::
+
+**Un cambio de motor: esto ya no se ajusta con `glm()`.** 
+
+La función `glm()` maneja respuestas de
+la familia exponencial **univariante** —un solo predictor lineal para una respuesta escalar
+(Bernoulli, Poisson…)—. El multinomial tiene respuesta **vectorial** ($K$ categorías cuyas
+probabilidades suman 1) y necesita **$K-1$ predictores lineales a la vez** (un logit por cada
+categoría no-referencia), así que se sale del marco de `glm()`. En R se ajusta con
+`nnet::multinom()` —lo que usamos aquí— o con `VGAM::vglm(..., family = multinomial)`; ambas
+estiman por máxima verosimilitud el **mismo** logit de categoría base.
 
 ```{r}
 #| label: u13-nominal
-#| eval: false
 library(nnet)
-m_nom <- multinom(clase_nom ~ x1 + x2, data = cohorte, trace = FALSE)
-summary(m_nom)                           # dos bloques de coeficientes: B|A y C|A
-exp(coef(m_nom))                         # odds ratios relativos
-attr(cohorte, "verdad")$nominal          # gamma_B y gamma_C verdaderos (DGP)
+m_nom <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac,
+                  data = glow, trace = FALSE)
+summary(m_nom) # dos bloques de coeficientes: Less|Same y Greater|Same
+tidy(m_nom) # visualización ordenada
+exp(coef(m_nom))      # odds ratios relativos
 ```
 
-::: {.callout-note}
-## El multinomial *mixto* queda como frontera
-Añadir un efecto aleatorio a un multinomial **nominal** sale de la pila estándar
-(`nnet`/`VGAM` son de efectos fijos; `lme4`/`glmmTMB` no ajustan multinomial) y exige
-herramientas especializadas (`mclogit`, `brms`). Lo señalamos como extensión avanzada, no
-como ejercicio.
-:::
+`multinom` devuelve **dos bloques**, `Less|Same` y `Greater|Same`. Por ejemplo, el coeficiente de
+`priorfracYes` en el bloque `Greater` se lee: una fractura previa multiplica por $e^{\hat\gamma}$
+las odds de percibirse en **mayor** riesgo (`Greater`) frente a **igual** (`Same`), a igualdad de
+edad; su signo da el sentido. (Al ser datos reales ya no hay una "verdad" del DGP con la que
+contrastar, como en la cohorte simulada: la lectura es directamente sustantiva.)
+
+Lo más comunicable es la **probabilidad predicha** de cada nivel. La @fig-u13-pred-nominal la
+traza frente a la edad:
+
+```{r}
+#| label: fig-u13-pred-nominal
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Probabilidad predicha de cada nivel de raterisk según la edad (multinomial nominal, priorfrac = No). Cada categoría sigue su propia curva, sin restricción entre ellas."
+library(ggeffects)
+plot(ggpredict(m_nom, terms = "age [all]"))
+```
 
 ## 3.4 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
 
-Cuando las categorías **tienen orden** (`sever_ord`: Leve < Moderado < Grave), conviene
-aprovecharlo en vez de tratarlas como nominales. El modelo de **odds proporcionales**
-(*cumulative logit*) modela los **logits acumulados** con umbrales ordenados y **un único**
+`raterisk` **tiene orden** (`Less < Same < Greater`), y el modelo nominal anterior lo ignoraba.
+Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcionales**
+(*cumulative logit*), que modela los **logits acumulados** con umbrales ordenados y **un único**
 vector de efectos:
 $$
-\operatorname{logit}\Pr(S_i\le k)=\theta_k-(\beta_1 x_{1i}+\beta_2 x_{2i}),
+\operatorname{logit}\Pr(Y_i\le k)=\theta_k-(\beta_1 x_{1i}+\beta_2 x_{2i}),
 \qquad \theta_1<\theta_2,
 $$
-de modo que $e^{\beta}$ es un odds ratio **acumulado** común a todos los cortes (de ahí
-«odds proporcionales»). En efectos fijos se ajusta con `MASS::polr`:
+(con tres categorías hay **dos** umbrales), de modo que $e^{\beta}$ es un odds ratio **acumulado**,
+común a todos los cortes —de ahí «odds proporcionales»—. Se ajusta con `MASS::polr`, que **exige**
+una respuesta de tipo **factor ordenado**:
 
 ```{r}
 #| label: u13-ordinal
-#| eval: false
-m_ord <- MASS::polr(sever_ord ~ x1 + x2, data = cohorte, Hess = TRUE)
-summary(m_ord)                           # umbrales theta y efectos beta
-attr(cohorte, "verdad")$ordinal          # valores verdaderos (DGP)
+glow_ord <- glow |>
+  mutate(raterisk = ordered(raterisk, levels = c("Less", "Same", "Greater")))
+m_ord <- MASS::polr(raterisk ~ age + priorfrac, data = glow_ord, Hess = TRUE)
+tidy(m_ord)        # dos umbrales (theta) y los efectos (beta), comunes a ambos cortes
+exp(coef(m_ord))      # odds ratios acumulados
 ```
 
-En la [Unidad 1.4](#sec-u14) reactivamos el hilo de **efectos aleatorios** y veremos la
-versión **mixta** de este ordinal (intercepto aleatorio por centro, `ordinal::clmm`), que
-recupera mejor umbrales y efectos que `polr` cuando hay agrupamiento: ese contraste enlaza
-ambas unidades.
+Frente al nominal de 3.3, el ordinal **gana parsimonia**: un solo $\beta$ por covariable en vez de
+uno por categoría, a cambio del **supuesto de proporcionalidad de odds** (el mismo efecto en todos
+los cortes), que conviene contrastar (un test de líneas paralelas).
+
+```{r}
+#| label: fig-u13-pred-ordinal
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Probabilidad predicha de cada nivel de raterisk según la edad (odds proporcionales, priorfrac = No). Las curvas están ligadas por un único efecto de la edad común a todos los cortes."
+library(ggeffects)
+plot(ggpredict(m_ord, terms = "age [all]"))
+```
+
+La @fig-u13-pred-ordinal lo deja ver: frente a las **curvas libres** del nominal
+(@fig-u13-pred-nominal), aquí están **ligadas** por un único efecto de la edad —la categoría
+central (`Same`) forma una joroba y las extremas son monótonas—. Si ambas imágenes se parecen, el
+supuesto de proporcionalidad es razonable y ganamos parsimonia; si difieren mucho, el ordinal
+estaría forzando.
+
+En la [Unidad 1.4](#sec-u14) reactivamos los efectos aleatorios y ajustamos un **ordinal mixto**
+(intercepto aleatorio por grupo, `ordinal::clmm`) —allí sobre la cohorte simulada, cuya verdad
+conocida deja ver cómo el mixto recupera mejor umbrales y efectos que `polr` cuando hay
+agrupamiento—.
+
 
 ::: {.callout-important}
 ## Tarea del estudiante (1.3)
