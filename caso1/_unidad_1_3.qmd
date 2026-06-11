@@ -53,7 +53,7 @@ a las del caso individual. Lo que cambia —y es la ganancia de agrupar— es la
 
 ## 3.2 Bondad de ajuste con datos agrupados: ahora el χ² sí funciona {#sec-u13-gof-binomial}
 
-En 2.6 vimos que, con datos **individuales**, la deviance residual **no** sirve como test
+En la [Sección 2.6](#sec-u12-diagnostico) vimos que, con datos **individuales**, la deviance residual **no** sirve como test
 absoluto de ajuste. Con datos **agrupados** (y $m_i$ suficientemente grandes) la asintótica
 **se recupera**: bajo un modelo correcto, tanto la deviance residual $D$ como el estadístico
 de Pearson $X^2=\sum_i r_{P,i}^2$ se distribuyen $\chi^2_{n-p}$ [@agresti2015; @faraway2016].
@@ -74,7 +74,7 @@ c(p_deviance = pchisq(deviance(fit_bin), gl, lower.tail = FALSE),
 Un $p$ **alto** indica que no hay evidencia de falta de ajuste: el modelo reproduce
 razonablemente las proporciones por celda. (Cautela: la aproximación exige celdas no
 demasiado pequeñas; con muchos $m_i$ chicos vuelve a degradarse.) Es exactamente el
-contraste que en 2.6 no podíamos usar y que ahora, al agrupar, recupera su sentido.
+contraste que en la [Sección 2.6](#sec-u12-diagnostico) no podíamos usar y que ahora, al agrupar, recupera su sentido.
 
 ## 3.3 Más de dos categorías sin orden: multinomial nominal {#sec-u13-nominal}
 

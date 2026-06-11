@@ -43,6 +43,7 @@ library(DHARMa)
 library(arm)
 library(performance)
 library(tidyverse)
+library(MuMIn)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
