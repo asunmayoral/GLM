@@ -1,7 +1,7 @@
 ---
 title: "Caso 1 · ¿Ocurre el evento? ¿Y cuándo?"
 subtitle: "Respuestas binarias, politómicas y tiempo hasta el evento — Modelos Lineales Generalizados con R"
-author: "Equipo docente"
+author: "A.M.Mayoral, con asistencia de Claude Opus 4.8"
 date: today
 lang: es
 format:
@@ -18,7 +18,9 @@ format:
   pdf:
     toc: true
     number-sections: false
-bibliography: references.bib
+bibliography: ../references.bib
+nocite: |
+  @*
 csl: https://www.zotero.org/styles/apa 
 execute:
   warning: false
@@ -44,6 +46,8 @@ library(arm)
 library(performance)
 library(tidyverse)
 library(MuMIn)
+library(readr)
+library(GGally)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
@@ -51,51 +55,53 @@ theme_set(theme_minimal(base_size = 12))
 ```
 
 ::: callout-note
-## Mapa del caso (estructurado por contenidos)
+## Mapa del caso
 
-Diseño **problema-primero**, organizado por **unidades de contenido**
-(no por franjas horarias fijas): cada unidad se imparte en el tiempo que
-requiera. Los dos hilos en espiral —efectos mixtos y supervivencia— se
-introducen aquí y se reactivan en los Casos 2 y 3.
+En esta unidad vamos a trabajar sobre respuestas categóricas. Iniciamos
+con respuesta binaria, seguimos con su agrupación natural en respuestas
+binomiales, y extendemos a respuesta politómica y multinomial. Por el
+camino incorporamos los efectos aleatorios en la modelización, y por
+último estudiamos también el abordaje como un problema de supervivencia
+para ir más allá de la predición del evento, incorporando datos
+censurados y prediciendo también cuándo se va a producir el evento.
 
-| Unidad | Contenido | Hilos |
-|------------------------|------------------------|------------------------|
-| **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. | — |
-| **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores. | — |
-| **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). | — |
-| **1.4** | Efectos aleatorios (GLMM logístico, intercepto aleatorio); reactivación del ordinal mixto. | Mixtos |
-| **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). | Censura |
-| **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas). | — |
+Trabajaremos con la base de datos GLOW y usaremos la cohorte simulada
+para el estudio de supervivencia y el estudio de caso sobre el que
+trabajarás tú estudiante, para demostrar que has aprendido a modelizar
+datos discretos.
+
+| Unidad | Contenido |
+|-----|------------------------------------|
+| **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. <br> Objetivos: RA1 (GLM vs OLS) |
+| **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores.<br> Objetivos: RA2 (ajuste) |
+| **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). <br> Objetivos: RA3 (interpretación en la escala correcta), <br> RA4 (diagnóstico, separación, calibración), <br> RA5 (comparación de modelos) |
+| **1.4** | Efectos aleatorios (GLMM logístico, intercepto aleatorio); reactivación del ordinal mixto. <br> Objetivos: RA6 (efectos mixtos) |
+| **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). <br> Objetivos: RA7 (censura y tiempo-a-evento como  casos del marco) |
+| **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas).<br>Objetivos: RA8 (estudio de caso reproducible) |
 :::
 
 # Presentación del caso {#sec-presentacion}
 
-::: callout-note
-## Objetivos del caso (RA cubiertos)
+Iniciamos pues la unidad, presentando los bancos de datos con los que
+vamos a trabajar. La pregunta que vertebra el caso tiene dos
+tiempos básicos: 
 
-RA1 (GLM vs OLS), RA2 (ajuste), RA3 (interpretación en la escala
-correcta), RA4 (diagnóstico, separación, calibración), RA5 (comparación
-de modelos), RA6 (efectos mixtos), RA7 (censura y tiempo-a-evento como
-casos del marco), RA8 (estudio de caso reproducible).
-:::
+1. **«¿Ocurre el evento?»**: una respuesta binaria que motiva
+el marco GLM y la regresión logística. 
+2. **«¿Cuándo?»**: el mismo evento como **tiempo hasta que ocurre**, con **censura**, que se
+reformula como un GLM sobre datos persona-periodo.
 
-La pregunta que vertebra el caso tiene dos tiempos. Primero, **«¿ocurre
-el evento?»**: una respuesta binaria que motiva el marco GLM y la
-regresión logística. Después, **«¿y cuándo?»**: el mismo evento como
-**tiempo hasta que ocurre**, con **censura**, que se reformula como un
-GLM sobre datos persona-periodo. En medio, dos matices: los sujetos
-vienen **agrupados** (abre los **efectos mixtos**), y la respuesta puede
-tener **más de dos categorías** (extensión politómica, nominal u
-ordinal).
+En el recorrido, surgen dos matices que también trataremos: 
 
-## Los datos del caso {#sec-datos}
+- los sujetos vienen **agrupados** (por centro), e introducimos los **efectos aleatorios** y los **modelos mixtos**, 
+- y la respuesta puede tener **más de dos categorías**, motivando la extensión politómica, nominal u ordinal.
 
-El caso combina **dos fuentes** con papeles distintos: un conjunto
-**real** para el ejemplo logístico que resolvemos en clase, y una
-**cohorte simulada** con proceso generador conocido que vertebra los
-hilos en espiral y las tareas evaluables.
+Para trabajar todas estas cuestiones utilizaremos dos fuentes de datos con
+papeles distintos: un conjunto **real** para el ejemplo logístico, y una
+**cohorte simulada** con proceso generador conocido, que vertebra la
+extensión de la modelización a la supervivencia.
 
-### a) Dato real — GLOW (ejemplo logístico, Unidades 1.1–1.3) {#sec-datos-glow}
+## Dato real — GLOW {#sec-datos-glow}
 
 `glow500` procede del estudio **GLOW** (*Global Longitudinal Study of
 Osteoporosis in Women*) y se distribuye en el paquete `aplore3`
@@ -105,7 +111,7 @@ binaria —`fracture`: alguna fractura en el primer año— y el resto son
 factores de riesgo basales:
 
 | Variable | Descripción | Tipo |
-|------------------------|------------------------|------------------------|
+|------------------------|------------------------------------------------|----------|
 | `fracture` | Fractura en el primer año (No/Yes) — **respuesta** | Binaria |
 | `age` | Edad al ingreso (años) | Continua |
 | `weight` | Peso al ingreso (kg) | Continua |
@@ -120,57 +126,8 @@ factores de riesgo basales:
 | `fracscore` | Puntuación compuesta de riesgo de fractura | Discreta |
 | `sub_id`, `site_id`, `phy_id` | Identificadores de paciente, centro y médico | ID |
 
-### b) Cohorte simulada — columna vertebral de los hilos en espiral {#sec-datos-cohorte}
-
-Es **sintética y con proceso generador explícito** (`R/dgp_cohorte.R`).
-De un único proceso generador salen **cuatro respuestas** sobre los
-mismos individuos, todas con **verdad conocida** (los parámetros que las
-generan están en `attr(cohorte, "verdad")`). Cada individuo pertenece a
-un **centro**, y los centros introducen correlación intragrupo mediante
-**interceptos aleatorios** —el ingrediente que motiva los efectos
-mixtos—. Estas son las variables de la cohorte:
-
-| Variable | Significado | Tipo | Se usa en |
-|------------------|------------------|------------------|------------------|
-| `id` | Identificador del individuo | — | — |
-| `centro` | Centro al que pertenece (grupo del efecto aleatorio) | Factor | 1.4, 1.5 |
-| `x1` | Covariable **continua** estandarizada (p. ej. edad tipificada) | Continua | todas |
-| `x2` | Covariable **binaria** 0/1 (p. ej. brazo de tratamiento) | Binaria | todas |
-| `tiempo` | Periodo de seguimiento (1–6) en que termina la observación | Entero | 1.5 |
-| `evento` | 1 = el evento se observó; 0 = censura administrativa | Binaria | 1.5 |
-| `ever` | ¿Ocurrió el evento durante el seguimiento? (= `evento`) | Binaria | 1.4 |
-| `clase_nom` | Respuesta **nominal** sin orden: perfil **A/B/C** | Factor (3) | 1.3 |
-| `sever_ord` | Respuesta **ordinal**: severidad **Leve \< Moderado \< Grave** | Factor ordenado (3) | 1.3, 1.4 |
-
-Las cuatro respuestas se generan así (la fundamentación teórica del
-bloque de supervivencia está en la [Unidad 1.5](#sec-u15)):
-
-- **Binaria y tiempo-a-evento** (`ever`, `tiempo`, `evento`). Surgen de
-  un modelo de **riesgo en tiempo discreto** con enlace `cloglog`,
-  $\text{cloglog}(h_{ijt})=\alpha_t+\beta_1 x_1+\beta_2 x_2+u_j$, con un
-  intercepto aleatorio por centro $u_j\sim\mathcal{N}(0,\sigma_u^2)$ y
-  **censura administrativa no informativa**. De ahí salen tanto la
-  binaria «¿ocurrió el evento?» (para el GLMM logístico de 1.4) como el
-  reloj de supervivencia (para el modelo persona-periodo de 1.5).
-- **Nominal** (`clase_nom`, categorías A/B/C **sin orden**). Se genera
-  con un **logit de categoría base** (multinomial) de **efectos fijos**
-  sobre `x1` y `x2`. Sirve para el multinomial logit de 1.3.
-  Interpretación posible: un perfil clínico en tres tipos no ordenados.
-- **Ordinal** (`sever_ord`, **Leve \< Moderado \< Grave**). Se genera
-  con un **cumulative logit** (odds proporcionales) sobre `x1`, `x2` y
-  un **intercepto aleatorio por centro**
-  $w_j\sim\mathcal{N}(0,\sigma_w^2)$. Sirve para el modelo ordinal mixto
-  de 1.4. Interpretación posible: un grado de severidad basal.
-
-Las respuestas categóricas (`clase_nom`, `sever_ord`) son
-**independientes** del reloj de supervivencia: comparten covariables y
-estructura de centros, pero no se derivan de si el sujeto tuvo el evento
-ni de cuándo. Es una decisión de diseño deliberada, para no entrar en
-modelos de riesgos competitivos, que quedan fuera del alcance del Caso
-1.
-
-**Carga del dato real (GLOW).** Creamos también una versión 0/1 de la
-respuesta para el experimento con OLS de la Unidad 1.1.
+Creamos también una versión 0/1 de la respuesta `fracture` para el
+experimento, que utilizaremos en esta unidad.
 
 ```{r}
 #| label: carga-datos
@@ -182,21 +139,228 @@ glow <- glow500 |>
 glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 ```
 
-**Construcción de la cohorte simulada.** El proceso generador vive en su
-propio script reutilizable (lo sourceamos para no duplicar código entre
-casos):
+Visualizamos en la @glow-eda los datos y las relaciones entre ellos,
+diferenciando por color entre las pacientes que han sufrido fractura y
+las que no.
+
+```{r}
+#| label: glow-eda
+#| fig-width: 10
+#| fig-height: 10
+#| out-width: "100%"
+#| fig-cap: "Descripción de GLOW. En la diagonal distribución de las variables, diferenciadas en color por `evento`. En los cruces la relación entre ellas."
+
+# Covariables sustantivas de GLOW (dejo fuera los identificadores)
+vars <- c("age", "weight", "height", "bmi", "fracscore",   # continuas / discretas
+          "priorfrac", "premeno", "momfrac",               # factores de riesgo binarios
+          "armassist", "smoke", "raterisk")                # binarios + ordinal
+
+glow |>
+  select(fracture, all_of(vars)) |>
+  ggpairs(
+    columns = vars,
+    mapping = aes(color = fracture, alpha = 0.6),
+    legend=1,
+    upper = list(continuous = wrap("cor", size = 2.3),     # correlaciones (global y por grupo)
+                 combo      = wrap("box_no_facet"),         # continua ~ factor: boxplots
+                 discrete   = wrap("count")),               # factor ~ factor: recuento
+    lower = list(continuous = wrap("points", alpha = 0.25, size = 0.4),
+                 combo      = wrap("facethist", bins = 20),
+                 discrete   = wrap("facetbar")),
+    diag  = list(continuous = wrap("densityDiag", alpha = 0.5),
+                 discrete   = wrap("barDiag")),
+    progress = FALSE
+  ) +
+  theme_bw(base_size = 7) +
+  theme(strip.text = element_text(size = 6))+
+  theme(legend.position = "bottom")
+```
+
+## Cohorte simulada {#sec-datos-cohorte}
+
+Está inspirada en el problema de GLOW y simula el seguimiento de las pacientes en el
+tiempo a lo largo de 6 años, para una cohorte de mujeres, repartidas en
+varias clínicas (24).
+
+El simulador `simular_cohorte()` está disponible en `R/dgp_cohorte.R` y parte de unas
+condiciones establecidas sobre las relaciones entre las variables consideradas 
+(recuperables en `str(attr(cohorte, "verdad"))`).
+
+Cada paciente acude a **revisiones periódicas anuales** —seis como
+máximo— y en cada una se constata si **ha sufrido una fractura desde la
+revisión anterior**. No observamos el **instante exacto** de la
+fractura, solo el **periodo** en que se detecta: por eso **el tiempo es
+discreto**. Así, `tiempo` $\in\{1,\dots,6\}$ representa el periodo en
+que **termina la observación** de cada mujer —bien porque se le detecta
+una fractura (`evento` = 1) o porque el seguimiento acaba sin ella
+(`evento` = 0, **censura**)—. `tiempo` = 1 significa que el desenlace
+ocurre en la **primera** revisión; `tiempo` = 6, que llega a la **sexta
+y última**. La expansión **persona-periodo** convierte a cada mujer en
+una fila por cada revisión a la que llega sin fractura, con `y` = 1 solo
+en aquella donde se detecta.
+
+El simulador utiliza dos predictores `x1` y `x2` abstractos, que podrían
+representar distintas características; a lo largo del curso **adoptamos
+una caracterización fija** para facilitar la interpretación:
+
+- `x1` = **fragilidad ósea** (a partir de la densidad mineral,
+  estandarizada en puntuación z): factor de riesgo **continuo**; a mayor
+  valor, hueso más frágil y **más** riesgo de fractura ($\beta_1>0$).
+- `x2` = **tratamiento** preventivo (1 = lo recibe, 0 = no): factor
+  **binario** y **protector**; reduce el riesgo ($\beta_2<0$).
+- `centro` = la **clínica** (24 en total); su intercepto aleatorio
+  recoge que unas clínicas tienen más riesgo basal que otras —la
+  *fragilidad* estadística / efecto mixto—.
+
+Las variables simuladas son:
+
+| Variable | Significado (lectura adoptada) | Tipo | Se usa en |
+|-----------|---------------------------------|---------------|-------|
+| `id` | Identificador de la paciente | — | — |
+| `centro` | **Clínica** (grupo del efecto aleatorio / fragilidad) | Factor (24 niveles) | 1.4, 1.5 |
+| `x1` | **Fragilidad ósea** (baja densidad mineral, estandarizada) | Continua | 1.4, 1.5 |
+| `x2` | **Tratamiento** preventivo (1 = sí, 0 = no) | Binaria | 1.4, 1.5 |
+| `tiempo` | **Periodo de revisión** (1–6) en que termina la observación | Entero | 1.5 |
+| `evento` | 1 = fractura **observada** en ese periodo; 0 = **censura** | Binaria | 1.5 |
+| `ever` | ¿Hubo fractura durante el seguimiento? (= `evento`) | Binaria | 1.4 |
+| `sever_ord` | **Severidad basal ordinal** de la osteoporosis (Leve \< Moderado \< Grave) | Factor ordenado (3) | 1.4 |
+| `clase_nom` | **Endotipo nominal** de fragilidad ósea A/B/C (sin orden) — ilustra el contraste; el multinomial del curso se ajusta sobre GLOW (`raterisk`) | Factor (3) | — |
+
+Las respuestas se generan a partir de un modelo de **riesgo en tiempo
+discreto** con enlace `cloglog` (lo estudiaremos más adelante):
+$$\operatorname{cloglog}(h_{ijt})=\alpha_t+\beta_1\,x_{1i}+\beta_2\,x_{2i}+u_j,
+\qquad u_j\sim\mathcal{N}(0,\sigma_u^2),$$
+con **intercepto aleatorio por clínica** $u_j$ (fragilidad) y **censura
+administrativa no informativa**. De ahí salen la respuesta binaria
+«¿hubo fractura?» y el reloj de supervivencia (en qué periodo se
+produjo). Construimos también una variable de **severidad ordinal**
+(`sever_ord`), que se genera aparte, con un cumulative logit más
+intercepto aleatorio por clínica, y la usa el ordinal mixto de 1.4. Las
+respuestas categóricas son **independientes** del reloj de supervivencia
+—comparten covariables y clínicas, pero no se derivan de si hubo
+fractura, ni de cuándo la hubo—, una decisión de diseño para no entrar
+en riesgos competitivos (fuera del alcance de esta unidad).
+
+**Las dos respuestas categóricas, en clave clínica.**
+
+Aunque comparten las covariables `x1` y `x2` con el reloj de
+supervivencia, `sever_ord` y `clase_nom` cuentan historias clínicas
+distintas y se generan con estructuras distintas; conviene fijar su
+lectura para interpretarlas con soltura.
+
+- `sever_ord` es una **gradación de severidad**: un único eje latente
+  ordena los tres niveles —el supuesto de *odds proporcionales*— y las
+  clínicas difieren en su reparto basal (intercepto aleatorio por
+  centro). Admite dos lecturas equivalentes: como **estadio
+  densitométrico de la osteoporosis** (Leve \< Moderado \< Grave ≈
+  osteopenia \< osteoporosis \< osteoporosis establecida) o como el
+  **grado semicuantitativo de fractura vertebral de Genant** (grados 1
+  \< 2 \< 3), que la literatura etiqueta literalmente
+  leve/moderado/grave. Nos quedamos con la primera: "estadio
+  densitométrico de la osteoporosis". Las hipótesis del simulador, **en
+  tendencia**: a **mayor fragilidad ósea** (`x1`) la severidad tiende a
+  **desplazarse hacia grados más altos**; el **tratamiento** (`x2`) se
+  asocia a grados **más leves** (lectura protectora); y, a igualdad de
+  paciente, **unas clínicas tienden a registrar severidades mayores que
+  otras** (distinto *case-mix* o criterio del lector). La relación con
+  el tratamiento es **asociativa**, no causal.
+
+- `clase_nom` es, en cambio, un **fenotipo cualitativo sin orden**: cada
+  categoría sigue su propio patrón —efectos específicos de categoría— y
+  la clínica **no** interviene (sin efecto aleatorio), de modo que es un
+  rasgo del **paciente**. La leemos como un **endotipo de fragilidad
+  ósea** con referencia **A** (baja densidad sin etiología secundaria),
+  un fenotipo **B** de **caídas / fragilidad musculoesquelética** y un
+  fenotipo **C** de **osteoporosis secundaria** (corticoidea o
+  endocrina). En tendencia: a **mayor fragilidad ósea** (`x1`), más
+  probable **alejarse de la referencia** hacia B y, sobre todo, hacia C;
+  y el **tratamiento** (`x2`) **separa** ambos fenotipos —tiende a
+  asociarse **menos** con el de caídas (que se maneja con prevención de
+  caídas) y **más** con la osteoporosis secundaria (donde la profilaxis
+  ósea casi se protocoliza)—. Como antes, se trata de una asociación de
+  **indicación/selección**, no de causalidad.
+
+**Simulación de los datos** Aplicamos el simulador generado y
+construimos la `cohorte` completa.
 
 ```{r}
 #| label: cohorte-sim
+#| 
+library(readr)
 source("R/dgp_cohorte.R")                        # define simular_cohorte(), expandir_persona_periodo()
 cohorte <- simular_cohorte()                     # nivel individuo (binaria, nominal, ordinal)
+# y guardamos las simulaciones
+#write_csv(cohorte, "cohorte.csv")        # nivel individuo
+# resumen
+glimpse(cohorte)
+head(cohorte)
+```
+
+Más tarde, para trabajar la supervivencia con un modelo logístico (1.5),
+habremos de utilizar su versión binaria, en la que desglosamos por filas
+la respuesta de cada paciente en cada uno de los seis periodos de tiempo
+observados durante el seguimiento, identificando con  (0/1) la ausencia/presencia 
+de fractura en cada periodo. Este banco de datos desglosado por periodo está
+disponible en `pp`:
+
+```{r}
+# transformamos la cohorte simulada a datos binarios
 pp      <- expandir_persona_periodo(cohorte)     # persona-periodo (supervivencia, 1.5)
+#write_csv(pp,      "cohorte_pp.csv")     # formato persona-periodo
+head(pp,6)
+```
+
+Visualizamos los datos simulados en la @cohorte-eda, y la relación entre los centros en la @cohorte-centro.
+
+```{r}
+#| label: cohorte-eda
+#| fig-width: 10
+#| fig-height: 10
+#| out-width: "100%"
+#| fig-cap: "Descripción de `cohorte`. En la diagonal distribución de las variables, diferenciadas en color por `evento`. En los cruces la relación entre ellas."
+
+# Preparo factores legibles (x2, tiempo y el desenlace como categóricos)
+cohorte_eda <- cohorte |>
+  mutate(
+    evento = factor(evento, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
+    x2     = factor(x2,     levels = c(0, 1), labels = c("No", "Sí")),
+    tiempo = factor(tiempo, levels = 1:6)
+  )
+
+# Variables sustantivas (fuera 'id', 'centro' y 'ever' = duplicado de 'evento')
+vars <- c("x1", "x2", "tiempo", "clase_nom", "sever_ord")
+
+cohorte_eda |>
+  select(evento, all_of(vars)) |>
+  ggpairs(
+    columns = vars,
+    mapping = aes(color = evento, alpha = 0.6),
+    legend=1,
+    upper = list(continuous = wrap("cor", size = 2.5),
+                 combo      = wrap("box_no_facet"),
+                 discrete   = wrap("count")),
+    lower = list(continuous = wrap("points", alpha = 0.25, size = 0.4),
+                 combo      = wrap("facethist", bins = 20),
+                 discrete   = wrap("facetbar")),
+    diag  = list(continuous = wrap("densityDiag", alpha = 0.5),
+                 discrete   = wrap("barDiag")),
+    progress = FALSE
+  ) +
+  theme_bw(base_size = 8)+
+  theme(legend.position = "bottom")
 ```
 
 ```{r}
-#| label: cohorte-resumen
-glimpse(cohorte)
-str(attr(cohorte, "verdad"))                     # "verdad conocida" para el diagnóstico
+#| label: cohorte-centro
+# 'centro' (24 niveles) no cabe en la matriz: se ve mejor como tasa de evento por clínica
+cohorte |>
+  group_by(centro) |>
+  summarise(tasa_fractura = mean(evento), n = n(), .groups = "drop") |>
+  ggplot(aes(reorder(centro, tasa_fractura), tasa_fractura)) +
+  geom_col(aes(fill = n)) +
+  coord_flip() +
+  labs(x = "Centro (ordenado por tasa)", y = "Proporción de fractura",
+       fill = "n", title = "Variación entre clínicas")
 ```
 
 <!-- ===================================================================== -->

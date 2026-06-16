@@ -13,12 +13,14 @@ vía intermedia: modelar la **variación entre grupos** como una distribución d
 es una muestra. Es el primero de los dos hilos en espiral del curso —los efectos mixtos—, que
 abrimos aquí sobre el GLMM logístico y reactivaremos en cada caso.
 
+Trabajamos sobre la cohorte simulada
+
 ::: {.callout-note}
 ## Sobre esta unidad
 Primer contacto con los **efectos mixtos** (hilo en espiral: se reactiva en el Caso 2).
 Introducimos los **efectos aleatorios** —de intercepto y de pendiente— sobre el GLMM logístico
 binario de la cohorte y, al cierre, reactivamos la respuesta **ordinal** de la
-[Unidad 1.3](#sec-u13) en su versión **mixta**. Trabajamos sobre la cohorte simulada, cuya
+[Unidad 3](#sec-u13) en su versión **mixta**. Trabajamos sobre la cohorte simulada, cuya
 **verdad conocida** permite contrastar lo estimado.
 **RA implicados:** RA6 (efectos mixtos).
 [@bates2015; @agresti2015]
@@ -129,10 +131,45 @@ En forma matricial, una pendiente aleatoria solo **añade columnas a $\mathbf{Z}
 aleatorio y grupo) y agranda $\mathbf{G}$, que pasa a tener un bloque $\boldsymbol\Sigma$ de
 $2\times2$ por grupo.
 
+
+
+
 ## 4.4 Laboratorio: GLMM logístico {#sec-u14-glmm}
 
-::: {.callout-tip}
-## Cómo se ajusta en R: `glmer` y la sintaxis `( | )`
+Replicamos la idea: cómo se distribuye la fragilidad (`x1`) entre
+quienes fracturan y quienes no, separando por tratamiento (`x2`) y por periodo de revisión
+(`tiempo`):
+
+```{r}
+#| label: fig-cohorte-eda-box
+#| fig-width: 10
+#| fig-height: 5
+#| out-width: "100%"
+#| fig-cap: "Fragilidad ósea (x1) según el desenlace, por brazo de tratamiento (x2) y con facetas por periodo de revisión (tiempo)."
+cohorte |>
+  mutate(Desenlace   = factor(evento, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
+         Tratamiento = factor(x2,     levels = c(0, 1), labels = c("No", "Sí"))) |>
+  ggplot(aes(x = Desenlace, y = x1, fill = Tratamiento)) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.25) +
+  facet_wrap(~ tiempo, nrow = 1, labeller = label_both) +
+  labs(x = "Desenlace", y = "Fragilidad ósea (x1, en z)", fill = "Tratamiento")
+```
+
+El patrón es nítido y **coherente en todos los periodos**: dentro de cada faceta, quienes
+**fracturan** tienen una **fragilidad mayor** (las cajas «Fractura» se desplazan hacia arriba) —el
+efecto de `x1` sobre el riesgo—. Y entre las **tratadas** (`x2` = Sí), las que llegan a fracturar
+son típicamente **aún más frágiles**: como el tratamiento protege, solo «caen» las de fragilidad más
+alta —el desplazamiento de umbral propio de un factor protector—. A lo largo de los periodos el
+cuadro se mantiene, en línea con la proporcionalidad del riesgo.
+
+**Sobre `centro`.** No lo he metido en este gráfico: con **24 niveles** no cabe de forma legible (ni
+como color ni como faceta adicional, que multiplicaría los paneles). La variación entre clínicas se
+ve mejor donde le corresponde —el **intercepto aleatorio** (la *fragilidad* del modelo mixto)—, que
+es justo lo que dibujamos más abajo, ya **modelizado**, en el *caterpillar* de los 24 centros.
+
+
+:::: {.callout-tip}
+## 🔧 En R. Ajustar un GLMM con `glmer` y la sintaxis `( | )`
 Un GLMM binomial se ajusta con **`lme4::glmer`** (o `glmmTMB::glmmTMB`, más rápido y flexible),
 con `family = binomial`, **igual para datos individuales y agrupados** —solo cambia la respuesta,
 como en `glm`—:
@@ -147,7 +184,7 @@ La parte `( ... | grupo )` declara **qué** varía por grupo:
 - `(0 + x | g)` — **solo** pendiente de `x` (sin intercepto aleatorio).
 - `(1 + x || g)` — intercepto y pendiente, **sin** correlación.
 - `(1 | g1) + (1 | g2)` — dos agrupamientos **cruzados**; `(1 | g1/g2)` para **anidados**.
-:::
+::::
 
 ```{r}
 #| label: u14-glmm
@@ -188,6 +225,29 @@ verdad del DGP ($x_1=0{,}85$, $x_2=-0{,}65$, $\sigma_u=0{,}70$), `m_int` recuper
 algo alto y **subestima** $\sigma_u$ (ICC latente $\approx0{,}06$ frente a $0{,}13$), algo habitual
 con respuesta binaria y pocos grupos.
 
+**El efecto de centro, dibujado.** El modelo no estima un número por centro, sino su *distribución*;
+pero los interceptos **predichos** (`ranef`, ya **encogidos** hacia 0) hacen visible esa
+heterogeneidad entre clínicas —la *fragilidad* del modelo mixto—:
+
+```{r}
+#| label: fig-u14-cohorte-caterpillar
+#| fig-width: 7
+#| fig-height: 6
+#| out-width: "85%"
+#| fig-cap: "Efecto de centro modelizado en la cohorte: interceptos aleatorios de los 24 centros (desviación en log-odds respecto al riesgo medio) con IC 95%, ordenados. La dispersión del conjunto es lo que el mixto resume en sigma_u; los centros cuyo intervalo no cruza el 0 se separan del promedio."
+re_coh <- as.data.frame(ranef(m_int, condVar = TRUE))   # columnas: grp, condval, condsd
+ggplot(re_coh, aes(reorder(grp, condval), condval)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_pointrange(aes(ymin = condval - 1.96 * condsd,
+                      ymax = condval + 1.96 * condsd), linewidth = 0.3) +
+  coord_flip() +
+  labs(x = "Centro", y = "Intercepto aleatorio (log-odds)")
+```
+
+Cada punto es la desviación estimada de un centro respecto al riesgo medio; el **shrinkage** acerca a
+0 a los centros con menos datos, y la **amplitud** del conjunto es la traducción visual de
+$\hat\sigma_u$.
+
 **¿Hace falta la pendiente aleatoria?** En `m_slope`, `VarCorr` da $\hat\sigma_{u_1}=0{,}40$ con una
 correlación casi extrema, $-0{,}80$; pero el **AIC apenas cambia** ($899{,}0\to898{,}1$, despreciable)
 y el LRT frente a `m_int` no es significativo ($p\approx0{,}08$, sobre 2 g.l.). Como el DGP **no**
@@ -195,7 +255,64 @@ incluye pendiente aleatoria, ese $0{,}40$ es **ruido sobreajustado**: los datos 
 justifica. Es exactamente cómo se decide —se añade, se compara por AIC/LRT y se descarta si no
 aporta—.
 
-## 4.5 Reactivación: el ordinal mixto {#sec-u14-ordinal-mixto}
+## 4.5 El modelo mixto sobre datos reales: GLOW por centro {#sec-u14-glmm-glow}
+
+La cohorte tiene la ventaja de la **verdad conocida**, pero 24 centros son muchos para *verlos*.
+GLOW ofrece el contrapunto **real e intuitivo**: 500 mujeres seguidas en **6 centros** (`site_id`).
+Las pacientes de un mismo centro comparten contexto asistencial, así que cabe el **mismo GLMM
+logístico** con intercepto aleatorio por centro, ahora sobre la respuesta real `fracture`:
+
+```{r}
+#| label: u14-glow-mixto
+library(lme4)
+glow_m <- glow |> mutate(site_id = factor(site_id))
+
+m_glow_pool <- glm  (fracture ~ age + priorfrac,                 family = binomial, data = glow_m)
+m_glow_mix  <- glmer(fracture ~ age + priorfrac + (1 | site_id), family = binomial, data = glow_m)
+
+summary(m_glow_mix)
+
+# Varianza entre centros e ICC latente
+vc <- as.data.frame(VarCorr(m_glow_mix))
+c(sigma_u = sqrt(vc$vcov[1]), ICC = vc$vcov[1] / (vc$vcov[1] + pi^2 / 3))
+
+# Efectos fijos: agrupado (glm) vs mixto (glmer)
+cbind(pooled = coef(m_glow_pool), mixto = fixef(m_glow_mix))
+```
+
+```{r}
+#| label: fig-u14-glow-caterpillar
+#| fig-width: 6.5
+#| fig-height: 3.5
+#| out-width: "75%"
+#| fig-cap: "Efecto de centro modelizado en GLOW: intercepto aleatorio de cada uno de los 6 centros (desviación en log-odds respecto al riesgo medio) con IC 95%. Los seis se apiñan en torno a 0 y todos los intervalos lo cruzan: la variación entre centros es mínima (ICC latente ≈ 0,7%)."
+re_glow <- as.data.frame(ranef(m_glow_mix, condVar = TRUE))   # grp, condval, condsd
+ggplot(re_glow, aes(reorder(grp, condval), condval)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_pointrange(aes(ymin = condval - 1.96 * condsd,
+                      ymax = condval + 1.96 * condsd)) +
+  coord_flip() +
+  labs(x = "Centro (site_id)", y = "Intercepto aleatorio (log-odds)")
+```
+
+Y el resultado es **claro**: la variación entre centros es **mínima**. El modelo estima
+$\hat\sigma_u=0{,}15$ (log-odds) y un **ICC latente de apenas $0{,}7\,\%$** —casi todo el riesgo está
+**dentro** de los centros, no entre ellos—. El *caterpillar* lo confirma: los **seis** interceptos se
+apiñan en torno a $0$ (de $-0{,}13$ a $+0{,}09$) y **todos** los intervalos lo cruzan, así que ninguno
+se separa del riesgo medio. Y como el efecto aleatorio es tan pequeño, los efectos fijos del mixto son
+**prácticamente idénticos** a los del *pooled* (edad $\approx+0{,}04$ por año; fractura previa
+$\widehat{\text{OR}}\approx e^{0{,}85}\!\approx\!2{,}3$). En GLOW, **agrupar por centro apenas
+aporta**: un hallazgo legítimo —no toda jerarquía esconde heterogeneidad— y el contraste perfecto con
+la cohorte, donde el centro **sí** estructuraba el riesgo ($\hat\sigma_u=0{,}44$, ICC $\approx 6\,\%$).
+
+Esta base hace explícitos dos **límites** que la cohorte disimulaba. Con **solo 6 grupos**, la
+varianza $\sigma_u$ se estima con **mucha incertidumbre** —por eso la cohorte, con 24 centros y
+verdad conocida, sigue siendo el banco de pruebas riguroso—; y un $\hat\sigma_u$ tan pequeño (y, en
+otros casos, **pegado al borde**) es el tipo de situación de **frontera** que el enfoque bayesiano
+maneja con más suavidad (callout al cierre). GLOW gana en **intuición** (pocos centros, reales,
+dibujables); la cohorte, en **rigor**.
+
+## 4.6 Reactivación: el ordinal mixto {#sec-u14-ordinal-mixto}
 
 En la [Sección 3.4](#sec-u13-ordinal) ajustamos la respuesta ordinal `sever_ord` con **efectos
 fijos** (`MASS::polr`). Como la cohorte está agrupada por centro, ahora añadimos un **intercepto

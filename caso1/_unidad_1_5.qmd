@@ -1,16 +1,48 @@
-<!-- Partial: incluir con {{< include _unidad_1_4.qmd >}}. Sin YAML.
+<!-- Partial: incluir con {{< include _unidad_1_5.qmd >}}. Sin YAML.
      Chunks prefijados u15-. Usa la cohorte simulada y su expansión pp.
      Esta unidad absorbe la fundamentación que antes vivía en el apéndice. -->
 
 # 5 · Supervivencia: del hazard al GLM en tiempo discreto {#sec-u15}
 
+
+Las unidades anteriores respondían a *«¿ocurre el evento?»*: una fractura, sí o no, modelada con la
+logística. Pero a esa pregunta le falta otra —*«¿y **cuándo**?»*—. Pasar de la ocurrencia al
+**tiempo hasta el evento** abre el **análisis de supervivencia**, el segundo hilo en espiral del
+curso. Sin salir del marco GLM, el tiempo-a-evento en **tiempo discreto** se reescribe como una
+regresión binomial con enlace `cloglog`, y nos permitirá integrar efectos de agrupación con modelos mixtos como los que ya vimos en la [Unidad 4](#sec-u14)—.
+
+**Los datos.** 
+
+GLOW se queda corto aquí: registra si hubo fractura en el primer año, pero no
+**cuándo** ni a quién se dejó de observar. Por eso trabajamos con una
+[**cohorte simulada**](#sec-datos-cohorte) —descrita al detalle, con todas sus variables y su
+proceso generador, en la Presentación del caso— inspirada en el mismo contexto clínico (fracturas
+en mujeres seguidas en varias clínicas), que
+añade justo lo que falta: un **seguimiento por periodos** (revisiones anuales > tiempo discreto), el **tiempo hasta la fractura** (`tiempo`)
+y si llegamos a **observar el evento** o no (`evento`: 1 = fractura observada; 0 = **censura**, p. ej.
+fin administrativo del seguimiento). Las covariables tienen lectura clínica: `x1` es un marcador de
+**fragilidad ósea** (baja densidad mineral, estandarizada en puntuación z), un **factor de riesgo
+continuo** —a mayor valor, hueso más frágil y **más** riesgo ($\beta_1>0$)—; `x2` es un **factor
+binario** y **protector** (recibir o no un **tratamiento** preventivo, $\beta_2<0$); y `centro` es la
+**clínica** a la que pertenece cada paciente —el agrupamiento que trataremos como **fragilidad**
+(intercepto aleatorio)—. Al ser
+simulada, conocemos la **verdad** del proceso generador y podremos comprobar que el ajuste la recupera.
+
+**Qué cambia respecto a antes.** 
+
+Hasta ahora estimábamos la **probabilidad** de un desenlace binario. Ahora el objeto es **dinámico**, e interesa:
+- el **riesgo a lo largo del tiempo** —el *hazard*: ¿qué
+riesgo de fracturar hay en cada periodo, entre quienes llegan sin fractura?—, 
+- la **curva de  supervivencia** $S(t)$ —¿qué fracción sigue sin fractura pasado $t$?— 
+- y cómo las covariables **aceleran o retrasan** el evento (los *hazard ratios*). 
+
+Y además, aparece un ingrediente nuevo, la
+**censura**: hay que aprovechar la información de las pacientes a las que **no** vimos fracturar en
+la ventana de observación, sin sesgar. Todo ello, como veremos, cabe dentro del GLM.
+
 ::: {.callout-note}
 ## Sobre esta unidad
-Abre el **hilo de censura y supervivencia** (en espiral: se reactiva en los Casos
-2 y 3). Aquí está **toda la fundamentación** —función de supervivencia, hazard,
-riesgos proporcionales, modelo de Cox y enlace `cloglog`— y se muestra que el
-tiempo-a-evento discreto **es un GLM** sobre datos persona-periodo. Es también la
-referencia teórica del simulador de la cohorte ([Los datos del caso](#sec-datos)). **RA implicados:**
+**RA implicados:**
 RA7 (censura y tiempo-a-evento como casos del marco GLM).
 [@dobson2018, cap. de supervivencia; @prentice1978; @allison1982; @cox1972;
 @aitkin1980]
@@ -18,87 +50,519 @@ RA7 (censura y tiempo-a-evento como casos del marco GLM).
 
 ## 5.1 La función de supervivencia y la función de riesgo {#sec-u15-hazard}
 
-Sea $T\ge 0$ el **tiempo hasta que ocurre el evento**. Toda la información sobre
-$T$ se expresa de cuatro formas equivalentes; conocer una determina las demás.
+Sea $T\ge 0$ el **tiempo hasta que ocurre el evento**. En **tiempo continuo**, toda la información
+sobre $T$ se resume en **tres representaciones equivalentes** —conocer una determina las otras dos—:
 
-**Función de supervivencia.** $S(t)=\Pr(T>t)$, la probabilidad de "seguir sin
-evento" pasado $t$. Se interpreta directamente ($S(5)=0{,}8$: el 80 % llega sin
-evento más allá de 5), cumple $S(0)=1$, es **no creciente** y $S(t)\to 0$.
+- **Función de supervivencia.** $S(t)=\Pr(T>t)$, la probabilidad de "seguir sin evento" pasado $t$.
+Se interpreta directamente ($S(5)=0{,}8$: el 80 % llega sin evento más allá de 5), cumple $S(0)=1$,
+es **no creciente** y $S(t)\to 0$.
 
-**Función de riesgo (hazard), en tiempo continuo.** Riesgo *instantáneo* de que
-el evento ocurra en $t$, **condicionado a no haber ocurrido antes**:
+- **Función de riesgo (hazard).** Riesgo **instantáneo** de que el evento ocurra en $t$, **condicionado
+a no haber ocurrido antes**:
 $$
 h(t)=\frac{f(t)}{S(t)}=-\frac{\mathrm{d}}{\mathrm{d}t}\log S(t).
 $$
-Es una **tasa** (no acotada por 1), no una probabilidad.
+Es una **tasa** (intensidad por unidad de tiempo, **no** acotada por 1), no una probabilidad.
 
-**Hazard acumulado.** $H(t)=\int_0^t h(u)\,\mathrm{d}u=-\log S(t)$, de donde
-$S(t)=\exp\{-H(t)\}$: la supervivencia es la exponencial de menos el riesgo
-acumulado.
+- **Hazard acumulado.** Se lee como el **riesgo total acumulado** hasta $t$ —la suma de los riesgos instantáneos— o, de forma equivalente, como el **número esperado de eventos** que ocurrirían hasta $t$ si el evento
+pudiera repetirse; de ahí que **no** sea una probabilidad y pueda **superar 1**. 
+$$H(t)=\int_0^t h(u)\,\mathrm{d}u=-\log S(t)$$
+Como $S(t)=e^{-H(t)}$, cada unidad de hazard acumulado multiplica la supervivencia por $e^{-1}\approx0{,}37$
+(así, $H(t)=1$ equivale a $S(t)\approx0{,}37$).
 
-**Versión en tiempo discreto** (la del simulador). Con periodos $t=1,2,\dots$, el
-hazard es una **probabilidad condicional**:
+Cuando el tiempo se observa **por periodos** $t=1,2,\dots$ —como en nuestra cohorte—, estas
+funciones tienen su **contrapartida en tiempo discreto**:
+
+- **Hazard discreto.** De los sujetos que llegan al periodo $t$ sin evento (el **conjunto de riesgo**
+en $t$), $h_t$ representa la **fracción que falla durante ese periodo**:
 $$
-h_t=\Pr(T=t\mid T\ge t)\in[0,1],
+h_t=\Pr(T=t\mid T\ge t)\in[0,1].
 $$
-y la supervivencia se reconstruye periodo a periodo, $S_t=\prod_{k=1}^{t}(1-h_k)$.
-El conjunto de sujetos que llegan en riesgo a $t$ es el **conjunto de riesgo**.
+A diferencia del continuo, $h_t$ es una **probabilidad** (acotada por 1); en lenguaje de tablas de vida es
+la **probabilidad condicional de fallo** $q_t$. Se relaciona con el hazard continuo agrupando el
+riesgo del intervalo:
+$$
+h_t=1-\frac{S(t)}{S(t-1)}=1-\exp\!\Big(-\!\int_{t-1}^{t} h(u)\,\mathrm{d}u\Big),
+$$
+de modo que **coincide con la tasa continua cuando el riesgo es pequeño** y se satura en 1 cuando es
+alto.
+
+- **Supervivencia discreta.** Se reconstruye periodo a periodo, $S_t=\prod_{k=1}^{t}(1-h_k)$ —el
+análogo discreto de $S(t)=e^{-H(t)}$—.
 
 ::: {.callout-warning}
 ## Tasa vs probabilidad
-El hazard continuo $h(t)$ es una **tasa** (puede superar 1); el hazard discreto
-$h_t$ es una **probabilidad** ($\in[0,1]$).
+El hazard **continuo** $h(t)$ es una **tasa** (puede superar 1); el hazard **discreto** $h_t$ es una
+**probabilidad** ($\in[0,1]$). Comparten la idea —riesgo de fallar ahora, dado que aún no ha
+fallado— pero no la escala.
 :::
 
-La consecuencia operativa: **cada periodo en riesgo es un ensayo de Bernoulli**
-con probabilidad $h_t$. Un sujeto **censurado** deja de aportar ensayos al salir
-de observación, sin generar evento; así la censura no informativa se maneja sin
-maquinaria extra. Disponer los datos con **una fila por sujeto y periodo en
-riesgo** (persona-periodo) convierte el problema en una secuencia de Bernoulli:
-justo lo que un GLM binomial ajusta.
+**La conexión con Bernoulli (y con el GLM).**
 
-## 5.2 Riesgos proporcionales y el modelo de Cox {#sec-u15-ph}
+En nuestros datos, cada periodo en riesgo es un **ensayo de Bernoulli** con probabilidad $h_t$: el
+sujeto "falla" (evento) o "sobrevive" ese periodo. Una paciente **censurada** es aquella que sale del
+seguimiento sin haber tenido una fractura (se acaba el periodo de observación); la censura no
+está vinculada al riesgo de fractura.
 
-¿Cómo depende el riesgo de las covariables? El modelo de **riesgos
-proporcionales** lo separa en dos factores:
+Disponer los datos con **una fila por sujeto y periodo en riesgo** (persona-periodo) convierte el
+problema en una **secuencia de ensayos de Bernoulli** con probabilidad $h_t$. La verosimilitud de
+supervivencia se **factoriza** exactamente como un producto de Bernoulli sobre los periodos,
+
+$$ P(T=t)=\begin{cases}
+h_t \prod_{s<t} (1-h_s) & \text{ si evento en } t\\
+\prod_{s \leq c} (1-h_s) & \text{ si censura}
+\end{cases}$$
+
+así que un **GLM binomial ordinario** (con enlace cloglog, [Sección 5.3](#sec-u15-glm))
+maximiza la verosimilitud correcta, sin maquinaria extra.
+
+::: {.callout-note}
+## ¿Hace falta un efecto aleatorio por paciente?
+Aunque cada sujeto aporte **varias filas** en el formato persona-periodo, **no**. Las filas de un
+mismo sujeto son **condicionalmente independientes** dadas las covariables y los interceptos por
+periodo —es la factorización de la verosimilitud de arriba, no una aproximación—, de modo que un GLM
+ordinario ya maximiza la verosimilitud correcta. Los efectos aleatorios entran en **otro nivel**: el
+de la **clínica** (`centro`), como *fragilidad compartida* (la ajustamos en la [Sección 5.3](#sec-u15-glm)). Una
+*fragilidad individual* por paciente sería una extensión posible —no un requisito— y, además, difícil
+de identificar con tan pocos periodos por sujeto.
+:::
+
+
+## 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox {#sec-u15-ph}
+
+El análisis de supervivencia tiene un instrumental **propio**, anterior al GLM, que conviene
+conocer antes de construir el nuestro: aporta el contexto, el vocabulario y una **vara de
+medir**. Lo recorremos en tres pasos, de lo más descriptivo a lo más estructurado.
+
+Primero, **Kaplan–Meier**: la forma **no paramétrica** de *dejar hablar a los datos*, que dibuja
+la curva de supervivencia y compara grupos sin suponer nada sobre el riesgo. Después, los
+**modelos de riesgos proporcionales**, el **marco** común que permite pasar de *describir* a
+*explicar* —cómo las covariables modulan el riesgo— y del que cuelgan tanto Cox como nuestro
+GLM. Y por último el **modelo de Cox**, la regresión **semiparamétrica** estándar, que pone ese
+marco a trabajar sobre la cohorte.
+
+Estas técnicas son el **precedente** y el **banco de pruebas** del modelo que construiremos en la
+[Sección 5.3](#sec-u15-glm): que el GLM **recupere lo mismo** que Cox y que las curvas de
+Kaplan–Meier será la **validación** de que vamos bien. Pero el GLM no se queda en reproducirlas:
+aporta lo que estas aproximaciones **no** dan —**predecir** el riesgo base y la supervivencia
+periodo a periodo, incorporar la **fragilidad** entre clínicas como efecto aleatorio y **relajar
+la proporcionalidad** cuando haga falta—, y todo **dentro de un único marco**, el de los GLM que
+ya manejamos. La validación es el punto de partida; su **alcance**, la razón de usarlo.
+
+### Kaplan–Meier: dejar hablar a los datos {#sec-u15-km}
+
+En supervivencia, lo primero es **mirar los datos**, sin comprometerse todavía con ningún
+modelo. Antes de imponer una fórmula al riesgo o un efecto a las covariables, interesa **ver**
+la forma de la curva de supervivencia —cómo y cuándo cae— y si dos grupos se separan. Ese es el
+terreno de los métodos **no paramétricos**: en lugar de estimar los parámetros de un modelo,
+**leen la curva directamente de los datos**, con el mínimo de supuestos. Su herramienta de
+referencia —y casi siempre el primer paso de cualquier análisis de supervivencia— es el
+estimador de **Kaplan–Meier**.
+
+El estimador de **Kaplan–Meier** [@kaplan1958] reconstruye la curva de supervivencia **sin
+imponer ninguna forma funcional**: en cada instante con eventos multiplica la fracción que
+"sobrevive",
+$$
+\widehat S(t)=\prod_{t_k\le t}\Bigl(1-\frac{d_k}{n_k}\Bigr),
+$$
+con $d_k$ eventos y $n_k$ sujetos en riesgo en $t_k$. Fíjate en que es **exactamente** el
+producto $\prod(1-h_k)$ de la [Sección 5.1](#sec-u15-hazard), con el hazard estimado de forma empírica,
+$\widehat h_k=d_k/n_k$: Kaplan–Meier es el **hermano no paramétrico** de la supervivencia
+discreta $S_t=\prod(1-h_k)$, y es especialmente útil para comparar curvas de supervivencia entre grupos/perfiles. Su visualización nos permite responder  preguntas descriptivas del tipo : ¿qué grupo sobrevive más?, ¿en qué momento empieza a agravarse el riesgo en un perfil?, ...
+
+```{r}
+#| label: fig-u15-km
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-cap: "Kaplan–Meier de la cohorte por brazo de tratamiento (x2): describe la caída de S(t) sin modelo, y el log-rank contrasta los dos grupos. KM solo admite grupos discretos —no la fragilidad continua x1— y no entrega hazard ratios; para eso hace falta un modelo."
+library(survival)
+library(survminer)
+
+km <- survfit(Surv(tiempo, evento) ~ x2, data = cohorte)
+ggsurvplot(km, data = cohorte, conf.int = TRUE, pval = TRUE,
+           legend.title = "Tratamiento",
+           legend.labs  = c("No", "Sí"),
+           xlab = "Periodo de revisión", ylab = "Supervivencia S(t)")
+```
+
+En la cohorte el patrón es el esperado: las **tratadas** (`x2` = Sí) se mantienen **por encima**
+de las no tratadas y la separación **crece con los periodos** —arrancan casi juntas y, al sexto,
+la supervivencia ronda $0{,}73$ frente a $\approx0{,}56$—; el **log-rank** confirma que la
+diferencia no es ruido ($p=0{,}0027$).
+
+KM **describe** y **compara**: visualiza $S(t)$ y, con la prueba **log-rank** [@mantel1966],
+contrasta si dos grupos tienen curvas distintas. Pero tiene limitaciones importantes y se queda como una primera herramienta descriptiva: **no ajusta por covariables**, no
+admite predictores **continuos** (la fragilidad `x1` se queda fuera) y no entrega un **tamaño
+de efecto** interpretable. Para eso hace falta una **regresión**.
+
+### Modelos de Riesgos Proporcionales {#sec-u15-prop}
+
+El modelo de Cox que veremos a continuación y el GLM de tiempo discreto que ajustaremos en la [Sección 5.3](#sec-u15-glm) parecen herramientas distintas, pero comparten el mismo esqueleto: ambos son modelos de riesgos proporcionales. Esta familia es el paraguas del que cuelgan los modelos de regresión para supervivencia —incluidos los que, como el nuestro, se expresan como un GLM—; por eso conviene presentarla antes que cualquiera de los dos: explica por qué aparecen tanto Cox como el GLM y en qué se diferencian.
+
+Todos sus miembros comparten una misma anatomía —una forma temporal del riesgo, común a todas las pacientes, modulada por un efecto multiplicativo de las covariables— y se distinguen solo en cómo tratan esa forma temporal, el hazard base: Cox la deja libre (semiparamétrico), los modelos paramétricos le imponen una fórmula, y el GLM de tiempo discreto la modela periodo a periodo. El efecto de las covariables —el hazard ratio— se lee igual en todos. Veamos la anatomía en detalle.
+
+
+El modelo de **riesgos proporcionales** separa el riesgo en dos piezas:
 $$
 h(t;\mathbf{x})=h_0(t)\,\exp(\mathbf{x}'\boldsymbol\beta).
 $$
-$h_0(t)$ es el **hazard base** (la forma del riesgo en el tiempo para
-$\mathbf{x}=\mathbf{0}$) y $\exp(\mathbf{x}'\boldsymbol\beta)$ un **factor
-multiplicativo** que lo escala, **igual en todos los instantes**.
+- El primer factor es el **hazard base** $h_0(t)$, que representa la **forma del riesgo a lo largo del tiempo** para el individuo de referencia ($\mathbf{x}=\mathbf 0$) —en nuestra cohorte, una mujer **no tratada,
+de fragilidad media y en la clínica de referencia**—. Es el "telón de fondo" temporal: dice
+si el riesgo de fractura **crece, decrece o es plano** con los periodos, al margen de quién
+sea la paciente. 
+>En el modelo discreto que ajustaremos, $h_0$ no es una curva continua sino
+**un valor por periodo**, recogido por los **interceptos $\alpha_t$** (uno por revisión):
+estimar el hazard base será, literalmente, estimar esos $\alpha_t$ —y en la [Sección 5.3](#sec-u15-glm) veremos que
+**crecen**, recuperando el riesgo base creciente del simulador—.
 
-**Qué significa "proporcional".** El cociente de riesgos entre dos sujetos,
-$h(t;\mathbf{x}_a)/h(t;\mathbf{x}_b)=\exp((\mathbf{x}_a-\mathbf{x}_b)'\boldsymbol\beta)$,
-**no depende de $t$**: las curvas de riesgo son proporcionales en todo momento.
+- El segundo factor, $\exp(\mathbf{x}'\boldsymbol\beta)$, es la **escala**, ese telón de fondo común **en todos los instantes**. 
 
-**Interpretación.** En la escala log-riesgo el modelo es aditivo,
-$\log h(t;\mathbf{x})=\log h_0(t)+\mathbf{x}'\boldsymbol\beta$, y cada
-$\exp(\beta_k)$ es un **hazard ratio** (factor por el que se multiplica el riesgo
-ante un aumento unitario de $x_k$; $>1$ aumenta el riesgo, $<1$ protege).
+Estos modelos se denominan de "riesgos proporcionales" porque el **cociente de riesgos** entre dos
+pacientes no depende de $t$.
+$$
+\frac{h(t;\mathbf{x}_a)}{h(t;\mathbf{x}_b)}=\exp\bigl((\mathbf{x}_a-\mathbf{x}_b)'\boldsymbol\beta\bigr),
+$$
+Gráficamente se muestra en la @fig-u15-ph-ilustra. 
+- En escala **log-hazard** las curvas de dos grupos van
+**paralelas** (separadas por una distancia fija) y **nunca se cruzan**. Esa constancia es
+**el supuesto** del modelo: el tratamiento —o la fragilidad— multiplica el riesgo por el
+**mismo** factor en el primer periodo y en el sexto. 
+- En la escala log-riesgo el modelo es
+**aditivo**, $\log h(t;\mathbf{x})=\log h_0(t)+\mathbf{x}'\boldsymbol\beta$, y cada
+$\exp(\beta_k)$ es un **hazard ratio**: el factor por el que se multiplica el riesgo ante un
+aumento unitario de $x_k$ ($>1$ aumenta el riesgo, $<1$ protege, $=1$ indiferente). 
 
-**El modelo de Cox** [@cox1972] es la versión **semiparamétrica**: deja $h_0(t)$
-sin especificar y estima $\boldsymbol\beta$ por verosimilitud parcial. Es muy
-flexible, pero **no es un GLM**; en este curso se presenta como la **frontera**
-semiparamétrica del marco y se trata en el Caso 3. El simulador, en cambio, fija
-una forma del riesgo base (por periodo), lo que lo mantiene dentro del GLM.
 
-## 5.3 El enlace complementary log-log {#sec-u15-cloglog}
+```{r}
+#| label: fig-u15-ph-ilustra
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 9
+#| fig-height: 3.6
+#| fig-cap: "Qué quiere decir 'proporcional', en dos escalas (hazard base creciente de juguete, HR = 2). Izquierda (hazard): el grupo con la covariable más alta es el de referencia multiplicado por un factor constante exp(β) en todos los periodos —la brecha se ensancha porque es multiplicativa—. Derecha (log-hazard): ese mismo efecto es una distancia vertical fija (β); las curvas van paralelas y nunca se cruzan. Si esa distancia cambiara con el tiempo (o las curvas se cruzaran), la proporcionalidad fallaría."
 
-Para modelar el hazard discreto $h_t$ con un predictor lineal usamos el
-**complementary log-log**, que lleva una probabilidad a toda la recta real:
+beta <- log(2)                                  # efecto de la covariable: HR = exp(beta) = 2
+base <- tibble(periodo = 1:6,
+               h0 = c(0.05, 0.07, 0.09, 0.11, 0.13, 0.15))  # hazard base creciente (ilustrativo)
+
+base |>
+  mutate(`Referencia (x = 0)` = h0,
+         `Grupo (x = 1)`      = h0 * exp(beta)) |>
+  pivot_longer(c(`Referencia (x = 0)`, `Grupo (x = 1)`),
+               names_to = "grupo", values_to = "hazard") |>
+  mutate(`Escala hazard` = hazard, `Escala log-hazard` = log(hazard)) |>
+  pivot_longer(c(`Escala hazard`, `Escala log-hazard`),
+               names_to = "escala", values_to = "valor") |>
+  ggplot(aes(periodo, valor, color = grupo)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~escala, scales = "free_y") +
+  scale_color_manual(values = c("Referencia (x = 0)" = "grey55",
+                                "Grupo (x = 1)"      = "#2c7fb8")) +
+  labs(x = "Periodo de revisión", y = NULL, color = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+::: {.callout-note}
+## Cuándo falla la proporcionalidad
+El supuesto de proporcionalidad se puede romper de dos formas.
+
+- En **un efecto que se desvanece**, el hazard ratio se mueve **hacia 1 sin llegar a
+  cruzarlo**: la ventaja se diluye y las curvas **convergen, pero no se cortan**. Es lo que
+  ocurre con una **vacuna** cuya protección decae con el tiempo, o por **depleción de
+  susceptibles** —los pacientes más frágiles tienen el evento pronto y queda una población
+  seleccionada más robusta, de modo que el efecto del factor de riesgo se atenúa—.
+- En **curvas que se cruzan**, el hazard ratio **pasa de $>1$ a $<1$** y la ventaja se
+  **invierte**. El caso de manual es **cirugía frente a tratamiento conservador**: riesgo alto
+  al principio (mortalidad perioperatoria) y menor después, así que las curvas de supervivencia
+  **se cortan**.
+
+La señal práctica: si las curvas de **Kaplan–Meier** **convergen** sin tocarse, es un efecto que
+se desvanece; si **se cortan**, es un cruce. En cualquiera de los dos casos —o si el efecto de
+una covariable **cambia con el tiempo**, o si el tratamiento tiene un **efecto inicial fuerte que
+luego desaparece**— un **único** hazard ratio deja de describir bien el efecto, y el **modelo de
+Cox básico** (o nuestro GLM con un solo HR) puede ser **inadecuado**: hay que recurrir a sus
+extensiones —coeficientes que varían en el tiempo, estratificación—.
+:::
+
+**¿Es razonable asumirla aquí?** La proporcionalidad es un supuesto, pero **se puede comprobar**, y
+con una covariable a mano el chequeo es directo. Para la binaria `x2`, la propia curva de
+Kaplan–Meier ya da una primera respuesta: bajo proporcionalidad las curvas de los dos grupos **no se
+cruzan** y se separan de forma ordenada —justo lo que veíamos, las tratadas siempre por encima con la
+brecha creciendo—, así que no hay señal de alarma. El chequeo gráfico **más fino** es el **diagrama
+log–log**: representar $\log(-\log\widehat S(t))$ frente a $\log t$ —es decir, el `cloglog` de la
+supervivencia de Kaplan–Meier— debería dar curvas aproximadamente **paralelas** si el supuesto se
+cumple. Que el diagnóstico natural sea precisamente el `cloglog` no es casualidad: es el enlace del
+modelo que construiremos.
+
+```{r}
+#| label: fig-u15-km-loglog
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 7
+#| fig-height: 4
+#| fig-cap: "Diagrama log-log de Kaplan-Meier por tratamiento: log(-log S(t)) frente a log(tiempo). Bajo riesgos proporcionales las dos curvas son aproximadamente paralelas. Con solo seis periodos el chequeo es grueso, pero no se aprecia cruce ni convergencia, así que la proporcionalidad para x2 es asumible."
+ggsurvplot(km, data = cohorte, fun = "cloglog",
+           legend.title = "Tratamiento", legend.labs = c("No", "Sí"),
+           xlab = "log(periodo)", ylab = "log(-log S(t))")
+```
+
+Para la covariable **continua** `x1`, Kaplan–Meier no sirve directamente (habría que
+**categorizarla** en grupos); ahí el chequeo general son los **residuos de Schoenfeld** del modelo
+ajustado —una tendencia temporal en ellos delata la no-proporcionalidad—, que dejamos para cuando
+tengamos el ajuste.
+
+:::: {.callout-tip}
+## 🔧 En R. Estimar y dibujar la curva de Kaplan–Meier
+Hace falta el paquete **`survival`** (y **`survminer`** para dibujarla). Los datos van **a nivel de
+paciente** —una fila por mujer—, con el **tiempo** hasta el evento y el **indicador** de
+evento/censura (1 = evento, 0 = censura). La respuesta se construye con `Surv(tiempo, evento)` y la
+curva se estima con `survfit`:
+
+```r
+library(survival); library(survminer)
+km <- survfit(Surv(tiempo, evento) ~ x2, data = cohorte)  # ~ 1 para la curva global
+ggsurvplot(km, data = cohorte, pval = TRUE)               # añade la prueba log-rank
+```
+
+A la derecha de `~` va la variable de grupo (aquí `x2`), y `evento` debe codificarse 1 = evento,
+0 = censura; con `fun = "cloglog"` se obtiene el diagrama log–log de arriba.
+::::
+
+
+### El modelo de Cox {#sec-u15-cox}
+
+De las regresiones de supervivencia, la de **Cox** [@cox1972] es, con diferencia, la **más
+utilizada**, y la razón es lo **poco** que exige. A diferencia de los modelos paramétricos, **no
+supone ninguna distribución** para el tiempo hasta el evento —ni exponencial, ni Weibull, ni
+ninguna otra—: la forma del riesgo a lo largo del tiempo, $h_0(t)$, se deja **completamente
+libre**. Su único compromiso es la **proporcionalidad** de la subsección anterior. De ahí el
+nombre **semiparamétrico**: el modelo es **paramétrico** en lo que interesa —el efecto de las
+covariables, $\exp(\mathbf{x}'\boldsymbol\beta)$— y **no paramétrico** en el resto —el hazard
+base—,
+$$
+h(t;\mathbf{x})=h_0(t)\exp(\mathbf{x}'\boldsymbol\beta).
+$$
+
+¿Cómo se estima $\boldsymbol\beta$ sin decir nada de $h_0(t)$? Mediante la **verosimilitud
+parcial** [@cox1975]:
+$$
+L_{\text{parc}}(\boldsymbol\beta)=\prod_{i:\,\delta_i=1}
+\frac{\exp(\mathbf{x}_i'\boldsymbol\beta)}{\sum_{j\in R(t_i)}\exp(\mathbf{x}_j'\boldsymbol\beta)},
+$$
+donde $R(t_i)$ es el **conjunto de riesgo** (los que siguen en seguimiento justo antes de $t_i$)
+y $\delta_i=1$ marca un evento. Cada factor compara, **en el instante de cada evento**, el riesgo
+de quien falla con el del resto de los que estaban en riesgo; en ese cociente **el hazard base
+$h_0(t)$ se cancela**. Así, Cox estima los efectos **sin especificar ni estimar** la forma
+temporal del riesgo —y de ahí buena parte de su **robustez**: no puede equivocarse en una
+distribución que nunca llega a asumir—.
+
+Esa combinación —**pocos supuestos**, manejo natural de la **censura** y un resultado
+directamente **interpretable** (hazard ratios)— explica por qué Cox es el **estándar** en el
+análisis de supervivencia y aparece en casi cualquier artículo clínico.
+
+:::: {.callout-tip}
+## 🔧 En R. Ajustar un modelo de Cox
+Con el paquete **`survival`**. Los datos van **a nivel de paciente** (una fila por mujer), con el
+**tiempo** hasta el evento y el **indicador** de evento/censura; la respuesta es de nuevo
+`Surv(tiempo, evento)` y el modelo se ajusta con `coxph`:
+
+```r
+library(survival)
+m_cox <- coxph(Surv(tiempo, evento) ~ x1 + x2, data = cohorte)
+summary(m_cox)        # coeficientes, HR = exp(coef), IC y p-valores
+```
+
+`exp(coef(m_cox))` son los **hazard ratios**; `survfit(m_cox, newdata = ...)` predice la
+supervivencia de perfiles concretos y `cox.zph(m_cox)` contrasta la proporcionalidad (residuos de
+Schoenfeld). Para el bosque de hazard ratios, `survminer::ggforest(m_cox)`.
+::::
+
+```{r}
+#| label: fig-u15-cox
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-cap: "Hazard ratios del modelo de Cox sobre la cohorte (fragilidad x1, tratamiento x2) con IC 95%. A diferencia de KM, Cox sí admite covariables continuas. Son, en esencia, los mismos efectos que recuperará el GLM de tiempo discreto en la Sección 5.3: la fragilidad eleva el riesgo (HR > 1) y el tratamiento lo reduce (HR < 1)."
+m_cox <- coxph(Surv(tiempo, evento) ~ x1 + x2, data = cohorte)
+ggforest(m_cox, data = cohorte)
+```
+
+Sobre la cohorte ($N=877$, $254$ eventos), Cox estima un HR de **2,31** para la fragilidad
+(IC 95 % $2{,}02\!-\!2{,}64$) y de **0,64** para el tratamiento (IC $0{,}49\!-\!0{,}83$), ambos
+con $p<0{,}001$: la fragilidad **más que dobla** el riesgo por cada desviación típica y el
+tratamiento lo **reduce** alrededor de un tercio. El de fragilidad **clava** la verdad del
+simulador ($e^{0{,}85}\approx2{,}34$); el del tratamiento queda algo **atenuado** frente a la
+suya ($e^{-0{,}65}\approx0{,}52$), el sesgo hacia 1 propio de **omitir la fragilidad compartida
+de las clínicas**.
+
+Más allá de los coeficientes, Cox permite **predecir la curva de supervivencia** de un perfil
+concreto de paciente —es la lectura clínica del hazard ratio—. El gráfico siguiente la traza a
+lo largo de los seis periodos para tres niveles de fragilidad ósea y los dos brazos de
+tratamiento:
+
+```{r}
+#| label: fig-u15-cox-pred
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Supervivencia predicha por el modelo de Cox a lo largo de los periodos, para tres niveles de fragilidad ósea (x1 = -1, 0, 1) y los dos brazos de tratamiento (x2). A más fragilidad la curva cae antes; el tratamiento (panel derecho) la sostiene más arriba. Las curvas no se cruzan: es la firma de los riesgos proporcionales."
+perfiles <- tidyr::expand_grid(
+  frag = factor(c("Baja", "Media", "Alta"), levels = c("Baja", "Media", "Alta")),
+  trat = factor(c("Sin tratamiento", "Con tratamiento"),
+                levels = c("Sin tratamiento", "Con tratamiento"))) |>
+  mutate(x1 = c(-1, -1, 0, 0, 1, 1), x2 = c(0, 1, 0, 1, 0, 1))
+
+sf <- survfit(m_cox, newdata = as.data.frame(perfiles[, c("x1", "x2")]))
+pred <- tibble(t    = rep(sf$time, nrow(perfiles)),
+               S    = as.vector(sf$surv),
+               frag = rep(perfiles$frag, each = length(sf$time)),
+               trat = rep(perfiles$trat, each = length(sf$time)))
+pred <- bind_rows(distinct(pred, frag, trat) |> mutate(t = 0, S = 1), pred) |>
+  arrange(frag, trat, t)
+
+ggplot(pred, aes(t, S, color = frag)) +
+  geom_step(linewidth = 1) +
+  facet_wrap(~trat) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(x = "Periodo de revisión", y = "Supervivencia S(t) predicha (Cox)",
+       color = "Fragilidad ósea")
+```
+
+Se lee de un vistazo: a más fragilidad la curva cae **antes y más hondo**, y el tratamiento
+(panel derecho) **sostiene** la supervivencia más arriba en todos los periodos. Y, fieles al
+supuesto, las curvas **no se cruzan**: el efecto es el mismo en cada periodo, solo cambia el
+nivel.
+
+Otra forma de mirarlo es **fijar el horizonte** y ver la supervivencia como **función de la
+fragilidad**. El gráfico siguiente traza la probabilidad de llegar **sin fractura al final del
+seguimiento** (sexto periodo) frente a `x1`, para los dos brazos de tratamiento:
+
+```{r}
+#| label: fig-u15-cox-x1
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Supervivencia predicha por Cox al final del seguimiento (sexto periodo) en función de la fragilidad ósea (x1), para las pacientes sin y con tratamiento. Cae de forma suave y monótona al aumentar la fragilidad; el tratamiento (curva superior) la desplaza hacia arriba en todo el rango. La separación vertical entre ambas curvas es el efecto del tratamiento a esa fragilidad."
+gx <- tidyr::expand_grid(x1 = seq(-2.5, 2.5, by = 0.1), x2 = c(0, 1))
+sfx <- survfit(m_cox, newdata = as.data.frame(gx))
+gx$S <- sfx$surv[nrow(sfx$surv), ]                 # supervivencia en el último periodo
+gx$Tratamiento <- factor(gx$x2, levels = c(0, 1),
+                         labels = c("Sin tratamiento", "Con tratamiento"))
+
+ggplot(gx, aes(x1, S, color = Tratamiento)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(x = "Fragilidad ósea (x1, en puntuación z)",
+       y = "Supervivencia al sexto periodo  S(6)", color = NULL) +
+  theme(legend.position = "top")
+```
+
+A más fragilidad, **menos** supervivencia, de forma suave y monótona; y la curva de las tratadas
+va **por encima** en todo el rango —el tratamiento ayuda a cualquier nivel de fragilidad, aunque
+no invierte la tendencia—. Hay un detalle clínico importante: aunque el hazard ratio es
+**constante**, el **beneficio absoluto** del tratamiento (la separación vertical entre las dos
+curvas) **no** lo es. Es pequeño en las pacientes de baja fragilidad (casi todas llegan sin
+fractura, $S(6)\approx0{,}95$ en ambos grupos) y en las de fragilidad extrema (donde el riesgo es
+alto haya o no tratamiento), y **máximo en la franja intermedia**. Es la diferencia entre efecto
+**relativo** (el HR, fijo) y efecto **absoluto** (depende del riesgo de base): la misma historia
+de los hazard ratios, ahora en la escala que una paciente entiende —su probabilidad de no
+fracturar—.
+
+Cox nos ha dado el efecto de las covariables y la predicción **sin** modelar el riesgo base.
+Pero queda **fuera del marco GLM** y, con nuestro tiempo discreto, no es la herramienta más
+natural. En la [Sección 5.3](#sec-u15-glm) construimos el modelo equivalente **dentro** del GLM;
+una vez ajustado, lo comparamos con Cox y derivamos las conclusiones clínicas.
+
+## 5.3 La modelización GLM del problema de supervivencia {#sec-u15-glm}
+
+Las técnicas de la [Sección 5.2](#sec-u15-ph) eran el **precedente**; ahora construimos
+**nuestro** modelo, y lo hacemos como en la práctica: **a partir de los datos**, sin suponer que
+conocemos el proceso que los generó. De las 877 mujeres de la cohorte tenemos tres piezas —un
+**evento** binario (fractura sí/no), un **tiempo** discreto (la revisión en que se observa) y una
+**censura** (seguimientos que terminan sin fractura)— y el objetivo es **integrarlas** en un
+modelo que estime el riesgo, respete la censura y dé efectos interpretables, todo **dentro del
+marco GLM**. La sección lo construye paso a paso: qué es la variable de interés y qué supuestos
+hacemos, qué enlace usamos y por qué, cómo se ajusta e interpreta sobre la cohorte, en qué mejora
+a Cox y qué conclusiones clínicas se derivan.
+
+### De los datos al modelo: qué es $T$ y qué asumimos {#sec-u15-anatomia}
+
+Démosle la vuelta al problema. En la práctica **no conocemos** el proceso que generó los datos;
+solo tenemos lo observado, y de ahí hay que **construir** un modelo razonable. ¿Qué tenemos,
+exactamente, de cada paciente de la cohorte?
+
+- un **indicador de fractura** (ocurrió / no ocurrió),
+- el **periodo de revisión** en que se observó el desenlace, y
+- una marca de **censura** (si el seguimiento terminó sin fractura).
+
+**La variable de interés es un tiempo discreto.** Llamemos $T$ al **tiempo hasta la fractura**.
+Como no vemos el instante exacto, sino solo la **revisión** en que se detecta, $T$ es una
+**variable aleatoria discreta** que toma valores en los periodos $\{1,2,\dots,6\}$. De cada
+paciente observamos su último periodo y si terminó en **evento** ($\delta=1$) o en **censura**
+($\delta=0$, es decir, solo sabemos que $T$ es **mayor** que ese periodo).
+
+**No modelamos $T$ directamente, sino su hazard.** La distribución de $T$ con censura es incómoda
+de manejar; en cambio, el **hazard discreto**
+$$
+h_t=\Pr(T=t\mid T\ge t)
+$$
+—la probabilidad de fracturar **en** la revisión $t$ **entre quienes llegan** sin fractura a ella
+([Sección 5.1](#sec-u15-hazard))— se deja estimar de forma natural. La razón es que descompone la
+historia de cada paciente en una **secuencia de preguntas binarias**: en cada revisión a la que
+llega, ¿fractura, sí o no? Y una secuencia de respuestas sí/no es justo lo que un **GLM binomial**
+sabe modelar.
+
+Esa descomposición es el formato **persona-periodo** de la [Sección 5.1](#sec-u15-hazard): **una
+fila por paciente y revisión en riesgo**, con `y = 1` solo en la revisión donde se detecta la
+fractura. La **censura encaja sin esfuerzo**: una paciente censurada aporta las filas de los
+periodos que sí se observaron (en todas, "no fractura") y deja de aportar después —no hay que
+inventarle un valor de $T$—.
+
+**Qué asumimos** (todo esto **sin** mirar cómo se generaron los datos):
+
+- *Independencia condicional.* Las varias filas de una misma paciente cuentan como ensayos
+  independientes **dadas** las covariables y el periodo —no porque sean sujetos distintos, sino
+  por la factorización de la verosimilitud de supervivencia (el «punto fino» de la
+  [Sección 5.1](#sec-u15-hazard))—. Por eso basta un GLM ordinario, sin efecto aleatorio de
+  paciente.
+- *Censura no informativa.* El motivo de abandonar el seguimiento **no** está ligado al riesgo de
+  fracturar; bajo ese supuesto, la censura no introduce sesgo.
+- *Riesgos proporcionales.* Asumimos que las covariables **multiplican** el hazard por un factor
+  **constante en el tiempo** (el supuesto de la [Sección 5.2](#sec-u15-ph)). Esto permite resumir
+  cada efecto en un único hazard ratio y, como veremos, **fija el enlace**. Si no se cumpliera, se
+  relajaría con interacciones covariable × periodo.
+- *Forma del riesgo base libre.* No imponemos ninguna fórmula a cómo cambia el riesgo con las
+  revisiones: dejamos **un parámetro por periodo**, $\alpha_t$ (uno por revisión). Es lo más
+  flexible posible —el análogo discreto de "no especificar $h_0(t)$" que hacía Cox—.
+
+Con esas piezas, el modelo casi se escribe solo: un **GLM binomial** para el hazard de cada
+periodo, con predictor lineal
+$$
+\eta_t(\mathbf{x})=\alpha_t+\mathbf{x}'\boldsymbol\beta
+$$
+—un intercepto por revisión ($\alpha_t$, el riesgo base) más los efectos de las covariables
+($\boldsymbol\beta$)—. Queda **una sola decisión**: el **enlace** que conecta el hazard (una
+probabilidad en $[0,1]$) con ese predictor. Y no es libre: el supuesto de **riesgos
+proporcionales** lo determina. Lo vemos a continuación.
+
+### El enlace complementary log-log y por qué es el natural {#sec-u15-cloglog}
+
+El hazard es una **probabilidad**; el predictor lineal $\alpha_t+\mathbf{x}'\boldsymbol\beta$ vive
+en toda la recta real. Hace falta un **enlace** que los conecte —como en cualquier GLM—, y aquí el
+supuesto de proporcionalidad **elige uno concreto**: el **complementary log-log**,
 $$
 \operatorname{cloglog}(p)=\log(-\log(1-p))=\eta,\qquad p=1-\exp(-\exp(\eta)).
 $$
-Esa inversa es la línea `h <- 1 - exp(-exp(eta))` del simulador. A diferencia del
-logit y el probit, es **asimétrico** (se aproxima a 1 más despacio que a 0), y esa
-asimetría es justo lo que lo hace natural para supervivencia.
+A diferencia del logit y el probit, es **asimétrico** (se aproxima a 1 más despacio que a 0).
 
 ```{r}
 #| label: fig-u15-enlaces
 #| code-fold: true
 #| code-summary: "Código de la figura"
-#| fig-cap: "De los enlaces comparados en la Unidad 1.1, aquí retenemos solo logit y cloglog —los relevantes en supervivencia discreta—. La asimetría del cloglog (se aproxima a 1 más despacio que a 0) es lo que lo hace el enlace natural de los riesgos proporcionales."
+#| fig-cap: "De los enlaces comparados en la Unidad 2, aquí retenemos solo logit y cloglog —los relevantes en supervivencia discreta—. La asimetría del cloglog (se aproxima a 1 más despacio que a 0) es lo que lo hace el enlace natural de los riesgos proporcionales."
 
 tibble(eta = seq(-4, 4, by = 0.02)) |>
   mutate(logit   = plogis(eta),
@@ -109,11 +573,9 @@ tibble(eta = seq(-4, 4, by = 0.02)) |>
   labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
 ```
 
-## 5.4 Por qué cloglog es el enlace natural del hazard discreto {#sec-u15-puente}
-
-Si el tiempo de un modelo de riesgos proporcionales solo se observa **agrupado en
-intervalos**, la probabilidad de fallar en el intervalo $t$ habiendo llegado en
-riesgo es, usando $S(t)=\exp\{-H(t)\}$,
+¿Por qué este enlace y no el logit? Porque **se deduce** del supuesto de riesgos proporcionales.
+Si el tiempo de un modelo PH solo se observa **agrupado en intervalos**, la probabilidad de fallar
+en el intervalo $t$ habiendo llegado en riesgo es, usando $S(t)=\exp\{-H(t)\}$,
 $$
 h_t(\mathbf{x})=1-\exp\!\bigl(-\Delta H_0(t)\,e^{\mathbf{x}'\boldsymbol\beta}\bigr).
 $$
@@ -122,53 +584,249 @@ $$
 \underbrace{\log(-\log(1-h_t))}_{\operatorname{cloglog}(h_t)}
 =\underbrace{\log\Delta H_0(t)}_{\alpha_t}+\mathbf{x}'\boldsymbol\beta.
 $$
-Es decir: **al agrupar en el tiempo un modelo de riesgos proporcionales, el
-hazard discreto satisface exactamente un modelo lineal con enlace cloglog**, con
-un intercepto por periodo $\alpha_t$ que absorbe el riesgo base [@prentice1978;
-@allison1982]. Con `logit` se obtiene la aproximación "logística discreta", pero
-solo el `cloglog` preserva los riesgos proporcionales subyacentes.
+Es decir: **al agrupar en el tiempo un modelo de riesgos proporcionales, el hazard discreto
+satisface exactamente un modelo lineal con enlace cloglog**, con un intercepto por periodo
+$\alpha_t$ que absorbe el riesgo base [@prentice1978; @allison1982]. Con `logit` se obtiene la
+aproximación "logística discreta", razonable cuando el riesgo por periodo es pequeño, pero solo el
+`cloglog` **preserva exactamente** los riesgos proporcionales subyacentes —y por eso reproduce los
+**mismos hazard ratios que Cox**—.
 
-## 5.5 Anatomía del simulador {#sec-u15-anatomia}
 
-El proceso generador (`R/dgp_cohorte.R`) se lee ahora línea a línea:
-$$
-\operatorname{cloglog}(h_{ijt})=\alpha_t+\beta_1 x_{1i}+\beta_2 x_{2i}+u_j,
-\qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
-$$
+### Ajuste en tiempo discreto e interpretación {#sec-u15-lab}
 
-- **$\alpha_t$** (`alpha_base`): riesgo base por periodo, creciente en la cohorte.
-- **$\beta_1,\beta_2$**: efectos de `x1`, `x2`; cada $\exp(\beta_k)$ es un hazard
-  ratio.
-- **$u_j$** (`rnorm(..., sigma_u)`): intercepto aleatorio por centro; el análogo
-  en supervivencia de un término de *fragilidad*, y la conexión con los efectos
-  mixtos de 1.3.
-- **Generación del tiempo**: recorre periodos con $h=1-\exp(-\exp(\eta))$ y
-  `rbinom(1,1,h)` hasta evento o **censura administrativa** $C_i$ (no informativa).
-- **Persona-periodo**: `expandir_persona_periodo()` da una fila por sujeto y
-  periodo en riesgo, con `y = 1` solo en el último periodo si hubo evento.
-
-## 5.6 Laboratorio: ajuste en tiempo discreto y su relación con el GLM {#sec-u15-lab}
+En formato **persona-periodo**, cada fila es un sujeto en un periodo en riesgo e `y` marca si
+fracturó en ese periodo. Ajustarlo es, literalmente, un **GLM binomial con enlace cloglog** —de ahí
+que sigamos dentro del marco—. (Aquí trabajamos sobre la cohorte, no sobre GLOW, por lo dicho en la
+introducción: GLOW no tiene tiempo.) Construido el modelo **a ciegas**, ahora aprovechamos que la
+cohorte es **simulada** para hacer algo que con datos reales no podríamos: **contrastar las
+estimaciones con la verdad** del proceso generador —la validación que anticipábamos—.
 
 ```{r}
 #| label: u15-ajuste
-#| eval: false
-# Supervivencia discreta = GLM binomial con enlace cloglog sobre persona-periodo
 m_pp <- glm(y ~ periodo + x1 + x2, family = binomial("cloglog"), data = pp)
 summary(m_pp)
 
-# Recuperación de la verdad:
-attr(cohorte, "verdad")$binaria$beta     # b1 = 0.85, b2 = -0.65
-coef(m_pp)[c("x1", "x2")]                # efectos
-# Los coeficientes de `periodo` estiman el riesgo base alpha_t (creciente).
-
-# Extensión mixta (fragilidad): intercepto aleatorio por centro
-# lme4::glmer(y ~ periodo + x1 + x2 + (1 | centro),
-#             family = binomial("cloglog"), data = pp)
+exp(coef(m_pp)[c("x1", "x2")])               # hazard ratios estimados
+exp(attr(cohorte, "verdad")$binaria$beta)    # HR verdaderos: e^0.85, e^-0.65
 ```
+
+Los coeficientes de `periodo` son los **interceptos por periodo** $\alpha_t$, y aquí **crecen**
+($0{,}39,\ 0{,}50,\ \dots,\ 0{,}78$ sobre el periodo 1): el modelo recupera el **riesgo base
+creciente** del DGP. Los de `x1` y `x2`, exponenciados, son **hazard ratios**: `x1` da
+$\widehat{\text{HR}}\approx2{,}32$, que **clava** la verdad ($e^{0{,}85}\approx2{,}34$), y `x2` da
+$\approx0{,}64$, algo **atenuado** frente a su verdad ($e^{-0{,}65}\approx0{,}52$) —el efecto
+protector se queda corto, en parte por omitir la fragilidad—. La **censura** no exige nada extra:
+un sujeto censurado simplemente **deja de aportar filas** tras su último periodo en riesgo, sin un
+`y = 1`; aporta lo que se observó (que no falló mientras estuvo) y nada más.
+
+El riesgo base por periodo y la supervivencia que implica:
+
+```{r}
+#| label: fig-u15-hazard-base
+#| fig-width: 10
+#| fig-height: 4
+#| fig-cap: "Riesgo base por periodo (h0t, evaluado en x1 = x2 = 0) y la supervivencia base St = prod(1 - h0k) que implica. En este DGP el riesgo base es creciente, de modo que la supervivencia cae cada vez más deprisa."
+base <- tibble(periodo = factor(levels(pp$periodo), levels = levels(pp$periodo)),
+               x1 = 0, x2 = 0)
+base$h0 <- predict(m_pp, newdata = base, type = "response")   # hazard base por periodo
+base$t  <- seq_len(nrow(base))
+base$S  <- cumprod(1 - base$h0)                               # supervivencia base
+
+pH <- ggplot(base, aes(t, h0)) +
+  geom_col(fill = "grey70") +
+  labs(x = "Periodo", y = expression(hazard~base~~h[0][t]), title = "Riesgo base por periodo")
+pS <- ggplot(base, aes(t, S)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(x = "Periodo", y = expression(supervivencia~~S[t]), title = "Supervivencia base")
+pH + pS
+```
+
+**Fragilidad: el centro como efecto aleatorio.** Las pacientes se agrupan en clínicas; añadir un
+**intercepto aleatorio por centro** —la *fragilidad*, en el lenguaje de la supervivencia— es,
+otra vez, un **GLMM cloglog**, y reactiva la [Unidad 4](#sec-u14) sobre el reloj de supervivencia.
+Y, como pedíamos, se ajusta **sin bayesiana**, con `lme4`:
+
+```{r}
+#| label: u15-fragilidad
+library(lme4)
+m_frail <- glmer(y ~ periodo + x1 + x2 + (1 | centro),
+                 family = binomial("cloglog"), data = pp)
+VarCorr(m_frail)               # sigma de la fragilidad (verdad del DGP: 0.70)
+fixef(m_frail)[c("x1", "x2")]  # efectos fijos, ahora condicionales al centro
+```
+
+`VarCorr` estima la **varianza de la fragilidad**: $\hat\sigma_u\approx0{,}37$, **por debajo** de la
+verdad ($0{,}70$) —la misma subestimación de las varianzas que con datos binarios y pocos grupos
+(24 centros)—; mide cuánto varía el riesgo base de unas clínicas a otras. Al **condicionar al
+centro**, los efectos crecen algo en magnitud ($x_1: 0{,}84\!\to\!0{,}89$;
+$x_2: -0{,}45\!\to\!-0{,}47$): es el salto marginal→condicional de 1.4, ahora sobre el hazard,
+aunque leve porque $\hat\sigma_u$ es pequeño.
+
+### Cloglog frente a logit: ¿cuánto importa el enlace? {#sec-u15-logit}
+
+Elegimos el `cloglog` por una razón **estructural**: preserva los riesgos proporcionales. Pero los
+datos persona-periodo son binarios, así que **nada impide** ajustarlos con el enlace por defecto, el
+**logit** —la *regresión logística de tiempo discreto*—. La diferencia es de **interpretación**: con
+`cloglog` los $\exp(\beta)$ son **hazard ratios** (riesgos proporcionales); con `logit` son **odds
+ratios** (un supuesto de *odds proporcionales*). Ajustemos los dos y comparémoslos:
+
+```{r}
+#| label: u15-logit
+m_pp_logit <- glm(y ~ periodo + x1 + x2, family = binomial("logit"), data = pp)
+
+# cloglog -> hazard ratios ; logit -> odds ratios
+cbind(cloglog_HR = exp(coef(m_pp)[c("x1", "x2")]),
+      logit_OR   = exp(coef(m_pp_logit)[c("x1", "x2")]))
+c(AIC_cloglog = AIC(m_pp), AIC_logit = AIC(m_pp_logit))
+```
+
+La tabla los pone lado a lado, y la diferencia es **mínima**: para la fragilidad, HR $=2{,}32$
+(cloglog) frente a OR $=2{,}44$ (logit); para el tratamiento, $0{,}64$ frente a $0{,}61$. El patrón
+es el esperado —el **odds ratio se aleja un poco más de 1** que el hazard ratio (algo más alto cuando
+el efecto es de riesgo, algo más bajo cuando es protector), porque con hazards por periodo
+**moderados** odds y riesgo se parecen pero no son idénticos—. Y los **AIC casi empatan** ($1656{,}8$
+con cloglog frente a $1657{,}3$ con logit), con una ventaja **mínima** para el cloglog. En estos
+datos, el enlace **apenas mueve** los resultados.
+
+```{r}
+#| label: fig-u15-logit-cmp
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 7
+#| fig-height: 4
+#| fig-cap: "Supervivencia base (x1 = x2 = 0) reconstruida desde el GLM con enlace cloglog y con logit. Las dos curvas son casi indistinguibles: con hazards por periodo moderados ambos enlaces dan prácticamente lo mismo. La preferencia por el cloglog es estructural (preserva los riesgos proporcionales y reproduce a Cox), no numérica."
+base2 <- tibble(periodo = factor(levels(pp$periodo), levels(pp$periodo)), x1 = 0, x2 = 0)
+pred2 <- base2 |>
+  mutate(cloglog = predict(m_pp,       newdata = base2, type = "response"),
+         logit   = predict(m_pp_logit, newdata = base2, type = "response")) |>
+  pivot_longer(c(cloglog, logit), names_to = "enlace", values_to = "h") |>
+  mutate(t = as.integer(periodo)) |>
+  arrange(enlace, t) |>
+  group_by(enlace) |>
+  mutate(S = cumprod(1 - h)) |>
+  ungroup()
+
+ggplot(pred2, aes(t, S, color = enlace)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(x = "Periodo", y = "Supervivencia base S(t)", color = "Enlace")
+```
+
+El gráfico lo confirma: la supervivencia base reconstruida con uno y otro enlace es **casi la misma
+curva**. La conclusión es doble. Numéricamente, aquí **da casi igual**; pero conceptualmente la
+elección **no es indiferente**: nos quedamos con el `cloglog` por lo que **significa** —es el único
+que preserva los **riesgos proporcionales** y, por tanto, el que **reproduce a Cox** y permite leer
+los efectos como hazard ratios—. El `logit` sería la opción si quisiéramos razonar en **odds**.
+
+### GLM frente a Cox: comparativa y ventajas {#sec-u15-comparativa}
+
+Con el GLM ya ajustado podemos **cerrar el círculo** con Cox. Los hazard ratios **coinciden**
+—Cox daba $2{,}31$ y $0{,}64$; el GLM persona-periodo da $\approx2{,}32$ y $0{,}64$—, como debe
+ser: ambos son modelos de riesgos proporcionales [@prentice1978]. La diferencia está en **cómo**
+llegan ahí:
+
+| Aspecto | **Cox** (semiparamétrico) | **GLM de tiempo discreto** (cloglog) |
+|---|---|---|
+| Hazard base $h_0(t)$ | **sin especificar**; no se estima para $\boldsymbol\beta$ | **modelado** por los interceptos de periodo $\alpha_t$ |
+| Estimación | verosimilitud **parcial** (cocientes sobre el conjunto de riesgo) | verosimilitud **completa**, familia exponencial |
+| ¿Es un GLM? | **No** (queda en la frontera del marco) | **Sí** (maquinaria IWLS estándar) |
+| Empates (varios eventos a la vez) | aproximaciones (Breslow, Efron) | **exactos** (varias filas con $y=1$) |
+| Predicción del riesgo base | indirecta (estimador de Breslow) | **directa** ($\hat h_{0t}$ por periodo) |
+| Fragilidad / efectos mixtos | requiere extensiones (*frailty models*) | **dentro del marco**, con `glmer` |
+| Efecto de covariables | $\exp(\beta)$ = hazard ratio | $\exp(\beta)$ = hazard ratio (**idéntico**) |
+
+¿Qué **gana** el GLM en este problema? Se queda **dentro del marco** GLM —misma maquinaria, mismos
+diagnósticos—; con tiempo **discreto y muchos empates** los trata de forma **exacta**, sin las
+aproximaciones de Breslow/Efron que Cox necesita; **modela** el riesgo base ($\alpha_t$), lo que
+permite **predecir el hazard y la supervivencia por periodo** de forma directa; y se **extiende**
+sin salir del marco a la **fragilidad** por centro con `glmer` (un GLMM cloglog), reactivando los
+efectos mixtos de la [Unidad 4](#sec-u14). ¿Qué gana Cox? **No** tiene que comprometerse con una
+forma del riesgo base —útil cuando el tiempo es **continuo** y esa forma es desconocida o
+irrelevante— y es el **estándar** universal. Por eso lo dejamos como **frontera** semiparamétrica
+(Caso 3) y aquí trabajamos con el GLM. En una frase: **Cox = proporcionalidad + hazard base no
+paramétrico**; **nuestro modelo = proporcionalidad + hazard base modelado por periodo**.
+
+### Conclusiones para la práctica clínica {#sec-u15-clinica}
+
+Traducidas a quien trata pacientes, las estimaciones del modelo dicen:
+
+- **La fragilidad ósea manda.** Cada desviación típica de baja densidad mineral **multiplica por
+  ~2,3** el riesgo de fractura en cada periodo: es el factor dominante. Identificar y vigilar de
+  cerca a las pacientes de alta fragilidad es la palanca de mayor impacto.
+- **El tratamiento ayuda, pero no basta por sí solo.** Reduce el riesgo **alrededor de un tercio**
+  (HR $0{,}64$), un efecto **real y estable en el tiempo**, pero **parcial**: en pacientes muy
+  frágiles el riesgo sigue siendo alto pese al tratamiento. Conviene combinarlo con el manejo de
+  la fragilidad.
+- **El riesgo no se relaja con el seguimiento.** El hazard base es **creciente**: la probabilidad
+  de fractura por periodo aumenta con el tiempo, así que la vigilancia **no debe disminuir** en las
+  revisiones tardías.
+- **Importa el centro.** La *fragilidad* entre clínicas indica que el **riesgo basal varía de un
+  centro a otro**: parte del riesgo individual depende del contexto asistencial, no solo de la
+  paciente.
+- **Un solo número resume el efecto.** Al cumplirse los riesgos proporcionales, el hazard ratio es
+  **estable en los seis periodos**: una única cifra (×2,3 por fragilidad; ×0,64 por tratamiento)
+  describe el efecto durante todo el seguimiento, lo que facilita comunicárselo a la paciente.
+
+El siguiente gráfico hace tangible la decisión clínica: el **riesgo acumulado de fractura**
+($1-S_t$) a lo largo de los periodos para tres perfiles de paciente.
+
+```{r}
+#| label: fig-u15-clinica
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 8
+#| fig-height: 4.2
+#| fig-cap: "Riesgo acumulado de fractura (1 - St) predicho por el GLM cloglog para tres perfiles. La distancia vertical entre 'alta fragilidad sin tratar' y 'con tratamiento' es la reducción de riesgo absoluta atribuible al tratamiento; crece con el seguimiento. Los valores exactos se leen sobre el eje al renderizar."
+arquetipos <- tibble(
+  arquetipo = factor(c("Alta fragilidad, sin tratamiento",
+                       "Alta fragilidad, con tratamiento",
+                       "Fragilidad media, con tratamiento"),
+                     levels = c("Alta fragilidad, sin tratamiento",
+                                "Alta fragilidad, con tratamiento",
+                                "Fragilidad media, con tratamiento")),
+  x1 = c(1, 1, 0), x2 = c(0, 1, 1))
+
+grid <- tidyr::expand_grid(periodo = factor(levels(pp$periodo), levels(pp$periodo)),
+                           arquetipo = arquetipos$arquetipo) |>
+  left_join(arquetipos, by = "arquetipo")
+grid$h <- predict(m_pp, newdata = grid, type = "response")
+grid <- grid |>
+  mutate(t = as.integer(periodo)) |>
+  arrange(arquetipo, t) |>
+  group_by(arquetipo) |>
+  mutate(S = cumprod(1 - h), riesgo_acum = 1 - S) |>
+  ungroup()
+
+ggplot(grid, aes(t, riesgo_acum, color = arquetipo)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Periodo de revisión", y = "Riesgo acumulado de fractura (1 - S)",
+       color = NULL) +
+  theme(legend.position = "top")
+```
+
+Los números ponen cifras a la decisión: tras los seis periodos, una paciente de **alta fragilidad
+sin tratar** acumula un riesgo de fractura de **≈68 %**; con tratamiento baja a **≈52 %** (unos
+**16 puntos** menos); y si además su fragilidad fuera **media**, el riesgo caería a **≈27 %**. La
+fragilidad pesa **más** que el fármaco —reducirla, cuando se puede, mueve más la aguja que el
+tratamiento por sí solo—.
+
+Estas conclusiones son **didácticas** —descansan en una cohorte simulada—, pero el **flujo** es el
+real: de los hazard ratios y la curva de supervivencia a una recomendación accionable. Con datos
+reales, el mismo modelo daría las cifras sobre las que decidir.
 
 ::: {.callout-important}
 ## Tarea del estudiante (1.5)
-<!-- TODO: (a) ajustar el modelo persona-periodo cloglog y contrastar b1, b2 con
-     la verdad; (b) representar e interpretar el riesgo base por periodo (alpha_t);
-     (c) discutir el papel de la censura y por qué no sesga si es no informativa. -->
+1. **Ajuste persona-periodo (RA7).** Ajusta el modelo cloglog sobre `pp`, reporta los **hazard
+   ratios** de `x1` y `x2` (con su IC) y contrástalos con la verdad del DGP.
+2. **Riesgo base.** Representa el **hazard base por periodo** ($\hat h_{0t}$) y la **supervivencia**
+   $S_t$ que implica; comenta su forma (¿creciente el riesgo?, ¿se acelera la caída de $S_t$?).
+3. **Censura.** Explica por qué, siendo **no informativa**, la censura no sesga la estimación: qué
+   información aporta —y cuál no— un sujeto censurado.
+4. **Fragilidad.** Añade `(1 | centro)` y compáralo con el ajuste sin fragilidad: interpreta
+   $\sigma_u$ y comenta qué cambia (o no) en los efectos fijos y sus errores estándar.
+5. **Cox y predicción.** Ajusta un Cox con las mismas covariables, compara sus hazard ratios con
+   los del GLM y representa la **supervivencia predicha** para un par de perfiles de paciente;
+   discute qué aporta cada enfoque.
 :::

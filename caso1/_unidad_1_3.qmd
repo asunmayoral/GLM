@@ -1,19 +1,31 @@
 <!-- Partial: incluir con {{< include _unidad_1_3.qmd >}}. Sin YAML.
-     Chunks prefijados u13-. Binomial agrupado y multinomial/ordinal (raterisk) sobre GLOW. -->
+     Chunks prefijados u13-. Binomial agrupado y politómicas (nominal/ordinal, raterisk) sobre GLOW. -->
 
-# 3 · Respuesta categórica generalizada: binomial agrupado y multinomial {#sec-u13}
+# 3 · Extensión de la respuesta binaria: politómica y binomial {#sec-u13}
 
-Cuando todas las predictoras son **categóricas**, dos sujetos con el mismo perfil de
-covariables son **intercambiables**: para el modelo son ensayos idénticos. Podemos entonces
-**colapsar** cada perfil en una sola fila que cuente *cuántos casos de cada tipo hay en el
-grupo*. Con respuesta **binaria**, agrupar convierte la Bernoulli individual ($y_i\in\{0,1\}$)
-en una **binomial**, $Y_i\sim\mathrm{Bin}(m_i,\pi_i)$, con $m_i$ el tamaño del grupo: es **el
-mismo modelo logístico**, solo cambia la disposición del dato (lo vemos en la [Sección 3.1](#sec-u13-binomial) y [Sección 3.2](#sec-u13-gof-binomial)). Con **más
-de dos categorías**, la respuesta es **categórica** (*multinoulli*) si la tratamos **individual**
-—una fila por sujeto— o **multinomial** $Y_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$ si la
-agrupamos en recuentos; en ambos casos el modelo es el mismo —el **logit de categoría base**
-(nominal) o el de **odds proporcionales** (ordinal)—, que tratamos en las Secciones
-[3.3](#sec-u13-nominal) y [3.4](#sec-u13-ordinal) sobre datos **individuales** de GLOW.
+La respuesta binaria de las unidades anteriores admite **dos extensiones naturales**, y esta
+unidad recorre ambas.
+
+La primera es **agrupar**. Cuando las predictoras son **categóricas**, dos sujetos con el mismo
+perfil de covariables son **intercambiables** —para el modelo, ensayos idénticos—, así que podemos
+**colapsar** cada perfil en una fila que cuente cuántos casos hay en el grupo. Con respuesta
+**binaria**, agrupar convierte la Bernoulli individual ($y_i\in\{0,1\}$) en una **binomial**,
+$Y_i\sim\mathrm{Bin}(m_i,\pi_i)$ con $m_i$ el tamaño del grupo: es **el mismo modelo logístico**,
+solo cambia la disposición del dato. Lo vemos en las Secciones [3.1](#sec-u13-binomial) y
+[3.2](#sec-u13-gof-binomial), donde agrupar además **recupera los diagnósticos de ajuste**.
+
+La segunda es admitir **más de dos categorías**. Si la respuesta es **politómica** —categórica con
+tres o más niveles—, el logit binario se generaliza al **logit de categoría base** cuando no hay
+orden ([Sección 3.3](#sec-u13-nominal)) y al de **odds proporcionales** cuando sí lo hay
+([Sección 3.4](#sec-u13-ordinal)). Aquí las tratamos sobre datos **individuales** de GLOW
+(`raterisk`). 
+
+::: {.callout-tip}
+Las respuestas politómicas también podrían agruparse en recuentos, generando una **multinomial**,
+$Y_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$, pero su ajuste se apoya en la equivalencia con un modelo
+**log-lineal de Poisson**, que desarrollamos en el Caso 2, donde se introduce la Poisson, 
+de modo que lo estudiaremos allí.
+:::
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -23,13 +35,20 @@ agrupamos en recuentos; en ambos casos el modelo es el mismo —el **logit de ca
 
 ## 3.1 Del dato individual al binomial agrupado {#sec-u13-binomial}
 
-Apliquemos esa agrupación a GLOW. Como las predictoras que usaremos son **factores**, cada
-combinación de niveles reúne a mujeres intercambiables; al colapsarlas, la respuesta pasa de un
-$0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo
+Apliquemos esa agrupación a GLOW. Vamos a considerar ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables; al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo
 llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia
 —y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
 
-Agrupamos GLOW por tres factores (`priorfrac`, `momfrac`, `raterisk`) y contamos fracturas:
+:::: {.callout-tip}
+## 🔧 En R. El `glm()` con datos binomiales
+
+El ajuste de datos binomiales es similar al de datos binarios, con la salvedad de cómo se especifica la respuesta aquí, a partir de una matriz con dos columnas: éxitos y fracasos:
+```
+glm(cind(exitos,fracasos) ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)
+```
+::::
+
+Agrupamos entonces GLOW por tres factores (`priorfrac`, `momfrac`, `raterisk`) y contamos fracturas:
 
 ```{r}
 #| label: u13-agrupar
@@ -81,8 +100,36 @@ razonablemente las proporciones por celda. (Cautela: la aproximación exige celd
 demasiado pequeñas; con muchos $m_i$ pequeños vuelve a degradarse.) Es exactamente el
 contraste que en la [Sección 2.6](#sec-u12-diagnostico) no podíamos usar y que ahora, al agrupar, recupera su sentido.
 
+:::: {.callout-tip}
+## 🔧 En R. El contraste χ² de bondad de ajuste (deviance y Pearson)
+Con el modelo agrupado ajustado, los grados de libertad son **celdas menos parámetros**
+(`df.residual`) y cada estadístico se compara con una $\chi^2_{n-p}$ mediante
+`pchisq(..., lower.tail = FALSE)`:
 
-Agrupar trae, además, varias ventajas de diagnóstico que el caso individual no permitía: 
+```r
+gl <- df.residual(fit_bin)                       # n - p = nº de celdas - nº de parámetros
+
+# Deviance
+pchisq(deviance(fit_bin), gl, lower.tail = FALSE)
+
+# Pearson
+X2 <- sum(residuals(fit_bin, type = "pearson")^2)
+pchisq(X2, gl, lower.tail = FALSE)
+```
+
+Un $p$ **alto** = no hay evidencia de falta de ajuste. ¿Cuál usar?
+
+- **Pearson ($X^2$)** para el **test absoluto** de bondad de ajuste: aproxima mejor la $\chi^2$ con
+  recuentos moderados y es, además, la base de la **sobredispersión** ($\hat\phi = X^2/\text{gl}$).
+- **Deviance** para **comparar modelos anidados** (su diferencia es el LRT) y como medida ligada a la
+  verosimilitud; como test **absoluto** es algo menos fiable que Pearson cuando los recuentos son
+  pequeños.
+- **Ambos** exigen celdas **no pequeñas** (regla práctica: frecuencias esperadas $\gtrsim 5$); con
+  muchos $m_i$ pequeños la aproximación $\chi^2$ se degrada —y la deviance, antes—.
+::::
+
+
+Agrupar trae, además, varias ventajas de diagnóstico que el caso individual no permitía:
 
 - Los **residuos** por celda ya son informativos (con $m_i$ suficiente, aproximadamente normales), de
 modo que se leen directamente.
@@ -121,9 +168,9 @@ diferencia es la que acabamos de explotar: al agrupar, recuperamos los **diagnó
 individual no eran válidos.
 
 
-## 3.3 Más de dos categorías sin orden: multinomial nominal {#sec-u13-nominal}
+## 3.3 Más de dos categorías sin orden: politómica nominal {#sec-u13-nominal}
 
-Cuando la respuesta tiene **más de dos categorías sin orden**, el logit binario se generaliza al
+Cuando seguimos teniendo respuestas individualizadas y la respuesta tiene **más de dos categorías sin orden**, el logit binario se generaliza al
 **logit de categoría base**: se fija una categoría de referencia y se modela, frente a ella, el
 log-odds de cada una de las demás. Usamos `raterisk` —el riesgo de fractura **autopercibido** en
 GLOW, con tres niveles `Less`/`Same`/`Greater`—, tomando `Same` como referencia:
@@ -207,7 +254,7 @@ plot(ggpredict(m_nom, terms = "age [all]"))
 
 ## 3.4 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
 
-`raterisk` **tiene orden** (`Less < Same < Greater`), y el modelo nominal anterior lo ignoraba.
+Consideramos ahora la respuesta individualizada `raterisk`, que **tiene orden** (`Less < Same < Greater`), y el modelo politómico anterior lo ignoraba.
 Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcionales**
 (*cumulative logit*), que modela los **logits acumulados** con umbrales ordenados y **un único**
 vector de efectos:
@@ -247,7 +294,7 @@ central (`Same`) forma una joroba y las extremas son monótonas—. Si ambas im�
 supuesto de proporcionalidad es razonable y ganamos parsimonia; si difieren mucho, el ordinal
 estaría forzando.
 
-En la [Unidad 1.4](#sec-u14) reactivamos los efectos aleatorios y ajustamos un **ordinal mixto**
+En la [Unidad 4](#sec-u14) reactivamos los efectos aleatorios y ajustamos un **ordinal mixto**
 (intercepto aleatorio por grupo, `ordinal::clmm`) —allí sobre la cohorte simulada, cuya verdad
 conocida deja ver cómo el mixto recupera mejor umbrales y efectos que `polr` cuando hay
 agrupamiento—.
