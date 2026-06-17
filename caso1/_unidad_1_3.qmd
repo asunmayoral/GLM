@@ -645,8 +645,8 @@ Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcion
 vector de efectos:
 $$
 \operatorname{logit}\Pr(Y\le k)= \operatorname{log}\frac{Pr(Y\le k)}{Pr(Y> k)}=\theta_k-\bigl(\beta \cdot\text{age}+\gamma \cdot \mathbf1(\text{priorfrac}=\text{Yes})\bigr),
-\qquad k\in\{\text{Less},\,\text{Same}\},\quad \theta_{\text{Less}}<\theta_{\text{Same}}
 $$
+con $k\in\{\text{Less},\,\text{Same}\},\quad \theta_{\text{Less}}<\theta_{\text{Same}}$.
 
 Frente al nominal de la [Sección 3.3](#sec-u13-nominal) —que estimaba **un vector de efectos por
 categoría**— aquí hay dos piezas bien diferenciadas:
@@ -801,10 +801,11 @@ paralelas** lo delataría—.
 ::: {.callout-note}
 ## Puente a la Unidad 4
 
-En la [Unidad 4](#sec-u14) reactivamos los **efectos aleatorios** y ajustamos un **ordinal mixto**
-(intercepto aleatorio por grupo, `ordinal::clmm`) —allí sobre la cohorte simulada, cuya verdad
-conocida deja ver cómo el mixto recupera mejor umbrales y efectos que `polr` cuando hay
-agrupamiento—.
+La [Unidad 4](#sec-u14) introduce los **efectos aleatorios**, sobre la respuesta **binaria**, que es
+donde los desarrollamos. Añadirlos a un **ordinal** como este es una extensión directa (un *ordinal
+mixto*, con `ordinal::clmm`): cada grupo desvía los umbrales y el resto del modelo no cambia. El hilo
+ordinal, además, reaparece en la [Unidad 5](#sec-u15): modelar el **tiempo discreto a un evento** es,
+de hecho, un ordinal *continuation-ratio*, allí con **fragilidad** de centro.
 :::
 
 

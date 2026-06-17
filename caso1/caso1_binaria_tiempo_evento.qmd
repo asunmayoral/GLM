@@ -75,7 +75,7 @@ datos discretos.
 | **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. <br> Objetivos: RA1 (GLM vs OLS) |
 | **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores.<br> Objetivos: RA2 (ajuste) |
 | **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). <br> Objetivos: RA3 (interpretación en la escala correcta), <br> RA4 (diagnóstico, separación, calibración), <br> RA5 (comparación de modelos) |
-| **1.4** | Efectos aleatorios (GLMM logístico, intercepto aleatorio); reactivación del ordinal mixto. <br> Objetivos: RA6 (efectos mixtos) |
+| **1.4** | Efectos aleatorios (GLMM logístico, intercepto y pendiente aleatorios) sobre la cohorte y validación con datos reales (GLOW); puente a la supervivencia. <br> Objetivos: RA6 (efectos mixtos) |
 | **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). <br> Objetivos: RA7 (censura y tiempo-a-evento como  casos del marco) |
 | **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas).<br>Objetivos: RA8 (estudio de caso reproducible) |
 :::
@@ -235,7 +235,7 @@ administrativa no informativa**. De ahí salen la respuesta binaria
 «¿hubo fractura?» y el reloj de supervivencia (en qué periodo se
 produjo). Construimos también una variable de **severidad ordinal**
 (`sever_ord`), que se genera aparte, con un cumulative logit más
-intercepto aleatorio por clínica, y la usa el ordinal mixto de 1.4. Las
+intercepto aleatorio por clínica, disponible como ordinal con verdad conocida para ejercicios. Las
 respuestas categóricas son **independientes** del reloj de supervivencia
 —comparten covariables y clínicas, pero no se derivan de si hubo
 fractura, ni de cuándo la hubo—, una decisión de diseño para no entrar
