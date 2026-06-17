@@ -603,12 +603,11 @@ En esta unidad trabajaremos con:
 
 Para modelizar con un modelo lineal generalizado la predicción de `fracture`, mantenemos el carácter dicotómico de la respuesta, y su modelización con una variable Bernouilli, con $p$ su valor esperado y la probabilidad de fractura. Buscamos pues, un modelo a través del que relacionar esta probabilidad con un predictor lineal construido en función de las variables `age` y `priorfrac`. Como hemos visto antes, la función `logit` nos permite manejar este cambio de escala de una probabilidad a toda la recta real, y por otro lado, la familia binomial integra a la distribución Bernouilli, por lo que planteamos lo que popularmente se conoce como **el modelo logit**, que aplicado a GLOW para predecir la fractura en función de la edad y el haber tenido una fractura previa, se formularía así:
 
-$$y_i=\begin{cases} 1 \ \text{fractura, con probabilidad } \pi_i \\
-0 \ \text{ no fractura, con probabilidad } 1-\pi_i
-\end{cases} \ \rightarrow \ logit(\pi_i)=\beta_0 + \beta_1 \cdot \text{age}_i + \gamma_{\text{priorfrac}}\text{priorfrac}_i, \qquad i= 1, ..., n$$  
+$$Y=\begin{cases} 1 \ \text{fractura, con probabilidad } \pi \\
+0 \ \text{ no fractura, con probabilidad } 1-\pi
+\end{cases} \ \rightarrow \ logit(\pi)=\theta + \beta \cdot \text{age} + \gamma \cdot \mathbf{1}(\text{priorfrac}=\text{Yes})
+$$  
 
-
-donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previa y 0 en caso contrario.
 
 :::: {.callout-tip}
 ## 🔧 En R. El `glm()` con datos binarios
@@ -1037,10 +1036,8 @@ la escala del predictor lineal:
 
 Recordemos el modelo que estamos ajustando sobre GLOW:
 
-$$\pi_i = P(Y_i=1) \ \rightarrow \ logit(\pi_i)=\beta_0 + \beta_1 \cdot \text{age}_i + \gamma_{\text{priorfrac}}\text{priorfrac}_i, \qquad i= 1, ..., n$$  
+$$\pi = P(Y=1) \ \rightarrow \ logit(\pi)=\theta + \beta \cdot \text{age} + \gamma \cdot \mathbf{1}(\text{priorfrac}=\text{Yes})$$  
 
-
-donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previo y 0 en caso contrario.
 
 ```{r}
 #| label: u12-coef
@@ -1059,7 +1056,7 @@ Aparecen en la ecuación los **odds y log-odds**, que provienen del enlace canó
 $$\text{odds}(x)=\frac{\pi(x)}{1-\pi(x)}$$
 - Su logaritmo —el **log-odds** o *logit*— es precisamente el enlace canónico, y por tanto
 **es** el predictor lineal:
-$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x)=\beta_0+\beta x.$$
+$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x).$$
 La escala de los log.odds es donde viven los coeficientes y donde el modelo es una recta.
 $$ \log.\text{odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
 
@@ -1212,7 +1209,7 @@ $$
 $$
 donde $\hat\pi(\texttt{nivel},x_i)$ se evalúa para todos los sujetos en la muestra en todos los niveles (en `priorfrac`, Yes y No).
 $$
-\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\beta_0+\hat\beta_{\text{age}}\,\text{age}_i+\hat\beta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\beta_{\text{pf}}^{\,\text{ref}}=0.
+\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\theta+\hat\beta\,\text{age}_i+\hat\delta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\delta_{\text{pf}}^{\,\text{ref}}=0.
 $$
 
 ```{r}
@@ -1427,7 +1424,7 @@ observación, y por lo tanto reproduce los datos exactamente ($\hat\mu_i=y_i$) y
 log-verosimilitud máxima $\ell_{\text{sat}}$. La **deviance** es esa distancia, en
 unidades de log-verosimilitud, convertido en un valor positivo:
 $$
-D=-2\bigl[\ell(\hat{\boldsymbol\beta})-\ell_{\text{sat}}\bigr].
+D=-2\bigl[\ell(\hat{\boldsymbol\theta})-\ell_{\text{sat}}\bigr].
 $$
 La deviance viene a ser el análogo GLM de la suma de cuadrados residual: cuanto menor valor toma, mejor ajuste. 
 
@@ -1489,7 +1486,7 @@ Para contestar la pregunta "¿es real el efecto de cada coeficiente?", se utiliz
 
 **Test de Wald**
 
-El test de Wald es el análogo directo de los tests $t$ del modelo lineal. Se construye con el cociente entre el estimador del coeficiente  y su error estándar:
+El test de Wald es el análogo directo de los tests $t$ del modelo lineal. Se construye con el cociente entre el estimador del coeficiente $\beta_k$ (asociado al predictor $x_k$) y su error estándar:
 
 $$
 z_k=\frac{\hat\beta_k}{\widehat{\text{EE}}(\hat\beta_k)}.
@@ -2305,7 +2302,7 @@ supervivencia desde la perspectiva de los datos binarios.
 <!-- Partial: incluir con {{< include _unidad_1_3.qmd >}}. Sin YAML.
      Chunks prefijados u13-. Binomial agrupado y politómicas (nominal/ordinal, raterisk) sobre GLOW. -->
 
-# 3 · Extensión de la respuesta binaria: politómica y binomial {#sec-u13}
+# 3 · Extensión de la respuesta binaria: binomial y politómica {#sec-u13}
 
 La respuesta binaria de las unidades anteriores admite **dos extensiones naturales**, y esta
 unidad recorre ambas.
@@ -2341,11 +2338,20 @@ de modo que lo estudiaremos allí.
 
 Para ejemplificar la implementación de esta versión del modelo binomial, appliquemos una agrupación a GLOW, considerando ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables. Al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia —y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
 
-Tendremos ahora datos $y_i \sim Bi(m_i,\pi_i), i=1,...,k$, con $y_i$ el número de éxitos en $m_i$ registros en cada una de las $k$ celdas o perfiles de covariables, con $\pi_i$ la probabilidad de éxito (fractura). El modelo que se plantea para GLOW propone como respuesta el combinado de éxitos y fracasos, $(y_i,m_i-y_i)$ y predictor lineal:
 
-$$\pi_i=P(Y_i=1) \rightarrow \eta_i=logit(\pi_i) = \theta + \gamma^{\text{momfrac}}\text{momfrac}_i + \delta_k^{\text{raterisk}}\text{raterisk}_{ik}$$
+Agrupados los datos en $k$ celdas (perfiles de covariables), en la celda $i$
 
-donde $\text{momfrac}_i=1$ si la madre de la paciente $i$ tuvo fractura y $\text{raterisk}_{ik}=1$ si su autopercepción del riesgo de fractura es $k$, con $k \in \{\text{Less, Same, Greater}\}$.
+$$Y_i \sim \mathrm{Bi}(m_i,\pi_i), \qquad i=1,\dots,k,\quad \textstyle\sum_i m_i=n,$$
+
+donde $Y_i$ es el número de fracturas entre las $m_i$ mujeres del perfil y $\pi_i$ su probabilidad de fractura. 
+
+La parte sistemática es común a todos los perfiles, así que la escribimos sin índice —con la respuesta $(\text{éxitos},\text{fracasos})=(Y,\,m-Y)$—, y así el modelo binomial plantea estimar:
+
+$$\operatorname{logit}(\pi)=\theta+\beta\,\text{priorfrac}+\gamma\,\text{momfrac}+\delta_{\text{Same}}\mathbf 1(\text{raterisk}=\text{Same})+\delta_{\text{Greater}}\mathbf 1(\text{raterisk}=\text{Greater}),$$
+
+
+con `raterisk = Less` como referencia. 
+
 
 :::: {.callout-tip}
 ## 🔧 En R. El `glm()` con datos binomiales
@@ -2711,30 +2717,24 @@ log-odds de cada una de las demás.
 Para ilustrar este modelo con GLOW, usamos `raterisk` —el riesgo de fractura **autopercibido** como variable respuesta $Y$, observada en tres niveles `Less`/`Same`/`Greater`—, y usamos la categoría `Same` como referencia. 
 
 
-\begin{eqnarray}
-y_i \in \{\text{Same},\text{Less},\text{Greater}\} & \rightarrow &\ \log\frac{\Pr(y_i=k)}{\Pr(y_i=\text{Same})}=\beta_{0k} + \beta_{1k} \cdot \text{age}_i + \gamma^{\text{priorfrac}}_{k}\text{priorfrac}_i,\\
-&& \qquad i= 1, ..., n; \ k\in\{\text{Less},\text{Greater}\}
-\end{eqnarray}
-
-donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previa y 0 en caso contrario.
+$$
+ \log\frac{\Pr(Y=k)}{\Pr(Y=\text{Same})}=\eta_{k}= \theta_{k} + \beta_{k} \cdot \text{age} + \gamma_{k} \cdot \mathbf{1}(\text{priorfrac}=\text{Yes}), \qquad k\in\{\text{Less},\text{Greater}\}
+ $$
 
 
-En el logit de categoría base cada coeficiente lleva **dos índices** que conviene no confundir:
-el del sujeto, $i$, y el de la **categoría de respuesta** $k$ (con cuál de las categorías distintas a la de referencia comparamos; aquí $k\in\{\text{Less},\text{Greater}\}$). Así, para el sujeto $i$,
-$\beta_{1k}$ es el efecto del regresor `age`, y $\gamma^{\text{priorfrac}}_{k}$ el efecto de haber tenido una fractura previa sobre el **log-odds de la categoría $k$ frente a la referencia `Same`**. Hay, por tanto, un **vector de
-coeficientes por cada categoría no-referencia** —uno para `Less` vs `Same` y otro para `Greater`
-vs `Same`—, cada uno con su interceptación y sus pendientes, $\{(\beta_{0k},\beta_{1k},\gamma_k^{\text{priorfrac}}), k \in \{\text{Less, Greater}\} \}$.
+Conviene leerla como **dos rectas, una por cada categoría no-referencia**. Fijada `Same` como base, a cada nivel $k\in\{\text{Less},\text{Greater}\}$ le asignamos su **propio predictor lineal** $\eta_{k}$, con **su propia** interceptación y **sus propias** pendientes: una recta describe cómo varían, con la edad y la fractura previa, los log-odds de percibirse en **menor** riesgo frente a «igual» (`Less` vs `Same`); la otra, los de percibirse en **mayor** riesgo frente a «igual» (`Greater` vs `Same`). La categoría base no necesita recta propia: hace de **vara de medir**, con $\eta_{\text{Same}}=0$ por convención. 
 
+Ajustar el modelo nominal equivale, pues, a estimar **a la vez** $K−1=2$ regresiones —`Less|Same` y `Greater|Same`—, cada una con su intercepto $\theta_k+\gamma_k\mathbf{1}(\text{priorfrac}=\text{Yes})$ y su pendiente $\beta_k$. Que cada categoría tenga **su propia recta** es lo que da al modelo nominal su flexibilidad —cada nivel puede responder a la edad o a la fractura previa de manera distinta, incluso en **direcciones opuestas**—, frente al ordinal de la [Sección 3.4](#sec-u13-ordinal), que impondrá una **pendiente común** a todos los cortes.
 
-Al exponenciar, $e^{\beta_{1k}}$ es un **odds ratio relativo**: el factor por el que se
+Al exponenciar, $e^{\beta_k}$ es un **odds ratio relativo**: el factor por el que se
 multiplican las **odds de pertenecer a la categoría $k$ en lugar de a `Same`** cuando `age`
-aumenta una unidad, manteniendo el resto constante. Por ejemplo, $e^{\beta_{1,\text{Greater}}}$
+aumenta una unidad, manteniendo el resto constante. Por ejemplo, $e^{\beta_{\text{Greater}}}$
 es cuánto cambia la ventaja de percibirse en **mayor** riesgo (`Greater`) frente a **igual**
 (`Same`) por cada año más de edad. Cuando se estiman los coeficientes del modelo, su
-**signo** ya orienta: $\beta_{1k}>0$ aumenta el riesgo de $k$ sobre `Same` al aumentar la edad,  y $\beta_{1k}<0$, disminuye el riesgo en $k$ respecto de `Same`.
+**signo** ya orienta: $\beta_{k}>0$ aumenta el riesgo de $k$ sobre `Same` al aumentar la edad,  y $\beta_{k}<0$, disminuye el riesgo en $k$ respecto de `Same`.
 
-Es siempre una comparación **por pares contra la referencia**: el OR de `Less` frente a `Greater` no
-aparece directamente —se obtiene combinando ambos juegos ($e^{\beta_{1k}-\beta_{1k'}}$) o
+Es siempre una comparación **por pares contra la referencia**: el odds de `Less` frente a `Greater` no
+aparece directamente —se obtiene combinando ambos juegos ($e^{\eta_{\text{Less}}-\eta_{\text{Greater}}}$) o
 reeligiendo la categoría base—. Cambiar la referencia cambia los coeficientes, pero **no** las
 probabilidades ajustadas.
 
@@ -2838,11 +2838,14 @@ cambio, apenas influye (OR ≈ 1: 1,01 para `Less`, 0,98 para `Greater`). Dos ma
 probabilidad por edades, la @fig-u13-pred-nominal—.
 
 Con los coeficientes estimados, la **probabilidad predicha** sale de combinar los dos predictores
-lineales (con $\text{priorfrac}=1$ si hay fractura previa, y $\text{age}$ en años):
+lineales (con $\mathbf1(\text{priorfrac}=\text{Yes})$ y $\text{age}$ en años):
+
 $$
-\eta_{\text{Less}}    = -0{,}71 + 0{,}010\,\text{age} - 0{,}42\,\text{priorfrac},\qquad
-\eta_{\text{Greater}} =  1{,}08 - 0{,}023\,\text{age} + 0{,}80\,\text{priorfrac}.
+\eta_{\text{Less}}    = -0{,}71 + 0{,}010\,\text{age} - 0{,}42\cdot\mathbf1(\text{priorfrac}=\text{Yes}),\qquad
+\eta_{\text{Greater}} =  1{,}08 - 0{,}023\,\text{age} + 0{,}80\cdot\mathbf1(\text{priorfrac}=\text{Yes}).
 $$
+
+
 Como `Same` es la referencia y las tres probabilidades suman 1,
 $$
 \Pr(Y=\text{Less})=\frac{e^{\eta_{\text{Less}}}}{1+e^{\eta_{\text{Less}}}+e^{\eta_{\text{Greater}}}},
@@ -2942,24 +2945,47 @@ Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcion
 (*cumulative logit*), que modela los **logits acumulados** con umbrales ordenados y **un único**
 vector de efectos:
 $$
-\operatorname{logit}\Pr(Y_i\le k)=\theta_k-\bigl(\beta_{\text{age}}\,\text{age}_i+\gamma_{\text{priorfrac}}\,\text{priorfrac}_i\bigr),
+\operatorname{logit}\Pr(Y\le k)= \operatorname{log}\frac{Pr(Y\le k)}{Pr(Y> k)}=\theta_k-\bigl(\beta \cdot\text{age}+\gamma \cdot \mathbf1(\text{priorfrac}=\text{Yes})\bigr),
 \qquad k\in\{\text{Less},\,\text{Same}\},\quad \theta_{\text{Less}}<\theta_{\text{Same}}
 $$
-donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previa y 0 en caso contrario.
 
 Frente al nominal de la [Sección 3.3](#sec-u13-nominal) —que estimaba **un vector de efectos por
-categoría**, $\{(\beta_{1k},\gamma_k)\}$— aquí hay dos piezas bien diferenciadas:
+categoría**— aquí hay dos piezas bien diferenciadas:
 
-- los **umbrales** (interceptos ordenados), uno por cada corte entre categorías contiguas: con tres
-  niveles hay **dos**, $\theta_{\text{Less}}$ (corte `Less|Same`, es decir $\Pr(Y\le\text{Less})$) y
-  $\theta_{\text{Same}}$ (corte `Same|Greater`, $\Pr(Y\le\text{Same})$), ordenados
-  $\theta_{\text{Less}}<\theta_{\text{Same}}$;
-- un **único vector de efectos** $(\beta_{\text{age}},\gamma_{\text{priorfrac}})$ **compartido por
-  los dos cortes** —de ahí «odds proporcionales»—, de modo que $e^{\beta_{\text{age}}}$ y
-  $e^{\gamma_{\text{priorfrac}}}$ son odds ratios **acumulados** comunes a todos ellos.
+- los **umbrales** (interceptos ordenados), uno por cada corte entre categorías contiguas.
+  Con tres niveles hay **dos**, 
+  
+  - corte `Less|Same`, es decir $\Pr(Y\le\text{Less})$: $\theta_{\text{Less}}$  y
+  - corte `Same|Greater`, $\Pr(Y\le\text{Same})$: $\theta_{\text{Same}}$, 
+  
+  ordenados $\theta_{\text{Less}}<\theta_{\text{Same}}$ para garantizar que las probabilidades
+  acumuladas crezcan y, con ellas, que las de cada categoría sean no negativas—;
+  
+- un **único vector de efectos** $(\beta,\gamma)$ **compartido por
+  los dos cortes** —de ahí «odds proporcionales»—: las covariables **desplazan en bloque** toda la
+  distribución sobre la escala ordenada, sin alterar la separación entre umbrales.
 
-Con los datos de GLOW, los umbrales estimados son $\theta_{\text{Less}}\approx-2{,}06$ y
-$\theta_{\text{Same}}\approx-0{,}44$, y el vector de efectos $(\beta_{\text{age}},\gamma_{\text{priorfrac}})\approx(-0{,}023,\ 0{,}90)$.
+**El signo y su lectura.** 
+
+El predictor lineal entra **restado**, $\theta_k-\eta$, con $\eta=\beta \cdot\text{age}+\gamma \cdot \mathbf1(\text{priorfrac}=\text{Yes})$ -que es la
+convención de `MASS::polr`-. No es un capricho: hace que un coeficiente **positivo** empuje hacia las
+categorías **altas**. Si $\beta>0$, sube $\eta$, baja $\theta_k-\eta$ y baja $\Pr(Y\le k)$ en
+**todos** los cortes —es decir, sube $\Pr(Y>k)$—. 
+
+Conviene, pues, leer el efecto sobre las **odds de superar un corte**:
+- una unidad más de $x$ multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta}$ —el **mismo** factor en los dos cortes— y, equivalentemente, $\operatorname{odds}(Y\le k)$ por
+$e^{-\beta}$
+- el hecho de que una paciente haya tenido fractura previa frente a que no la haya tenido, resta $\gamma$ a $\operatorname{logit}\Pr(Y\le k)$, de modo que multiplica por $e^{-\gamma}$ las odds acumuladas $\operatorname{odds}(Y\le k)$ y por  $e^{+\gamma}$ las odds de superar el corte $\operatorname{odds}(Y>k)$, y es el mismo factor en los dos cortes.
+
+**En GLOW**, los umbrales estimados son $\theta_{\text{Less}}\approx-2{,}06$ y
+$\theta_{\text{Same}}\approx-0{,}44$, y el vector de efectos
+$(\beta_{\text{age}},\gamma_{\text{priorfrac}})\approx(-0{,}023,\ 0{,}90)$. Se lee así: la **fractura
+previa** ($\gamma>0$, $e^{\gamma}\approx 2{,}46$) multiplica por $\approx 2{,}5$ las odds de percibirse
+en una categoría **más alta** (más `Greater`, menos `Less`), por igual en ambos cortes; la **edad**
+($\beta<0$, $e^{\beta}\approx 0{,}98$ por año) empuja levemente hacia categorías **más bajas**
+(`Less`). Ambos efectos coinciden en dirección con los del nominal, señal de que la proporcionalidad
+de odds es razonable aquí.
+
 Se ajusta con `MASS::polr`, que **exige** una respuesta de tipo **factor ordenado**:
 
 ```{r}

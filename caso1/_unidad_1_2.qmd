@@ -305,10 +305,8 @@ la escala del predictor lineal:
 
 Recordemos el modelo que estamos ajustando sobre GLOW:
 
-$$\pi_i = P(Y_i=1) \ \rightarrow \ logit(\pi_i)=\beta_0 + \beta_1 \cdot \text{age}_i + \gamma_{\text{priorfrac}}\text{priorfrac}_i, \qquad i= 1, ..., n$$  
+$$\pi = P(Y=1) \ \rightarrow \ logit(\pi)=\theta + \beta \cdot \text{age} + \gamma \cdot \mathbf{1}(\text{priorfrac}=\text{Yes})$$  
 
-
-donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previo y 0 en caso contrario.
 
 ```{r}
 #| label: u12-coef
@@ -327,7 +325,7 @@ Aparecen en la ecuación los **odds y log-odds**, que provienen del enlace canó
 $$\text{odds}(x)=\frac{\pi(x)}{1-\pi(x)}$$
 - Su logaritmo —el **log-odds** o *logit*— es precisamente el enlace canónico, y por tanto
 **es** el predictor lineal:
-$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x)=\beta_0+\beta x.$$
+$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x).$$
 La escala de los log.odds es donde viven los coeficientes y donde el modelo es una recta.
 $$ \log.\text{odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
 
@@ -480,7 +478,7 @@ $$
 $$
 donde $\hat\pi(\texttt{nivel},x_i)$ se evalúa para todos los sujetos en la muestra en todos los niveles (en `priorfrac`, Yes y No).
 $$
-\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\beta_0+\hat\beta_{\text{age}}\,\text{age}_i+\hat\beta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\beta_{\text{pf}}^{\,\text{ref}}=0.
+\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\theta+\hat\beta\,\text{age}_i+\hat\delta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\delta_{\text{pf}}^{\,\text{ref}}=0.
 $$
 
 ```{r}
@@ -695,7 +693,7 @@ observación, y por lo tanto reproduce los datos exactamente ($\hat\mu_i=y_i$) y
 log-verosimilitud máxima $\ell_{\text{sat}}$. La **deviance** es esa distancia, en
 unidades de log-verosimilitud, convertido en un valor positivo:
 $$
-D=-2\bigl[\ell(\hat{\boldsymbol\beta})-\ell_{\text{sat}}\bigr].
+D=-2\bigl[\ell(\hat{\boldsymbol\theta})-\ell_{\text{sat}}\bigr].
 $$
 La deviance viene a ser el análogo GLM de la suma de cuadrados residual: cuanto menor valor toma, mejor ajuste. 
 
@@ -757,7 +755,7 @@ Para contestar la pregunta "¿es real el efecto de cada coeficiente?", se utiliz
 
 **Test de Wald**
 
-El test de Wald es el análogo directo de los tests $t$ del modelo lineal. Se construye con el cociente entre el estimador del coeficiente  y su error estándar:
+El test de Wald es el análogo directo de los tests $t$ del modelo lineal. Se construye con el cociente entre el estimador del coeficiente $\beta_k$ (asociado al predictor $x_k$) y su error estándar:
 
 $$
 z_k=\frac{\hat\beta_k}{\widehat{\text{EE}}(\hat\beta_k)}.
