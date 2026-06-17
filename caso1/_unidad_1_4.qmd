@@ -13,7 +13,24 @@ vía intermedia: modelar la **variación entre grupos** como una distribución d
 es una muestra. Es el primero de los dos hilos en espiral del curso —los efectos mixtos—, que
 abrimos aquí sobre el GLMM logístico y reactivaremos en cada caso.
 
-Trabajamos sobre la cohorte simulada
+En nuestros datos ese agrupamiento tiene nombre: la variable **`centro`**. Tanto en **GLOW** como en
+la **cohorte** simulada, cada paciente pertenece a un centro hospitalario, y los centros **no son
+intercambiables**: difieren en **criterios diagnósticos** —cómo se define y registra una fractura,
+qué umbrales se aplican— y en **factores de entorno** ligados a su **ubicación** —perfil de las
+pacientes, exposición, hábitos, recursos del área—. Dos mujeres con la misma edad y los mismos
+antecedentes pueden, por tanto, tener un riesgo algo distinto según **dónde** se las atienda.
+
+Ahora bien, el centro **no nos interesa como predictor**: no queremos —ni tendría sentido clínico—
+predecir si una paciente se fracturará **según a qué hospital pertenezca**, ni los seis centros de
+GLOW (o los veinticuatro de la cohorte) son un fin en sí mismos; son una **muestra** de los muchos
+centros posibles. Lo que **sí** debemos reconocer es que el centro induce **agrupamiento**: las
+pacientes de un mismo centro se **parecen más entre sí** de lo que explicaría el azar —no son del
+todo independientes— y, a la vez, hay **diferencias sistemáticas entre centros** —unos con un riesgo
+basal más alto que otros—. Gastar un coeficiente **fijo** por centro malgastaría parámetros y no
+generalizaría a centros nuevos; ignorarlo falsearía la precisión. La vía adecuada es modelar esa
+variación **entre centros** como **efectos aleatorios** —el objeto de esta unidad—: estimamos
+**cuánto varían** los centros (una varianza), no el valor concreto de cada uno. Trabajamos sobre la
+**cohorte** simulada, cuya verdad conocida permite comprobar si lo recuperamos bien.
 
 ::: {.callout-note}
 ## Sobre esta unidad

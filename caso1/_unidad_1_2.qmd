@@ -290,6 +290,7 @@ los datos, lo que respalda quedarnos con el logit por interpretabilidad.
 
 ## 2.3 Interpretación: del coeficiente a la probabilidad {#sec-u12-interpretacion}
 
+
 **El enlace rompió la línea recta.** En OLS, $\beta$ era el cambio en la respuesta
 por cada unidad de $x$: una lectura directa. Aquí ya no. El modelo es lineal en el
 **predictor** $\eta=\beta_0+\beta x$, pero la respuesta es $\mu=g^{-1}(\eta)$, una
@@ -301,6 +302,13 @@ pondremos nombre.
 
 **Lo que da el modelo:** `summary()` (o `broom::tidy`) devuelve los coeficientes en
 la escala del predictor lineal:
+
+Recordemos el modelo que estamos ajustando sobre GLOW:
+
+$$\pi_i = P(Y_i=1) \ \rightarrow \ logit(\pi_i)=\beta_0 + \beta_1 \cdot \text{age}_i + \gamma_{\text{priorfrac}}\text{priorfrac}_i, \qquad i= 1, ..., n$$  
+
+
+donde $\text{age}_i$ es la edad de la paciente $i$, y $\text{priorfrac}_i=1$ si la paciente tuvo una fractura previo y 0 en caso contrario.
 
 ```{r}
 #| label: u12-coef
@@ -1058,10 +1066,9 @@ Conviene situar tres modelos en una **escalera**, del peor al mejor ajuste posib
   **ajustado vs nulo**: $D_0-D\sim\chi^2_{p}$. Un $p$ bajo **rechaza el nulo** a favor del nuestro
   —las covariables explican algo—. Es la pregunta *«¿mejor que nada?»*.
 - **¿Ajusta bien?** (bondad de ajuste, la de aquí). Se compara **ajustado vs saturado**: la propia
-  **deviance residual** $D=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})\sim\chi^2_{n-p}$ **es** el
-  LRT frente al mejor ajuste posible. Mide *«¿cuánto queda sin explicar respecto a un ajuste
-  perfecto?»*; un $p$ bajo señala **falta de ajuste**. (Con Pearson, igual: $X^2=\sum_i r_{P,i}^2$,
-  $r_{P,i}=(y_i-\hat\mu_i)/\sqrt{V(\hat\mu_i)}$, también contra $\chi^2_{n-p}$.)
+  **deviance residual** $D=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})$ **es** el LRT frente al mejor
+  ajuste posible y, bajo un modelo correcto, se distribuiría $\chi^2_{n-p}$. Mide *«¿cuánto queda sin
+  explicar respecto a un ajuste perfecto?»*; un $p$ bajo señala **falta de ajuste**.
 
 ¿Por qué el **saturado** y no el nulo es la referencia de la *bondad de ajuste*? Porque "ajustar
 bien" es **acercarse al mejor ajuste alcanzable**, no solo superar a "no ajustar nada": un modelo
@@ -1081,28 +1088,19 @@ $\ell_{\text{sat}}=0$ y $D=-2\ell(\hat{\boldsymbol\beta})$ depende **solo** de l
 ajustadas, sin informar del ajuste absoluto [@agresti2015; @hosmer2013].
 
 **Cómo se resuelve, entonces.** Dos vías: (i) **agrupar** —si las covariables son categóricas, se
-pasa a binomial y el $\chi^2$ **recupera su sentido** ([Unidad 3](#sec-u13))—; (ii) cuando no se
+pasa a binomial: tanto $D$ como el **estadístico de Pearson** $X^2$ **recuperan su sentido** como
+contraste $\chi^2$, y allí los definimos con detalle ([Sección 3.2](#sec-u13-gof-binomial))—; (ii) cuando no se
 puede (covariables continuas, como en GLOW), se sustituye el contraste global por herramientas que
 **agrupan implícitamente** o **simulan**: el **test de Hosmer–Lemeshow** (deciles de riesgo), la
 **curva de calibración** y los **residuos por tramos**, que vemos a continuación.
 
 ### Residuos
 
-Para diagnosticar un GLM **observación a observación** se estandariza el residuo crudo
-$y_i-\hat\mu_i$. Los dos residuos **estándar**, los que se usan por defecto, son:
-
-- **Pearson**, que divide por la desviación típica que predice el modelo,
-  $r_{P,i}=(y_i-\hat\mu_i)/\sqrt{V(\hat\mu_i)}$; su suma de cuadrados es el estadístico
-  $X^2=\sum_i r_{P,i}^2$.
-- **Deviance**, que reparte la deviance total entre las observaciones,
-  $r_{D,i}=\operatorname{sign}(y_i-\hat\mu_i)\sqrt{d_i}$ con $\sum_i d_i=D$ (en Bernoulli,
-  $d_i=-2[\,y_i\log\hat\pi_i+(1-y_i)\log(1-\hat\pi_i)\,]$); su suma de cuadrados es la deviance $D$.
-
-Con **suficiente información por observación** (datos agrupados, conteos altos) ambos son
-aproximadamente $N(0,1)$ [@mccullagh1989] y se leen directamente en un gráfico frente a los
-ajustados y en un Q–Q. (Hay además otros residuos —*working*, *parciales*, o versiones
-*estandarizadas* por leverage— para fines concretos como la forma funcional o la influencia, que
-aquí no necesitamos.)
+Para diagnosticar un GLM **observación a observación** se examinan los **residuos**. Los estándar de
+un GLM son los de **Pearson** y los de **deviance** [@mccullagh1989];
+son informativos cuando hay **suficiente información por observación** —datos agrupados, conteos
+altos—, y los desarrollamos en propiedad (fórmulas, gráfico y variantes —estandarizados, leverage,
+distancia de Cook—) en la [Sección 3.2](#sec-u13-gof-binomial), donde **sí** funcionan.
 
 **El problema en binaria.** Con respuesta **binaria individual**, $y_i\in\{0,1\}$: para cada
 $\hat\mu_i$ el residuo crudo solo toma dos valores y se ordena en **dos bandas**, y ni Pearson ni
@@ -1451,10 +1449,12 @@ alarmas. Eso es la curva **ROC** y su área, el **AUC** [@robin2011].
 La **curva ROC** (*receiver operating characteristic*) recorre **todos los umbrales** $c\in[0,1]$ y,
 para cada uno, dibuja la **sensibilidad** (tasa de verdaderos positivos, TPR) frente a
 **1 − especificidad** (tasa de falsos positivos, FPR):
-$$
-\text{TPR}(c)=\frac{TP(c)}{TP(c)+FN(c)}=\Pr(\hat\pi\ge c\mid Y=1),\\
-\text{FPR}(c)=\frac{FP(c)}{FP(c)+TN(c)}=\Pr(\hat\pi\ge c\mid Y=0).
-$$
+
+\begin{eqnarray}
+\text{TPR}(c)&=&\frac{TP(c)}{TP(c)+FN(c)}=\Pr(\hat\pi\ge c\mid Y=1),\\
+\text{FPR}(c)&=&\frac{FP(c)}{FP(c)+TN(c)}=\Pr(\hat\pi\ge c\mid Y=0).
+\end{eqnarray}
+
 La curva es el conjunto de puntos $\{(\text{FPR}(c),\,\text{TPR}(c)):c\in[0,1]\}$; cada punto es un
 clasificador posible. La **diagonal** es el azar (TPR = FPR), y cuanto más se arrima la curva a la
 **esquina superior izquierda**, mejor separa (ver @fig-u12-roc).
