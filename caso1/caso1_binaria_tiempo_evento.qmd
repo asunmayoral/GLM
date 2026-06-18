@@ -139,12 +139,10 @@ glow <- glow500 |>
 glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 ```
 
-Visualizamos en la @glow-eda los datos y las relaciones entre ellos,
-diferenciando por color entre las pacientes que han sufrido fractura y
-las que no.
+Visualizamos en la @fig-glow-eda los datos y las relaciones entre variables en GLOW. 
 
 ```{r}
-#| label: glow-eda
+#| label: fig-glow-eda
 #| fig-width: 10
 #| fig-height: 10
 #| out-width: "100%"
@@ -310,10 +308,10 @@ pp      <- expandir_persona_periodo(cohorte)     # persona-periodo (supervivenci
 head(pp,6)
 ```
 
-Visualizamos los datos simulados en la @cohorte-eda, y la relación entre los centros en la @cohorte-centro.
+Visualizamos en la @fig-cohorte-eda los datos simulados en la `cohorte`.
 
 ```{r}
-#| label: cohorte-eda
+#| label: fig-cohorte-eda
 #| fig-width: 10
 #| fig-height: 10
 #| out-width: "100%"
@@ -350,18 +348,6 @@ cohorte_eda |>
   theme(legend.position = "bottom")
 ```
 
-```{r}
-#| label: cohorte-centro
-# 'centro' (24 niveles) no cabe en la matriz: se ve mejor como tasa de evento por clínica
-cohorte |>
-  group_by(centro) |>
-  summarise(tasa_fractura = mean(evento), n = n(), .groups = "drop") |>
-  ggplot(aes(reorder(centro, tasa_fractura), tasa_fractura)) +
-  geom_col(aes(fill = n)) +
-  coord_flip() +
-  labs(x = "Centro (ordenado por tasa)", y = "Proporción de fractura",
-       fill = "n", title = "Variación entre clínicas")
-```
 
 <!-- ===================================================================== -->
 

@@ -21,26 +21,58 @@ qué umbrales se aplican— y en **factores de entorno** ligados a su **ubicaci�
 pacientes, exposición, hábitos, recursos del área—. Dos mujeres con la misma edad y los mismos
 antecedentes pueden, por tanto, tener un riesgo algo distinto según **dónde** se las atienda.
 
+En la @fig-u14-prop-centro se muestran las diferencias entre centros respecto
+a las tasas de fractura, en las bases de datos `cohorte` y GLOW. De partida, se aprecia cierta 
+variabilidad de base entre los centros, mucho más notoria en `cohorte` que en GLOW. 
+
+```{r}
+#| label: fig-u14-prop-centro
+#| fig-width: 11
+#| fig-height: 5
+#| fig-cap: "Proporción observada de fractura por centro. Izquierda (azul): cohorte simulada (24 centros). Derecha (naranja): GLOW (6 centros, datos reales). Línea discontinua: proporción global. Ambos paneles comparten el eje de proporción: la cohorte se despliega (~0,12 a ~0,60; los centros estructuran el riesgo), mientras que en GLOW los seis se apiñan (el centro apenas aporta, ICC ≈ 0,7%). El color distingue cada conjunto, no codifica ninguna variable."
+library(patchwork)
+lims     <- c(0, 0.62)
+col_coh  <- "#2c7fb8"   # azul  → cohorte
+col_glow <- "#e6810a"   # naranja → GLOW
+
+prop_coh <- cohorte |>
+  group_by(centro) |>
+  summarise(prop = mean(ever), n = n(), .groups = "drop")
+p_coh <- ggplot(prop_coh, aes(reorder(factor(centro), prop), prop)) +
+  geom_hline(yintercept = mean(cohorte$ever), linetype = "dashed", color = "grey50") +
+  geom_col(fill = col_coh) +
+  coord_flip() + scale_y_continuous(limits = lims) +
+  labs(x = "Centro", y = "Proporción de fractura (ever)", title = "Cohorte (24 centros)")
+
+prop_glow <- glow |>
+  mutate(frac01 = as.integer(fracture == "Yes")) |>
+  group_by(site_id) |>
+  summarise(prop = mean(frac01), n = n(), .groups = "drop")
+p_glow <- ggplot(prop_glow, aes(reorder(factor(site_id), prop), prop)) +
+  geom_hline(yintercept = mean(glow$fracture == "Yes"), linetype = "dashed", color = "grey50") +
+  geom_col(fill = col_glow) +
+  coord_flip() + scale_y_continuous(limits = c(0,0.35)) +
+  labs(x = "Centro (site_id)", y = "Proporción de fractura", title = "GLOW (6 centros)")
+
+p_coh + p_glow
+```
+
 Ahora bien, el centro **no nos interesa como predictor**: no queremos —ni tendría sentido clínico—
-predecir si una paciente se fracturará **según a qué hospital pertenezca**, ni los seis centros de
-GLOW (o los veinticuatro de la cohorte) son un fin en sí mismos; son una **muestra** de los muchos
+predecir si una paciente se fracturará **según a qué hospital pertenezca**, ni en los seis centros de
+GLOW, ni en los veinticuatro de la cohorte, pues no son un fin en sí mismos; son una **muestra** de los muchos
 centros posibles. Lo que **sí** debemos reconocer es que el centro induce **agrupamiento**: las
 pacientes de un mismo centro se **parecen más entre sí** de lo que explicaría el azar —no son del
 todo independientes— y, a la vez, hay **diferencias sistemáticas entre centros** —unos con un riesgo
 basal más alto que otros—. Gastar un coeficiente **fijo** por centro malgastaría parámetros y no
-generalizaría a centros nuevos; ignorarlo falsearía la precisión. La vía adecuada es modelar esa
+generalizaría a centros nuevos; ignorarlo falsearía la precisión. 
+
+La vía adecuada es modelar esa
 variación **entre centros** como **efectos aleatorios** —el objeto de esta unidad—: estimamos
 **cuánto varían** los centros (una varianza), no el valor concreto de cada uno. Trabajamos sobre la
 **cohorte** simulada, cuya verdad conocida permite comprobar si lo recuperamos bien.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Primer contacto con los **efectos mixtos** (hilo en espiral: se reactiva en el Caso 2).
-Introducimos los **efectos aleatorios** —de intercepto y de pendiente— sobre el GLMM logístico
-binario de la cohorte y los contrastamos con **datos reales** (GLOW). Trabajamos sobre la cohorte
-simulada, cuya **verdad conocida** permite contrastar lo estimado, y dejamos abierto el paso a la
-[Unidad 5](#sec-u15), donde el mismo efecto de centro reaparece como **fragilidad** sobre el reloj
-de la supervivencia.
 **RA implicados:** RA6 (efectos mixtos).
 [@bates2015; @agresti2015]
 :::
@@ -49,16 +81,16 @@ de la supervivencia.
 
 La idea central es un cambio de pregunta. Un efecto **fijo** responde *«¿cuál es el efecto?»* con
 **un número para toda la población**. Un efecto **aleatorio** no estima un número por grupo, sino
-la **distribución** de la que esos números proceden: en lugar de *«¿cuál es la interceptación del
-centro 7?»*, pregunta *«¿cuánto varían los interceptos entre centros?»* —su **varianza**—. Se
-modela la **dispersión** entre grupos, no cada grupo por separado.
+la **distribución** de la que esos números proceden: en lugar de *«¿cuál es el efecto del
+grupo 7?»*, pregunta *«¿cuánto varían los efectos entre grupos?»* —su **varianza**—. Se
+modela la **dispersión** entre grupos (en nuestro caso, `centros`), no cada grupo por separado.
 
 **Dos cosas pueden variar de un grupo a otro:**
 
 - El **nivel de base** → un **intercepto aleatorio** $u_{0j}$: cada centro parte de un riesgo
   basal distinto (la curva se **desplaza** arriba o abajo).
 - La **sensibilidad a una covariable** → una **pendiente aleatoria** $u_{1j}$: en cada centro, el
-  efecto de (digamos) la edad es distinto (la curva se **inclina** de forma diferente).
+  efecto de cierta covariable continua es distinto (la curva se **inclina** de forma diferente).
 
 **¿Para qué sirven?** Cuatro cosas concretas:
 
@@ -77,9 +109,11 @@ modela la **dispersión** entre grupos, no cada grupo por separado.
 En una frase: el efecto fijo dice *cuánto*; el efecto aleatorio dice *cuánto varía ese cuánto entre
 grupos* —y lo resume en una varianza—.
 
+Los efectos aleatorios se pueden incorporar en un modelo lineal (generalizado) a través de la interceptación, de la pendiente o de ambas. Veamos sus implicaciones y las modelizaciones asociadas. 
+
 ## 4.2 Intercepto aleatorio {#sec-u14-intercepto}
 
-Empecemos por dejar variar el **nivel de base**. Para tratar el centro hay tres estrategias:
+Cuando hablamos de una afectación en la interceptación, nos estamos refiriendo a la modelización del **nivel de base**. Para tratar este nivel de base, considerando un posible efecto de agrupación relativo a `centro` en nuestra base de datos, hay tres estrategias:
 
 - **Ignorarlo** (*complete pooling*): un solo intercepto para todos. Subestima la incertidumbre y
   puede sesgar los efectos.
@@ -87,13 +121,19 @@ Empecemos por dejar variar el **nivel de base**. Para tratar el centro hay tres 
   de libertad y no generaliza a centros nuevos.
 - **Intercepto aleatorio** (*partial pooling*): los interceptos de centro son **extracciones de una
   distribución**, $u_j\sim\mathcal{N}(0,\sigma_u^2)$; no estimamos cada $u_j$, sino su **varianza**
-  $\sigma_u^2$.
+  $\sigma_u^2$, asumiendo que todos están centrados en torno a una interceptación media global (y por lo tanto estas desviaciones de la interceptación global tienen media cero).
 
 El modelo, para la binaria de la cohorte, es un **GLMM logístico**:
 $$
 \operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_j,
 \qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
 $$
+
+Ese término $u_j$ no es una abstracción: ya teníamos su **huella visual** en la cohorte. La
+@fig-u14-prop-centro mostraba que la proporción de fractura **varía de un centro a otro** —de
+$\approx 0{,}12$ a $\approx 0{,}60$ (en torno a una media global explícita con la vertical punteada)—, justo la dispersión de **niveles basales** que $u_j$ recoge (y
+que en GLOW era mínima). Hay que tener en cuenta que en general, una proporción
+por centro mezclaría el nivel basal con la **composición** de covariables del centro; si estas estuvieran correladas con  `centro`, el gráfico estaría confundiendo efectos.
 
 En **forma matricial** —la notación habitual de los modelos mixtos, que conviene reconocer desde
 ya—, el predictor lineal de todas las observaciones se escribe
@@ -103,22 +143,74 @@ $$
 $$
 donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**;
 $\mathbf{Z}$ ($n\times q$) y $\mathbf{u}$ son el diseño y los efectos **aleatorios**, con $\mathbf{G}$
-su matriz de covarianzas; y $g$ es el enlace (aquí, logit). Para el **intercepto aleatorio**,
-$\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, $\mathbf{Z}$ es la matriz
+su matriz de covarianzas; y $g$ es el enlace (aquí, logit). 
+
+Para el **intercepto aleatorio**, $\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, 
+$\mathbf{Z}$ es la matriz
 **indicadora** que asigna cada observación a su centro, y $\mathbf{G}=\sigma_u^2\,\mathbf{I}_J$. La
 parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo nuevo es el término $\mathbf{Z}\mathbf{u}$.
 
 Se interpreta así:
 
-- **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos. En la escala latente
-  logística, el **coeficiente de correlación intraclase** $\text{ICC}=\sigma_u^2/(\sigma_u^2+\pi^2/3)$
-  mide qué fracción de la variación total es **entre** centros (en la cohorte, $\approx 0{,}13$).
-- **Condicional vs marginal.** En un GLMM **no lineal**, los efectos fijos son **condicionales**
-  (específicos de grupo: «para un centro dado») y **difieren** de los **marginales** (poblacionales,
-  promediados sobre los centros). Por eso un ajuste *pooled* —que estima algo marginal— **atenúa**
-  los coeficientes frente a la verdad condicional. No es un error: son dos cantidades distintas.
-- **Shrinkage.** Los interceptos de centro estimados (`ranef`) están **encogidos** hacia 0; los
-  centros con menos datos se encogen más.
+- **Componentes de varianza.** $\sigma_u^2$ resume cuánto varían los grupos entre sí. En la escala
+  latente logística, el **coeficiente de correlación intraclase**,
+  $\text{ICC}=\sigma_u^2/(\sigma_u^2+\pi^2/3)$ —donde $\pi^2/3$ es la varianza de la logística
+  estándar—, mide qué fracción de la variación total ocurre **entre** centros y no dentro de ellos
+  (en la cohorte, $\approx 0{,}13$: un 13 %). Es, en sí misma, una respuesta sustantiva: cuánto pesa
+  la clínica frente a las diferencias entre pacientes.
+- **Condicional vs marginal.** Con un enlace **no lineal** como el logit, el efecto de una covariable
+  tiene **dos versiones que no coinciden** (en un modelo lineal sí lo harían). Se entiende mejor con la
+  (@fig-u14-cond-marg): cada centro tiene su **propia curva logística** frente a la covariable, todas
+  con la **misma pendiente** —el efecto **condicional**, «para un centro dado», que es el que estima
+  `glmer`— pero **desplazadas** según su intercepto $u_j$. Al **promediar** esas curvas sobre la
+  población de centros, la sigmoide resultante sale **más aplanada**, y su pendiente —el efecto
+  **marginal**, poblacional— es **menor en magnitud**. Por eso un ajuste *pooled*, que estima algo
+  marginal, **atenúa** los coeficientes frente al mixto: no es un error, son **dos cantidades
+  distintas**, y la brecha **crece con $\sigma_u$** (aproximadamente
+  $\beta_{\text{marginal}}\approx\beta_{\text{condicional}}/\sqrt{1+0{,}346\,\sigma_u^2}$). Aquí, con
+  $\sigma_u$ pequeño, la atenuación es **leve**.
+- **Shrinkage (partial pooling).** Los interceptos de centro estimados (`ranef`) **no** son las
+  desviaciones crudas de cada centro (las del *no pooling*, un parámetro por centro), sino un
+  **compromiso** entre los **datos del propio centro** y la **media global** —el $0$ hacia el que la
+  distribución $u_j\sim\mathcal{N}(0,\sigma_u^2)$ los empuja—. El peso de cada fuente depende de
+  **cuánta información** aporta el centro: con **muchos** datos domina su propia estimación y **apenas
+  se encoge**; con **pocos**, esa estimación es ruidosa y el modelo la **arrima a 0** (se encoge
+  más), tomando fuerza prestada del conjunto. Así se estabilizan los grupos pequeños sin dispararse
+  por azar —un centro con dos pacientes, ambas fracturadas, no recibe un intercepto extremo—. En la @fig-u14-cohorte-caterpillar se ve directo: los centros con intervalos más anchos (menos datos) son los más
+  arrastrados hacia $0$.
+
+```{r}
+#| label: fig-u14-cond-marg
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Por qué *condicional* ≠ *marginal* con enlace no lineal. En gris, varias curvas logísticas con la misma pendiente desplazadas por el intercepto de centro; en azul, una de ellas (un centro típico: el efecto condicional, lo que estima glmer). Su promedio sobre los centros (naranja) es la curva marginal, más plana: la pendiente poblacional es menor que la de cada centro. El efecto se ha exagerado (sigma_u grande) para hacerlo visible; con sigma_u pequeño, como en la cohorte, ambas curvas casi coinciden."
+b0 <- 0; b1 <- 1.5; sigma_u <- 2          # sigma_u exagerado para que el aplanamiento se vea
+x  <- seq(-6, 6, length.out = 200)
+
+# Familia de curvas condicionales: varios centros (distinto u_j), MISMA pendiente
+cond_fam <- tidyr::expand_grid(x = x, u = c(-4, -2, 0, 2, 4)) |>
+  dplyr::mutate(p = plogis(b0 + b1 * x + u))
+
+# Curva marginal: promedio de plogis(b0 + b1*x + u) sobre u ~ N(0, sigma_u^2)
+ug <- seq(-4 * sigma_u, 4 * sigma_u, length.out = 401)
+w  <- dnorm(ug, 0, sigma_u); w <- w / sum(w)
+destacadas <- dplyr::bind_rows(
+  tibble::tibble(x = x, p = plogis(b0 + b1 * x),
+                 tipo = "condicional (un centro)"),
+  tibble::tibble(x = x, p = sapply(x, \(xi) sum(w * plogis(b0 + b1 * xi + ug))),
+                 tipo = "marginal (promedio)")
+)
+
+ggplot() +
+  geom_line(data = cond_fam,   aes(x, p, group = u), color = "grey75", linewidth = 0.5) +
+  geom_line(data = destacadas, aes(x, p, color = tipo), linewidth = 1.2) +
+  scale_color_manual(values = c("condicional (un centro)" = "#2c7fb8",
+                                "marginal (promedio)"     = "#e6810a")) +
+  labs(x = "covariable", y = "Probabilidad de fractura", color = NULL) +
+  theme(legend.position = "top")
+```
 
 ## 4.3 Pendiente aleatoria: cuando el efecto varía por grupo {#sec-u14-pendiente}
 
@@ -150,14 +242,56 @@ En forma matricial, una pendiente aleatoria solo **añade columnas a $\mathbf{Z}
 aleatorio y grupo) y agranda $\mathbf{G}$, que pasa a tener un bloque $\boldsymbol\Sigma$ de
 $2\times2$ por grupo.
 
+**¿Tiene sentido en la cohorte?** Para verlo, agrupamos `x1` en tramos y, en cada centro, calculamos
+la proporción de fracturas por tramo: si el **efecto** de `x1` variara por centro, las **pendientes**
+de esas líneas diferirían de un panel a otro.
+
+```{r}
+#| label: fig-u14-x1-centro
+#| fig-width: 10
+#| fig-height: 6.5
+#| fig-cap: "Proporción de fracturas frente a la fragilidad ósea (x1), en bins de igual longitud, con una faceta por centro (rejilla 6×4). La tendencia creciente común refleja el efecto (fijo) de x1; las diferencias de nivel entre paneles, el intercepto aleatorio. Con pocas pacientes por centro y bin las curvas son ruidosas, así que las diferencias de pendiente no son interpretables a ojo."
+library(tidyverse)
+n_bins <- 4
+br  <- seq(min(cohorte$x1), max(cohorte$x1), length.out = n_bins + 1)
+mid <- (head(br, -1) + tail(br, -1)) / 2              # punto medio de cada bin (posición en X)
+cohorte |>
+  mutate(bin    = cut(x1, breaks = br, include.lowest = TRUE),  # bins de igual longitud
+         x1_bin = mid[as.integer(bin)]) |>
+  group_by(centro, x1_bin) |>
+  summarise(prop = mean(evento), .groups = "drop") |>           # proporción de fracturas por centro y bin
+  ggplot(aes(x1_bin, prop, color = factor(centro), group = centro)) +
+  geom_line(alpha = 0.5) +
+  geom_point(size = 1.6, alpha = 0.8) +
+  facet_wrap(~ centro, ncol = 6) +                              # 6 columnas × 4 filas
+  labs(x = "x1 (fragilidad ósea)", y = "Proporción de fracturas") +
+  guides(color = "none")                                        # sin leyenda de centros
+```
+
+En la @fig-u14-x1-centro se aprecia con claridad una **tendencia creciente común** —el efecto de
+`x1`, compartido por todos los centros— y **diferencias de nivel** entre paneles (unos
+sistemáticamente más altos): la huella del **intercepto aleatorio**. Las diferencias de **pendiente**
+(algún panel parece plano o decreciente) son, en cambio, **difíciles de separar del ruido de
+muestreo**: con tan pocas pacientes por centro y tramo, cada punto se apoya en pocos casos y oscila
+con facilidad. A ojo no podemos decidir si hay pendientes aleatorias reales; lo **contrastaremos
+formalmente** en el laboratorio ([Sección 4.4](#sec-u14-glmm)).
+
 
 
 
 ## 4.4 Laboratorio: GLMM logístico {#sec-u14-glmm}
 
-Replicamos la idea: cómo se distribuye la fragilidad (`x1`) entre
-quienes fracturan y quienes no, separando por tratamiento (`x2`) y por periodo de revisión
-(`tiempo`):
+Planteamos estudiar la probabilidad de fractura en la base de datos `cohorte`, utilizando como respuesta la variable `ever`, que indica si una paciente ha sufrido o no una fractura, y como predictoras la variable continua fragilidad ósea `x1` y la categórica referida al tratamiento preventivo `x2`. Ahora queremos incorporar la agrupación natural definida por el `centro` de procedencia de las pacientes, a través de un efecto aleatorio.
+
+Las dos piezas ya las hemos **inspeccionado**: el **intercepto aleatorio** —diferencias de nivel
+basal entre centros, claras en la @fig-u14-prop-centro ([Sección 4.2](#sec-u14-intercepto))— parecía
+nítido, mientras que la **pendiente aleatoria** sobre `x1` —@fig-u14-x1-centro
+([Sección 4.3](#sec-u14-pendiente))— no se distinguía del ruido. Ahora lo resolvemos como se debe:
+**ajustando** las variantes —*pooled*, solo intercepto, e intercepto + pendiente— y
+**comparándolas** (AIC, LRT) contra la **verdad conocida** del DGP. Antes, una última mirada
+descriptiva a los **efectos fijos** —cómo se reparte la fragilidad según el desenlace y el
+tratamiento—:
+
 
 ```{r}
 #| label: fig-cohorte-eda-box
