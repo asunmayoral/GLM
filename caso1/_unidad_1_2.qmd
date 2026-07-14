@@ -15,8 +15,17 @@ modelos, interpretarlos en la escala correcta y evaluarlos como clasificadores.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-**RA implicados:** RA2 (ajuste), RA3 (interpretación en la escala correcta), RA4
-(diagnóstico, separación, calibración), RA5 (comparación de modelos).
+RA implicados:
+
+- **RA2 · Formulación y estimación.** Formular en la familia exponencial, estimar por MV (IWLS) y
+  hacer inferencia (deviance, Wald, razón de verosimilitudes).
+- **RA3 · Interpretación en la escala correcta.** Leer los efectos como odds ratios y efectos
+  marginales.
+- **RA4 · Diagnóstico y bondad de ajuste.** Separación, calibración, residuos y evaluación como
+  clasificador.
+- **RA5 · Selección y comparación de modelos.** Deviance, AIC/BIC y contrastes de razón de
+  verosimilitudes.
+
 [@nelder1972; @mccullagh1989; @dobson2018; @agresti2015; @hosmer2013; @fox2016]
 :::
 
@@ -1538,23 +1547,28 @@ son preguntas independientes.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (1.2) — alineada con RA3–RA5
-1. **Interpretación (RA3).** Elige **dos** covariables del modelo e interpreta su
-   efecto en **dos escalas**: odds ratio (con IC) y efecto marginal medio (AME),
-   en lenguaje clínico. Explica por qué el coeficiente crudo no es un efecto sobre
-   la probabilidad.
-2. **Comparación escalonada (RA5).** Construye una escalera de al menos cuatro
-   modelos que incluya **una interacción** (factor×continua o factor×factor).
-   Compáralos por **LRT, AIC y BIC**, documenta dónde discrepan AIC y BIC y
-   **justifica tu modelo final** (no basta con el AIC mínimo).
-3. **Evaluación (RA4).** Para tu modelo elegido, reporta **AUC** y evalúa la
-   **calibración** (gráfico + Hosmer–Lemeshow, con su salvedad). Comprueba además
-   si hay **separación** en algún subgrupo y, si la hubiera, explica cómo la
-   tratarías.
+## Tarea del estudiante (1.2) — resuelve la Pregunta 1 del caso
+Completa la **Pregunta 1** del cliente ([Unidad 6](#sec-u16)) sobre la cohorte de tu equipo:
+partiendo del `glm(ever ~ x1 + x2)` de la Unidad 1, interprétalo, decídelo y evalúalo.
 
-*Formato:* fragmento reproducible en el `.qmd` del grupo. Alimenta los apartados
-«Diagnóstico y validación», «Selección y comparación» e «Interpretación» de la
-rúbrica del informe (ver [Unidad 6](#sec-u16)).
+Tareas:
+
+1. **Interpreta (RA3).** Da el efecto de la fragilidad y del tratamiento en **dos escalas** —odds
+   ratio (con IC) y efecto marginal medio (AME)—, en lenguaje clínico; explica por qué el coeficiente
+   crudo no es un efecto sobre la probabilidad. Estima el **riesgo de una paciente nueva** con un
+   perfil concreto.
+2. **¿Protege por igual a todas? (RA5).** El cliente pregunta si el efecto del tratamiento depende de
+   la fragilidad: añade la **interacción `x1:x2`**, contrástala (**LRT**) dentro de una escalera de
+   modelos y compáralos por **AIC y BIC**; documenta dónde discrepan y **justifica tu modelo final**
+   (no basta el AIC mínimo).
+3. **Evalúa (RA4).** Reporta **AUC**, evalúa la **calibración** (gráfico + Hosmer–Lemeshow, con su
+   salvedad) y comprueba si hay **separación** en algún subgrupo; si la hubiera, explica cómo la
+   tratarías.
+4. **Responde al cliente.** Con lo anterior, redacta la respuesta a la Pregunta 1 y una recomendación
+   accionable.
+
+*Formato:* fragmento reproducible en el `.qmd` del equipo; es el borrador de la Pregunta 1 del
+informe (ver [Unidad 6](#sec-u16)).
 :::
 
 ## Puente a la Unidad 3 {#sec-u12-puente}

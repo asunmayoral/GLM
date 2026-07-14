@@ -29,7 +29,14 @@ de modo que lo estudiaremos allí.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-**RA implicados:** RA1–RA5 sobre un nuevo tipo de respuesta.
+RA implicados (el marco de 1.1–1.2 aplicado a nuevos tipos de respuesta):
+
+- **RA2 · Formulación y estimación.** Ajustar el binomial agrupado y los modelos politómicos
+  (nominal, ordinal).
+- **RA3 · Interpretación en la escala correcta.** Odds ratios relativos (nominal) y acumulados
+  (ordinal).
+- **RA4 · Diagnóstico y bondad de ajuste.** Contraste χ², calibración y sobredispersión.
+- **RA5 · Selección y comparación de modelos.** Nominal frente a ordinal (parsimonia).
 :::
 
 
@@ -810,11 +817,24 @@ de hecho, un ordinal *continuation-ratio*, allí con **fragilidad** de centro.
 
 
 ::: {.callout-important}
-## Tarea del estudiante (1.3)
-1. **Binomial agrupado (RA2, RA4).** Agrupa GLOW por un conjunto de factores y ajusta el
-   binomial; comprueba que recupera la logística individual y aplica el **contraste χ² de
-   bondad de ajuste** (deviance y Pearson), interpretándolo. Discute el efecto del tamaño de
-   celda.
-2. **Multinomial (RA3).** Interpreta un **odds ratio relativo** del multinomial nominal y un
-   **odds ratio acumulado** del ordinal (odds proporcionales), en lenguaje del problema.
+## Tarea del estudiante (1.3) — resuelve las Preguntas 3 y 4 del caso
+Sobre la cohorte de tu equipo, responde dos preguntas del cliente ([Unidad 6](#sec-u16)).
+
+**Pregunta 3 — tipo de fractura (`clase_nom`).**
+
+1. **Identifica y ajusta (RA3).** Reconoce que el tipo es una respuesta **nominal** (sin orden) y  ajusta el modelo adecuado (`nnet::multinom`) con `x1` y `x2`.
+2. **Interpreta y predice.** Lee los efectos como **odds ratios relativos** frente a la categoría
+   base (¿hacia qué tipo empuja cada factor?), predice el tipo más probable para un par de perfiles y
+   evalúa (p. ej. **Brier multiclase**).
+
+**Pregunta 4 — gravedad (`sever_ord`).**
+
+3. **Identifica y ajusta (RA3).** Reconoce que la gravedad es una respuesta **ordinal** y ajusta el
+   modelo de **odds proporcionales**; comprueba el supuesto de proporcionalidad.
+4. **Interpreta y responde.** Lee el **odds ratio acumulado** común (¿el tratamiento hace las
+   fracturas menos graves?) y responde al cliente.
+
+*Apoyo — control de calidad (RA2, RA4).* Como técnica de bondad de ajuste, agrupa la binaria de la
+Pregunta 1 en su versión **binomial** y aplica el **contraste χ²** (deviance y Pearson),
+interpretándolo y discutiendo el efecto del tamaño de celda.
 :::

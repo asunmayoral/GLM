@@ -73,7 +73,13 @@ variación **entre centros** como **efectos aleatorios** —el objeto de esta un
 
 ::: {.callout-note}
 ## Sobre esta unidad
-**RA implicados:** RA6 (efectos mixtos).
+RA implicados:
+
+- **RA6 · Efectos aleatorios.** Ajustar e interpretar GLMM (intercepto y pendiente): componentes de
+  varianza, ICC, *shrinkage* y condicional vs marginal.
+- **RA4 · Diagnóstico y bondad de ajuste** (del mixto). Residuos simulados (DHARMa), $R^2$
+  marginal/condicional y solidez del ajuste.
+
 [@bates2015; @agresti2015]
 :::
 
@@ -918,20 +924,25 @@ mixto) encajan sin forzar. Herramientas: `brms`, `rstanarm`, `MCMCglmm`.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (1.4)
-1. **Pooled vs GLMM (RA6).** Ajusta `ever ~ x1 + x2` en dos versiones: *pooled* (`glm`) y con
-   intercepto aleatorio (`glmer`, `(1 | centro)`). Compara `coef(m_pool)` con `fixef(m_int)`,
-   contrasta ambos con la **verdad** del DGP y explica por qué el *pooled* **atenúa** los efectos
-   (condicional vs marginal). Interpreta el **ICC**.
-2. **Pendiente aleatoria.** Añade `(1 + x1 | centro)` y examina `VarCorr`: interpreta $\sigma_{u_1}$
-   y su correlación con el intercepto, y razona —a la vista de la varianza estimada, la correlación y la
-   convergencia— si los datos justifican la pendiente aleatoria.
-3. **Datos reales (GLOW).** Ajusta `fracture ~ age + priorfrac + (1 | site_id)` sobre GLOW y
-   compáralo con su versión *pooled* (`glm`): estima $\sigma_u$ y el **ICC latente**, interpreta el
-   *caterpillar* de los 6 centros y discute por qué aquí el agrupamiento **apenas aporta** —y qué
-   limita estimar $\sigma_u$ con tan pocos grupos—.
-4. **Diagnóstico del mixto (RA4, RA6).** Sobre el modelo de intercepto aleatorio del ejercicio 1,
-   calcula los **residuos simulados** (`DHARMa::simulateResiduals`) y comenta el **Q–Q** y el **test
-   de dispersión**; reporta el $R^2$ **marginal** y **condicional** (`performance::r2`) e interpreta su
-   **diferencia**; y comprueba con `isSingular` que el ajuste es **sólido**.
+## Tarea del estudiante (1.4) — resuelve la Pregunta 5 del caso
+Responde la **Pregunta 5** del cliente ([Unidad 6](#sec-u16)) sobre la cohorte de tu equipo: *¿cuánto
+del riesgo depende de la clínica, hay centros mejores o peores, y qué esperar de uno nuevo?* 
+
+Tareas:
+
+1. **Reconoce el agrupamiento (RA6).** Ajusta el riesgo de fractura con **intercepto aleatorio por
+   centro** (`glmer`, `(1 | centro)`) y compáralo con la versión *pooled* (`glm`): interpreta el
+   **ICC** (cuánto pesa la clínica) y explica por qué el *pooled* **atenúa** los efectos (condicional
+   vs marginal), contrastándolos con la **verdad del DGP**.
+2. **Centros mejores y peores.** Interpreta el *caterpillar* de los interceptos por centro
+   (`ranef`) y el ***shrinkage***: qué clínicas se desvían y por qué las extremas se encogen.
+3. **¿Pendiente aleatoria?** Prueba `(1 + x1 | centro)` y razona —varianza estimada, correlación con
+   el intercepto, convergencia— si los datos la justifican.
+4. **Diagnóstico (RA4).** Residuos simulados (`DHARMa::simulateResiduals`, Q–Q y dispersión), $R^2$
+   **marginal** y **condicional** (`performance::r2`) y `isSingular` para confirmar que el ajuste es
+   sólido.
+5. **Responde al cliente,** incluida la expectativa para **una clínica nueva** (predicción marginal).
+
+*Opcional (dato real):* repite el punto 1 sobre GLOW con `(1 | site_id)` y comenta por qué allí, con
+tan pocos centros, el agrupamiento apenas aporta.
 :::

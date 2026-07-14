@@ -15,39 +15,164 @@ caso reproducibles) y, de forma acumulativa, RA1–RA7.
 
 ## 6.1 El estudio de caso (entregable) {#sec-u16-caso}
 
-<!-- TODO: enunciado del estudio de caso del grupo, que debe atravesar las tres
-     "lentes" del Caso 1 sobre datos propios o asignados:
-       - respuesta binaria (logística + interpretación + evaluación),
-       - agrupamiento (intercepto aleatorio / extensión politómica),
-       - tiempo-a-evento discreto (persona-periodo + cloglog).
-     Indicar datos admisibles (origen y licencia) o el uso de la cohorte simulada. -->
+### El encargo
 
-## 6.2 Componentes de evaluación {#sec-u16-componentes}
+Te contrata la dirección médica de **OsteoRed**, una red de 24 clínicas de salud ósea que, dentro de
+un programa de prevención, ha seguido durante seis años a una cohorte de mujeres. No son
+estadísticos: te traen sus datos y sus preguntas, y esperan **respuestas y recomendaciones**, no una
+clase de modelos.
 
-Alineados con los instrumentos de la guía:
+De cada mujer registraron su **fragilidad ósea** (un marcador de densidad mineral, estandarizado;
+`x1`), si seguía el **tratamiento preventivo** (`x2`), la **clínica** a la que acude (`centro`) y, a
+lo largo de hasta **seis revisiones anuales**, si sufrió una **fractura** y **cuándo** —o si terminó
+el seguimiento sin fracturarse— (`ever`, `tiempo`, `evento`); y, cuando la hubo, su **tipo**
+(`clase_nom`: A/B/C) y su **gravedad** (`sever_ord`: leve/moderada/grave).
 
-- **Informe (P).** Documento reproducible (`.qmd`) con el ciclo dato → modelo →
-  diagnóstico → interpretación, en la escala correcta.
-- **Reflexión (R).** Documento breve sobre decisiones de modelización y sus
-  límites.
-- **Exposición (E).** Presentación del estudio de caso.
-- **Q&A individual (w).** Defensa individual ante preguntas.
+> **Lo que la dirección de OsteoRed quiere saber**
+>
+> 1. «¿Podemos anticipar qué mujeres acabarán fracturándose? ¿Influyen de verdad la fragilidad ósea
+>    y nuestro tratamiento, y cuánto? ¿Podríamos estimar el riesgo de una paciente nueva? Y el
+>    tratamiento, ¿protege por igual a todas o depende de lo frágil que esté cada una?»
+> 2. «No nos basta con saber *si* se fracturan: necesitamos saber **cuándo**. ¿En qué momento del
+>    seguimiento se dispara el riesgo? ¿Cada cuánto deberíamos citarlas a revisión? ¿El tratamiento
+>    **retrasa** la fractura? Y cuidado: muchas terminan el seguimiento sin fracturarse, no queremos
+>    que eso distorsione las cuentas.»
+> 3. «Cuando hay fractura, la clasificamos en tres **tipos** (A, B, C). ¿Los mismos factores empujan
+>    hacia unos tipos más que otros? ¿Podríamos anticipar el tipo más probable?»
+> 4. «Cada fractura tiene una **gravedad** (leve, moderada, grave). ¿Qué la agrava? ¿Nuestro
+>    tratamiento, además de evitar fracturas, hace que las que ocurren sean **menos graves**?»
+> 5. «Trabajamos en **24 clínicas** y sospechamos que no todas rinden igual. ¿El riesgo depende de la
+>    clínica o es todo cosa de la paciente? ¿Hay centros que lo hacen claramente mejor o peor? Si
+>    abrimos uno nuevo, ¿qué deberíamos esperar?»
 
-## 6.3 Actividades a completar (cuestiones evaluables) {#sec-u16-actividades}
+### Tu trabajo
 
-<!-- TODO: lista de cuestiones evaluables que el material deja "abiertas" a lo
-     largo de 1.1-1.4 (las "Tarea del estudiante"), reorganizadas como entregables
-     del caso. Conectar cada cuestión con el RA y el componente (P/R/E/w). -->
+Entregas un **informe de consultoría reproducible** que convierta esas preguntas en análisis. Nadie
+te dice qué modelo usar: **elegirlo y defenderlo es parte de la nota**. Para **cada** pregunta del
+cliente:
 
-## 6.4 Rúbricas {#sec-u16-rubricas}
+1. **Identifica el objetivo** y qué tipo de respuesta tienes entre manos.
+2. **Propón un análisis adecuado y justifícalo:** por qué ese modelo y no otro, qué enlace, si
+   procede una interacción, si hay que reconocer el agrupamiento por clínica o el tiempo con censura.
+3. **Resuélvelo** con rigor, con las decisiones de selección y el diagnóstico que lo respalden.
+4. **Interprétalo** en la escala que el cliente entienda: probabilidades, veces más riesgo, plazos…
+5. **Responde al cliente** con una recomendación accionable.
 
-<!-- TODO: insertar las rúbricas EXACTAS de la guía docente (§8: informe P,
-     reflexión R, exposición E, Q&A w). NO se reproducen aquí de memoria; se
-     copian de la fuente. Pendiente: confirmar criterios y pesos con la guía. -->
+De forma transversal, el informe incluye **predicción** donde el cliente la pide (el riesgo de una
+paciente nueva, el calendario de revisiones, qué esperar de una clínica nueva), el **control de
+calidad** de cada análisis y la **reproducibilidad**: un `.qmd` que corre de principio a fin (RA8).
+
+### El formato: un informe técnico
+
+OsteoRed pregunta en términos **ejecutivos** (qué hacer, a quién vigilar, cada cuánto), pero tu
+entregable es un **informe técnico**, no un resumen ejecutivo. La diferencia está en el lector: un
+resumen ejecutivo va directo a conclusiones y recomendaciones, con lo técnico al mínimo; un informe
+técnico se escribe para alguien que podría **auditar o reproducir** tu trabajo, así que documenta el
+razonamiento completo —objetivo, método elegido y su justificación, supuestos, ajuste, diagnóstico e
+interpretación— antes de llegar a la recomendación.
+
+En la práctica: traduce cada pregunta ejecutiva del cliente a uno o varios **objetivos analíticos
+precisos**; organiza el informe siguiendo esas preguntas y, dentro de cada una, recorre el ciclo
+(objetivo → método justificado → resultados → diagnóstico → interpretación → respuesta y
+recomendación); y **devuelve cada conclusión al lenguaje del cliente**. El rigor técnico y la lectura
+accionable conviven: lo técnico sostiene la recomendación, no la sustituye.
 
 ::: {.callout-important}
-## Pendiente de la fuente
-Los criterios, niveles y pesos de las rúbricas deben tomarse literalmente de la
-§8 de la guía docente. Este andamiaje deja los huecos marcados para rellenarlos
-con esa fuente.
+## Apartado de Reflexión sobre el uso de la IA (obligatorio)
+Cierra el informe con un apartado de **Reflexión ética sobre la IA** que recoja una reflexión sobre el uso que se ha hecho de la IA para la realización del trabajo: qué herramientas usasteis y para qué, los **prompts relevantes**, y —sobre todo— cómo **verificasteis y validasteis** lo que produjeron (qué comprobasteis, qué corregisteis, qué descartasteis).
+
+Es la evidencia de vuestro proceso y del uso responsable de la IA.
 :::
+
+
+::: {.callout-important}
+## Anexo de reproducibilidad (obligatorio)
+Añade al final un **anexo de reproducibilidad** que permita a otra persona regenerar el informe: el
+**entorno** (`sessionInfo()` o `renv`, con las versiones de los paquetes), la **semilla** usada, las
+**instrucciones para ejecutar** el `.qmd` de principio a fin y la **procedencia y estructura de los
+datos** (`cohorte` y su expansión persona-periodo).
+:::
+
+
+::: {.callout-important}
+Además, el líder del equipo ha de completar y presentar, en un documento adicional:
+- La **planificación y reparto** de tareas asumidas en el equipo (roles, tareas, cómo os organizasteis en el tiempo,  qué revisiones o hitos hubo y cómo resolvisteis los bloqueos.
+- La evaluación de los compañeros, anotando el grado de implicación (del 0 al 100%) en el trabajo.
+- El checklist de tareas realizadas (según la propuesta especificada abajo) cumplimentado.
+:::
+
+
+::: {.callout-tip}
+## Control de calidad interno: ajusta a ciegas y valida contra el DGP
+Esto es tuyo, no del cliente. Como la cohorte es simulada, los parámetros que la generaron están en
+`attr(cohorte, "verdad")`: los
+efectos $\beta$ de `x1` y `x2`, la varianza entre centros $\sigma_u$, el riesgo base por periodo
+$\alpha_t$ y los parámetros del nominal y del ordinal. La disciplina que se te pide: **ajusta y
+decide sin mirar esa "verdad"** y, solo al final, compárala con tus estimaciones, mostrando el
+contraste en el informe.
+
+Ten presente que esta comprobación es un lujo **didáctico**, posible solo porque los datos son
+simulados. Con datos reales no existe tal "verdad": allí la confianza en el modelo descansa en el
+diagnóstico, la validación fuera de muestra y el conocimiento del problema. Recógelo así en tu
+Reflexión.
+:::
+
+::: {.callout-tip}
+## Cada equipo, una base de datos distinta
+Cada equipo trabaja sobre **su propia cohorte**, generada con una configuración diferente —pero
+coherente— de los parámetros del DGP. Las diez configuraciones y los datos por equipo los produce el
+script `scripts/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` la cohorte
+(`cohorte.rds` / `.csv`) y su expansión persona-periodo (`pp.rds` / `.csv`). El enunciado y las
+preguntas del cliente son los mismos para todos; lo que cambia de un equipo a otro son las
+**conclusiones numéricas** (efectos, riesgos, plazos). La clave con los parámetros verdaderos
+(`configuraciones_equipos.csv`) la guarda el/la docente.
+:::
+
+## 6.2 Checklist de tareas {#sec-u16-checklist}
+
+Antes de entregar, comprueba dos cosas: que has **respondido cada pregunta del cliente** y que no te
+has saltado ninguna de las **tareas que un buen analista** hace en un proyecto. Verifica cada casilla y marca las que hayas comprobado e incluido en la entrega.
+
+### ¿Respondida cada pregunta del cliente?
+
+- [ ] **P1 · Riesgo de fractura:** quién se fractura, papel de la fragilidad y del tratamiento, riesgo de una paciente nueva, y si el efecto del tratamiento depende de la fragilidad.
+- [ ] **P2 · Cuándo ocurre:** evolución del riesgo a lo largo de las revisiones, calendario de seguimiento y efecto del tratamiento sobre los plazos, con la censura bien tratada.
+- [ ] **P3 · Tipo de fractura:** qué factores empujan hacia cada tipo y anticipación del más probable.
+- [ ] **P4 · Gravedad:** qué agrava la fractura y si el tratamiento la reduce.
+- [ ] **P5 · Peso de la clínica:** cuánto del riesgo depende del centro, centros mejores o peores y qué esperar de uno nuevo.
+
+### Tareas analíticas del proyecto
+
+*Comprensión y datos*
+
+- [ ] Traducir cada pregunta del cliente a objetivos analíticos precisos.
+- [ ] Explorar y depurar los datos (EDA): tipos de variable, escalas, atípicos y ausentes.
+
+*Modelización*
+
+- [ ] Identificar el tipo de respuesta y elegir un modelo adecuado a cada objetivo, justificándolo.
+- [ ] Especificar bien: enlace, interacciones pertinentes, agrupamiento (efectos aleatorios), tiempo con censura, proporcionalidad.
+- [ ] Comprobar la modificación de un efecto por otra variable cuando el cliente lo pregunta (interacción).
+- [ ] Ajustar y comprobar la convergencia y la estabilidad del ajuste.
+
+*Evaluación*
+
+- [ ] Diagnosticar: residuos, calibración, separación, bondad de ajuste (χ²), sobredispersión y los supuestos propios del modelo (proporcionalidad de odds en el ordinal, riesgos proporcionales en supervivencia, convergencia y no-singularidad en los mixtos).
+- [ ] Evaluar la capacidad predictiva con la métrica adecuada: AUC y calibración (binaria), Brier multiclase (nominal), hazard/supervivencia por periodo.
+- [ ] Seleccionar y comparar modelos con criterios (AIC/BIC) y contrastes (LRT), justificando la elección.
+
+*Resultados*
+
+- [ ] Interpretar los efectos en la escala propia de cada respuesta —odds ratios y efectos marginales (binaria), OR relativos (nominal), OR acumulado (ordinal), hazard ratios (supervivencia)—, en términos relativos y absolutos, con sus intervalos de confianza.
+- [ ] Predecir donde el cliente lo pide (perfiles de paciente, paciente nueva, clínica nueva, calendario).
+- [ ] Control de calidad: contrastar las estimaciones con la verdad del DGP.
+
+*Cierre*
+
+- [ ] Responder a cada pregunta con una recomendación accionable, en el lenguaje del cliente.
+- [ ] Comunicar: informe técnico claro y ordenado, figuras legibles y referencias (APA 7).
+- [ ] Reproducibilidad: el `.qmd` corre de principio a fin; semilla, entorno y datos documentados en el anexo.
+- [ ] Incluir la reflexión sobre el uso de la IA.
+- [ ] Adjuntar el documento de planificación y reparto de tareas, evaluación, valoración y checklist de tareas realizadas.
+
+

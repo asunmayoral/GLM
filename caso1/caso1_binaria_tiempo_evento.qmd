@@ -54,6 +54,19 @@ set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 ```
 
+## Resultados de aprendizaje del Caso 1 {#sec-ra}
+
+Al completar el Caso 1, el estudiante será capaz de:
+
+- **RA1 · Marco GLM frente a OLS.** Reconocer por qué el modelo lineal (OLS) falla ante respuestas discretas y describir los tres componentes de un GLM: componente aleatorio, predictor lineal y función de enlace.
+- **RA2 · Formulación y estimación.** Formular un GLM en la familia exponencial, ajustarlo por máxima verosimilitud (IWLS) y hacer inferencia (deviance, Wald, razón de verosimilitudes).
+- **RA3 · Interpretación en la escala correcta.** Interpretar los efectos en la escala propia de cada respuesta: odds ratios y efectos marginales (binaria), odds ratios relativos (nominal), odds ratios acumulados (ordinal) y hazard ratios (supervivencia).
+- **RA4 · Diagnóstico y bondad de ajuste.** Evaluar el modelo con residuos, separación, calibración, el contraste χ² de bondad de ajuste y la sobredispersión.
+- **RA5 · Selección y comparación de modelos.** Comparar y seleccionar modelos con deviance, AIC/BIC y contrastes de razón de verosimilitudes.
+- **RA6 · Efectos aleatorios.** Ajustar e interpretar modelos mixtos (GLMM) con intercepto y pendiente aleatorios: componentes de varianza, ICC, *shrinkage* y la distinción condicional vs marginal.
+- **RA7 · Tiempo-a-evento y censura.** Reformular la supervivencia en tiempo discreto como un GLM binomial con enlace `cloglog` sobre datos persona-periodo, tratando la censura y prediciendo hazard y supervivencia.
+- **RA8 · Estudio de caso reproducible.** Desarrollar, presentar y defender un estudio de caso reproducible que integre las lentes anteriores.
+
 ::: callout-note
 ## Mapa del caso
 
@@ -72,12 +85,12 @@ datos discretos.
 
 | Unidad | Contenido |
 |-----|------------------------------------|
-| **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. <br> Objetivos: RA1 (GLM vs OLS) |
-| **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores.<br> Objetivos: RA2 (ajuste) |
-| **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). <br> Objetivos: RA3 (interpretación en la escala correcta), <br> RA4 (diagnóstico, separación, calibración), <br> RA5 (comparación de modelos) |
-| **1.4** | Efectos aleatorios (GLMM logístico, intercepto y pendiente aleatorios) sobre la cohorte y validación con datos reales (GLOW); puente a la supervivencia. <br> Objetivos: RA6 (efectos mixtos) |
-| **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales, Cox; el tiempo discreto como GLM (`cloglog` persona-periodo). <br> Objetivos: RA7 (censura y tiempo-a-evento como  casos del marco) |
-| **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas).<br>Objetivos: RA8 (estudio de caso reproducible) |
+| **1.1** | Cuando la recta no llega: OLS falla en binaria; tres componentes del GLM; tipología de respuestas; primer `glm`. <br> Objetivos: **RA1** (y primer contacto con RA2) |
+| **1.2** | Formulación de los GLM: familia exponencial, enlace, IWLS, *deviance*; inferencia; interpretación (OR, efectos marginales); evaluación y comparación de clasificadores.<br> Objetivos: **RA2, RA3, RA4, RA5** |
+| **1.3** | Respuesta categórica generalizada: binomial agrupado (ajuste y bondad de ajuste con χ²) y respuestas politómicas — multinomial nominal y ordinal (odds proporcionales). <br> Objetivos: **RA2–RA5** sobre nuevos tipos de respuesta |
+| **1.4** | Efectos aleatorios (GLMM logístico, intercepto y pendiente aleatorios) sobre la cohorte y validación con datos reales (GLOW); puente a la supervivencia. <br> Objetivos: **RA6** (y RA4 en el diagnóstico del mixto) |
+| **1.5** | Supervivencia: función de supervivencia, hazard, riesgos proporcionales (Cox como referencia, detalle en el Caso 3); el tiempo discreto como GLM (`cloglog` persona-periodo). <br> Objetivos: **RA7** (y RA3 vía hazard ratios) |
+| **1.6** | Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas).<br>Objetivos: **RA8** (integra RA1–RA7) |
 :::
 
 # Presentación del caso {#sec-presentacion}
@@ -294,19 +307,9 @@ glimpse(cohorte)
 head(cohorte)
 ```
 
-Más tarde, para trabajar la supervivencia con un modelo logístico (1.5),
-habremos de utilizar su versión binaria, en la que desglosamos por filas
-la respuesta de cada paciente en cada uno de los seis periodos de tiempo
-observados durante el seguimiento, identificando con  (0/1) la ausencia/presencia 
-de fractura en cada periodo. Este banco de datos desglosado por periodo está
-disponible en `pp`:
-
-```{r}
-# transformamos la cohorte simulada a datos binarios
-pp      <- expandir_persona_periodo(cohorte)     # persona-periodo (supervivencia, 1.5)
-#write_csv(pp,      "cohorte_pp.csv")     # formato persona-periodo
-head(pp,6)
-```
+Más tarde, para trabajar la supervivencia (Unidad 1.5), transformaremos esta `cohorte` a un formato
+**persona-periodo** —una fila por paciente y periodo en riesgo—; esa expansión se construye y se
+explica allí, donde se usa.
 
 Visualizamos en la @fig-cohorte-eda los datos simulados en la `cohorte`.
 

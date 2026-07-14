@@ -1,0 +1,94 @@
+<svg viewBox="0 0 1120 1010" xmlns="http://www.w3.org/2000/svg" role="img" font-family="'Segoe UI',system-ui,sans-serif">
+<title>Organigrama del sistema de evaluación con fórmulas</title>
+<desc>Árbol de la evaluación continua (N media de 3 estudios de caso; cada EC = 0,6 Gru + 0,4 Ind; Gru = (0,5 Inf + 0,4 Expo + 0,1 Def) x Co) y del examen final (N = 0,5 Inf + 0,5 Def).</desc>
+<style>
+  .t{fill:#2C2C2A;} .tv{fill:#3C3489;} .to{fill:#993C1D;} .tw{fill:#fff;}
+  .h{font-weight:700;} .lbl{fill:#5F5E5A;} .crit{fill:#5F5E5A;}
+  .f{font-family:'JetBrains Mono',Consolas,monospace;}
+  text{font-family:'Segoe UI',system-ui,sans-serif;}
+</style>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#9a938c"/>
+  </marker>
+</defs>
+<rect x="0" y="0" width="1120" height="1010" fill="#ffffff"/>
+<text x="560" y="34" text-anchor="middle" class="t h" font-size="21">Evaluación · Modelos Lineales Generalizados</text>
+<rect x="26" y="60" width="1068" height="596" rx="16" fill="#F7F6FE" stroke="#CECBF6"/>
+<text x="46" y="86" class="tv h" font-size="13">EVALUACIÓN CONTINUA</text>
+<rect x="405" y="96" width="310" height="60" rx="10" fill="#7F77DD" stroke="#7F77DD"/>
+<text x="560" y="120" text-anchor="middle" class="tw h" font-size="14">3 Estudios de Caso · nota final</text>
+<text x="560" y="142" text-anchor="middle" class="tw f" font-size="14">N = (EC1 + EC2 + EC3) · 1/3</text>
+<text x="700" y="113" text-anchor="end" class="tw h" font-size="11">100%</text>
+<path d="M560,156 V176" fill="none" stroke="#9a938c" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="326" y="178" width="468" height="86" rx="10" fill="#EEEDFE" stroke="#AFA9EC"/>
+<text x="346" y="202" class="tv h" font-size="14">Estudio de caso (EC)</text>
+<text x="774" y="202" text-anchor="end" class="tv h" font-size="13">33,33% c/u</text>
+<text x="346" y="224" class="t f" font-size="13">EC = 0,6·Gru + 0,4·Ind</text>
+<text x="346" y="248" class="crit" font-size="11">Requisito continua:  Gru ≥ 3,5  ∧  Ind ≥ 3,5  ∧  EC ≥ 5</text>
+<path d="M560,264 V282 H322 V300" fill="none" stroke="#9a938c" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M560,264 V282 H855 V300" fill="none" stroke="#9a938c" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="60" y="302" width="524" height="70" rx="10" fill="#EEEDFE" stroke="#AFA9EC"/>
+<text x="80" y="326" class="tv h" font-size="14">Proyecto grupal (Gru)</text>
+<text x="564" y="326" text-anchor="end" class="tv h" font-size="16">60%</text>
+<text x="80" y="352" class="t f" font-size="13">Gru = (0,5·Inf + 0,4·Expo + 0,1·Def) · Co</text>
+<path d="M100,372 V636 " fill="none" stroke="#AFA9EC" stroke-width="1.5"/>
+<path d="M100,414 H120" fill="none" stroke="#AFA9EC" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120" y="386" width="464" height="76" rx="9" fill="#fff" stroke="#CECBF6"/>
+<text x="138" y="408" class="tv h" font-size="12.5">Informe (Inf)</text>
+<text x="566" y="408" text-anchor="end" class="tv h" font-size="13">50%</text>
+<text x="138" y="426" class="crit" font-size="10.5">concreción del problema y objetivos · descripción de datos y métodos ·</text>
+<text x="138" y="440" class="crit" font-size="10.5">adecuación de resultados e interpretaciones · redacción y ajuste al</text>
+<text x="138" y="454" class="crit" font-size="10.5">formato estandarizado · uso ético de la IA</text>
+<path d="M100,504 H120" fill="none" stroke="#AFA9EC" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120" y="472" width="464" height="62" rx="9" fill="#fff" stroke="#CECBF6"/>
+<text x="138" y="494" class="tv h" font-size="12.5">Exposición (Expo)</text>
+<text x="566" y="494" text-anchor="end" class="tv h" font-size="13">40%</text>
+<text x="138" y="512" class="crit" font-size="10.5">narrativa · soporte visual · identificación de las ideas clave ·</text>
+<text x="138" y="526" class="crit" font-size="10.5">comunicación oral</text>
+<path d="M100,566 H120" fill="none" stroke="#AFA9EC" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120" y="544" width="464" height="44" rx="9" fill="#fff" stroke="#CECBF6"/>
+<text x="138" y="566" class="tv h" font-size="12.5">Defensa (Def)</text>
+<text x="566" y="566" text-anchor="end" class="tv h" font-size="13">10%</text>
+<text x="138" y="582" class="crit" font-size="10.5">corrección y justificación de las respuestas</text>
+<path d="M100,620 H120" fill="none" stroke="#AFA9EC" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120" y="598" width="464" height="46" rx="9" fill="#FBEAF0" stroke="#ED93B1"/>
+<text x="138" y="620" class="h" fill="#993556" font-size="12.5">Coevaluación 360 (Co)</text>
+<text x="566" y="620" text-anchor="end" class="h" fill="#993556" font-size="12">× multiplicador</text>
+<text x="138" y="636" class="crit" font-size="10.5">cumplimiento · contribución · colaboración en el desarrollo del proyecto</text>
+<rect x="612" y="302" width="470" height="342" rx="10" fill="#EEEDFE" stroke="#AFA9EC"/>
+<text x="632" y="326" class="tv h" font-size="14">Examen oral individual</text>
+<text x="1062" y="326" text-anchor="end" class="tv h" font-size="16">40%</text>
+<text x="632" y="350" class="t f" font-size="13">Defensa individual (Ind)</text>
+<line x1="632" y1="362" x2="1062" y2="362" stroke="#CECBF6"/>
+<text x="632" y="386" class="crit" font-size="11">En tutoría, tras la corrección del proyecto (≤ 2 semanas).</text>
+<text x="632" y="416" class="tv h" font-size="11.5">Criterios:</text>
+<text x="632" y="436" class="crit" font-size="11">· justificaciones técnicas e interpretación de resultados</text>
+<text x="632" y="456" class="crit" font-size="11">· resolución de las correcciones señaladas en el proyecto</text>
+<text x="632" y="476" class="crit" font-size="11">· reflexión sobre los puntos débiles y recomendaciones dadas</text>
+<text x="632" y="496" class="crit" font-size="11">· proyección de soluciones a nuevos retos del estudio de caso</text>
+<rect x="26" y="676" width="1068" height="316" rx="16" fill="#FDF6F3" stroke="#F5C4B3"/>
+<text x="46" y="702" class="to h" font-size="13">EVALUACIÓN FINAL · si no participa o no supera la continua</text>
+<rect x="405" y="714" width="310" height="66" rx="10" fill="#D85A30" stroke="#D85A30"/>
+<text x="560" y="738" text-anchor="middle" class="tw h" font-size="13">Examen final · 1-2 casos resueltos</text>
+<text x="560" y="760" text-anchor="middle" class="tw f" font-size="14">N = 0,5·Inf + 0,5·Def</text>
+<text x="700" y="731" text-anchor="end" class="tw h" font-size="11">100%</text>
+<path d="M560,780 V800 H340 V820" fill="none" stroke="#9a938c" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M560,780 V800 H780 V820" fill="none" stroke="#9a938c" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="100" y="822" width="480" height="150" rx="9" fill="#fff" stroke="#F5C4B3"/>
+<text x="120" y="846" class="to h" font-size="13">Informe (Inf)</text>
+<text x="560" y="846" text-anchor="end" class="to h" font-size="15">50%</text>
+<line x1="120" y1="856" x2="560" y2="856" stroke="#F5C4B3"/>
+<text x="120" y="878" class="crit" font-size="11">· justificaciones técnicas e interpretación de resultados</text>
+<text x="120" y="900" class="crit" font-size="11">· soluciones e implicaciones derivadas</text>
+<text x="120" y="922" class="crit" font-size="11">· capacidades comunicativas escritas</text>
+<text x="120" y="944" class="crit" font-size="11">· ajuste al formato estandarizado</text>
+<rect x="620" y="822" width="462" height="150" rx="9" fill="#fff" stroke="#F5C4B3"/>
+<text x="640" y="846" class="to h" font-size="13">Defensa Oral (Def)</text>
+<text x="1062" y="846" text-anchor="end" class="to h" font-size="15">50%</text>
+<line x1="640" y1="856" x2="1062" y2="856" stroke="#F5C4B3"/>
+<text x="640" y="878" class="crit" font-size="11">· justificación y corrección técnica</text>
+<text x="640" y="900" class="crit" font-size="11">· interpretación de resultados</text>
+<text x="640" y="922" class="crit" font-size="11">· comunicación oral</text>
+<text x="640" y="948" class="crit" font-size="10.5">Sin recursos de consulta (físico o digital).</text>
+</svg>

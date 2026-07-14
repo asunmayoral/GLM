@@ -1,0 +1,27 @@
+---
+title: "supervivencia 2"
+format: html
+---
+
+## 5.1 La función de supervivencia y la función de riesgo {#sec-u25-hazard}
+
+
+Sea $T\ge 0$ el **tiempo hasta que ocurre el evento**. En **tiempo continuo**, toda la información
+sobre $T$ se resume en **tres representaciones equivalentes** —conocer una determina las otras dos—:
+
+- **Función de supervivencia.** $S(t)=\Pr(T>t)$, la probabilidad de "seguir sin evento" pasado $t$.
+Se interpreta directamente ($S(5)=0{,}8$: el 80 % llega sin evento más allá de 5), cumple $S(0)=1$,
+es **no creciente** y $S(t)\to 0$.
+
+- **Función de riesgo (hazard).** Riesgo **instantáneo** de que el evento ocurra en $t$, **condicionado
+a no haber ocurrido antes**, por lo que se calcula como el ratio de la función de densidad de $T$, $f(t)$, por la función de supervivencia $S(t)$:
+$$
+h(t)=\frac{f(t)}{S(t)}=-\frac{\mathrm{d}}{\mathrm{d}t}\log S(t).
+$$
+Es una **tasa** (intensidad por unidad de tiempo, **no** acotada por 1), no una probabilidad.
+
+- **Hazard acumulado.** Se lee como el **riesgo total acumulado** hasta $t$ —la suma de los riesgos instantáneos— o, de forma equivalente, como el **número esperado de eventos** que ocurrirían hasta $t$ si el evento
+pudiera repetirse; de ahí que **no** sea una probabilidad y pueda **superar 1**. 
+$$H(t)=\int_0^t h(u)\,\mathrm{d}u=-\log S(t)$$
+Como $S(t)=e^{-H(t)}$, cada unidad de hazard acumulado multiplica la supervivencia por $e^{-1}\approx0{,}37$
+(así, $H(t)=1$ equivale a $S(t)\approx0{,}37$).

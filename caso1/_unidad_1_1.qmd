@@ -8,8 +8,12 @@ Comparamos en esta sección, los resultados de un modelo lineal y los de un mode
 
 ::: {.callout-note}
 ## Sobre esta unidad
-**RA implicados:** RA1 y, en su primer
-contacto, RA2.
+RA implicados:
+
+- **RA1 · Marco GLM frente a OLS.** Reconocer por qué el modelo lineal (OLS) falla ante respuestas
+  discretas y describir los tres componentes de un GLM (aleatorio, predictor lineal y enlace).
+- **RA2 · Formulación y estimación** (primer contacto). Formular y estimar un GLM como generalización
+  del modelo lineal.
 :::
 
 ## 1.1 El modelo lineal en GLOW
@@ -330,14 +334,22 @@ patchwork::wrap_plots( p_ols, p_glm, nrow = 2) +
 
 
 ::: {.callout-important}
-## Tarea del estudiante (1.1) — alineada con RA1
-1. **Demuestra el fallo de OLS con tu propio gráfico.** Elige una covariable
-   continua distinta de `age` (p. ej. `bmi` o `height`), ajusta
-   `lm(fractura01 ~ covariable)` y construye **un** gráfico que evidencie a la
-   vez predicciones fuera de $[0,1]$ y el patrón de residuos en dos bandas.
-2. **Mapea fallo → componente.** Tabla de dos columnas: los cuatro fallos de OLS
-   y qué componente del GLM (aleatoria / predictor lineal / enlace) resuelve cada
-   uno, con una frase de porqué.
+## Tarea del estudiante (1.1) — arranca la Pregunta 1 del caso
+Empiezas a responder la **Pregunta 1** del cliente ([Unidad 6](#sec-u16)) —*¿quién se fractura y
+cuánto influyen la fragilidad (`x1`) y el tratamiento (`x2`)?*— sobre la **cohorte de tu equipo**.
+Aquí solo la dejas **planteada y ajustada**; interpretarla, decidirla y evaluarla es cosa de la
+Unidad 2. 
+
+Tareas:
+
+1. **Identifica el objetivo y el tipo de respuesta.** Argumenta que «¿ocurre la fractura?» es una
+   respuesta **binaria** (`ever`) y que el **modelo lineal (OLS) no sirve**: ajusta `lm(ever ~ x1)` y
+   construye **un** gráfico que evidencie a la vez predicciones fuera de $[0,1]$ y los residuos en dos
+   bandas.
+2. **Del fallo al GLM.** En una tabla, asocia cada fallo de OLS con el **componente del GLM**
+   (aleatoria / predictor lineal / enlace) que lo resuelve, con una frase de porqué.
+3. **Primer ajuste.** Ajusta `glm(ever ~ x1 + x2, family = binomial)` y guárdalo en el `.qmd` del
+   equipo: es el punto de partida de la Pregunta 1, que completarás en la Unidad 2.
 :::
 
 ## Puente a la Unidad 2 {#sec-u11-puente}

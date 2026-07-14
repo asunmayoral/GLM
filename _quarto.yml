@@ -19,7 +19,7 @@ website:
       - href: index.qmd
         text: Inicio
       - href: caso1/caso1_binaria_tiempo_evento.qmd
-        text: "Caso 1 · Binaria y tiempo-a-evento"
+        text: "Caso 1 · Binaria"
   page-footer:
     center: "Material docente · Grado en Ciencia de Datos e IA · Universidad Miguel Hernández"
 
