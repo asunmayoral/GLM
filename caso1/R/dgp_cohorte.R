@@ -149,3 +149,49 @@ expandir_persona_periodo <- function(d) {
                y = c(rep(0L, Ti - 1L), d$evento[i]))
   }))
 }
+
+#' Localiza la carpeta de un caso subiendo hasta la raíz del proyecto
+#' (donde está `_quarto.yml`). Robusto a cualquier directorio de trabajo.
+.raiz_glm <- function(desde = getwd()) {
+  d <- normalizePath(desde, winslash = "/", mustWork = FALSE)
+  repeat {
+    if (file.exists(file.path(d, "_quarto.yml"))) return(d)
+    p <- dirname(d); if (identical(p, d)) return(NA_character_); d <- p
+  }
+}
+.base_caso <- function(caso) {
+  raiz <- .raiz_glm()
+  if (is.na(raiz)) stop("No encuentro la raíz del proyecto (_quarto.yml). Abre el proyecto GLM.")
+  file.path(raiz, caso)
+}
+
+#' Carga la cohorte simulada con CACHÉ a fichero.
+#'
+#' Genera los datos con `simular_cohorte()` y los guarda en `datos/`. En llamadas
+#' posteriores relee el `.rds` si existe y está al día. Regenera solo si: el
+#' fichero no existe, `refrescar = TRUE`, o `dgp_cohorte.R` es más reciente que la
+#' caché (es decir, si has tocado el DGP). El nombre del fichero depende de la
+#' semilla, de modo que las cohortes de distintos equipos no se pisan.
+#'
+#' @param refrescar TRUE fuerza regenerar aunque exista la caché.
+#' @param semilla   Semilla del DGP (forma parte del nombre del fichero).
+#' @param ...       Otros argumentos para `simular_cohorte()`.
+cargar_cohorte <- function(refrescar = FALSE, semilla = SEMILLA_CURSO, ...) {
+  base      <- .base_caso("caso1")
+  ruta_dgp  <- file.path(base, "R", "dgp_cohorte.R")
+  dir_cache <- file.path(base, "datos")
+  archivo   <- file.path(dir_cache, sprintf("cohorte_%s.rds", semilla))
+
+  al_dia <- file.exists(archivo) &&
+    (!file.exists(ruta_dgp) || file.mtime(archivo) >= file.mtime(ruta_dgp))
+
+  if (!refrescar && al_dia) {
+    message("cargar_cohorte(): leyendo caché  -> ", archivo)
+    return(readRDS(archivo))
+  }
+  message("cargar_cohorte(): generando datos -> ", archivo)
+  datos <- simular_cohorte(semilla = semilla, ...)
+  dir.create(dir_cache, showWarnings = FALSE, recursive = TRUE)
+  saveRDS(datos, archivo)
+  datos
+}

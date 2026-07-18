@@ -1,0 +1,521 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_4.qmd >}}. Sin YAML. Chunks u24-. -->
+
+# 4 · Conteos agrupados: modelos mixtos {#sec-u24}
+
+En el Caso 1 ya usamos **efectos aleatorios** para datos agrupados; ahora los llevamos a los
+**conteos** y damos un paso más: el **anidamiento**. Las pólizas de la cartera no son independientes: se
+**agrupan por agencia**, y las agencias, a su vez, en **regiones** —una jerarquía anidada, región →
+agencia → póliza—. Cada nivel tramita los siniestros a su propio ritmo. Ignorar esa estructura —tratarla
+como una Poisson corriente—
+subestima los errores estándar (igual que la sobredispersión) y, sobre todo, impide responder a
+preguntas de negocio: *¿cuánto del ritmo depende de la agencia y cuánto de la póliza? ¿qué agencias se
+desvían? ¿qué esperar de una agencia nueva?*
+
+Esta unidad es una **espiral**: reactiva los mixtos del Caso 1, ahora sobre la familia Poisson. Como es
+**un** modelo (el GLMM de Poisson con intercepto aleatorio) y no una familia de alternativas, seguimos
+el recorrido completo de la Unidad 2.1: contexto → modelización y estimación → interpretación →
+inferencia y selección → bondad de ajuste y diagnóstico.
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **mixtos** (espiral) — extender la Poisson a datos **agrupados y anidados**
+(interceptos aleatorios por región y agencia), interpretar los **componentes de varianza** (σ², ICC) y
+distinguir la media **condicional** de la **marginal**.
+:::
+
+## 4.1 Qué es y de dónde viene: el agrupamiento {#sec-u24-contexto}
+
+La respuesta `n_gestiones` cuenta las gestiones de siniestro de cada póliza, tramitadas a través de su
+**agencia**; y las 30 agencias se reparten en **6 regiones**. En el margen `n_gestiones` parecía casi
+bien portada (var/media ≈ 1.2), pero esconde esa jerarquía: su ritmo varía **entre regiones** y, dentro
+de cada región, **entre agencias**. Lo vemos representando la tasa de gestiones de cada agencia,
+agrupada por su región:
+
+```{r}
+#| label: fig-u24-anidamiento
+#| fig-cap: "Tasa de gestiones (por año) de cada agencia (puntos), agrupadas por región; la barra marca la media de cada región y la línea discontinua, la media global. Se ven **dos niveles de variación**: las regiones se separan entre sí y, dentro de cada una, las agencias se dispersan. Es un anidamiento región → agencia → póliza."
+#| fig-width: 6.5
+#| fig-height: 4
+tasa_global <- sum(cartera$n_gestiones) / sum(cartera$exposicion)
+cartera |>
+  dplyr::group_by(area = region, agencia) |>
+  dplyr::summarise(tasa = sum(n_gestiones) / sum(exposicion), .groups = "drop") |>
+  ggplot(aes(area, tasa, colour = area)) +
+  geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
+  stat_summary(fun = mean, geom = "crossbar", width = 0.6, colour = "grey25") +
+  geom_jitter(width = 0.15, height = 0, size = 2, alpha = 0.8) +
+  labs(x = "región", y = "tasa de gestiones (por año)") +
+  theme(legend.position = "none")
+```
+
+Conviene detenerse en **cómo se construye** la figura. Cada **punto** es una agencia, colocada a la
+altura de su **tasa de gestiones**: el total de gestiones de sus pólizas dividido por su exposición
+total, `sum(n_gestiones) / sum(exposicion)`. Es la tasa **ponderada por exposición** —el estimador
+natural del ritmo Poisson de la agencia—, no el promedio de las tasas póliza a póliza, que con un conteo
+tan escaso estaría dominado por el ruido de las pólizas de poca cobertura. La **barra** gris de cada
+región resume sus agencias (la media de sus tasas) y la **línea discontinua**, la tasa global de la
+cartera. Así, la altura de cada punto habla de una agencia y la de cada barra, de una región.
+
+Se aprecian **dos niveles de variación**: las **regiones** se separan entre sí (sus medias, las barras,
+están a alturas distintas) y, dentro de cada una, las **agencias** se dispersan. Es un **anidamiento**:
+región → agencia → póliza. De ahí, dos consecuencias que rompen la Poisson corriente:
+
+- **Dependencia jerárquica**: dos pólizas de la misma agencia se parecen más entre sí que a las de otra;
+  y dos agencias de la misma región, más que a las de otra. La independencia que la Poisson asume falla
+  **a los dos niveles**.
+- **Sobredispersión aparente**: esa variación entre grupos, vista en el margen, **infla la varianza**.
+  Es el mecanismo del efecto aleatorio a nivel de observación (OLRE) que nombramos en la
+  [Unidad 2.2](#sec-u22) y retomamos en la [§4.6](#sec-u24-olre); pero aquí el agrupamiento es **real** y
+  **jerárquico**, no una etiqueta por fila.
+
+Ignorarlo deja los errores estándar demasiado optimistas y no permite **cuantificar** cuánto del ritmo
+es de la región, cuánto de la agencia y cuánto de la póliza, ni **predecir** el de una agencia o región
+nuevas. El **modelo mixto anidado** lo resuelve: interceptos aleatorios por **región** y por **agencia**.
+
+## 4.2 El modelo mixto de Poisson {#sec-u24-modelo}
+
+### El modelo y su estimación
+
+Para la póliza $i$ de la agencia $j$, y siendo $r(j)$ la **única** región a la que pertenece esa agencia,
+mantenemos la Poisson pero añadimos un desplazamiento aleatorio del **log-ritmo** en cada nivel de la
+jerarquía. Con log-ritmo nos referimos al **logaritmo de la tasa**, $\log(\mu_{ij}/e_{ij})$: la escala
+en la que la Poisson con enlace log es lineal —la del predictor— y en la que, por tanto, sumamos los
+efectos. Un desplazamiento $u$ en esa escala equivale a multiplicar la tasa por $\exp(u)$.
+
+$$
+Y_{ij}\mid u^{\text{reg}}_{r(j)},\,u^{\text{ag}}_{j}\ \sim\ \operatorname{Poisson}(\mu_{ij}),
+$$
+
+$$
+\log \mu_{ij}=\underbrace{\log e_{ij}}_{\text{offset}}
++\mathbf{x}_{ij}^{\top}\boldsymbol\beta
++u^{\text{reg}}_{r(j)}+u^{\text{ag}}_{j},
+\qquad
+u^{\text{reg}}_{r}\sim N(0,\sigma^2_{\text{reg}}),\quad
+u^{\text{ag}}_{j}\sim N(0,\sigma^2_{\text{ag}}).
+$$
+
+El índice $r(j)$ es la clave del **anidamiento**: al depender de $j$, ata cada agencia a su región y hace
+que la póliza $i$ acumule los dos desplazamientos de su rama, $u^{\text{reg}}_{r(j)}+u^{\text{ag}}_{j}$.
+
+Los **efectos fijos** $\boldsymbol\beta$ son comunes a toda la cartera. Los **efectos aleatorios** son dos
+conjuntos de desplazamientos del log-ritmo, uno por cada nivel de la jerarquía:
+
+- $u^{\text{reg}}_{r}$ — **un valor por región** (6 en total). Recoge lo que hace que una región tramite
+  por encima o por debajo de la media —cultura de siniestralidad, regulación local, composición de la
+  cartera— sin que lo midamos, y lo **comparten todas las pólizas** de esa región.
+- $u^{\text{ag}}_{j}$ — **un valor por agencia** (30 en total). Recoge la desviación propia de cada
+  agencia respecto a **su** región —gestión, carga de trabajo, criterio al abrir expedientes—, y lo
+  comparten todas las pólizas de esa agencia.
+
+No son parámetros que estimemos uno a uno, sino **variables latentes**: se suponen normales de media 0 e
+independientes entre niveles, y de cada nivel solo estimamos su **varianza** ($\sigma^2_{\text{reg}}$,
+$\sigma^2_{\text{ag}}$). En la escala de la tasa, $\exp(u)$ es el factor multiplicativo que aplican: una
+agencia con $u^{\text{ag}}_{j}>0$ tramita por encima de lo esperado para su región.
+
+En la fórmula de R el anidamiento **no se ve** en `(1 | region) + (1 | agencia)`, que trataría región y
+agencia como factores **cruzados**. Por eso se escribe `(1 | region/agencia)`, que se despliega en
+`(1 | region) + (1 | region:agencia)`: el término `region:agencia` reetiqueta cada agencia **dentro de**
+su región y es lo que materializa la jerarquía. (Aquí, al ser únicos los identificadores de agencia,
+ambas formas coincidirían numéricamente, pero `region/agencia` es la manera explícita y segura de
+declararlo.)
+
+Condicionados a esos efectos, los conteos vuelven a ser Poisson independientes: toda la dependencia
+jerárquica queda recogida en los $u$ compartidos. El `offset(log(exposicion))` conserva la lectura en
+tasa (IRR), como en la [Unidad 2.1](#sec-u21). Como los $u$ no se observan, la verosimilitud los
+**integra** (verosimilitud marginal); para la Poisson-log esa integral no tiene forma cerrada, y `glmer`
+la aproxima por Laplace (o cuadratura adaptativa de Gauss-Hermite).
+
+```{r}
+#| label: u24-glmm
+m_pois <- glm(
+  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)),
+  family = poisson, data = cartera
+)
+
+m_glmm <- glmer(
+  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)) + (1 | region/agencia),
+  family = poisson, data = cartera
+)
+summary(m_glmm)
+```
+
+```{r}
+#| label: u24-vc
+# Desviaciones típicas de cada nivel (escala log).
+vc <- as.data.frame(VarCorr(m_glmm))
+sd_reg <- vc$sdcor[vc$grp == "region"]
+sd_ag  <- vc$sdcor[vc$grp == "agencia:region"]
+c(sigma_region = sd_reg, sigma_agencia = sd_ag)
+```
+
+## 4.3 Interpretación {#sec-u24-interpretacion}
+
+Hay tres cosas que leer: los efectos fijos como IRR, los componentes de varianza con el ICC (coeficiente de correlación intraclase), y los
+desplazamientos de cada agencia (BLUP) con la predicción condicional frente a la marginal.
+
+### Efectos fijos: IRR condicionales
+
+::: {.callout-note}
+## Recordatorio · IRR (razón de tasas)
+Cada coeficiente vive en la escala log; al exponenciarlo se obtiene la razón de tasas (*incidence rate
+ratio*): el factor por el que se multiplica la tasa cuando el predictor aumenta en una unidad.
+
+$$\text{IRR}_k=e^{\beta_k},\qquad \text{IC}_{95\%}=e^{\beta_k\pm 1.96\,\operatorname{SE}(\beta_k)}.$$
+
+$\text{IRR}>1$ eleva la tasa, $<1$ la reduce, $=1$ no la cambia. En R: `exp(coef(m))` o, con intervalos,
+`broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)`; aquí, sobre el GLMM, lo hacemos a mano
+exponenciando los coeficientes y su error estándar.
+:::
+
+```{r}
+#| label: u24-irr
+ef <- summary(m_glmm)$coefficients
+data.frame(
+  termino   = rownames(ef),
+  IRR       = exp(ef[, "Estimate"]),
+  conf.low  = exp(ef[, "Estimate"] - 1.96 * ef[, "Std. Error"]),
+  conf.high = exp(ef[, "Estimate"] + 1.96 * ef[, "Std. Error"])
+) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+```
+
+Se leen igual que en la Poisson de la [Unidad 2.1](#sec-u21) —cada factor multiplica la tasa por su
+IRR—, con un matiz: ahora son **condicionales** al grupo, el efecto de la covariable *fijada la agencia y
+la región*, ya neto del nivel jerárquico. La potencia eleva el ritmo de gestiones y el uso comercial
+también; la edad lo mueve poco (revísalo en la tabla). En un GLMM de Poisson los efectos fijos conservan
+esa lectura condicional; la tasa **marginal** (promediada sobre agencias) difiere ligeramente por la no
+linealidad del enlace, algo que retomamos en la predicción.
+
+### Componentes de varianza e ICC
+
+::: {.callout-note}
+## Recordatorio · ICC (correlación intraclase)
+Fracción de la varianza total —en la escala latente del log— que aporta cada nivel de agrupamiento;
+equivale a la correlación esperada entre dos observaciones del mismo grupo.
+
+$$\text{ICC}_{\text{nivel}}=\frac{\sigma^2_{\text{nivel}}}{\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}}+\sigma^2_{\text{obs}}}.$$
+
+Para la Poisson-log, $\sigma^2_{\text{obs}}$ es una varianza de observación propia de la distribución (del
+tipo $\ln(1+1/\bar\mu)$), que no hace falta calcular a mano. En R: `performance::icc(m, by_group = TRUE)`
+—mira el *adjusted*, que reparte solo la varianza de los efectos aleatorios—.
+:::
+
+Las desviaciones típicas estimadas son $\sigma_{\text{reg}}\approx$ `r round(sd_reg, 2)` entre regiones y
+$\sigma_{\text{ag}}\approx$ `r round(sd_ag, 2)` entre agencias (escala log). En términos multiplicativos,
+una agencia típica se separa de su región por un factor del orden de $\exp(\sigma_{\text{ag}})\approx$
+`r round(exp(sd_ag), 2)`. El **ICC** reparte esa variación: qué fracción de la variabilidad total del
+ritmo vive entre grupos, y cuánta corresponde a cada nivel.
+
+```{r}
+#| label: u24-icc
+performance::icc(m_glmm, by_group = TRUE)
+```
+
+### BLUP: qué agencias se desvían
+
+::: {.callout-note}
+## Recordatorio · BLUP (predicción del efecto aleatorio)
+El BLUP es el valor predicho del efecto aleatorio de un grupo, $\hat u_j$: una estimación **encogida**
+(*empirical Bayes*) de cuánto se desvía ese grupo, que combina su propio dato con la media general. En un
+modelo lineal,
+
+$$\hat u_j=\frac{\sigma^2_u}{\sigma^2_u+\sigma^2_\varepsilon/n_j}\,\big(\bar y_j-\bar{\mathbf x}_j^{\top}\boldsymbol\beta\big),$$
+
+así que los grupos con pocos datos ($n_j$ pequeño) se encogen más hacia 0. En el GLMM es la moda de la
+distribución del efecto dada la muestra. En R: `ranef(m)` (con `condVar = TRUE` para los intervalos del
+gráfico).
+:::
+
+Los interceptos aleatorios predichos (BLUP) sitúan cada agencia respecto a su región. El gráfico de
+intervalos ordena las agencias y señala las que tramitan a un ritmo atípico:
+
+```{r}
+#| label: fig-u24-blups
+#| fig-cap: "Desviación del log-ritmo (BLUP) de cada agencia respecto a su región, con intervalo aproximado. Las agencias por encima de 0 tramitan por encima de lo esperado para su región; las de abajo, por debajo."
+#| fig-width: 6
+#| fig-height: 5
+re  <- ranef(m_glmm, condVar = TRUE)$`agencia:region`
+re_df <- tibble::tibble(
+  agencia = rownames(re),
+  b  = re[, 1],
+  se = sqrt(attr(re, "postVar")[1, 1, ])
+) |>
+  dplyr::mutate(agencia = forcats::fct_reorder(agencia, b))
+ggplot(re_df, aes(b, agencia)) +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey60") +
+  geom_pointrange(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se), size = 0.3) +
+  labs(x = "desviación del log-ritmo (BLUP)", y = "agencia")
+```
+
+### Predicción: condicional frente a marginal
+
+::: {.callout-note}
+## Recordatorio · Predicción condicional vs marginal
+La predicción **condicional** es la de un grupo **conocido**: usa su BLUP,
+
+$$\hat\mu_{ij}=e_{ij}\,\exp\!\big(\mathbf{x}_{ij}^{\top}\hat{\boldsymbol\beta}+\hat u^{\text{reg}}_{r(j)}+\hat u^{\text{ag}}_{j}\big).$$
+
+La predicción **marginal** anula los efectos aleatorios ($u=0$) y responde a «¿qué esperar de un grupo
+cualquiera?»:
+
+$$\hat\mu^{\,0}=e\,\exp\!\big(\mathbf{x}^{\top}\hat{\boldsymbol\beta}\big).$$
+
+Ojo: $\hat\mu^{\,0}$ es la tasa de un grupo *mediano* (con $u=0$), no la **media poblacional**. Por el
+enlace log, la media promediando sobre todos los grupos es algo mayor,
+$\;e\,\exp\!\big(\mathbf{x}^{\top}\hat{\boldsymbol\beta}+(\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/2\big)$.
+En R: `predict(m, nd, type = "response", re.form = NULL)` (condicional, con sus efectos) frente a
+`re.form = ~0` (marginal, sin ellos); para la media poblacional promediada, `marginaleffects` o `emmeans`.
+:::
+
+Una agencia **conocida** se predice con su BLUP (media condicional); una agencia **nueva** o cualquiera
+de la cartera se predice anulando los efectos aleatorios (media marginal, `re.form = ~0`):
+
+```{r}
+#| label: u24-pred
+nd <- cartera |>
+  dplyr::slice(1) |>
+  dplyr::mutate(exposicion = 1)                       # tasa anual, misma póliza tipo
+
+c(
+  condicional = predict(m_glmm, nd, type = "response", re.form = NULL),  # su agencia
+  marginal    = predict(m_glmm, nd, type = "response", re.form = ~0)     # agencia cualquiera
+)
+```
+
+La condicional usa el desplazamiento estimado de *esa* agencia; la marginal fija los efectos aleatorios
+en cero y responde a *«¿qué esperar de una agencia cualquiera?»*, con más incertidumbre. Por el enlace
+log, la media marginal exacta queda algo por encima de la predicción con $u=0$, en un factor
+$\exp\!\big((\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/2\big)$.
+
+## 4.4 Inferencia y selección {#sec-u24-inferencia}
+
+La inferencia opera en **dos niveles**: sobre los **efectos fijos** (¿importa cada covariable?) y sobre
+la **estructura aleatoria** (¿hace falta el agrupamiento?).
+
+### Los efectos fijos: contraste y selección
+
+El `summary(m_glmm)` ya incluye el contraste de Wald de cada coeficiente (su $z$ y su $p$). Para decidir
+si **prescindimos de una covariable**, el contraste más fiable es el de razón de verosimilitudes:
+`drop1()` reajusta el modelo quitando cada término y lo compara con el completo. Como `glmer` estima por
+máxima verosimilitud, este LRT sobre los efectos fijos es válido.
+
+```{r}
+#| label: u24-drop1
+drop1(m_glmm, test = "Chisq")
+```
+
+Cada fila es un LRT que **elimina ese término**: un $p$ grande —y un AIC que no mejora al quitarlo—
+delata una covariable prescindible. Seleccionamos así el predictor fijo, igual que en la
+[Unidad 2.1](#sec-u21), pero ahora **por encima** de los interceptos aleatorios de región y agencia.
+
+### La estructura aleatoria: ¿hace falta el agrupamiento?
+
+Ahora la pregunta es si el agrupamiento aporta. Comparamos el mixto con la Poisson y con la binomial
+negativa por criterios de información:
+
+```{r}
+#| label: u24-aic
+m_nb <- glm.nb(
+  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)),
+  data = cartera
+)
+performance::compare_performance(
+  Poisson = m_pois, NB = m_nb, GLMM = m_glmm,
+  metrics = c("AIC", "BIC", "RMSE")
+)
+```
+
+El mixto debería quedar por delante. Aquí conecta con la [Unidad 2.2](#sec-u22): la variación entre
+grupos que en el margen parecía **sobredispersión** ($\phi>1$) el GLMM la explica de forma estructural,
+en vez de absorberla como dispersión sin estructura. La binomial negativa recogería ese exceso de
+varianza, pero no distingue región de agencia ni predice una agencia nueva; el mixto sí.
+
+::: {.callout-warning}
+## Un cuidado con el contraste de $\sigma^2=0$
+Contrastar si un componente de varianza es nulo coloca el parámetro en el **borde** de su espacio (una
+varianza no puede ser negativa). La distribución de referencia del cociente de verosimilitudes deja de
+ser una $\chi^2$ ordinaria y pasa a ser una **mezcla**; el $p$-valor ingenuo resulta conservador (hay que
+partirlo por la mitad). Por eso nos apoyamos en AIC/BIC y en la magnitud de los componentes, más que en
+un único $p$-valor.
+:::
+
+## 4.5 Bondad de ajuste y diagnóstico {#sec-u24-diagnostico}
+
+El diagnóstico combina las herramientas del compendio de conteo con las propias de los mixtos. Residuos
+simulados (`DHARMa`), que ya deberían salir bien portados si la estructura jerárquica captó el
+agrupamiento:
+
+```{r}
+#| label: fig-u24-dharma
+#| fig-cap: "Residuos simulados (DHARMa) del GLMM de Poisson: QQ frente a la uniforme y residuos contra el predicho."
+#| fig-width: 7
+#| fig-height: 3.4
+res_glmm <- simulateResiduals(m_glmm)
+plot(res_glmm)
+```
+
+El $R^2$ de Nakagawa [@nakagawa2013; @nakagawa2017] separa lo que explican los efectos fijos (marginal)
+de lo que añade la estructura aleatoria (condicional); la brecha entre ambos cuantifica el peso del
+agrupamiento:
+
+```{r}
+#| label: u24-r2
+performance::r2(m_glmm)
+```
+
+Conviene además comprobar que el ajuste **convergió** y no es **singular** (`isSingular(m_glmm)`: un
+componente de varianza colapsado a 0 indicaría un modelo sobreparametrizado para estos datos). Y, como el
+banco es simulado, podemos **validar contra la verdad**: el DGP fijó $\sigma_{\text{reg}}=0.50$ y
+$\sigma_{\text{ag}}=0.60$; el mixto estima `r round(sd_reg, 2)` y `r round(sd_ag, 2)`.
+
+::: {.callout-note}
+## Bondad de ajuste en modelos mixtos
+Al recorrido de conteo (índice de dispersión, criterios de información y residuos simulados; véase el
+compendio de la [Unidad 2.2](#sec-u22-diagnostico)) los mixtos añaden: **residuos DHARMa** interpretados
+sobre la estructura aleatoria, **dispersión residual** (`testDispersion`), **$R^2$ de Nakagawa**
+—marginal frente a condicional—, el **ICC** por nivel, y el control de **convergencia y singularidad**.
+Ninguna medida resume el ajuste por sí sola: se leen juntas.
+:::
+
+## 4.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) {#sec-u24-olre}
+
+En la [Unidad 2.2](#sec-u22) aplazamos el **OLRE** hasta aquí, porque es, literalmente, un modelo mixto.
+La idea: añadir un intercepto aleatorio **por observación**, `(1 | id)`, de modo que cada fila reciba su
+propio impulso $v_i\sim N(0,\sigma^2_{\text{obs}})$ sobre el log-ritmo,
+
+$$
+\log\mu_i=\log e_i+\mathbf{x}_i^{\top}\boldsymbol\beta+v_i,\qquad v_i\sim N(0,\sigma^2_{\text{obs}}).
+$$
+
+Al integrar $v_i$, la respuesta marginal es una **Poisson-lognormal**: su varianza supera a la media, así
+que el OLRE **modela la sobredispersión** como un efecto aleatorio, en paralelo a lo que la binomial
+negativa hace con una mezcla Poisson-Gamma.
+
+### Por qué modelizar `n_danos` como OLRE
+
+`n_danos` fue la respuesta **sobredispersa** del caso: en la [Unidad 2.3](#sec-u22-nb) su cociente
+varianza/media superaba con holgura el 1 y la NB la ajustó mucho mejor que la Poisson. Lo confirmamos
+sobre el ajuste Poisson:
+
+```{r}
+#| label: u24-olre-disp
+m_pois_danos <- glm(
+  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)),
+  family = poisson, data = cartera
+)
+performance::check_overdispersion(m_pois_danos)
+```
+
+¿De dónde viene esa sobredispersión? De **heterogeneidad no observada entre pólizas**: dos conductores con
+las mismas covariables no comparten el mismo riesgo real —hábitos, entorno, azar—, y esas diferencias que
+no medimos hacen que unos acumulen más partes de los que «les tocaría» por su $\mathbf{x}$. Modelizar ese
+exceso como un impulso aleatorio por póliza, $v_i$, es **exactamente** un OLRE: cada póliza lleva su
+propio multiplicador $\exp(v_i)$ sobre la tasa.
+
+Conviene puntualizar una diferencia con el modelo anidado. Allí cada agencia agrupaba **muchas** pólizas,
+y el efecto aleatorio capturaba lo que comparten. Aquí, en cambio, la cartera tiene **una sola fila por
+póliza**: el efecto por observación coincide con uno por sujeto, de modo que cada «grupo» es de **tamaño
+1**. Por eso el OLRE no modela dependencia entre observaciones —no la hay— sino la heterogeneidad
+sobrante, es decir, la sobredispersión. Es la misma razón por la que sus herramientas de grupo (ICC,
+BLUP, condicional frente a marginal) aquí no aplican: no hay grupos que comparar.
+
+Y aquí está la conexión con la [Unidad 2.3](#sec-u22-nb): **el OLRE y la binomial negativa son el mismo
+tipo de modelo** —una Poisson con un multiplicador aleatorio por observación— y solo se diferencian en la
+**ley de ese multiplicador**. La NB usa una mezcla Poisson-**Gamma**; el OLRE, una Poisson-**lognormal**.
+Ambas añaden **un único** parámetro de dispersión y capturan la varianza extra. Por eso el OLRE es una
+alternativa sensata —y de igual coste— a la NB, y especialmente natural en esta unidad, donde ya
+trabajamos en el marco de los mixtos.
+
+En cambio, no lo aplicamos a `n_gestiones` porque su variación extra es el **agrupamiento** región/agencia
+que ya modelamos; un OLRE encima no tendría nada que absorber y su varianza saldría $\approx 0$. El OLRE
+luce ante sobredispersión **de observación**, no de grupo.
+
+### El modelo y su ajuste
+
+Añadimos a la Poisson de `n_danos` un intercepto aleatorio por póliza —un nivel por observación—:
+
+```{r}
+#| label: u24-olre
+cartera$id_obs <- factor(seq_len(nrow(cartera)))   # un nivel aleatorio por observación
+m_olre <- glmer(
+  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)) + (1 | id_obs),
+  family = poisson, data = cartera
+)
+sd_olre <- as.data.frame(VarCorr(m_olre))$sdcor[1]
+c(sigma_obs = sd_olre)
+```
+
+El componente estimado, $\sigma_{\text{obs}}\approx$ `r round(sd_olre, 2)` (escala log), es la magnitud de
+esa heterogeneidad de fila: en tasa, una póliza se aparta de su valor esperado por un factor del orden de
+$\exp(\sigma_{\text{obs}})$. Los efectos fijos se siguen leyendo como IRR, ahora **netos** de esa
+variabilidad individual. (Es el ajuste más lento de la unidad: lleva un nivel aleatorio por observación.)
+
+### Inferencia, bondad de ajuste y diagnóstico
+
+Que $\sigma_{\text{obs}}$ sea claramente **mayor que 0** confirma la sobredispersión, con la misma cautela
+del contraste en el borde de [§4.4](#sec-u24-inferencia): miramos su magnitud y los criterios de
+información, no un único $p$-valor. La prueba de fuego es el **diagnóstico de residuos**: si el OLRE ha
+absorbido el exceso de varianza, los residuos simulados de `DHARMa` quedan bien portados y el test de
+dispersión, no significativo:
+
+```{r}
+#| label: fig-u24-olre-diag
+#| fig-cap: "Residuos simulados (DHARMa) del OLRE sobre `n_danos`. Frente a la Poisson —sobredispersa—, el QQ y la prueba de dispersión deben indicar que la varianza extra ya está recogida."
+#| fig-width: 7
+#| fig-height: 3.4
+res_olre <- simulateResiduals(m_olre)
+plot(res_olre)
+```
+
+### Comparación con la binomial negativa
+
+Por último, ponemos lado a lado la Poisson, la NB2 y el OLRE:
+
+```{r}
+#| label: u24-olre-comp
+m_nb2 <- glm.nb(
+  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+    offset(log(exposicion)), data = cartera
+)
+performance::compare_performance(
+  Poisson = m_pois_danos, NB2 = m_nb2, OLRE = m_olre, metrics = c("AIC", "BIC", "RMSE")
+)
+```
+
+Las dos correcciones dejan muy atrás a la Poisson y, entre sí, suelen quedar **próximas** en AIC: son dos
+lentes —Poisson-lognormal frente a Poisson-Gamma— para la misma sobredispersión. ¿Cuál elegir? La NB da
+una **distribución cerrada**, es más rápida y es la opción por defecto ante sobredispersión pura; el OLRE
+encaja con naturalidad cuando **ya tienes efectos aleatorios** —por ejemplo, si quisieras combinar la
+heterogeneidad de póliza con la de agencia en un mismo modelo— o cuando prefieres la mezcla lognormal.
+Para `n_danos`, sin estructura de grupo, la NB2 es la más práctica; el OLRE muestra que esa misma
+sobredispersión también se lee como un efecto aleatorio.
+
+::: {.callout-tip}
+## Un ejemplo de manual: `grouseticks`
+El caso canónico de OLRE es `lme4::grouseticks`: el número de garrapatas en pollos de urogallo, un conteo
+muy sobredisperso y con estructura jerárquica (pollo dentro de nidada `BROOD` dentro de localidad
+`LOCATION`). Ahí el OLRE **convive** con otros efectos aleatorios —se añade `(1 | INDEX)`, con `INDEX` el
+identificador de fila que ya trae el propio conjunto de datos— para separar la sobredispersión de
+observación de la variación entre grupos, algo que una NB sola no distingue:
+
+```r
+data(grouseticks, package = "lme4")
+m <- glmer(TICKS ~ YEAR + HEIGHT + (1 | BROOD) + (1 | LOCATION) + (1 | INDEX),
+           family = poisson, data = grouseticks)
+```
+:::
+
+::: {.callout-important}
+## Tarea del estudiante (2.4) — resuelve la Pregunta 6 del caso
+Sobre la cohorte del equipo, ajusta el GLMM de Poisson del uso de recursos con un intercepto aleatorio por
+centro, `(1 | centro)`, y `offset(log(exposicion))`. Interpreta los efectos fijos en IRR (condicionales
+al centro), cuantifica con el **ICC** qué parte del ritmo depende del centro y qué esperar de un centro
+**nuevo** (predicción marginal). Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** el
+componente de varianza estimado frente al $\sigma_a$ que fijó el DGP.
+:::

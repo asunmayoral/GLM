@@ -1,0 +1,38 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_2.qmd >}}. Sin YAML. Chunks u32-. -->
+
+# 2 · Más allá de la Gamma {#sec-u32}
+
+<!-- TODO intro: cuando la Gamma se queda corta. Familia de alternativas -> estructura
+     problema/identificación -> bloque por modelo -> comparación. -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **continuas positivas** — alternativas a la Gamma (**inversa gaussiana**,
+**lognormal**) y **modelar la dispersión** (GLM dobles / heterocedasticidad); saber elegir.
+:::
+
+## 2.1 Qué es y cómo se identifica {#sec-u32-contexto}
+
+<!-- TODO: la Gamma asume CV constante (Var propto mu^2). ¿Y si la varianza crece distinto, o la
+     asimetría es mayor? Diagnóstico: residuos, relación media-varianza en escala de importe. -->
+
+## 2.2 Inversa gaussiana {#sec-u32-ig}
+
+<!-- TODO: Var = phi·mu^3; colas más pesadas que la Gamma; family = inverse.gaussian. -->
+
+## 2.3 Lognormal (log-OLS) {#sec-u32-lognormal}
+
+<!-- TODO: log(Y) ~ Normal; cuándo; sesgo de retransformación (corrección de Duan / smearing). -->
+
+## 2.4 Modelar la dispersión {#sec-u32-dispersion}
+
+<!-- TODO: heterocedasticidad; GLM dobles (modelo para mu y modelo para phi); dglm / gamlss. -->
+
+## 2.5 Elegir, comparar y conectar {#sec-u32-elegir}
+
+<!-- TODO: comparación de alternativas por AIC / bondad de ajuste / predicción; validación DGP. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.2)
+<!-- TODO -->
+:::

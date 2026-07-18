@@ -1,0 +1,36 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_3.qmd >}}. Sin YAML. Chunks u33-. -->
+
+# 3 · Ceros y positivos juntos: Tweedie {#sec-u33}
+
+<!-- TODO intro: el COSTE TOTAL por póliza mezcla pólizas sin siniestro (masa en 0) y positivos
+     continuos. Es un semicontinuo -> Tweedie (compuesto Poisson-Gamma). Nexo con el Caso 2:
+     prima pura = frecuencia x severidad. -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **continuas positivas** — el modelo **Tweedie** para el coste total (masa en 0 +
+positivo continuo), su índice de potencia $p$, y la **prima pura** como frecuencia × severidad.
+:::
+
+## 3.1 Qué es y de dónde viene: coste total con masa en cero {#sec-u33-contexto}
+
+<!-- TODO: distribución del coste total (muchos ceros + cola positiva); por qué Gamma sola no vale. -->
+
+## 3.2 El modelo Tweedie {#sec-u33-modelo}
+
+<!-- TODO: familia de dispersión exponencial con Var = phi·mu^p, 1 < p < 2 (compuesto Poisson-Gamma);
+     estimación (incluida la del índice p); statmod::tweedie / glmmTMB. -->
+
+## 3.3 Prima pura: frecuencia × severidad {#sec-u33-prima}
+
+<!-- TODO: dos vías al coste esperado: (a) Tweedie directo sobre el coste total; (b) Poisson
+     (frecuencia, Caso 2) × Gamma (severidad, 3.1). Comparación. -->
+
+## 3.4 Bondad de ajuste y diagnóstico {#sec-u33-diagnostico}
+
+<!-- TODO: diagnóstico del Tweedie; comparación con las dos vías; validación DGP. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.3)
+<!-- TODO -->
+:::

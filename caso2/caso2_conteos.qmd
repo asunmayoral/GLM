@@ -1,0 +1,190 @@
+---
+title: "Caso 2 · ¿Cuántas veces y a qué ritmo?"
+subtitle: "Conteos, tasas e intensidad del riesgo — Modelos Lineales Generalizados con R"
+author: "A.M.Mayoral, con asistencia de Claude Opus 4.8"
+date: today
+lang: es
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: false      # numeración MANUAL (2.1, 2.2, ...) en los títulos
+    code-fold: show
+    code-tools:
+      source: false
+      toggle: true
+    theme: cosmo
+    df-print: paged
+  pdf:
+    toc: true
+    number-sections: false
+bibliography: ../references.bib
+nocite: |
+  @*
+csl: https://www.zotero.org/styles/apa
+execute:
+  warning: false
+  message: false
+editor:
+  markdown:
+    wrap: 72
+---
+
+<!-- ============================================================================
+     Caso 2 (Poisson). Datos vía R/dgp_conteos.R:
+       - contexto "auto"  -> cartera simulada, columna vertebral de la TEORÍA.
+       - contexto "salud" -> cohorte del ESTUDIO DE CASO (Unidad 2.7).
+     Ver PROPUESTA_CASO2.md y ESQUEMA_DATOS_SEGUROS.md.
+============================================================================ -->
+
+```{r}
+#| label: setup
+#| include: false
+
+# Núcleo.
+library(broom)
+library(tidyverse)
+library(MASS)          # glm.nb (base-recommended)
+library(pscl)          # hurdle / zeroinfl
+library(glmmTMB)       # conteos mixtos / ceros
+library(lme4)          # glmer (Poisson)
+library(DHARMa); library(performance); library(marginaleffects)
+library(survival)      # riesgos a trozos (base-recommended)
+library(MuMIn); library(glmnet)   # selección / regularización 
+library(vcdExtra)      # zero-inflated
+
+SEMILLA_CURSO <- 20252026L
+set.seed(SEMILLA_CURSO)
+theme_set(theme_minimal(base_size = 12))
+```
+
+## Objetivos y resultados de aprendizaje del Caso 2 {#sec-ra2}
+
+**Objetivo general (curso).** *Conteos y tasas:* ajustar, interpretar, diagnosticar y
+comparar/seleccionar modelos para conteos y tasas —Poisson y binomial negativa, con *offset* para
+tasas—: razones de tasas, sobredispersión y exceso de ceros. Reactiva el objetivo de **mixtos y
+supervivencia** (riesgos a trozos) y culmina en el de **comunicar y reproducir** (estudio de caso).
+
+<!-- TODO: Resultados de aprendizaje ESPECÍFICOS del Caso 2 (se construirán como en el Caso 1, a su
+     debido momento). -->
+
+::: {.callout-note}
+## Pendiente
+Los **resultados de aprendizaje específicos** del Caso 2 se redactarán más adelante, como se hizo con
+el Caso 1.
+:::
+
+::: callout-note
+## Mapa del caso
+
+En el Caso 1 preguntábamos *«¿ocurre el evento? ¿y cuándo?»*. Ahora el evento es **repetible**:
+preguntamos *«¿cuántas veces y a qué ritmo?»*. Entramos en la familia **Poisson** (enlace log),
+tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **exceso de ceros**, los
+**conteos agrupados** (mixtos) y el nexo de la supervivencia como **tasa** (riesgos a trozos).
+
+| Unidad | Contenido | Objetivo |
+|-----|------------------------------------|-----|
+| **2.1** | Poisson y log-lineal: *Contexto* (recuentos, tasas, tablas de contingencia y de cambio) · *Modelización y estimación* · *Interpretación* (IRR, asociación) · *Inferencia y selección* · *Bondad de ajuste, diagnóstico y predicción*. | Conteos y tasas |
+| **2.2** | Sobredispersión: causas, diagnóstico, quasi-Poisson y binomial negativa (con OLRE y conexiones). | Conteos y tasas |
+| **2.3** | Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | Conteos y tasas |
+| **2.4** | Conteos agrupados: GLMM de Poisson. | Mixtos (espiral) |
+| **2.5** | Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | Supervivencia (espiral) |
+| **2.6** | Selección, validación cruzada y regularización (`glmnet` Poisson). | Conteos y tasas |
+| **2.7** | Estudio de caso, exposiciones y evaluación. | Comunicar y reproducir |
+:::
+
+# Presentación del caso {#sec-presentacion2}
+
+## El contexto y los datos {#sec-datos-cartera}
+
+Para la teoría trabajamos con una **cartera de seguros de auto simulada**: una compañía sigue a sus
+pólizas durante un periodo y registra, para cada una, cuántas veces ocurre cada tipo de incidencia.
+Al ser **simulada** conocemos su proceso generador (la «verdad»), lo que nos permitirá **validar** los
+ajustes —como hicimos con la cohorte del Caso 1—. El estudio de caso ([Unidad 2.7](#sec-u27)) usará
+una **cohorte sanitaria** análoga, generada con el mismo motor.
+
+Cada fila es una **póliza**, observada durante `exposicion` (fracción de año de cobertura). Como el
+número de incidencias depende del tiempo expuesto, la exposición entra como **offset**
+(`log(exposicion)`) y modelamos **tasas**, no recuentos brutos.
+
+| Papel | Variables |
+|---|---|
+| Estructura | `id_poliza`; `agencia` (oficina que gestiona la póliza — variable de **agrupación**); `region` (agrupa las agencias — nivel superior del **anidamiento**, para la Unidad 2.4); `exposicion` (**fracción del año** en que la póliza estuvo en vigor → *offset*) |
+| Respuestas (conteos) | `n_asistencia` (asistencias en carretera; frecuentes), `n_danos` (partes por daños propios; heterogéneos), `n_fraude` (reclamaciones **sometidas a revisión antifraude**; con exceso de ceros estructurales), `n_gestiones` (gestiones de siniestro **de la póliza** tramitadas a través de su agencia; una cifra por póliza, con ritmo propio de cada agencia) |
+| Predictores del riesgo | `edad_conductor`, `antiguedad_carnet`, `potencia_cv`, `antiguedad_vehiculo`, `zona_circulacion`, `uso`, `tipo_vehiculo` |
+| Variables adicionales (ruido / selección) | `sexo`, `estado_civil`, `color_vehiculo`, `tiene_garaje`, `forma_pago`, `financiado`, `km_declarados`, `valor_vehiculo`, `n_conductores`, `antiguedad_cliente` |
+| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: nivel de **bonificación-penalización** de la póliza (1 = mejor tarifa … 5 = peor) el **año anterior** y el **actual**; comparándolos se ve cómo evoluciona el riesgo (tabla cuadrada) |
+| Tiempo-a-evento | `tiempo_primer_sin` (tramo del periodo en que se observa el **primer siniestro** de la póliza; o el último tramo seguido si no hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
+
+Las **cuatro respuestas** comparten predictores pero están diseñadas para ilustrar cada fenómeno del
+caso: `n_asistencia` es una Poisson bien portada; `n_danos`, sobredispersa; `n_fraude`, con exceso de
+ceros; y `n_gestiones` recoge el efecto de la **agencia**. Hay más variables de las necesarias, a
+propósito, para practicar la selección.
+
+Generamos la cartera y la miramos por encima:
+
+```{r}
+#| label: cartera-sim
+source("R/dgp_conteos.R")            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+glimpse(cartera)
+```
+
+Un **descriptivo global** de las cuatro respuestas —media, porcentaje de ceros, máximo y el cociente
+varianza/media, que anticipa la dispersión—:
+
+```{r}
+#| label: tbl-cartera-resp
+#| tbl-cap: "Descriptivo de las cuatro respuestas de conteo: media, % de ceros, máximo y cociente varianza/media."
+resp <- c("n_asistencia", "n_danos", "n_fraude", "n_gestiones")
+purrr::map_dfr(resp, ~ tibble::tibble(
+  respuesta = .x,
+  media     = round(mean(cartera[[.x]]), 2),
+  pct_ceros = round(mean(cartera[[.x]] == 0) * 100),
+  maximo    = max(cartera[[.x]]),
+  var_media = round(var(cartera[[.x]]) / mean(cartera[[.x]]), 2)))
+```
+
+El cociente `var_media` ya adelanta parte de la historia: **cercano a 1** en `n_asistencia` (Poisson
+bien portada); **claramente > 1** en `n_danos` (sobredispersión) y en `n_fraude` (aquí inflado por su
+**exceso de ceros** —mira su `pct_ceros`—). En cambio `n_gestiones` parece casi bien portada en el margen
+(var/media $\approx 1.2$): su rasgo —el efecto de la **agencia**— apenas se aprecia en un descriptivo marginal y
+solo se destapará al **modelar el agrupamiento** (Unidad 2.4). Cada unidad se ocupará de uno de estos
+rasgos.
+
+Y su distribución (recortando la cola en 8 eventos para legibilidad):
+
+```{r}
+#| label: fig-cartera-eda
+#| fig-width: 9
+#| fig-height: 5
+#| fig-cap: "Distribución de las cuatro respuestas de conteo en la cartera (cola recortada en 8). n_asistencia se comporta como una Poisson; n_danos tiene cola larga (sobredispersión); n_fraude tiene muchos ceros (inflación de ceros); n_gestiones es un conteo bajo cuyo efecto de agencia solo se aprecia al modelar."
+cartera |>
+  dplyr::select(dplyr::all_of(resp)) |>
+  tidyr::pivot_longer(dplyr::everything(), names_to = "respuesta", values_to = "conteo") |>
+  dplyr::filter(conteo <= 8) |>
+  ggplot(aes(conteo)) +
+  geom_bar(fill = "steelblue") +
+  facet_wrap(~ respuesta, scales = "free_y") +
+  labs(x = "nº de eventos por póliza", y = "nº de pólizas")
+```
+
+# Reproducibilidad {#sec-repro2}
+
+<!-- TODO -->
+
+{{< include _unidad_2_1.qmd >}}
+
+{{< include _unidad_2_2.qmd >}}
+
+{{< include _unidad_2_3.qmd >}}
+
+{{< include _unidad_2_4.qmd >}}
+
+{{< include _unidad_2_5.qmd >}}
+
+{{< include _unidad_2_6.qmd >}}
+
+{{< include _unidad_2_7.qmd >}}
+
+# Referencias {.unnumbered}

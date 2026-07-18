@@ -1,0 +1,34 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-. -->
+
+# 5 · Del importe al tiempo: modelos de vida acelerada {#sec-u35}
+
+<!-- TODO intro: espiral de supervivencia. Los TIEMPOS son también positivos continuos; los modelos
+     paramétricos de supervivencia (AFT) son GLM-like sobre log(T). Cierra el círculo con el Caso 1. -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **supervivencia** (espiral) — modelos de **vida acelerada** (AFT) para tiempos
+positivos continuos (Weibull, log-normal, log-logístico); interpretación y censura.
+:::
+
+## 5.1 Qué es y de dónde viene: tiempos como positivos continuos {#sec-u35-contexto}
+
+<!-- TODO: T > 0 continuo (duración hasta un evento); nexo con la Gamma y con el Caso 1. -->
+
+## 5.2 El modelo AFT {#sec-u35-modelo}
+
+<!-- TODO: log(T) = x'beta + sigma·e; factor de aceleración exp(beta); Weibull / lognormal /
+     loglogístico; survival::survreg; papel de la CENSURA (a diferencia de 3.1). -->
+
+## 5.3 Interpretación y comparación con Cox {#sec-u35-interpretacion}
+
+<!-- TODO: factor de aceleración vs hazard ratio; AFT vs PH; cuándo cada uno. -->
+
+## 5.4 Bondad de ajuste y diagnóstico {#sec-u35-diagnostico}
+
+<!-- TODO: residuos de supervivencia; elección de la distribución; validación DGP. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.5)
+<!-- TODO -->
+:::

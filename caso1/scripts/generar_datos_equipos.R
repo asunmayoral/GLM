@@ -15,7 +15,13 @@
 #    ordinal: bord_x1 > 0, bord_x2 < 0, umbrales theta1 < theta2.
 # =============================================================================
 
-source("R/dgp_cohorte.R")   # simular_cohorte(), expandir_persona_periodo()
+# simular_cohorte(), expandir_persona_periodo()
+# Directorio robusto: funciona con el wd en 'caso1/' o en la raíz del proyecto.
+if (!file.exists("R/dgp_cohorte.R")) {
+  if (file.exists("caso1/R/dgp_cohorte.R")) setwd("caso1") else
+    stop("Ejecuta este script con el directorio de trabajo en 'caso1/' (o en la raíz del proyecto).")
+}
+source("R/dgp_cohorte.R")
 
 K       <- 10L
 out_dir <- "datos_equipos"
@@ -115,3 +121,5 @@ write.csv(resumen,  file.path(out_dir, "resumen_equipos.csv"),         row.names
 cat("\n== Resumen de las cohortes generadas ==\n"); print(resumen)
 cat("\nDatos por equipo en:", normalizePath(out_dir), "\n")
 cat("Clave del docente: configuraciones_equipos.csv (no repartir a los equipos).\n")
+
+setwd("..") # volvemos al directorio raíz

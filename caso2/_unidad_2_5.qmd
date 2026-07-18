@@ -1,0 +1,217 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_5.qmd >}}. Sin YAML. Chunks u25-. -->
+
+# 5 · Del conteo al reloj. Supervivencia {#sec-u25}
+
+En el Caso 1 aplazamos el modelo de Cox y prometimos volver a la supervivencia desde otra familia. Aquí
+cumplimos: el **hazard** —el ritmo instantáneo al que ocurre el evento— es, en el fondo, una **tasa**, y
+ya sabemos modelar tasas con la Poisson y un *offset*. El evento de esta cartera es el **primer
+siniestro** de cada póliza (`tiempo_primer_sin`, `evento`), seguido a lo largo de los tramos de cobertura
+y sujeto a **censura** cuando la póliza agota el periodo sin siniestro. Trocearemos ese tiempo en
+intervalos, supondremos el hazard **constante dentro de cada intervalo** —el modelo **exponencial a
+trozos**— y veremos que su verosimilitud es, exactamente, la de una Poisson sobre datos
+**persona-periodo**. De ahí sale todo: razones de riesgo leídas como IRR, una curva de supervivencia, y
+la comparación con los clásicos —**Cox** y **Kaplan–Meier**— para comprobar que no es un mundo aparte,
+sino el **mismo hazard** visto desde los conteos. Cerramos con la **fragilidad** (*frailty*), que no es
+otra cosa que un GLMM de Poisson.
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **supervivencia** (espiral) — el modelo de **riesgos a trozos** como `glm(poisson)`
+con `offset(log` tiempo-persona`)`; su equivalencia con el persona-periodo `cloglog` del Caso 1, la
+comparación con **Cox** y **Kaplan–Meier**, y el nexo con la **fragilidad** (*frailty* ≡ GLMM de Poisson).
+:::
+
+<!-- ============================================================================
+     ESQUEMA PROPUESTO (a validar antes de desarrollar sección a sección):
+       5.1 Contexto: el hazard como una tasa.
+       5.2 El modelo exponencial a trozos como GLM de Poisson.
+       5.3 Dos lentes del mismo hazard: Poisson y cloglog (nexo Caso 1).
+       5.4 ¿Comparable con los clásicos? Cox y Kaplan-Meier.
+       5.5 Fragilidad = GLMM de Poisson (puente con la Unidad 2.4).
+============================================================================ -->
+
+## 5.1 El hazard como una tasa: el problema del tiempo a evento {#sec-u25-contexto}
+
+### Los datos y la pregunta
+
+De cada póliza sabemos **cuándo** ocurrió su **primer siniestro** —o que **no** ocurrió mientras estuvo
+cubierta—. Dos columnas lo resumen: `tiempo_primer_sin`, el tramo de cobertura (de 1 a
+`r max(cartera$tiempo_primer_sin)`) en que se observó el primer siniestro o, si no lo hubo, el último
+tramo seguido; y `evento`, que vale 1 si el siniestro se observó y 0 si la póliza terminó su cobertura
+sin él. La duración del seguimiento la marca `exposicion` (la fracción de año cubierta).
+
+```{r}
+#| label: u25-datos
+cartera |>
+  dplyr::select(id_poliza, tiempo_primer_sin, evento, exposicion,
+                zona_circulacion, uso, potencia_cv) |>
+  head(8)
+```
+
+Ese `0` de `evento` es la clave: es una observación **censurada**. Sabemos que la póliza estuvo sin
+siniestro *al menos* hasta donde la seguimos, pero no cuándo —ni si— habría dado el primer parte. Esa
+censura es lo que impide tratar el problema como una binaria («¿tuvo siniestro?») o como una respuesta
+lineal: perderíamos la información de **cuándo** y trataríamos mal a quien se observó poco tiempo. En la
+cartera, un `r round(mean(cartera$evento) * 100)`% de las pólizas registró su primer siniestro dentro del
+periodo; el resto está censurado.
+
+Conviene precisar la escala temporal. Estudiamos el **último ejercicio económico** de la aseguradora, un
+año que dividimos en **6 tramos de igual duración** (~2 meses cada uno) con un **origen común** para todas
+las pólizas. No todas están cubiertas el año entero: `exposicion` es la fracción de ese año en que la
+póliza estuvo vigente, de modo que cada una está **en riesgo solo durante sus primeros**
+$\lceil 6\cdot\texttt{exposicion}\rceil$ **tramos** (de 2 a 6). De ahí que una póliza pueda no llegar al
+tramo 6 por dos motivos: porque tuvo su **primer siniestro** antes (`evento = 1`, y dejamos de seguirla),
+o porque su **cobertura terminó** antes —censura administrativa, `evento = 0`—. Como `exposicion` se
+asigna con independencia del proceso de siniestros, esa censura es **no informativa**, condición que los
+métodos de supervivencia necesitan.
+
+::: {.callout-tip}
+## Cómo leer una fila: `(tiempo_primer_sin, evento)`
+Cada tramo dura ~2 meses y la póliza se observa durante $\lceil 6\cdot\texttt{exposicion}\rceil$ tramos.
+Al ser el tiempo **discreto**, un siniestro en el tramo $k$ significa que la póliza sobrevivió sin partes
+los $k-1$ tramos completos anteriores y que el primer parte cayó **dentro** del tramo $k$.
+
+- **Vigente todo el año** (`exposicion = 1` → 6 tramos, 12 meses):
+  - `tiempo_primer_sin = 6, evento = 0`: ningún parte en los **12 meses**.
+  - `tiempo_primer_sin = 6, evento = 1`: sin partes los primeros 5 tramos (**10 meses**) y el primer parte
+    en el tramo 6 (meses 11–12).
+- **Media vigencia** (`exposicion = 0.5` → 3 tramos, 6 meses):
+  - `tiempo_primer_sin = 3, evento = 0`: ningún parte en los **6 meses** de cobertura.
+  - `tiempo_primer_sin = 3, evento = 1`: sin partes los primeros 2 tramos (**4 meses**) y el primer parte
+    en el tramo 3 (meses 5–6).
+
+En general: con `evento = 0` la póliza estuvo sin partes **toda** su vigencia ($2\cdot\texttt{tiempo}$
+meses); con `evento = 1` sobrevivió $2\cdot(\texttt{tiempo}-1)$ meses completos y el primer parte ocurrió
+en el tramo `tiempo`.
+:::
+
+Lo que buscamos es el **hazard**: el ritmo al que aparece el primer siniestro entre las pólizas que
+**siguen sin haberlo tenido**, cómo evoluciona a lo largo de la cobertura, y qué perfiles lo elevan. De
+ahí derivaremos la **supervivencia** (probabilidad de seguir sin siniestro) y las **razones de riesgo**
+de cada factor.
+
+### Una primera mirada: la curva de supervivencia
+
+La herramienta descriptiva natural del tiempo a evento es la curva de **Kaplan–Meier**, que estima $S(t)$
+—la proporción que aún no ha tenido el siniestro— respetando la censura. La miramos por
+`zona_circulacion`, uno de los factores de interés:
+
+```{r}
+#| label: fig-u25-km
+#| fig-cap: "Supervivencia (Kaplan–Meier) sin primer siniestro a lo largo de los tramos de cobertura, por zona de circulación. Que las curvas se separen anticipa un efecto de la zona sobre el riesgo; que todas bajen, un hazard que se acumula con el tiempo."
+#| fig-width: 6.5
+#| fig-height: 4
+km <- survfit(Surv(tiempo_primer_sin, evento) ~ zona_circulacion, data = cartera)
+broom::tidy(km) |>
+  ggplot(aes(time, estimate, colour = strata)) +
+  geom_step(linewidth = 0.8) +
+  labs(x = "tramo de cobertura", y = "supervivencia estimada  S(t)", colour = "zona")
+```
+
+Se lee de un vistazo: la supervivencia **cae** conforme avanza la cobertura —el riesgo se acumula— y las
+curvas **se separan** por zona, lo que adelanta que la zona modula el hazard. Cuantificar esa forma y el
+efecto de cada factor es la tarea del modelo.
+
+### Del tiempo al riesgo: hazard, supervivencia y su relación
+
+Tres funciones describen el tiempo a evento. La **supervivencia** $S(t)=P(T>t)$ es la probabilidad de
+seguir sin siniestro pasado $t$. El **hazard** $h(t)$ es la tasa instantánea de siniestro entre quienes
+siguen en riesgo,
+
+$$h(t)=\lim_{\Delta t\to 0}\frac{P(t\le T<t+\Delta t \mid T\ge t)}{\Delta t}.$$
+
+Y el **hazard acumulado** $H(t)=\int_0^t h(u)\,\mathrm{d}u$ las enlaza:
+
+$$S(t)=\exp\!\big(-H(t)\big).$$
+
+La palabra clave es **tasa**: el hazard es un ritmo de eventos por unidad de tiempo-persona. Y las tasas
+ya sabemos modelarlas —Poisson y *offset*—. Solo falta darle una forma manejable.
+
+Un apunte, porque quizá lo has notado: estas definiciones son de tiempo **continuo**, pero nuestros datos
+son **discretos** —solo vemos el tramo—, como en el Caso 1. No hay contradicción. Adoptamos la vista del
+**exponencial a trozos** (que formalizamos enseguida): bajo los tramos suponemos un tiempo continuo con
+un hazard que es un **ritmo constante dentro de cada tramo**; los tramos son la resolución con que
+observamos, no una negación de que el evento ocurra en un instante real. Y esta descripción **coincide**
+con la de tiempo discreto del Caso 1 en los bordes de los tramos —los únicos puntos que vemos—: allí el
+hazard era una **probabilidad** por periodo, $h_j$, con $S_k=\prod_{j\le k}(1-h_j)$ (enlace `cloglog`);
+aquí es una **tasa** $\lambda_j$ con $S=e^{-H}$, y ambas se enlazan por $h_j=1-e^{-\lambda_j\Delta_j}$, de
+modo que $\prod_j(1-h_j)=e^{-\sum_j\lambda_j\Delta_j}=e^{-H}$: **la misma supervivencia**. Son dos lentes
+del mismo hazard —la tasa (Poisson) aquí, la probabilidad (`cloglog`) en el Caso 1— y las reunimos en la
+[§5.3](#sec-u25-nexo).
+
+### La transformación a persona-periodo (y por qué)
+
+Suponemos el hazard **constante dentro de cada tramo** —el modelo **exponencial a trozos**—: un valor
+$h_k$ en cada intervalo $k$, escalonado. Con ese supuesto, el seguimiento de cada póliza se descompone en
+sus tramos en riesgo y, en cada tramo, que ocurra o no el siniestro (dado el tiempo expuesto) se comporta
+como un **conteo de Poisson** de media proporcional a $h_k$. La consecuencia es notable: la verosimilitud
+de supervivencia coincide **exactamente** con una verosimilitud de **Poisson** [@holford1980; @laird1981].
+
+Para explotarla, reescribimos los datos en formato **persona-periodo**: una fila por póliza y por tramo
+en el que estuvo en riesgo. En cada fila, la respuesta `y` vale 1 solo en el tramo donde ocurrió el
+siniestro (0 en el resto; 0 en todos si la póliza está censurada). El **tiempo en riesgo** del tramo
+haría de *offset* (`log` tiempo-persona); aquí todos los tramos tienen la misma anchura, así que ese
+offset es constante y quedará absorbido por el efecto de `tramo` —lo retomamos en 5.2—. La expansión la
+hace `expandir_poliza_tramo()`:
+
+```{r}
+#| label: u25-pp
+pp <- expandir_poliza_tramo(cartera, "tiempo_primer_sin", "evento", col_id = "id_poliza")
+# la primera póliza, desplegada en sus tramos en riesgo:
+head(pp[pp$id == pp$id[1], c("id", "tramo", "y", "zona_circulacion", "uso")], 8)
+```
+
+¿Por qué y para qué esta transformación? Porque convierte un problema de supervivencia en una **regresión
+de Poisson corriente**: cada póliza aporta tantas filas como tramos sobrevivió, el factor `tramo`
+capturará la forma del hazard base $h_k$, las covariables entran como en cualquier GLM, y la **censura se
+trata sola** —una póliza censurada simplemente aporta filas con `y = 0` hasta donde se la siguió, sin fila
+de evento—. Con los datos así dispuestos, en la [Sección 5.2](#sec-u25-piecewise) el modelo será,
+literalmente, un `glm(..., family = poisson)`.
+
+## 5.2 El modelo de riesgos a trozos como GLM de Poisson {#sec-u25-piecewise}
+
+<!-- TODO desarrollo:
+     - El modelo: log h_ik = alpha_k (baseline por tramo) + x' beta; offset log(t en riesgo).
+       glm(evento ~ tramo + covariables + offset(log(t)), family = poisson, data = pp).
+     - Interpretación: exp(beta) = razones de riesgo (hazard ratios), riesgos proporcionales; los
+       alpha_k = forma del hazard base (aquí, creciente con la cobertura).
+     - De los coeficientes a la curva: hazard por tramo -> H(t) acumulado -> S(t) = exp(-H).
+     - Validación contra el DGP: h0_tramo = c(.05,.06,.07,.08,.09,.10) y los signos de b_evento. -->
+
+## 5.3 Dos lentes del mismo hazard: Poisson y `cloglog` {#sec-u25-nexo}
+
+<!-- TODO desarrollo:
+     - Nexo con el Caso 1 (1.5): allí el persona-periodo se ajustaba con binomial + enlace cloglog
+       (probabilidad por periodo); aquí con Poisson + offset (tasa por tiempo-persona).
+     - Dos lentes GLM del MISMO hazard proporcional: mismos hazard ratios (coinciden en el límite de
+       intervalos finos / eventos raros). Ajustar ambos y comparar los beta.
+     - Cuándo cada uno: cloglog si el tiempo es intrínsecamente discreto; Poisson a trozos si pensamos en
+       tasa/tiempo-persona y queremos el puente con Cox. -->
+
+## 5.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier {#sec-u25-clasicos}
+
+<!-- TODO desarrollo:
+     - Cox (survival::coxph) sobre (tiempo, evento): comparar sus log-HR con los beta del Poisson a
+       trozos -> casi coinciden. Idea: Cox = exponencial a trozos con un corte por cada tiempo de evento
+       (baseline perfilado); al afinar los intervalos, el Poisson a trozos -> Cox.
+     - Kaplan-Meier (survival::survfit) frente a la supervivencia del Poisson a trozos: superponer S(t)
+       del GLM (solo tramo) sobre la KM -> coinciden; el baseline del PEM aproxima el Nelson-Aalen.
+     - Mensaje: el GLM de Poisson no es un rival, es el mismo hazard alcanzado desde los conteos.
+     - Callout con la equivalencia de verosimilitudes Poisson <-> exponencial a trozos. -->
+
+## 5.5 Fragilidad ≡ GLMM de Poisson {#sec-u25-frailty}
+
+<!-- TODO desarrollo (puente, breve):
+     - Heterogeneidad no observada en el riesgo = intercepto aleatorio sobre el log-hazard.
+     - Fragilidad COMPARTIDA: pólizas de la misma agencia comparten fragilidad -> glmer(evento ~ tramo +
+       x + (1|agencia) + offset, poisson) sobre el persona-periodo. Reconecta con la Unidad 2.4.
+     - Interpretar la varianza como dispersión del riesgo base entre grupos; mencionar la fragilidad
+       individual (OLRE). -->
+
+::: {.callout-important}
+## Tarea del estudiante (2.5) — resuelve la Pregunta 5 del caso
+<!-- TODO: sobre la cartera del equipo, ajustar el modelo de riesgos a trozos (Poisson + offset) sobre el
+     persona-periodo, describir cómo evoluciona el riesgo de siniestro a lo largo de la cobertura (hazard
+     base por tramo), leer las razones de riesgo, y comparar la curva de supervivencia con la
+     Kaplan-Meier. Validar el hazard base contra h0_tramo del DGP. -->
+:::

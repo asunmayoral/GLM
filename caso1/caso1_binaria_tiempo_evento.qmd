@@ -298,8 +298,8 @@ construimos la `cohorte` completa.
 #| label: cohorte-sim
 #| 
 library(readr)
-source("R/dgp_cohorte.R")                        # define simular_cohorte(), expandir_persona_periodo()
-cohorte <- simular_cohorte()                     # nivel individuo (binaria, nominal, ordinal)
+source("R/dgp_cohorte.R")                        # define simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
+cohorte <- cargar_cohorte()                      # lee datos/cohorte_*.rds si existe; si no (o si cambió el DGP), simula y guarda
 # y guardamos las simulaciones
 #write_csv(cohorte, "cohorte.csv")        # nivel individuo
 # resumen

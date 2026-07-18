@@ -1,0 +1,27 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_6.qmd >}}. Sin YAML. Chunks u36-. -->
+
+# 6 · Selección, validación cruzada y regularización {#sec-u36}
+
+<!-- TODO intro: con muchos predictores del importe, selección y regularización; validación
+     out-of-sample. Espejo de la Unidad 2.6 del Caso 2. -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **continuas positivas** — selección de modelos, **validación cruzada** y
+**regularización** para respuestas positivas.
+:::
+
+## 6.1 De la selección clásica a la validación cruzada {#sec-u36-cv}
+
+<!-- TODO: AIC/BIC vs error out-of-sample; métricas para importes (RMSE en escala log, desviación
+     Gamma, pinball si cuantiles). -->
+
+## 6.2 Regularización {#sec-u36-reg}
+
+<!-- TODO: glmnet no soporta Gamma directamente; opciones: regularizar sobre log(Y) (gaussiano),
+     Tweedie/`glmnet` vía HDtweedie, o penalización en gamlss. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.6)
+<!-- TODO -->
+:::

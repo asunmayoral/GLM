@@ -1,0 +1,38 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-.
+     Capstone de selección: de AIC/BIC a la validación cruzada y la regularización. -->
+
+# 6 · Selección, validación cruzada y regularización {#sec-u26}
+
+<!-- TODO intro: en el Caso 1 la selección era por deviance/AIC/BIC y la evaluación (AUC) era
+     in-sample; aquí damos el salto a la evaluación out-of-sample (CV) y a la penalización. Se
+     aplica sobre Poisson (glmnet tiene familia poisson; no tiene Gamma -> Caso 3, solo conceptual). -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **Conteos y tasas** — comparar y seleccionar modelos con **validación cruzada** y
+**regularización** (lasso/ridge/elastic-net) sobre Poisson.
+:::
+
+## 6.1 De la selección clásica a la validación cruzada {#sec-u26-cv}
+
+<!-- TODO: recap AIC/BIC del Caso 1; k-fold CV como evaluación out-of-sample; compromiso
+     sesgo–varianza; la CV como versión out-of-sample del AUC/accuracy in-sample del Caso 1. -->
+
+## 6.2 Regularización: ridge, lasso y elastic-net {#sec-u26-reg}
+
+<!-- TODO: penalización L2 (ridge) / L1 (lasso) / mixta (elastic-net); glmnet(family="poisson");
+     cv.glmnet para elegir lambda; el lasso como selección de variables. Conviene un dato con
+     muchos predictores (p. ej. AER::NMES1988). -->
+
+## 6.3 La misma herramienta en la binaria {#sec-u26-binomial}
+
+<!-- TODO: recuadro que aplica glmnet(family="binomial") a la logística del Caso 1: misma máquina,
+     otra familia. Nota: glmnet cubre binomial, poisson, cox... pero NO Gamma (Caso 3: solo
+     conceptual). -->
+
+::: {.callout-important}
+## Tarea del estudiante (2.6)
+<!-- TODO: sobre la cartera del equipo (o un dato con muchos predictores), ajustar un Poisson
+     regularizado con cv.glmnet, comparar con la selección por AIC/BIC e interpretar qué variables
+     retiene el lasso. -->
+:::

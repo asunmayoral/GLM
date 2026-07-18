@@ -23,10 +23,11 @@ que se introducen pronto y reaparecen en cada bloque.
 - **Caso 1 · ¿Ocurre el evento? ¿Y cuándo?** Respuestas binarias y tiempo hasta
   el evento en tiempo discreto: regresión logística, evaluación de
   clasificadores, intercepto aleatorio y enlace complementario log-log.
-- **Caso 2 · ¿Cuántas veces?** *(en preparación)* Conteos y tasas: Poisson,
-  *offset* e IRR, sobredispersión, exceso de ceros y GLMM de Poisson.
-- **Caso 3 · ¿Cuánto?** *(en preparación)* Continuas positivas: Gamma, inversa
-  gaussiana, regularización y modelos de tiempo de fallo acelerado.
+- **[Caso 2 · ¿Cuántas veces y a qué ritmo?](caso2/caso2_conteos.qmd)** *(borrador)* Conteos y
+  tasas: Poisson, *offset* e IRR, sobredispersión, exceso de ceros, GLMM de Poisson y riesgos a
+  trozos.
+- **Caso 3 · ¿Cuánto?** *(en construcción)* Continuas positivas:
+  Gamma, inversa gaussiana y lognormal, Tweedie (prima pura), GLMM Gamma y modelos de vida acelerada.
 
 ## Cómo usar estas páginas
 

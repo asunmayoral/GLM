@@ -1,0 +1,93 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML.
+     Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía. -->
+
+# 7 · Estudio de caso, exposición y evaluación {#sec-u27}
+
+::: {.callout-note}
+## Sobre esta unidad
+Cierre del Caso 2: estudio de caso de conteos/tasas y exposiciones con Q&A individual. No hay teoría
+nueva; se integra y se evalúa todo lo anterior. Objetivo general: **comunicar y reproducir** (estudio
+de caso reproducible), de forma acumulativa sobre los de conteos, mixtos y supervivencia.
+:::
+
+## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
+
+### El encargo
+
+Te contrata la dirección médica de **una aseguradora de salud**, que sigue a una cohorte de
+asegurados a través de sus **centros** de atención. No son estadísticos: te traen sus datos y sus
+preguntas, y esperan **respuestas y recomendaciones** para planificar recursos, no una clase de
+modelos. Como en el Caso 1, tú **eliges y justificas** el modelo en cada caso.
+
+> **Lo que la dirección quiere saber**
+>
+> 1. ¿A qué **ritmo** usan nuestros asegurados la atención primaria, y qué perfiles disparan ese uso?
+>    ¿Podríamos estimar el ritmo esperado de un asegurado nuevo?
+> 2. ¿Tiene que ver el **tipo de asegurado** (ámbito, régimen, grupo de riesgo) con que acabe usando
+>    más o menos los servicios, o son cosas independientes entre sí?
+> 3. Reevaluamos el **nivel de riesgo** de cada asegurado cada año. ¿Cómo se mueven de un nivel a otro
+>    de un año al siguiente? ¿Es un vaivén equilibrado o hay una **deriva** (empeoran más de los que
+>    mejoran)?
+> 4. Unos pocos asegurados concentran **muchísimas urgencias** y la mayoría casi ninguna. ¿Vuestro
+>    modelo refleja bien esa enorme variabilidad, o se queda corto?
+> 5. La mayoría **nunca tiene un ingreso grave**. ¿Hay asegurados que, sencillamente, no ingresarán,
+>    frente a otros que aún no lo han hecho? ¿Cómo los distinguimos?
+> 6. ¿El uso de recursos depende del **centro** al que está adscrito el asegurado, o es todo cosa del
+>    propio paciente? ¿Hay centros que se desvían? Si abrimos un centro nuevo, ¿qué deberíamos esperar?
+> 7. ¿Cómo **evoluciona en el tiempo** el riesgo de un primer ingreso grave a lo largo del
+>    seguimiento? ¿Cada cuánto conviene revisar a los asegurados de más riesgo?
+> 8. Manejamos **muchísimas variables** de cada asegurado y no sabemos cuáles importan de verdad.
+>    ¿Nos das un modelo **sencillo y fiable** para anticipar el uso de recursos, diciéndonos qué
+>    variables merece la pena conservar?
+
+<!-- Mapa docente (no revelar al alumno): Q1 Poisson + offset + IRR + predicción (2.1) ·
+     Q2 tablas de contingencia / log-lineal (asociación vs independencia) (2.1) ·
+     Q3 tabla cuadrada de cambio: simetría / homogeneidad marginal / movilidad (2.1) ·
+     Q4 sobredispersión: quasi-Poisson / binomial negativa (2.2) · Q5 exceso de ceros: hurdle / ZI (2.3) ·
+     Q6 GLMM de Poisson, ICC, predicción marginal (2.4) · Q7 riesgos a trozos ≡ Poisson (2.5) ·
+     Q8 selección + validación cruzada + regularización (2.6). -->
+
+
+### Los datos que te proporcionamos
+
+Como los datos son **simulados** (con proceso generador conocido), podrás validar tus estimaciones
+contra la verdad. Cada fila es un **asegurado**, seguido durante `anios_seguimiento` (la
+**exposición**: el número de eventos se lee por unidad de tiempo, con `offset = log(anios_seguimiento)`).
+
+| Papel | Variables |
+|---|---|
+| Estructura | `id_paciente`; `centro` (centro de salud al que está **adscrito** el asegurado — variable de agrupación); `anios_seguimiento` (tiempo seguido, en años → *offset*) |
+| Respuestas (conteos) | `n_visitas_ap` (visitas a atención primaria), `n_urgencias`, `n_ingresos_graves` (ingresos hospitalarios graves), `n_pruebas` (pruebas diagnósticas solicitadas) |
+| Predictores clínicos/demográficos | `edad`; `anios_desde_dx` (años desde el **diagnóstico** de su condición crónica principal); `indice_comorbilidad` (nº de **condiciones crónicas** concurrentes); `imc`; `ambito` (urbano/mixto/rural); `regimen` (privado/público); `grupo_riesgo` (bajo/medio/alto) |
+| Variables adicionales (para explorar / selección) | `sexo`, `estado_civil`, `nivel_estudios`, `habito_tabaco`, `seguro_privado`, `medio_contacto` (canal habitual con el sistema: presencial/telefónico/telemático), `n_farmacos_cronicos`, `gasto_farmacia_anual`, `n_convivientes`, `anios_afiliado` |
+| Cambio (dos momentos) | `nivel_riesgo_prev` y `nivel_riesgo_act`: **estratificación de riesgo** del asegurado (1 = bajo … 5 = alto) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
+| Tiempo-a-evento | `tiempo_primer_ingreso` (tramo del seguimiento en que se observa el **primer ingreso grave**; o el último tramo seguido si no hubo → censura), `evento` (1 = ingreso observado, 0 = censura) |
+
+Hay **más variables de las que necesitarás**: algunas son ruido, a propósito, para que ejercites la
+selección y decidas qué entra en el modelo.
+
+### Tu trabajo
+
+<!-- TODO: mismo ciclo que 1.6 (identificar objetivo → proponer y justificar → resolver → interpretar
+     → recomendar); informe técnico; predicción; control de calidad contra el DGP; reproducibilidad. -->
+
+Entregas un **informe de consultoría reproducible**: para cada pregunta, identifica el objetivo,
+propón y justifica el análisis, resuélvelo, interprétalo y recomienda. Con **control de calidad**
+contra la verdad del DGP (`attr(cohorte, "verdad")`) —ajusta a ciegas, valida al final—.
+
+::: {.callout-tip}
+## Cada equipo, una base de datos distinta
+Cada equipo trabaja **su propia cohorte** de salud, generada con una configuración diferente —pero
+coherente— del DGP (`scripts/generar_datos_equipos_conteos.R`, en `datos_equipos_salud/equipo_XX/`).
+El enunciado es común; las conclusiones numéricas cambian de un equipo a otro.
+:::
+
+## 7.2 Checklist de tareas {#sec-u27-checklist}
+
+<!-- TODO: adaptar el checklist de 1.6 a conteos/tasas (offset, IRR, sobredispersión, ceros, mixtos,
+     riesgos a trozos, selección/regularización, validación contra el DGP). -->
+
+## 7.3 Rúbricas {#sec-u27-rubricas}
+
+Las rúbricas están en la **guía docente (§7.4)** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se
+reproducen aquí.

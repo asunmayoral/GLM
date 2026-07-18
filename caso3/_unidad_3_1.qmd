@@ -1,0 +1,43 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_1.qmd >}}. Sin YAML. Chunks u31-. -->
+
+# 1 · GLM Gamma {#sec-u31}
+
+<!-- TODO intro: la respuesta es un IMPORTE positivo y asimétrico a la derecha; el modelo lineal
+     gaussiano no vale. La Gamma es la distribución de referencia (Var = phi·mu^2, CV constante).
+     Recorrido completo de 2.1 (modelo único). -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **continuas positivas** — el GLM **Gamma** (enlaces log/inverso), el parámetro de
+dispersión φ, la interpretación multiplicativa y el diagnóstico.
+:::
+
+## 1.1 Contexto: qué modela {#sec-u31-contexto}
+
+<!-- TODO: el coste de siniestro (positivo, asimétrico); por qué el gaussiano falla; gráfico de la
+     distribución del importe y de su relación con predictores. -->
+
+## 1.2 Modelización y estimación {#sec-u31-modelo}
+
+<!-- TODO: Y ~ Gamma(media mu, dispersión phi); Var = phi·mu^2; enlace LOG (efectos multiplicativos)
+     frente al INVERSO (canónico); estimación por MV / IWLS; phi estimado por deviance/Pearson. -->
+
+## 1.3 Interpretación {#sec-u31-interpretacion}
+
+<!-- TODO: con enlace log, exp(beta) = factor multiplicativo del importe medio; coeficiente de
+     variación constante; lectura de phi. -->
+
+## 1.4 Inferencia y selección {#sec-u31-inferencia}
+
+<!-- TODO: Wald / LRT / contraste F (phi desconocida); AIC. -->
+
+## 1.5 Bondad de ajuste y diagnóstico {#sec-u31-diagnostico}
+
+<!-- TODO: residuos (deviance / cuantil aleatorizados), DHARMa, QQ-plot; enlace al compendio de bondad
+     de ajuste. Validación contra el DGP. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.1)
+<!-- TODO: sobre la cartera del equipo, modelar el coste medio de siniestro con un GLM Gamma (enlace
+     log); interpretar los factores; diagnosticar. -->
+:::

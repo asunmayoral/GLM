@@ -1,0 +1,28 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_7.qmd >}}. Sin YAML.
+     Espejo de las unidades de estudio de caso (1.6 / 2.7): encargo de consultoría + datos + checklist.
+     Rúbricas en la guía docente. -->
+
+# 7 · Estudio de caso, exposición y evaluación {#sec-u37}
+
+::: {.callout-note}
+## Sobre esta unidad
+Cierre del Caso 3: estudio de caso sobre **importes/costes** (continuas positivas) con Q&A individual.
+No hay teoría nueva; se integra y se evalúa todo lo anterior. Objetivo general: **comunicar y
+reproducir**.
+:::
+
+## 7.1 El estudio de caso (entregable) {#sec-u37-caso}
+
+<!-- TODO: encargo de consultoría (aseguradora de salud: coste/estancia); preguntas realistas que
+     dirijan el informe (mapear a 3.1 Gamma, 3.2 alternativas/dispersión, 3.3 Tweedie/prima pura,
+     3.4 mixtos, 3.5 AFT, 3.6 selección); datos del equipo; control de calidad contra el DGP. -->
+
+## 7.2 Checklist de tareas {#sec-u37-checklist}
+
+<!-- TODO: adaptar el checklist a importes (Gamma/log, dispersión, Tweedie, mixtos, AFT, selección,
+     validación contra el DGP). -->
+
+## 7.3 Rúbricas {#sec-u37-rubricas}
+
+Las rúbricas están en la **guía docente** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se reproducen
+aquí.

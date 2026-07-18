@@ -1,0 +1,38 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u34-. -->
+
+# 4 · Continuas positivas agrupadas: GLMM Gamma {#sec-u34}
+
+<!-- TODO intro: espiral de mixtos, ahora sobre la Gamma. Los importes se agrupan (agencia/region,
+     como en el Caso 2); recorrido completo de 2.1 (modelo único). -->
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con interceptos aleatorios (y anidamiento),
+componentes de varianza e interpretación condicional vs marginal.
+:::
+
+## 4.1 Qué es y de dónde viene: el agrupamiento {#sec-u34-contexto}
+
+<!-- TODO: el coste medio varía entre agencias/regiones; reutilizar la jerarquía region > agencia. -->
+
+## 4.2 El modelo mixto Gamma {#sec-u34-modelo}
+
+<!-- TODO: log(mu_ij) = x'beta + u_j; Gamma con intercepto aleatorio; glmmTMB(family = Gamma). -->
+
+## 4.3 Interpretación {#sec-u34-interpretacion}
+
+<!-- TODO: efectos fijos multiplicativos; componentes de varianza; BLUPs; media condicional vs
+     marginal (retransformación con enlace log). -->
+
+## 4.4 Inferencia y selección {#sec-u34-inferencia}
+
+<!-- TODO: ¿hace falta el efecto aleatorio? LRT en el borde; AIC. -->
+
+## 4.5 Bondad de ajuste y diagnóstico {#sec-u34-diagnostico}
+
+<!-- TODO: DHARMa en mixtos; R2 de Nakagawa; validación DGP. -->
+
+::: {.callout-important}
+## Tarea del estudiante (3.4)
+<!-- TODO -->
+:::

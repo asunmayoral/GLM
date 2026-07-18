@@ -1,0 +1,444 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_1.qmd >}}. Sin YAML. Chunks u21-.
+     Unidad fundacional (Poisson y log-lineal). Estructura espejo del Caso 1:
+     Contexto · Modelización y estimación · Interpretación · Inferencia y selección ·
+     Bondad de ajuste, diagnóstico y predicción. -->
+
+# 1 · Poisson y modelos log-lineales {#sec-u21}
+
+El Caso 1 preguntaba *si* ocurría un evento; ahora contamos **cuántas veces** ocurre. La respuesta es
+un **recuento** —un entero no negativo $0,1,2,\dots$—, y eso descarta el modelo lineal (predeciría
+valores negativos o fraccionarios) y la logística (que solo distingue 0/1). La maquinaria del GLM
+—familia exponencial, IWLS, deviance, inferencia— ya la tenemos del Caso 1: aquí la **recapitulamos**
+y ponemos el peso en lo propio del conteo. Empezamos por el **contexto**: qué problemas vamos a
+resolver.
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **Conteos y tasas** (Poisson, IRR, *offset*) y **modelos log-lineales** para tablas
+de contingencia. Recap del **marco GLM** del Caso 1.
+:::
+
+## 1.1 Contexto: qué problemas resuelve este modelo {#sec-u21-contexto}
+
+En la cartera de la aseguradora, «contar» aparece en **cuatro sabores** que motivan todo el caso. Los
+recorremos con los datos antes de construir el modelo.
+
+**1) Recuentos de eventos.** Cada póliza acumula un número de partes (`n_asistencia`, `n_danos`…): un
+entero pequeño, con muchos ceros y una cola a la derecha (lo vimos en la @fig-cartera-eda). La
+pregunta natural es *cómo influyen las covariables en ese recuento* —qué perfiles acumulan más—, y
+para responderla necesitamos un modelo cuya respuesta sea, precisamente, un conteo.
+
+**2) Tasas: el papel de la exposición.** Dos pólizas con el mismo perfil no son igual de arriesgadas
+si una ha estado en vigor todo el año y la otra solo unos meses: el recuento bruto **confunde el
+riesgo con el tiempo observado**. Se ve de un vistazo —a más exposición, más partes—:
+
+```{r}
+#| label: fig-u21-exposicion
+#| fig-cap: "Media de partes por daños (`n_danos`) según el tiempo de exposición de la póliza: crece con la exposición. El recuento bruto mezcla riesgo y tiempo observado; por eso modelaremos la *tasa* (partes por unidad de exposición) con un *offset*."
+#| fig-width: 6
+#| fig-height: 3.4
+cartera |>
+  mutate(tramo = cut(exposicion, c(0, 0.5, 0.75, 1),
+                     labels = c("< 0.5", "0.5–0.75", "> 0.75"), include.lowest = TRUE)) |>
+  group_by(tramo) |>
+  summarise(media_danos = mean(n_danos), .groups = "drop") |>
+  ggplot(aes(tramo, media_danos)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "exposición (fracción de año en vigor)", y = "media de partes por daños")
+```
+
+Lo correcto no es modelar el **recuento** sino la **tasa** (partes por unidad de exposición). Lo
+haremos incorporando la exposición como *offset*.
+
+**3) Tablas de contingencia: ¿asociación o independencia?** A veces cruzamos dos variables categóricas
+y contamos casos en cada celda. ¿La **zona de circulación** se relaciona con sufrir daños, o son
+independientes?
+
+```{r}
+#| label: tbl-u21-contingencia
+#| tbl-cap: "Zona de circulación × indicador de daños (con/sin), con el porcentaje de pólizas con algún parte por zona."
+cartera |>
+  mutate(danos = ifelse(n_danos > 0, "con daños", "sin daños")) |>
+  count(zona_circulacion, danos) |>
+  tidyr::pivot_wider(names_from = danos, values_from = n) |>
+  mutate(pct_con_danos = round(`con daños` / (`con daños` + `sin daños`) * 100))
+```
+
+La tabla apunta a **asociación**: las pólizas de zona urbana tienen algún parte de daños con más
+frecuencia (~58 %) que las de zona rural (~49 %). Contrastar formalmente esa asociación —y con más de
+dos variables— es el terreno de los **modelos log-lineales**, que no son más que una regresión de
+Poisson sobre los **recuentos de celda**.
+
+**4) Tablas de cambio (cuadradas).** El nivel de **bonus-malus** se reevalúa cada año. Si cruzamos el
+nivel del año previo con el actual obtenemos una **tabla cuadrada** (misma clasificación en dos
+momentos):
+
+```{r}
+#| label: tbl-u21-cambio
+#| tbl-cap: "Tabla cuadrada del bonus-malus: nivel del año previo × nivel del año actual (con marginales)."
+addmargins(table(previo = cartera$bonus_malus_prev, actual = cartera$bonus_malus_act))
+```
+
+La diagonal son las pólizas que **no cambian**; fuera de ella, quién sube y quién baja. Y comparamos
+las dos distribuciones marginales (nivel previo vs actual):
+
+```{r}
+#| label: tbl-u21-cambio-marg
+#| tbl-cap: "Distribuciones marginales del bonus-malus (proporciones) en el año previo y en el actual."
+rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
+      actual = prop.table(table(cartera$bonus_malus_act))) |> round(3)
+```
+
+Los marginales **no coinciden**: el nivel intermedio pierde peso hacia los extremos y sube algo la
+cola alta (más *malus*) —hay **deriva**, no homogeneidad marginal—. Preguntas de este tipo —¿es
+simétrico el cambio?, ¿son iguales los marginales?— se responden con modelos específicos para tablas
+cuadradas (**simetría**, **homogeneidad marginal**).
+
+Los cuatro problemas —recuentos, tasas, asociación en tablas y cambio— los resuelve **un mismo
+modelo**: la regresión de **Poisson** y su versión **log-lineal**, ambas con enlace `log`. Lo
+construimos a continuación —y, cuando el Poisson básico se quede corto (la varianza se dispara o
+sobran ceros), lo ampliaremos en las unidades siguientes—.
+
+## 1.2 Modelización y estimación {#sec-u21-modelizacion}
+
+### El modelo genérico
+
+Los recuentos piden una **distribución para enteros no negativos**: la **Poisson**. El modelo reúne
+los tres ingredientes de todo GLM (Caso 1):
+
+- **Componente aleatoria:** $Y_i \sim \text{Poisson}(\mu_i)$, con soporte $\{0,1,2,\dots\}$. Su rasgo
+  distintivo es que **la media iguala a la varianza**, $\mathrm{E}[Y_i]=\mathrm{Var}[Y_i]=\mu_i$ (lo
+  pondremos a prueba en la [Sección 1.5](#sec-u21-diagnostico)).
+- **Enlace log:** $\log\mu_i=\eta_i$, de modo que $\mu_i=e^{\eta_i}>0$ —garantiza una media positiva y
+  hace que los efectos sean **multiplicativos**—.
+- **Predictor lineal:** $\eta_i=\beta_0+\beta_1 x_{i1}+\dots+\beta_p x_{ip}$.
+
+Juntando las piezas, $\mu_i=\exp(\beta_0+\mathbf{x}_i'\boldsymbol\beta)$.
+
+La **estimación** es por máxima verosimilitud. Partiendo de la función de masa de la Poisson,
+$\Pr(Y_i=y_i)=e^{-\mu_i}\mu_i^{y_i}/y_i!$, y sustituyendo $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$
+(con el *offset* $\log t_i$ si lo hay), la **log-verosimilitud** es
+
+$$\ell(\boldsymbol\beta)=\sum_{i=1}^{n}\Bigl[\,y_i\,\mathbf{x}_i'\boldsymbol\beta-\exp(\mathbf{x}_i'\boldsymbol\beta)-\log(y_i!)\,\Bigr].$$
+
+Derivando e igualando a cero se obtienen las **ecuaciones de verosimilitud**, que en forma compacta son
+
+$$\frac{\partial\ell}{\partial\boldsymbol\beta}=\sum_{i=1}^{n}(y_i-\mu_i)\,\mathbf{x}_i=\mathbf{X}'(\mathbf{y}-\boldsymbol\mu)=\mathbf{0}.$$
+
+No tienen solución cerrada (son no lineales en $\boldsymbol\beta$), pero el método de Fisher las resuelve
+iterando **mínimos cuadrados ponderados** (**IWLS**): en cada paso se regresa una respuesta de trabajo
+$z_i=\eta_i+(y_i-\mu_i)/\mu_i$ sobre $\mathbf{X}$ con pesos $w_i=\mu_i$, hasta converger. Es la misma
+maquinaria del Caso 1, con $w_i=\mu_i$ propio de la Poisson. En R, `glm(..., family = poisson)`.
+
+Dos extensiones del mismo modelo, que usaremos enseguida:
+
+- **Tasas con *offset*.** Si el recuento se acumula sobre una **exposición** $t_i$, modelamos la
+  **tasa** $\mu_i/t_i$: de $\log(\mu_i/t_i)=\eta_i$ sale $\log\mu_i=\eta_i+\log t_i$. Ese $\log t_i$
+  es un ***offset***: un término del predictor con **coeficiente fijado a 1** (no se estima).
+- **Modelos log-lineales.** Cuando el dato son los **recuentos de las celdas** de una tabla, el mismo
+  Poisson modela esas frecuencias: la respuesta es el conteo de la celda y los predictores, los
+  **factores de clasificación**. El modelo de **independencia** lleva solo efectos principales; añadir
+  la **interacción** da el modelo **saturado** (ajuste perfecto), y esa interacción **es** la
+  asociación. (Puente con el Caso 1: el log-lineal saturado de una tabla $I\times 2$ equivale a una
+  **logística** del factor binario sobre el otro.)
+
+### Aplicado a los cuatro problemas del contexto
+
+Antes de ajustar, un vistazo exploratorio: ¿cómo se relaciona `n_asistencia` con cada predictor del
+modelo? Representamos su **tasa** (asistencias por año de exposición) por cuartiles de los continuos y
+por nivel de los categóricos:
+
+```{r}
+#| label: fig-u21-eda-modelo
+#| fig-cap: "Tasa de `n_asistencia` (asistencias por año de exposición) según cada predictor del modelo. La tasa sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican incluir esos términos."
+#| fig-width: 9
+#| fig-height: 5
+dplyr::bind_rows(
+  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
+                     y = n_asistencia, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
+  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
+                     y = n_asistencia, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
+  ggplot(aes(nivel, tasa)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por año)")
+```
+
+La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
+baja levemente con la **edad**. Ninguna relación es plana: todos aportan señal, lo que justifica el
+modelo que ajustamos ahora. El modelo, además, estima el efecto de cada predictor **ajustado por los
+demás**, que puede matizar estas vistas marginales.
+
+**1) Recuento.** Cuántas asistencias tiene una póliza según su perfil —la Poisson básica—:
+
+```{r}
+#| label: u21-fit-conteo
+m_conteo <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo,
+                family = poisson, data = cartera)
+broom::tidy(m_conteo)
+```
+
+**2) Tasa.** El mismo modelo, pero sobre la **tasa** por unidad de exposición: basta añadir el
+*offset*.
+
+```{r}
+#| label: u21-fit-tasa
+m_tasa <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                offset(log(exposicion)),
+              family = poisson, data = cartera)
+broom::tidy(m_tasa)
+```
+
+Es el ajuste correcto cuando la exposición varía: ahora los coeficientes son efectos sobre la **tasa**,
+no sobre el recuento bruto (su lectura como razones de tasas va en la
+[Sección 1.3](#sec-u21-interpretacion)).
+
+**3) Tabla de contingencia (log-lineal).** Modelamos los **recuentos de celda** de `zona × daños`:
+comparamos independencia frente a asociación.
+
+```{r}
+#| label: u21-fit-loglineal
+tabla <- cartera |>
+  dplyr::mutate(danos = ifelse(n_danos > 0, "con", "sin")) |>
+  dplyr::count(zona_circulacion, danos)                 # una fila por celda: n = frecuencia
+
+m_indep <- glm(n ~ zona_circulacion + danos, family = poisson, data = tabla)  # independencia
+m_sat   <- glm(n ~ zona_circulacion * danos, family = poisson, data = tabla)  # con asociación
+
+# el saturado reproduce la tabla; el de independencia, no
+cbind(tabla, indep = round(fitted(m_indep), 1), sat = round(fitted(m_sat), 1))
+```
+
+El término `zona_circulacion:danos` es la **asociación**; que sea o no real se contrasta en la
+[Sección 1.4](#sec-u21-inferencia).
+
+**4) Tabla cuadrada (cambio).** Sobre el cruce `bonus_malus_prev × bonus_malus_act`, el **modelo de
+simetría** obliga a que las celdas $(i,j)$ y $(j,i)$ tengan la misma frecuencia esperada:
+
+```{r}
+#| label: u21-fit-simetria
+cuad <- as.data.frame(table(prev = cartera$bonus_malus_prev, act = cartera$bonus_malus_act)) |>
+  dplyr::mutate(i = as.integer(prev), j = as.integer(act),
+                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))   # empareja (i,j) y (j,i)
+
+m_sim <- glm(Freq ~ par, family = poisson, data = cuad)                   # modelo de simetría
+head(broom::tidy(m_sim), 5)
+```
+
+Comparando este modelo con el ajuste perfecto se contrasta si el cambio de bonus-malus es simétrico.
+Es el más sencillo de los **modelos de cambio** (avanzados); la **homogeneidad marginal** y la
+**cuasi-simetría** son extensiones.
+
+## 1.3 Interpretación {#sec-u21-interpretacion}
+
+### En regresión: razones de tasas (IRR)
+
+El enlace log hace que los efectos sean **multiplicativos**: como $\mu=\exp(\beta_0+\mathbf{x}'\boldsymbol\beta)$,
+aumentar $x_k$ en una unidad multiplica la media (o la tasa, con *offset*) por $e^{\beta_k}$. Ese
+factor es la **razón de tasas** (*incidence rate ratio*, IRR): $>1$ eleva la tasa, $<1$ la reduce,
+$=1$ es indiferente. Basta **exponenciar** los coeficientes:
+
+```{r}
+#| label: u21-irr
+broom::tidy(m_tasa, exponentiate = TRUE, conf.int = TRUE)
+```
+
+Se leen en el lenguaje del problema: la **potencia** eleva la tasa de asistencias (IRR > 1 por cada CV
+adicional), y las zonas menos urbanas la reducen frente a la urbana (IRR < 1); cada factor multiplica
+la tasa por su IRR, con el intervalo de confianza como margen. Y una **predicción** cierra la lectura
+—la tasa esperada (asistencias en un año, `exposicion = 1`) de un perfil concreto—:
+
+```{r}
+#| label: u21-pred
+perfil <- data.frame(edad_conductor = 45, potencia_cv = 110, zona_circulacion = "urbana",
+                     uso = "particular", tipo_vehiculo = "turismo", exposicion = 1)
+predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en un año
+```
+
+### Efecto relativo vs absoluto
+
+El IRR es un efecto **relativo** (multiplicativo) y es **constante**. El efecto **absoluto** —cuántas
+asistencias más— depende de la tasa base: el mismo IRR pesa más sobre una póliza de alto riesgo que
+sobre una de bajo. Se ve comparando dos perfiles:
+
+```{r}
+#| label: u21-abs
+perfiles <- data.frame(edad_conductor = 45, potencia_cv = 110,
+                       zona_circulacion = c("urbana", "rural"), uso = "particular",
+                       tipo_vehiculo = "turismo", exposicion = 1)
+predict(m_tasa, perfiles, type = "response")   # esperadas: urbana vs rural
+```
+
+### En el log-lineal: la asociación
+
+En una tabla, la **interacción** del modelo saturado es la **asociación**, y se lee como un **odds
+ratio**. El puente con el Caso 1: esos odds ratios son exactamente los de la **logística** del
+indicador de daños sobre la zona —log-lineal y logística son dos caras del mismo modelo—:
+
+```{r}
+#| label: u21-loglin-or
+m_logit <- glm(I(n_danos > 0) ~ zona_circulacion, family = binomial, data = cartera)
+exp(coef(m_logit))   # odds ratios de 'con daños' respecto a la zona de referencia
+```
+
+Como la referencia es la zona **urbana**, los odds de tener algún parte de daños salen **menores** en
+las zonas mixta y rural (OR < 1 respecto a la urbana): es la misma asociación que capta la interacción
+`zona_circulacion:danos` del log-lineal `m_sat`.
+
+### En la tabla cuadrada: qué dice la simetría
+
+En el modelo de simetría (`m_sim`), interpretar coeficientes celda a celda aporta poco; lo que importa
+es **si el modelo ajusta**: si lo hace, subir y bajar de nivel se equilibran (cambio simétrico); si
+no, hay **deriva** —el sentido y el tamaño de esa deriva se leen en los marginales de la
+[Sección 1.1](#sec-u21-contexto)—. El contraste formal lo vemos a continuación.
+
+## 1.4 Inferencia y selección {#sec-u21-inferencia}
+
+La maquinaria inferencial es la del Caso 1: **Wald** para un vistazo rápido, **razón de
+verosimilitudes** (LRT) para contrastar términos, e **información** (AIC/BIC) para comparar modelos.
+Solo cambia la lectura, que ahora es de tasas y asociaciones.
+
+### Contraste de los efectos
+
+La tabla de `summary`/`tidy` trae, por coeficiente, el estadístico y $p$ de **Wald**. Es cómodo, pero
+para conteos el LRT es más fiable; `drop1` reajusta el modelo quitando cada término y lo contrasta:
+
+```{r}
+#| label: u21-drop1
+drop1(m_tasa, test = "LRT")   # aporte de cada predictor por razón de verosimilitudes
+```
+
+Cada fila mide cuánta **deviance** se pierde al retirar ese predictor: un $p$ pequeño indica que aporta
+señal sobre la tasa y conviene conservarlo.
+
+### El contraste de independencia es un LRT
+
+En la tabla `zona × daños`, comparar el modelo de **independencia** con el **saturado** es,
+exactamente, el contraste de asociación (la versión LR del $\chi^2$ de Pearson):
+
+```{r}
+#| label: u21-indep
+anova(m_indep, m_sat, test = "LRT")   # H0: zona y daños son independientes
+```
+
+Si el $p$ es pequeño se **rechaza la independencia**: zona y daños están asociados —la misma conclusión
+que el odds ratio de la [Sección 1.3](#sec-u21-interpretacion), ahora como contraste—.
+
+### El contraste de simetría
+
+Para la tabla cuadrada, la **deviance residual** del modelo de simetría (frente al ajuste perfecto del
+saturado) es el estadístico de simetría; se compara con una $\chi^2$:
+
+```{r}
+#| label: u21-simetria-test
+c(deviance = deviance(m_sim), gl = df.residual(m_sim),
+  p_valor  = pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE))
+```
+
+Un $p$ pequeño rechaza la simetría: el trasiego de bonus-malus **no** está equilibrado, hay deriva.
+
+### Selección de modelos
+
+Para elegir entre especificaciones se usan **AIC/BIC** (menor es mejor; BIC penaliza más la
+complejidad) y, si son anidadas, el LRT. Por ejemplo, ¿aporta `tipo_vehiculo`?
+
+```{r}
+#| label: u21-seleccion
+m_red <- update(m_tasa, . ~ . - tipo_vehiculo)
+AIC(m_tasa, m_red)
+anova(m_red, m_tasa, test = "LRT")
+```
+
+Comparar así, término a término, se vuelve inviable con **muchos** predictores (y la cartera tiene
+predictores de ruido a propósito). La selección automática por **validación cruzada** y la
+**regularización** (lasso/ridge para Poisson con `glmnet`) se desarrollan en la
+[Unidad 2.6](#sec-u26); aquí basta con la comparación guiada por hipótesis.
+
+## 1.5 Bondad de ajuste, diagnóstico y predicción {#sec-u21-diagnostico}
+
+Ajustado el modelo, falta lo esencial: ¿describe bien los datos? La Poisson impone una restricción
+fuerte —**media = varianza**—, y comprobar si se cumple es, a la vez, el diagnóstico de esta unidad y
+el disparador de la siguiente.
+
+### Bondad de ajuste y el índice de dispersión
+
+¿Cómo se comprueba la **bondad de ajuste** de un modelo de conteo? El contraste clásico enfrenta la
+**deviance** residual (o el $\chi^2$ de Pearson) a una $\chi^2_{n-p}$: si el modelo ajusta, ronda sus
+grados de libertad. Pero arrastra una **restricción** de peso —solo es válido con **frecuencias
+esperadas altas** (medias grandes o datos agrupados)—, y con conteos individuales y muchos ceros, que es
+lo habitual, la aproximación $\chi^2$ **falla**. Por eso, en la práctica, la bondad de ajuste se apoya en
+piezas más robustas: el **índice de dispersión**, el **rootograma** y los **residuos simulados**
+(`DHARMa`), más el **AIC** para comparar modelos. El compendio completo, con sus restricciones, lo
+reunimos en la [Unidad 2.2](#sec-u22).
+
+Empezamos por el **índice de dispersión**: la deviance y el $\chi^2$ de Pearson divididos por sus grados
+de libertad deberían rondar **1** si la Poisson ajusta.
+
+```{r}
+#| label: u21-dispersion
+disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
+c(deviance_gl = deviance(m_tasa) / df.residual(m_tasa),
+  indice_dispersion = disp(m_tasa))
+```
+
+En `n_asistencia` el índice queda **cerca de 1**: la Poisson basta.
+
+### Diagnóstico de residuos
+
+Los residuos de Pearson o deviance frente a los valores ajustados no deberían mostrar patrón ni un
+abanico creciente. Con conteos, los residuos crudos son difíciles de leer, y la herramienta recomendada
+son los **residuos simulados** de `DHARMa` (o `performance::check_overdispersion`), que corrigen la
+discreción:
+
+```{r}
+#| label: u21-dharma
+#| eval: false
+library(DHARMa)
+simulateResiduals(m_tasa, plot = TRUE)      # residuos escalados; QQ y dispersión
+performance::check_overdispersion(m_tasa)   # test formal del índice de dispersión
+```
+
+### El puente a la sobredispersión (Unidad 2.2)
+
+El índice de dispersión es también el **detector** de sobredispersión. Ajustando la misma Poisson a
+`n_danos` —los partes por daños— se ve el contraste:
+
+```{r}
+#| label: u21-sobredispersion
+m_danos <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                 offset(log(exposicion)), family = poisson, data = cartera)
+c(asistencia = disp(m_tasa), danos = disp(m_danos))
+```
+
+En `n_danos` el índice se dispara muy por encima de 1: la Poisson **subestima la variabilidad** y sus
+errores estándar quedan demasiado optimistas. Ese es exactamente el problema que aborda la
+[Unidad 2.2](#sec-u22) con quasi-Poisson y binomial negativa.
+
+### Predicción
+
+Predecir es leer el modelo en la escala de los datos. Para un conteo o una tasa, `predict(type =
+"response")` da la media esperada (lo vimos en la [Sección 1.3](#sec-u21-interpretacion)). En el
+log-lineal, los valores ajustados son las **frecuencias esperadas de celda**; contrastarlas con las
+observadas muestra dónde está la asociación:
+
+```{r}
+#| label: u21-pred-celda
+transform(tabla, esperado_indep = round(fitted(m_indep), 1))   # observado (n) vs esperado si independientes
+```
+
+Las celdas donde el observado se aparta del esperado bajo independencia son, precisamente, las que
+delatan la asociación entre zona y daños.
+
+::: {.callout-important}
+## Tarea del estudiante (2.1) — arranca la Pregunta 1 del caso
+Sobre la cartera de tu equipo, aborda la **Pregunta 1** de la dirección ([Unidad 2.7](#sec-u27)): *¿a
+qué ritmo se producen los siniestros y qué perfiles lo elevan?* Modela la **tasa** con Poisson y
+`offset(log(exposicion))`, lee los factores en **IRR** (con sus intervalos), y **predice** el ritmo
+esperado de una póliza nueva. Cierra comprobando si la Poisson basta —**índice de dispersión**—: si se
+dispara, deja anotado el problema; lo resolverás en la Unidad 2.2. Valida tus estimaciones contra la
+verdad del DGP (`attr(cartera, "verdad")`).
+:::
