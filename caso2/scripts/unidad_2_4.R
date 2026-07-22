@@ -43,7 +43,7 @@ cartera |>
   geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
   stat_summary(fun = mean, geom = "crossbar", width = 0.6, colour = "grey25") +
   geom_jitter(width = 0.15, height = 0, size = 2, alpha = 0.8) +
-  labs(x = "región", y = "tasa de gestiones (por año)") +
+  labs(x = "región", y = "tasa de gestiones (por unidad de exposición)") +
   theme(legend.position = "none")
 
 # -----------------------------------------------------------------------------
@@ -108,7 +108,7 @@ ggplot(re_df, aes(b, agencia)) +
 # -----------------------------------------------------------------------------
 nd <- cartera |>
   dplyr::slice(1) |>
-  dplyr::mutate(exposicion = 1)                       # tasa anual, misma póliza tipo
+  dplyr::mutate(exposicion = 1)                       # ventana de exposición completa, misma póliza tipo
 
 c(
   condicional = predict(m_glmm, nd, type = "response", re.form = NULL),  # su agencia
@@ -182,3 +182,10 @@ m_nb2 <- glm.nb(
 performance::compare_performance(
   Poisson = m_pois_danos, NB2 = m_nb2, OLRE = m_olre, metrics = c("AIC", "BIC", "RMSE")
 )
+
+# -----------------------------------------------------------------------------
+# [u24-olre-rmse]  ·  4.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > Comparación con la binomial negativa
+# -----------------------------------------------------------------------------
+pred_marg <- predict(m_olre, type = "response", re.form = NA)     # población, sin el BLUP
+rmse_olre_marginal <- sqrt(mean((cartera$n_danos - pred_marg)^2))
+rmse_olre_marginal

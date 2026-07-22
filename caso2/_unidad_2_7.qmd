@@ -1,91 +1,190 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML.
-     Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía. -->
+<!-- Partial · Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML.
+     Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía.
+     Estudio de caso del Caso 2 sobre la CARTERA DE AUTO (dgp_auto.R). La misma cartera se
+     reutiliza en el Caso 3 (coste y duración) → síntesis "tres lentes". -->
 
 # 7 · Estudio de caso, exposición y evaluación {#sec-u27}
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Cierre del Caso 2: estudio de caso de conteos/tasas y exposiciones con Q&A individual. No hay teoría
-nueva; se integra y se evalúa todo lo anterior. Objetivo general: **comunicar y reproducir** (estudio
-de caso reproducible), de forma acumulativa sobre los de conteos, mixtos y supervivencia.
+Cierre del Caso 2: estudio de caso de **conteos, tasas e intensidad del riesgo** sobre una cartera de
+auto, con exposición y Q&A individual. No hay teoría nueva; se integra y evalúa todo lo anterior.
+Objetivo general: **comunicar y reproducir** (estudio de caso reproducible), de forma acumulativa sobre
+los hilos de conteos, mixtos y supervivencia. La **misma cartera** volverá en el Caso 3 (coste de los
+siniestros y duración de la póliza): lo que aquí modelas como *frecuencia* será una de las **tres
+lentes** del cliente.
 :::
 
 ## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
 
 ### El encargo
 
-Te contrata la dirección médica de **una aseguradora de salud**, que sigue a una cohorte de
-asegurados a través de sus **centros** de atención. No son estadísticos: te traen sus datos y sus
-preguntas, y esperan **respuestas y recomendaciones** para planificar recursos, no una clase de
-modelos. Como en el Caso 1, tú **eliges y justificas** el modelo en cada caso.
+Te contrata la **dirección técnica** de una **aseguradora de automóvil**, que gestiona su cartera a
+través de una red de **agencias**. No son estadísticos: te traen sus datos y sus preguntas, y esperan
+**respuestas y recomendaciones** para tarificar y planificar, no una clase de modelos. Como en el
+Caso 1, tú **eliges y justificas** el modelo en cada caso.
 
 > **Lo que la dirección quiere saber**
 >
-> 1. ¿A qué **ritmo** usan nuestros asegurados la atención primaria, y qué perfiles disparan ese uso?
->    ¿Podríamos estimar el ritmo esperado de un asegurado nuevo?
-> 2. ¿Tiene que ver el **tipo de asegurado** (ámbito, régimen, grupo de riesgo) con que acabe usando
->    más o menos los servicios, o son cosas independientes entre sí?
-> 3. Reevaluamos el **nivel de riesgo** de cada asegurado cada año. ¿Cómo se mueven de un nivel a otro
->    de un año al siguiente? ¿Es un vaivén equilibrado o hay una **deriva** (empeoran más de los que
->    mejoran)?
-> 4. Unos pocos asegurados concentran **muchísimas urgencias** y la mayoría casi ninguna. ¿Vuestro
->    modelo refleja bien esa enorme variabilidad, o se queda corto?
-> 5. La mayoría **nunca tiene un ingreso grave**. ¿Hay asegurados que, sencillamente, no ingresarán,
->    frente a otros que aún no lo han hecho? ¿Cómo los distinguimos?
-> 6. ¿El uso de recursos depende del **centro** al que está adscrito el asegurado, o es todo cosa del
->    propio paciente? ¿Hay centros que se desvían? Si abrimos un centro nuevo, ¿qué deberíamos esperar?
-> 7. ¿Cómo **evoluciona en el tiempo** el riesgo de un primer ingreso grave a lo largo del
->    seguimiento? ¿Cada cuánto conviene revisar a los asegurados de más riesgo?
-> 8. Manejamos **muchísimas variables** de cada asegurado y no sabemos cuáles importan de verdad.
->    ¿Nos das un modelo **sencillo y fiable** para anticipar el uso de recursos, diciéndonos qué
->    variables merece la pena conservar?
+> *Sobre el ritmo de siniestros y qué lo explica*
+>
+> 1. ¿A qué **ritmo** tienen siniestros nuestras pólizas, y qué factores lo suben o lo bajan —y **cuánto**?
+> 2. ¿Podríais estimar el ritmo esperado, **con su margen**, de una **póliza nueva** de un perfil concreto?
+> 3. Las **asistencias en carretera**, ¿siguen el mismo patrón de riesgo que los siniestros, o responden a
+>    otras cosas?
+> 4. ¿Están **asociados** el tipo de vehículo, la zona y el uso con tener o no algún siniestro, o son
+>    **independientes** entre sí?
+> 5. Reevaluamos el **bonus-malus** cada año: ¿cómo se mueven las pólizas de un nivel a otro? ¿Es un vaivén
+>    equilibrado o hay **deriva** (empeoran más de las que mejoran)?
+>
+> *Sobre la enorme variabilidad y los ceros*
+>
+> 6. Unas pocas pólizas concentran **muchísimos partes** y la mayoría casi ninguno. ¿Vuestro modelo refleja
+>    esa variabilidad o se queda corto? ¿Qué implica para la **tarifa** y para lo fiables que son vuestros
+>    números?
+> 7. ¿A qué se debe esa variabilidad de más: hay pólizas **intrínsecamente más siniestrosas** que las
+>    variables no capturan?
+> 8. La mayoría de reclamaciones **nunca pasa por revisión antifraude**. ¿Hay pólizas que por su naturaleza
+>    **no la levantan**, frente a otras que aún no lo han hecho? ¿Cómo las distinguimos?
+>
+> *Sobre las agencias y el territorio*
+>
+> 9. ¿El volumen de **gestiones** depende de la **agencia** que lleva la póliza, o es cosa de la propia
+>    póliza? ¿**Cuánta** variación es atribuible a la agencia?
+> 10. ¿Hay un efecto de **región** por encima de las agencias?
+> 11. ¿Qué agencias se **desvían** —mejor o peor de lo que cabría esperar por su cartera—?
+> 12. Si abrimos una **agencia nueva**, ¿qué deberíamos esperar?
+>
+> *Sobre cómo evoluciona el riesgo en el tiempo*
+>
+> 13. ¿Cómo cambia el riesgo del **primer siniestro** a lo largo de la antigüedad de la póliza? ¿Sube, baja,
+>     se mantiene?
+> 14. Con el **historial completo** de partes, ¿el riesgo de los **siguientes** siniestros se comporta como
+>     el del primero, o distinto?
+> 15. ¿Cada cuánto conviene **revisar** a las pólizas de más riesgo?
+>
+> *Sobre un modelo sencillo, fiable y responsable*
+>
+> 16. Manejamos **muchísimas variables**: ¿cuáles merece la pena **conservar** para anticipar la
+>     siniestralidad, sin perder fiabilidad?
+> 17. Tenemos el **sexo** del conductor y sabemos que predice, pero la ley **prohíbe** tarificar con él:
+>     ¿cómo hacéis una selección que lo **respete** y no lo cuele por la puerta de atrás (proxies)?
 
-<!-- Mapa docente (no revelar al alumno): Q1 Poisson + offset + IRR + predicción (2.1) ·
-     Q2 tablas de contingencia / log-lineal (asociación vs independencia) (2.1) ·
-     Q3 tabla cuadrada de cambio: simetría / homogeneidad marginal / movilidad (2.1) ·
-     Q4 sobredispersión: quasi-Poisson / binomial negativa (2.2) · Q5 exceso de ceros: hurdle / ZI (2.3) ·
-     Q6 GLMM de Poisson, ICC, predicción marginal (2.4) · Q7 riesgos a trozos ≡ Poisson (2.5) ·
-     Q8 selección + validación cruzada + regularización (2.6). -->
-
+<!-- Mapa docente (no revelar al alumno). Cada pregunta -> unidad + técnica:
+     Q1 Poisson + offset + IRR (2.1) · Q2 predicción con intervalo para un perfil nuevo (2.1) ·
+     Q3 comparar dos respuestas de tasa (n_siniestros vs n_asistencia): estructuras de riesgo distintas (2.1) ·
+     Q4 tablas de contingencia / log-lineal: asociación vs independencia (2.1) ·
+     Q5 tabla cuadrada: simetría / homogeneidad marginal / movilidad / deriva (2.1) ·
+     Q6 sobredispersión: quasi-Poisson vs binomial negativa; efecto en errores estándar e inferencia (2.2) ·
+     Q7 heterogeneidad no observada: OLRE / fragilidad — puente 2.2<->2.4<->2.5 ·
+     Q8 exceso de ceros: hurdle vs zero-inflated; las dos partes (2.3) ·
+     Q9 GLMM de Poisson; ICC; % de varianza de agencia (2.4) ·
+     Q10 anidamiento región > agencia (efectos aleatorios cruzados/anidados) (2.4) ·
+     Q11 BLUPs / caterpillar; shrinkage; agencias atípicas (2.4) ·
+     Q12 predicción condicional vs marginal; agencia nueva (2.4) ·
+     Q13 riesgos a trozos ≡ Poisson; hazard base por tramo; comparación Cox/KM (2.5) ·
+     Q14 eventos recurrentes (Andersen-Gill) sobre el PANEL, con offset variable (2.5, callout avanzado) ·
+     Q15 recomendación operativa a partir del hazard (2.5) ·
+     Q16 selección: AIC/BIC vs validación cruzada vs regularización/lasso (2.6) ·
+     Q17 fairness: factor PROHIBIDO (sexo, Test-Achats) y proxies en la selección (2.6).
+     El coste (Gamma/IG) y la baja (AFT/Cox) NO entran aquí: son el estudio de caso del Caso 3. -->
 
 ### Los datos que te proporcionamos
 
 Como los datos son **simulados** (con proceso generador conocido), podrás validar tus estimaciones
-contra la verdad. Cada fila es un **asegurado**, seguido durante `anios_seguimiento` (la
-**exposición**: el número de eventos se lee por unidad de tiempo, con `offset = log(anios_seguimiento)`).
+contra la verdad. Cada fila es una **póliza**, observada durante su `antiguedad` en la cartera. La
+**exposición** entra como *offset* (`offset = log(exposicion)`): los partes se leen **por unidad de
+tiempo expuesto**, no en bruto.
 
 | Papel | Variables |
 |---|---|
-| Estructura | `id_paciente`; `centro` (centro de salud al que está **adscrito** el asegurado — variable de agrupación); `anios_seguimiento` (tiempo seguido, en años → *offset*) |
-| Respuestas (conteos) | `n_visitas_ap` (visitas a atención primaria), `n_urgencias`, `n_ingresos_graves` (ingresos hospitalarios graves), `n_pruebas` (pruebas diagnósticas solicitadas) |
-| Predictores clínicos/demográficos | `edad`; `anios_desde_dx` (años desde el **diagnóstico** de su condición crónica principal); `indice_comorbilidad` (nº de **condiciones crónicas** concurrentes); `imc`; `ambito` (urbano/mixto/rural); `regimen` (privado/público); `grupo_riesgo` (bajo/medio/alto) |
-| Variables adicionales (para explorar / selección) | `sexo`, `estado_civil`, `nivel_estudios`, `habito_tabaco`, `seguro_privado`, `medio_contacto` (canal habitual con el sistema: presencial/telefónico/telemático), `n_farmacos_cronicos`, `gasto_farmacia_anual`, `n_convivientes`, `anios_afiliado` |
-| Cambio (dos momentos) | `nivel_riesgo_prev` y `nivel_riesgo_act`: **estratificación de riesgo** del asegurado (1 = bajo … 5 = alto) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
-| Tiempo-a-evento | `tiempo_primer_ingreso` (tramo del seguimiento en que se observa el **primer ingreso grave**; o el último tramo seguido si no hubo → censura), `evento` (1 = ingreso observado, 0 = censura) |
+| Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (tiempo expuesto como fracción del cliente más veterano → *offset*); `antiguedad` (años en la cartera) |
+| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia) |
+| Predictores de riesgo | `edad_conductor`; `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
+| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Úsalo para **discutir** *fairness* y variables *proxy*, no para el modelo final |
+| Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
+| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
+| Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
 
 Hay **más variables de las que necesitarás**: algunas son ruido, a propósito, para que ejercites la
 selección y decidas qué entra en el modelo.
 
+::: {.callout-note}
+## La misma cartera, tres lentes
+Esta cartera lleva además el **coste** de cada siniestro y el **tiempo hasta la baja** de la póliza
+(`coste_total`, `coste_medio`, la tabla de siniestros con `attr(cartera, "siniestros")`, y `t_baja`,
+`baja`). No los necesitas para el Caso 2 —aquí modelas **frecuencia**—, pero son las otras dos lentes
+(¿**cuánto** cuesta? ¿**cuánto** dura?) que retomaremos en el **Caso 3**.
+:::
+
 ### Tu trabajo
 
-<!-- TODO: mismo ciclo que 1.6 (identificar objetivo → proponer y justificar → resolver → interpretar
-     → recomendar); informe técnico; predicción; control de calidad contra el DGP; reproducibilidad. -->
+Entregas un **informe de consultoría reproducible**. Para **cada** pregunta sigues el mismo ciclo que en
+el Caso 1: **identifica el objetivo** (qué te preguntan de verdad), **propón y justifica** el análisis
+(qué modelo y por qué, frente a alternativas), **resuélvelo**, **interprétalo en la escala correcta**
+(IRR, efectos marginales, probabilidades) y **recomienda** en términos que la dirección entienda. Cuando
+proceda, **predice** (p. ej. el ritmo de una póliza nueva) con su incertidumbre.
 
-Entregas un **informe de consultoría reproducible**: para cada pregunta, identifica el objetivo,
-propón y justifica el análisis, resuélvelo, interprétalo y recomienda. Con **control de calidad**
-contra la verdad del DGP (`attr(cohorte, "verdad")`) —ajusta a ciegas, valida al final—.
+Trabajas con **control de calidad** contra la verdad del DGP (`attr(cartera, "verdad")`): ajusta **a
+ciegas** y valida **al final**, comprobando si recuperas los efectos y parámetros conocidos. Y cuidas la
+**reproducibilidad**: cuaderno Quarto con semilla fija, código y datos documentados y reejecutables.
+
+::: {.callout-important}
+## El factor prohibido
+`sexo` tiene señal real, pero la ley (primas unisex) **prohíbe** usarlo para tarificar. Tu informe debe
+(i) **no** incluirlo en el modelo de tarificación, (ii) comentar el riesgo de **proxies** —variables
+permitidas que lo correlacionan (p. ej. tipo de vehículo o potencia)— y (iii) razonar cómo harías una
+selección **responsable**. Es parte de la nota (reflexión individual).
+:::
 
 ::: {.callout-tip}
-## Cada equipo, una base de datos distinta
-Cada equipo trabaja **su propia cohorte** de salud, generada con una configuración diferente —pero
-coherente— del DGP (`scripts/generar_datos_equipos_conteos.R`, en `datos_equipos_salud/equipo_XX/`).
-El enunciado es común; las conclusiones numéricas cambian de un equipo a otro.
+## Cada equipo, una cartera distinta
+Cada equipo trabaja **su propia cartera**, generada con una configuración diferente —pero coherente— del
+DGP (`R/generar_datos_equipos_auto.R`, en `datos_equipos_auto/equipo_XX/`). El enunciado es común;
+las conclusiones numéricas cambian de un equipo a otro. La cartera de teoría se carga con
+`cargar_cartera_auto()`; la de tu equipo, desde su carpeta.
 :::
 
 ## 7.2 Checklist de tareas {#sec-u27-checklist}
 
-<!-- TODO: adaptar el checklist de 1.6 a conteos/tasas (offset, IRR, sobredispersión, ceros, mixtos,
-     riesgos a trozos, selección/regularización, validación contra el DGP). -->
+Un guion de mínimos (no exhaustivo; el orden es orientativo). No hace falta agotar cada apartado: prioriza
+según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
+
+- **Exploración y exposición.** Descriptivo de las cuatro respuestas (media, % de ceros, máximo, var/media)
+  y de la exposición. Justifica el *offset* `log(exposicion)`: modelas **tasas**, no recuentos brutos.
+
+- **Ritmo y perfiles (Q1–Q5 · 2.1).** Poisson con *offset* e interpretación en **IRR** (Q1); **predicción**
+  del ritmo de una póliza nueva **con intervalo** (Q2); compara la estructura de riesgo de `n_siniestros`
+  frente a `n_asistencia` —¿mismos factores, misma fuerza?— (Q3); **tabla de contingencia** y modelo
+  **log-lineal** para asociación vs independencia entre `tipo_vehiculo`, `zona_circulacion` y `uso` (Q4);
+  **tabla cuadrada** `bonus_malus_prev` → `bonus_malus_act` con contrastes de **simetría** y **homogeneidad
+  marginal** y medida de la **deriva** (Q5).
+
+- **Variabilidad y ceros (Q6–Q8 · 2.2–2.3).** Diagnostica la **sobredispersión** (var/media, dispersión) y
+  compara **quasi-Poisson** vs **binomial negativa**, explicando el efecto en errores estándar e inferencia
+  —y en la tarifa— (Q6); razona el origen como **heterogeneidad no observada** (OLRE / fragilidad), enlazando
+  con los mixtos y la supervivencia (Q7); sobre `n_fraude`, distingue **ceros estructurales** de muestrales y
+  compara **hurdle** vs **zero-inflated**, interpretando las **dos partes** (Q8).
+
+- **Agencias y territorio (Q9–Q12 · 2.4).** GLMM de Poisson `(1 | id_agencia)` con **región** por encima
+  (anidamiento); estima el **ICC** / porcentaje de varianza de agencia (Q9–Q10); identifica agencias
+  **atípicas** con BLUPs / *caterpillar* y comenta el **shrinkage** (Q11); distingue predicción
+  **condicional** vs **marginal** y responde qué esperar de una **agencia nueva** (Q12).
+
+- **El riesgo en el tiempo (Q13–Q15 · 2.5).** Riesgos a trozos ≡ Poisson sobre el **persona-periodo**;
+  describe el **hazard base** por tramo de antigüedad y compáralo con **Kaplan–Meier / Cox** (Q13); con el
+  **panel** y el **historial**, plantea los **eventos recurrentes** (Andersen–Gill) con *offset* variable y
+  discute si el riesgo del 2.º, 3.º… siniestro difiere del primero (Q14, avanzado); traduce el hazard en una
+  **recomendación** de cada cuánto revisar (Q15).
+
+- **Modelo fiable y responsable (Q16–Q17 · 2.6).** Compara **AIC/BIC**, **validación cruzada** y
+  **regularización** (lasso); entrega un modelo **corto y fiable** y justifica qué variables conservas (Q16).
+  **Fairness:** excluye `sexo` del modelo de tarificación, detecta posibles **proxies** y razona una selección
+  **responsable** (Q17).
+
+- **Control de calidad y reproducibilidad.** Valida contra `attr(cartera, "verdad")` (ajuste a ciegas,
+  validación al final); cuaderno Quarto con **semilla fija**, reejecutable; interpretación en la **escala
+  correcta** en todo el informe.
 
 ## 7.3 Rúbricas {#sec-u27-rubricas}
 

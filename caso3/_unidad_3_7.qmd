@@ -1,28 +1,59 @@
 <!-- Partial · DRAFT. Incluir con {{< include _unidad_3_7.qmd >}}. Sin YAML.
-     Espejo de las unidades de estudio de caso (1.6 / 2.7): encargo de consultoría + datos + checklist.
-     Rúbricas en la guía docente. -->
+     Espejo de las unidades de estudio de caso (1.6 / 2.7): encargo + datos + checklist.
+     Rúbricas en la guía docente. Tipología de informe del Caso 3: ARTÍCULO DE INVESTIGACIÓN. -->
 
 # 7 · Estudio de caso, exposición y evaluación {#sec-u37}
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Cierre del Caso 3: estudio de caso sobre **importes/costes** (continuas positivas) con Q&A individual.
-No hay teoría nueva; se integra y se evalúa todo lo anterior. Objetivo general: **comunicar y
-reproducir**.
+Cierre del Caso 3: estudio de caso sobre **magnitudes positivas y vida útil** en mantenimiento
+industrial, con exposición y Q&A individual. No hay teoría nueva; se integra y se evalúa todo lo
+anterior. Objetivo general: **comunicar y reproducir**.
 :::
 
 ## 7.1 El estudio de caso (entregable) {#sec-u37-caso}
 
-<!-- TODO: encargo de consultoría (aseguradora de salud: coste/estancia); preguntas realistas que
-     dirijan el informe (mapear a 3.1 Gamma, 3.2 alternativas/dispersión, 3.3 Tweedie/prima pura,
-     3.4 mixtos, 3.5 AFT, 3.6 selección); datos del equipo; control de calidad contra el DGP. -->
+<!-- TODO: encargo realista (dirección de mantenimiento de la empresa: ¿compensa extender el plan
+     preventivo? ¿a qué máquinas?). Preguntas que dirijan el informe y mapeen a las unidades:
+       - coste de intervención y sus factores  -> 3.1 (Gamma) y 3.2 (familia y escala)
+       - trayectorias de degradación por máquina -> 3.3 (GLMM Gamma)
+       - vida útil hasta el fallo y censura    -> 3.4 (KM + AFT)
+       - efecto del mantenimiento en el riesgo -> 3.5 (Cox y su proporcionalidad)
+       - qué lente responde a la pregunta      -> 3.6 (síntesis)
+     Datos del equipo (variante del DGP con semilla propia); control de calidad contra la verdad. -->
 
-## 7.2 Checklist de tareas {#sec-u37-checklist}
+<!-- DATOS REALES (pendiente de preparar). Se contempla usar **Backblaze Drive Stats** como
+     contrapunto real al banco simulado, replicando lo que el Caso 1 hace con GLOW.
+       - Qué es: fiabilidad de discos duros en centros de datos, publicado por trimestres desde 2013.
+         Tiempo-a-fallo real con censura (discos retirados antes de fallar), covariables S.M.A.R.T.
+         dependientes del tiempo y agrupación por modelo/fabricante (análoga a nuestras plantas).
+       - Fuente: https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data
+       - LICENCIA (verificada): uso libre CITANDO A BACKBLAZE como fuente; el usuario es responsable
+         del uso; se pueden vender obras derivadas; NO se puede vender el dato en sí (es gratuito).
+       - A resolver antes de adoptarlo:
+           (a) TAMAÑO: ~1 GB comprimido y ~12 GB en disco por trimestre (un CSV por día, una fila por
+               disco y día). Hay que preprocesar a tabla disco-nivel y distribuir el extracto.
+           (b) CENSURA EXTREMA: AFR ~1,4% => más del 98% censurados, frente al ~40% del banco
+               simulado. Es didáctico (otro régimen de censura), pero cambia la potencia.
+       - NO añadir aún la entrada a references.bib: los .qmd usan `nocite: @*` y aparecería en la
+         bibliografía de los tres casos. Añadirla al desarrollar esta unidad.
+     Ver PROPUESTA_CASO3.md, sección «Datos reales para el estudio de caso». -->
 
-<!-- TODO: adaptar el checklist a importes (Gamma/log, dispersión, Tweedie, mixtos, AFT, selección,
-     validación contra el DGP). -->
+## 7.2 Formato del informe: artículo de investigación {#sec-u37-formato}
 
-## 7.3 Rúbricas {#sec-u37-rubricas}
+<!-- TODO: la guía fija para el Caso 3 el formato de ARTÍCULO DE INVESTIGACIÓN (distinto del informe
+     técnico del Caso 1 y del ejecutivo del Caso 2): resumen, introducción, datos y métodos,
+     resultados, discusión, limitaciones y referencias. Recordar el apartado obligatorio de reflexión
+     sobre el uso ético de la IA (sin él, el informe no puede alcanzar «excelente»). -->
+
+## 7.3 Checklist de tareas {#sec-u37-checklist}
+
+<!-- TODO: adaptar el checklist al caso: elección y justificación de familia y enlace; interpretación
+     multiplicativa; estructura aleatoria justificada; tratamiento explícito de la censura;
+     diagnóstico de la proporcionalidad; comparación de las tres lentes; validación contra el DGP;
+     reproducibilidad (Quarto + renv + Git). -->
+
+## 7.4 Rúbricas {#sec-u37-rubricas}
 
 Las rúbricas están en la **guía docente** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se reproducen
 aquí.

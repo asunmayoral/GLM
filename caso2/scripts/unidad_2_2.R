@@ -47,7 +47,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por año)")
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
 # [fig-u22-media-varianza]  ·  2.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
@@ -77,8 +77,8 @@ ggplot() +
   geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
   scale_colour_manual(values = c(
     "Poisson: Var = media"             = "grey55",
-    "Lineal: phi·media"    = "darkorange",
-    "Cuadratica: media+a·media²" = "steelblue")) +
+    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
+    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
   labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
 
 # -----------------------------------------------------------------------------

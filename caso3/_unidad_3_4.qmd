@@ -1,38 +1,258 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u34-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u34-.
+     Unidad de MODELO ÚNICO (recorrido completo): del importe al tiempo -> AFT.
+     Reactiva el hilo de SUPERVIVENCIA (espiral). Novedad conceptual: la CENSURA en la verosimilitud.
+     Datos: banco$modelo_supervivencia (tiempos CONTINUOS, censura administrativa ~40%). -->
 
-# 4 · Continuas positivas agrupadas: GLMM Gamma {#sec-u34}
+# 4 · Del importe al tiempo: modelos de vida acelerada (AFT) {#sec-u34}
 
-<!-- TODO intro: espiral de mixtos, ahora sobre la Gamma. Los importes se agrupan (agencia/region,
-     como en el Caso 2); recorrido completo de 2.1 (modelo único). -->
+Hasta aquí la respuesta ha sido un **importe** o un **índice**: cuánto cuesta, cuánto se degrada. Ahora
+es un **tiempo**: cuántos días aguanta una máquina hasta el primer fallo grave. Un tiempo de vida es
+también una magnitud **positiva y asimétrica** —el mismo terreno de la Gamma—, así que el instinto de
+las unidades anteriores sigue valiendo. Pero aparece un ingrediente nuevo que lo cambia todo: al cerrar
+el estudio a los 720 días, muchas máquinas **siguen funcionando**. De ellas no sabemos cuándo fallarán,
+solo que aún no lo han hecho. Eso es **censura**, y modelarla bien es el corazón de esta unidad —la
+reactivación del hilo de **supervivencia**—.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con interceptos aleatorios (y anidamiento),
-componentes de varianza e interpretación condicional vs marginal.
+Objetivo general: **continuas positivas + supervivencia** — Kaplan–Meier descriptivo y modelos de
+**vida acelerada** (exponencial, Weibull, log-normal); la **censura en la verosimilitud** y el factor
+de aceleración.
 :::
 
-## 4.1 Qué es y de dónde viene: el agrupamiento {#sec-u34-contexto}
+## 4.1 Contexto: el tiempo como respuesta, y la censura {#sec-u34-contexto}
 
-<!-- TODO: el coste medio varía entre agencias/regiones; reutilizar la jerarquía region > agencia. -->
+Trabajamos con `modelo_supervivencia`: una fila por máquina, con su tiempo de seguimiento y si ese
+tiempo acabó en **fallo** o en **censura**.
 
-## 4.2 El modelo mixto Gamma {#sec-u34-modelo}
+```{r}
+#| label: u34-datos
+surv <- banco$modelo_supervivencia
 
-<!-- TODO: log(mu_ij) = x'beta + u_j; Gamma con intercepto aleatorio; glmmTMB(family = Gamma). -->
+c(maquinas = nrow(surv),
+  fallos = sum(surv$fallo),
+  prop_fallo = round(mean(surv$fallo), 3),
+  censuras = sum(surv$fallo == 0),
+  seg_mediano = round(median(surv$tiempo)))
+```
 
-## 4.3 Interpretación {#sec-u34-interpretacion}
+Cuatro de cada diez máquinas llegan vivas al final del estudio: su tiempo está **censurado por la
+derecha** (sabemos que $T>720$, no su valor). Ignorar la censura —por ejemplo, analizar solo las que
+fallaron, o tratar los 720 como si fueran el tiempo de fallo— **sesga** cualquier conclusión: en el
+primer caso descartas justo las máquinas más robustas; en el segundo, inventas fallos que no han
+ocurrido. La supervivencia existe precisamente para usar **toda** la información, también la parcial.
 
-<!-- TODO: efectos fijos multiplicativos; componentes de varianza; BLUPs; media condicional vs
-     marginal (retransformación con enlace log). -->
+::: {.callout-tip}
+## Un detalle del banco que conviene saber
+Los tiempos de fallo son **continuos**: aunque el DGP simula por intervalos mensuales, el instante
+exacto se extrae dentro de cada intervalo, así que no hay empates. Eso permite tratar `tiempo`
+directamente como respuesta continua —sin discretizar— tanto aquí como en la [Unidad 3.5](#sec-u35). La
+censura, en cambio, es **administrativa y única**: todas las máquinas censuradas lo están en el mismo
+instante, los 720 días del cierre.
+:::
 
-## 4.4 Inferencia y selección {#sec-u34-inferencia}
+El objeto que empaqueta «tiempo + estado» es `Surv(tiempo, fallo)`, y es la respuesta de todo lo que
+sigue:
 
-<!-- TODO: ¿hace falta el efecto aleatorio? LRT en el borde; AIC. -->
+```{r}
+#| label: u34-surv
+library(survival)
+head(Surv(surv$tiempo, surv$fallo), 12)   # un "+" marca las observaciones censuradas
+```
 
-## 4.5 Bondad de ajuste y diagnóstico {#sec-u34-diagnostico}
+## 4.2 Kaplan–Meier: la mirada descriptiva {#sec-u34-km}
 
-<!-- TODO: DHARMa en mixtos; R2 de Nakagawa; validación DGP. -->
+Antes de modelar, describimos. El estimador de **Kaplan–Meier** [@kaplan1958] reconstruye la función de
+supervivencia $S(t)=\Pr(T>t)$ **respetando la censura**: cada máquina contribuye mientras está en
+observación y sale del conjunto de riesgo al fallar o al censurarse. Lo miramos por plan de
+mantenimiento, que es la pregunta de negocio:
+
+```{r}
+#| label: fig-u34-km
+#| fig-width: 7.5
+#| fig-height: 4.8
+#| fig-cap: "Curvas de Kaplan–Meier de la supervivencia sin fallo, por plan de mantenimiento, con intervalos de confianza y marcas de censura. La curva del plan preventivo se mantiene por encima: sus máquinas tardan más en fallar."
+km <- survfit(Surv(tiempo, fallo) ~ plan_mantenimiento, data = surv)
+
+survminer::ggsurvplot(km, data = surv, conf.int = TRUE, risk.table = TRUE,
+                      censor = TRUE, legend.labs = c("Correctivo", "Preventivo"),
+                      xlab = "días", ylab = "S(t) = probabilidad de seguir sin fallo")
+```
+
+La curva del plan **preventivo** domina a la del **correctivo**: a cualquier horizonte, la probabilidad
+de seguir sin fallar es mayor. Lo resumimos con las medianas de supervivencia y lo contrastamos con la
+prueba de **log-rank**:
+
+```{r}
+#| label: u34-logrank
+km                                            # imprime las medianas por grupo
+survdiff(Surv(tiempo, fallo) ~ plan_mantenimiento, data = surv)   # log-rank
+```
+
+La diferencia es significativa: el plan preventivo **alarga** la vida de la máquina. El log-rank es un
+buen titular, pero no cuantifica *cuánto* ni ajusta por otras variables (una máquina con plan preventivo
+puede ser además más nueva). Para eso necesitamos un modelo.
+
+## 4.3 El modelo AFT y la censura en la verosimilitud {#sec-u34-modelo}
+
+El modelo de **vida acelerada** (*accelerated failure time*, AFT) es el puente natural desde lo que ya
+sabemos. Modela el **logaritmo del tiempo** como lineal en las covariables:
+$$\log T_i = \beta_0 + \beta_1 x_{i1} + \dots + \sigma\,\varepsilon_i,$$
+donde $\varepsilon$ tiene una distribución que fija la **familia** (valor extremo → Weibull; normal →
+log-normal; logística → log-logística) y $\sigma$ es un parámetro de escala. Es, en esencia, una
+regresión sobre $\log T$ —emparentada con el log-OLS de la [Unidad 3.2](#sec-u32)—, con **una
+diferencia capital**:
+
+::: {.callout-important}
+## La censura entra en la verosimilitud
+En 3.1 y 3.2 todas las observaciones eran completas y cada una contribuía a la verosimilitud con su
+**densidad** $f(t_i)$. Con censura, una máquina que a los 720 días sigue viva no aporta «falló en 720»,
+sino «no había fallado todavía en 720», y su contribución correcta es la **función de supervivencia**
+$S(t_i)=\Pr(T>t_i)$. La verosimilitud combina las dos clases de aporte:
+$$L=\prod_{i:\,\text{fallo}} f(t_i)\;\prod_{i:\,\text{censura}} S(t_i).$$
+Esta es la idea que distingue la supervivencia de una regresión ordinaria sobre $\log T$: **no se
+tiran las observaciones incompletas, se usan como desigualdades**. Ajustar `lm(log(tiempo) ~ ...)`
+sobre las máquinas que fallaron sería sencillamente incorrecto.
+:::
+
+Lo ajustamos con `survival::survreg`, que maximiza esa verosimilitud. Empezamos por la Weibull:
+
+```{r}
+#| label: u34-aft-weibull
+aft_w <- survreg(Surv(tiempo, fallo) ~ plan_mantenimiento + antiguedad_anios +
+                   carga_media + tipo + fabricante,
+                 dist = "weibull", data = surv)
+
+summary(aft_w)
+```
+
+## 4.4 Interpretación: el factor de aceleración {#sec-u34-interpretacion}
+
+En un AFT los coeficientes viven en la **escala del log-tiempo**, así que $e^{\beta}$ es un **factor de
+aceleración**: el número por el que se **multiplica el tiempo de vida** cuando la covariable sube una
+unidad. Un factor mayor que 1 **alarga** la vida; menor que 1, la acorta. Es una lectura distinta —y
+más intuitiva para mantenimiento— que el *hazard ratio* que veremos en la [Unidad 3.5](#sec-u35):
+aquí hablamos de **estirar o encoger el reloj**, no de multiplicar un riesgo instantáneo.
+
+```{r}
+#| label: tbl-u34-af
+#| tbl-cap: "Factores de aceleración del AFT Weibull (coeficientes exponenciados): factor multiplicativo sobre el tiempo de vida, con intervalo de confianza al 95 %. Se omite el término de escala."
+broom::tidy(aft_w, conf.int = TRUE) |>
+  dplyr::filter(term != "(Intercept)", term != "Log(scale)") |>
+  dplyr::transmute(term,
+                   factor_aceleracion = round(exp(estimate), 3),
+                   conf.low = round(exp(conf.low), 3),
+                   conf.high = round(exp(conf.high), 3),
+                   p.value = signif(p.value, 3))
+```
+
+La lectura de negocio del **plan preventivo**: su factor de aceleración por encima de 1 significa que
+las máquinas con mantenimiento preventivo **viven proporcionalmente más** que las de mantenimiento
+correctivo, a igualdad del resto. Es la misma conclusión del Kaplan–Meier, pero ahora **cuantificada y
+ajustada** por la antigüedad, la carga y el tipo. Y a diferencia del log-rank, el AFT nos da algo
+accionable: una estimación de *cuánto* se prolonga la vida útil, que es justo lo que un análisis
+coste-beneficio del plan necesita.
+
+El resto de la tabla merece una mirada, porque afina la historia. La **carga media** es el predictor
+más fuerte con diferencia: su factor de aceleración muy por debajo de 1 dice que una máquina muy
+exigida vive una **fracción** del tiempo de una poco cargada —el desgaste es, sobre todo, cuestión de
+cuánto se le pide—. La **antigüedad inicial** también acorta la vida, como cabía esperar. Y hay un
+detalle que cierra un hilo abierto en la [Unidad 3.1](#sec-u31): el **fabricante**, que allí era un
+**control sin efecto sobre el coste**, aquí sí importa —el fabricante B alarga la vida de forma
+significativa—. No es una contradicción, es una lección: una misma variable puede ser **irrelevante
+para una respuesta y determinante para otra**. El fabricante no cambia lo que cuesta reparar una
+máquina, pero sí **cuánto tarda en romperse**. Modelar es siempre *modelar una respuesta concreta*, no
+«las variables importantes» en abstracto.
+
+Conviene además leer la **forma** de la Weibull, porque cuenta cómo envejece la máquina:
+
+```{r}
+#| label: u34-forma
+forma_weibull <- 1 / aft_w$scale   # shape: >1 hazard creciente, <1 decreciente, =1 constante
+round(c(escala_sigma = aft_w$scale, forma_weibull = forma_weibull), 3)
+```
+
+Una forma **mayor que 1** dice que el riesgo instantáneo de fallo **crece con el tiempo**: las máquinas
+se desgastan, no fallan al azar. Es coherente con lo que sabemos del sistema —y con el sentido común
+industrial—.
+
+## 4.5 Elección de distribución, diagnóstico y validación {#sec-u34-diagnostico}
+
+La Weibull es una elección, no la única. La familia AFT ofrece varias formas de $\varepsilon$, y
+—igual que en 3.2 con las familias de la Gamma— la decisión se toma comparando ajuste, no por defecto.
+
+```{r}
+#| label: tbl-u34-comparacion
+#| tbl-cap: "Comparación de distribuciones AFT por AIC (mismo predictor, distinta forma de la respuesta). La exponencial es la Weibull con forma fija en 1."
+formula_aft <- Surv(tiempo, fallo) ~ plan_mantenimiento + antiguedad_anios +
+  carga_media + tipo + fabricante
+
+purrr::map_dfr(c("exponential", "weibull", "lognormal", "loglogistic"), \(dd) {
+  m <- survreg(formula_aft, dist = dd, data = surv)
+  tibble::tibble(distribucion = dd, logLik = round(as.numeric(logLik(m)), 1), AIC = round(AIC(m), 1))
+}) |>
+  dplyr::arrange(AIC)
+```
+
+La **Weibull gana**, y con sentido: su hazard monótono creciente encaja con el envejecimiento, mientras
+que la log-normal y la log-logística (hazard que sube y luego baja) describen procesos con un pico de
+riesgo intermedio que aquí no se da. La exponencial queda claramente detrás —su hazard **constante** es
+demasiado rígido para una máquina que se desgasta—.
+
+Un diagnóstico gráfico complementario: los residuos de la Weibull deberían, si el modelo es correcto,
+comportarse como una muestra censurada de una distribución conocida.
+
+```{r}
+#| label: fig-u34-diag
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Residuos de Cox–Snell del AFT Weibull: supervivencia de Kaplan–Meier de los residuos (negro) frente a la de una exponencial estándar (rojo). Si el modelo ajusta, ambas curvas coinciden. El acuerdo razonable respalda la elección de distribución."
+# Residuo estandarizado de valor extremo; su exponencial es un residuo de Cox–Snell ~ Exp(1)
+res_cs <- exp((log(surv$tiempo) - aft_w$linear.predictors) / aft_w$scale)
+km_res <- survfit(Surv(res_cs, surv$fallo) ~ 1)
+
+plot(km_res, conf.int = FALSE, xlim = c(0, 4),
+     xlab = "residuo de Cox–Snell", ylab = "supervivencia del residuo")
+curve(exp(-x), from = 0, to = 4, add = TRUE, col = "firebrick", lwd = 2)
+legend("topright", c("KM de los residuos", "exponencial estándar teórica"),
+       lty = 1, col = c("black", "firebrick"), bty = "n")
+```
+
+### Validación contra el DGP
+
+Aquí hay un matiz de rigor que quiero dejar claro, porque distingue este caso de los anteriores.
+
+::: {.callout-warning}
+## El AFT es una aproximación, no el modelo verdadero
+En 3.1 la Gamma **era** la familia del proceso generador, y recuperábamos sus coeficientes casi
+exactos. Aquí no: el DGP no genera los tiempos con una Weibull, sino con un **hazard a trozos** (un
+riesgo que crece escalón a escalón) más un efecto de mantenimiento que **decae con el tiempo**. La
+Weibull es la mejor *aproximación paramétrica* a ese proceso, no su forma exacta. Por eso la validación
+aquí es **cualitativa**: comprobamos que la **dirección** y la **forma** son correctas, no que los
+números coincidan con parámetros verdaderos que, en rigor, no existen en la escala AFT.
+:::
+
+Con esa cautela, el modelo acierta en lo que importa: la forma de la Weibull sale **mayor que 1**
+(hazard creciente, como el envejecimiento del DGP), y el plan preventivo sale **protector** (factor de
+aceleración > 1, alarga la vida), coherente con el mecanismo generador —el mantenimiento reduce el
+riesgo de fallo—. Lo que el AFT **no** puede capturar es que ese efecto protector **se debilita con el
+tiempo**: al asumir un factor de aceleración constante, promedia un efecto que en realidad cambia. Esa
+grieta —la **no proporcionalidad**— es justo la que abrirá la [Unidad 3.5](#sec-u35) con el modelo de
+Cox y su diagnóstico.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.4)
-<!-- TODO -->
+Sobre el banco de vuestro equipo:
+
+1. Estimad la supervivencia por Kaplan–Meier según el plan de mantenimiento y contrastadla con
+   log-rank. Interpretad las medianas de supervivencia en días.
+2. Ajustad un AFT Weibull e **interpretad en tiempo** (factor de aceleración) el efecto del plan, la
+   antigüedad y la carga. ¿Cuántos días de vida útil añade, aproximadamente, el plan preventivo a una
+   máquina promedio?
+3. Comparad exponencial, Weibull y log-normal por AIC. Justificad la elección conectándola con la
+   **forma del hazard** que cada una implica.
+4. La censura es esencial: reajustad el modelo **descartando** las máquinas censuradas y comparad los
+   coeficientes. ¿En qué dirección se sesga el resultado al tirar la información parcial?
+5. Discutid una limitación del AFT en este problema: ¿qué rasgo del proceso de fallo —conocido por el
+   DGP— **no** puede representar un factor de aceleración constante?
 :::

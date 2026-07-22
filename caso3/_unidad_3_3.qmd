@@ -1,36 +1,319 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_3.qmd >}}. Sin YAML. Chunks u33-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_3.qmd >}}. Sin YAML. Chunks u33-.
+     Unidad de MODELO ÚNICO (recorrido completo, espejo de 3.1): GLMM Gamma.
+     Reactiva el hilo de MIXTOS (espiral). Respuesta: degradacion (repetida por máquina).
+     Datos: banco$modelo_longitudinal. -->
 
-# 3 · Ceros y positivos juntos: Tweedie {#sec-u33}
+# 3 · Continuas positivas agrupadas: GLMM Gamma {#sec-u33}
 
-<!-- TODO intro: el COSTE TOTAL por póliza mezcla pólizas sin siniestro (masa en 0) y positivos
-     continuos. Es un semicontinuo -> Tweedie (compuesto Poisson-Gamma). Nexo con el Caso 2:
-     prima pura = frecuencia x severidad. -->
+Las dos unidades anteriores modelaron **una** intervención por máquina: observaciones independientes,
+una fila cada una. Ahora cambiamos de tabla y de pregunta. En `modelo_longitudinal` cada máquina se
+mide **muchas veces** a lo largo del seguimiento —su **degradación** visita tras visita—, y esas
+medidas **no son independientes**: las de una misma máquina se parecen entre sí más de lo que se
+parecen a las de otra. Ignorarlo no es un pecado venial; falsea la inferencia. Esta unidad extiende la
+Gamma para dar cuenta de ese agrupamiento —es la reactivación del hilo de **efectos mixtos**— y, de
+paso, salda por fin la deuda que dejamos abierta en 3.1 y 3.2: aquella variabilidad entre **plantas**
+que, al no tener dónde ir, inflaba la dispersión $\hat\phi$. La respuesta es ahora otra —la
+degradación, no el coste—, pero el fenómeno y el remedio son los mismos: dar a la planta su propio
+nivel en el modelo.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **continuas positivas** — el modelo **Tweedie** para el coste total (masa en 0 +
-positivo continuo), su índice de potencia $p$, y la **prima pura** como frecuencia × severidad.
+Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con intercepto y **pendiente aleatoria** por
+máquina, **anidamiento** en plantas, componentes de varianza e interpretación condicional vs marginal.
 :::
 
-## 3.1 Qué es y de dónde viene: coste total con masa en cero {#sec-u33-contexto}
+## 3.1 Contexto: por qué las medidas no son independientes {#sec-u33-contexto}
 
-<!-- TODO: distribución del coste total (muchos ceros + cola positiva); por qué Gamma sola no vale. -->
+Trabajamos con `modelo_longitudinal`: una fila por **visita** de cada máquina.
 
-## 3.2 El modelo Tweedie {#sec-u33-modelo}
+```{r}
+#| label: u33-datos
+long <- banco$modelo_longitudinal
 
-<!-- TODO: familia de dispersión exponencial con Var = phi·mu^p, 1 < p < 2 (compuesto Poisson-Gamma);
-     estimación (incluida la del índice p); statmod::tweedie / glmmTMB. -->
+c(filas = nrow(long),
+  maquinas = dplyr::n_distinct(long$id_maquina),
+  plantas = dplyr::n_distinct(long$id_planta),
+  visitas_medianas = median(as.numeric(table(long$id_maquina)))) |> round(1)
+```
 
-## 3.3 Prima pura: frecuencia × severidad {#sec-u33-prima}
+Cada máquina aporta una **trayectoria** de degradación. Si dibujamos unas cuantas se ve de un vistazo
+el problema —y la oportunidad—:
 
-<!-- TODO: dos vías al coste esperado: (a) Tweedie directo sobre el coste total; (b) Poisson
-     (frecuencia, Caso 2) × Gamma (severidad, 3.1). Comparación. -->
+```{r}
+#| label: fig-u33-trayectorias
+#| fig-width: 8
+#| fig-height: 4.2
+#| fig-cap: "Trayectorias de degradación (eje log) de 20 máquinas a lo largo del seguimiento. Cada máquina parte de un nivel distinto y evoluciona a su propio ritmo: hay estructura dentro de cada línea que un modelo de observaciones independientes no puede ver."
+set.seed(1)
+muestra <- sample(levels(factor(long$id_maquina)), 20)
 
-## 3.4 Bondad de ajuste y diagnóstico {#sec-u33-diagnostico}
+long |>
+  dplyr::filter(id_maquina %in% muestra) |>
+  ggplot(aes(tiempo_anios, degradacion, group = id_maquina, colour = id_maquina)) +
+  geom_line(alpha = 0.7) +
+  scale_y_log10() +
+  labs(x = "tiempo de seguimiento (años)", y = "degradación (escala log)") +
+  theme(legend.position = "none")
+```
 
-<!-- TODO: diagnóstico del Tweedie; comparación con las dos vías; validación DGP. -->
+Dos rasgos saltan a la vista, y cada uno pide una pieza del modelo:
+
+1. **Las máquinas parten de niveles distintos.** Unas están sistemáticamente más degradadas que otras
+   desde el principio. Eso es un **intercepto aleatorio** por máquina.
+2. **Se degradan a ritmos distintos.** Las líneas no son paralelas: unas suben más deprisa que otras.
+   Eso es una **pendiente aleatoria** del tiempo, por máquina.
+
+¿Cuánto importa el agrupamiento? Una forma cruda de medirlo: comparar la variación **entre** máquinas
+con la variación **dentro** de cada máquina.
+
+```{r}
+#| label: tbl-u33-icc-crudo
+#| tbl-cap: "Descomposición cruda de la variabilidad de log(degradación): desviación típica total, entre medias de máquina, y dentro de cada máquina. Que la variación entre máquinas sea comparable a la de dentro anticipa una correlación intraclase alta."
+long |>
+  dplyr::mutate(ld = log(degradacion)) |>
+  dplyr::group_by(id_maquina) |>
+  dplyr::mutate(media_maq = mean(ld)) |>
+  dplyr::ungroup() |>
+  dplyr::summarise(
+    sd_total  = round(sd(ld), 3),
+    sd_entre  = round(sd(unique(media_maq)), 3),
+    sd_dentro = round(sd(ld - media_maq), 3))
+```
+
+La variación entre máquinas es **incluso mayor** que la de dentro de cada máquina: hay **mucha**
+correlación intraclase (del orden de la mitad de la varianza total procede de *qué* máquina es). Tratar
+las más de 11 000 filas como independientes fingiría un tamaño muestral que no tenemos —son 600
+máquinas, no 11 000 observaciones libres— y estrecharía los intervalos de confianza de forma engañosa.
+
+## 3.2 El modelo mixto Gamma {#sec-u33-modelo}
+
+Mantenemos la **Gamma con enlace log** de la unidad 3.1 —la respuesta sigue siendo positiva y
+asimétrica— y le añadimos los efectos aleatorios que pide la @fig-u33-trayectorias. El modelo para la
+degradación de la máquina $i$ en el tiempo $t$ es
+$$\log \mu_{it} = \underbrace{\beta_0 + \beta_t\,t + \beta_a\,\text{antig}_i + \beta_c\,\text{carga}_{it} + \dots}_{\text{efectos fijos}}
+\;+\; \underbrace{b_{0i} + b_{1i}\,t}_{\text{máquina}} \;+\; \underbrace{u_{p(i)}}_{\text{planta}},$$
+con $Y_{it}\sim\text{Gamma}(\mu_{it},\phi)$. Los términos aleatorios $b_{0i}$ (intercepto) y $b_{1i}$
+(pendiente) capturan que cada máquina parte de su nivel y evoluciona a su ritmo; $u_{p(i)}$ recoge que
+las máquinas de una misma **planta** comparten condiciones no medidas. Lo ajustamos con `glmmTMB`, que
+admite la familia Gamma con estructura aleatoria flexible:
+
+```{r}
+#| label: u33-ajuste
+m_glmm <- glmmTMB::glmmTMB(
+  degradacion ~ tiempo_anios + antiguedad_anios + carga + tipo +
+    (tiempo_anios | id_maquina) + (1 | id_planta),
+  family = Gamma(link = "log"), data = long)
+
+summary(m_glmm)
+```
+
+El término `(tiempo_anios | id_maquina)` pide intercepto **y** pendiente aleatorios por máquina (con su
+correlación), y `(1 | id_planta)` añade el intercepto aleatorio de planta —el **anidamiento**: visitas
+dentro de máquinas, máquinas dentro de plantas—.
+
+## 3.3 Interpretación {#sec-u33-interpretacion}
+
+Un GLMM se lee en **dos capas**: los efectos fijos (la tendencia media de la población) y los
+componentes de varianza (cuánta heterogeneidad hay alrededor).
+
+**Efectos fijos.** Se interpretan como en 3.1, de forma **multiplicativa**: $e^{\beta}$ es el factor
+sobre la degradación media. La diferencia es el matiz condicional —valen «para una máquina y planta
+dadas»—.
+
+```{r}
+#| label: tbl-u33-fijos
+#| tbl-cap: "Efectos fijos del GLMM, exponenciados: factor multiplicativo sobre la degradación media, con intervalo de confianza de Wald al 95 %."
+co <- summary(m_glmm)$coefficients$cond
+tibble::tibble(
+  term      = rownames(co),
+  estimate  = exp(co[, "Estimate"]),
+  conf.low  = exp(co[, "Estimate"] - 1.96 * co[, "Std. Error"]),
+  conf.high = exp(co[, "Estimate"] + 1.96 * co[, "Std. Error"]),
+  p.value   = co[, "Pr(>|z|)"]) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), \(x) round(x, 3)),
+                p.value = signif(p.value, 3))
+```
+
+**Componentes de varianza.** Es la parte nueva, y la que responde a «¿cuánta heterogeneidad, y de qué
+nivel?».
+
+```{r}
+#| label: tbl-u33-varcomp
+#| tbl-cap: "Desviaciones típicas de los efectos aleatorios: intercepto y pendiente por máquina (con su correlación) e intercepto por planta. Están en la escala del predictor lineal (log)."
+glmmTMB::VarCorr(m_glmm)
+```
+
+Tres lecturas:
+
+- **Intercepto de máquina.** Su desviación típica dice cuánto varía el nivel de degradación de partida
+  entre máquinas, en escala log: con una desviación en torno a $0{,}28$, una máquina «típicamente
+  alta» arranca sobre un $e^{0{,}28}\approx 1{,}32$ —un 32 % por encima de la media, a igualdad de lo
+  demás—.
+- **Pendiente de máquina.** Cuánto varía el **ritmo** de degradación. Que sea claramente distinta de
+  cero es sustantivo para mantenimiento: **no todas las máquinas envejecen igual de rápido**, y eso es
+  justo lo que un plan predictivo querría anticipar.
+- **Planta.** La desviación típica de planta es **modesta pero real**, y es la variabilidad que en las
+  unidades 3.1 y 3.2 no teníamos cómo modelar y acababa inflando $\hat\phi$. Aquí tiene por fin su
+  sitio.
+
+::: {.callout-important}
+## El nivel superior se esconde dentro del inferior
+Si ajustaras el modelo **solo** con `(1 | id_maquina)` —sin el término de planta— y buscaras el efecto
+de planta en los residuos, no encontrarías nada: el intercepto de máquina ya se ha **tragado** la
+variación de planta, porque cada máquina pertenece a una sola planta. La lección es general y cuesta
+interiorizarla: **un efecto de nivel superior no se diagnostica mirando los residuos del nivel
+inferior**; hay que **modelarlo explícitamente** como un término aparte para verlo. Por eso el
+anidamiento se declara en la fórmula, no se descubre después.
+:::
+
+**Predicción condicional vs marginal.** Con efectos aleatorios hay **dos** predicciones distintas, y
+confundirlas es un error caro:
+
+```{r}
+#| label: fig-u33-cond-marg
+#| fig-width: 7.5
+#| fig-height: 4
+#| fig-cap: "Degradación media predicha frente al tiempo. En negro, la predicción MARGINAL (población de máquinas, re.form = NA); en color, las predicciones CONDICIONALES de seis máquinas concretas (con sus efectos aleatorios). La marginal es la tendencia media; las condicionales son las trayectorias esperadas de máquinas individuales."
+rej <- tidyr::expand_grid(
+  tiempo_anios = seq(0, 2, 0.1),
+  antiguedad_anios = mean(long$antiguedad_anios),
+  carga = mean(long$carga),
+  tipo = "Torno")
+
+# MARGINAL: población de máquinas, sin efectos aleatorios (re.form = NA)
+marg <- rej
+marg$pred <- predict(m_glmm, newdata = rej, type = "response", re.form = NA)
+
+# CONDICIONAL: seis máquinas concretas, cada una con su planta y sus efectos aleatorios
+set.seed(7)
+seis  <- sample(unique(long$id_maquina), 6)
+mapa  <- dplyr::distinct(long, id_maquina, id_planta)
+cond  <- tidyr::expand_grid(rej, id_maquina = seis) |>
+  dplyr::left_join(mapa, by = "id_maquina")
+cond$pred <- predict(m_glmm, newdata = cond, type = "response", re.form = NULL)
+
+ggplot(marg, aes(tiempo_anios, pred)) +
+  geom_line(data = cond, aes(colour = factor(id_maquina)), alpha = 0.7) +
+  geom_line(linewidth = 1.2) +
+  labs(x = "tiempo (años)", y = "degradación media predicha", colour = "máquina")
+```
+
+La **marginal** responde «¿cómo se degrada una máquina cualquiera?» —útil para planificar la flota—; la
+**condicional** responde «¿cómo se degradará *esta* máquina?» —útil para decidir sobre una unidad
+concreta—. Un GLMM da las dos; un modelo de efectos fijos, solo un remedo de la primera.
+
+## 3.4 Inferencia y selección: ¿hace falta cada pieza? {#sec-u33-inferencia}
+
+Añadir efectos aleatorios no sale gratis en grados de libertad, así que hay que justificarlos. La
+comparación se hace por **razón de verosimilitudes** entre modelos anidados.
+
+**¿Hace falta la pendiente aleatoria?** Comparamos el modelo con solo intercepto de máquina frente al
+que añade la pendiente:
+
+```{r}
+#| label: u33-lrt-pendiente
+m_solo_int <- glmmTMB::glmmTMB(
+  degradacion ~ tiempo_anios + antiguedad_anios + carga + tipo +
+    (1 | id_maquina) + (1 | id_planta),
+  family = Gamma(link = "log"), data = long)
+
+anova(m_solo_int, m_glmm)
+```
+
+::: {.callout-warning}
+## El contraste en el borde del espacio paramétrico
+Contrastar si una varianza es cero pone el valor bajo la hipótesis nula **en la frontera** del espacio
+de parámetros (una varianza no puede ser negativa). Ahí el estadístico no sigue una $\chi^2$ ordinaria,
+sino una **mezcla** de $\chi^2$: el valor $p$ que da `anova()` es **conservador** —demasiado grande—.
+Si ya con la corrección conservadora el término es claramente significativo, la conclusión es firme; si
+quedara en el filo, habría que afinar (p. ej. dividir el $p$ por 2 como aproximación). Aquí la pendiente
+aleatoria es netamente necesaria.
+:::
+
+**¿Y el efecto de planta?** Mismo procedimiento, quitando `(1 | id_planta)`:
+
+```{r}
+#| label: u33-lrt-planta
+m_sin_planta <- glmmTMB::glmmTMB(
+  degradacion ~ tiempo_anios + antiguedad_anios + carga + tipo +
+    (tiempo_anios | id_maquina),
+  family = Gamma(link = "log"), data = long)
+
+anova(m_sin_planta, m_glmm)
+```
+
+Conviene separar dos cosas que se confunden a menudo. La **magnitud** del efecto de planta es pequeña
+(su desviación típica es la menor de las tres componentes), pero su **inclusión está claramente
+respaldada**: el contraste es netamente significativo y el AIC baja al añadirlo. Pequeño no es lo mismo
+que prescindible —está en el proceso generador, su efecto es real, y omitirlo devolvería esa
+variabilidad a $\phi$, justo el problema que veníamos arrastrando desde 3.1—.
+
+## 3.5 Bondad de ajuste, diagnóstico y validación {#sec-u33-diagnostico}
+
+**Residuos.** En un GLMM los residuos crudos son aún menos informativos que en un GLM. Recurrimos otra
+vez a los **residuos cuantil simulados** de DHARMa, que sí saben tratar la estructura jerárquica:
+
+```{r}
+#| label: fig-u33-dharma
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Diagnóstico DHARMa del GLMM Gamma. Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste. Derecha: residuos frente a predicho. Buscamos uniformidad y ausencia de estructura, ahora respetando el agrupamiento."
+DHARMa::simulateResiduals(m_glmm, n = 1000, plot = TRUE)
+```
+
+**¿Cuánto explica el modelo?** El $R^2$ de un mixto se parte en dos [@nakagawa2017]: el **marginal**
+(solo los efectos fijos) y el **condicional** (fijos + aleatorios). La distancia entre ambos mide
+cuánto aporta conocer la máquina y la planta.
+
+```{r}
+#| label: u33-r2
+performance::r2_nakagawa(m_glmm)
+```
+
+La lectura es elocuente: los **efectos fijos por sí solos** (R² marginal) explican una parte, pero al
+sumar la **identidad de la máquina y la planta** (R² condicional) la varianza explicada da un salto
+grande —en torno al doble—. Traducido: para anticipar la degradación, *qué máquina es* pesa tanto como
+*sus covariables observadas*. Ese salto es, en una cifra, el argumento de esta unidad.
+
+**Validación contra el DGP.** Como siempre, contrastamos con la verdad —y aquí la novedad es que
+validamos también los **componentes de varianza**, no solo los efectos fijos—:
+
+```{r}
+#| label: tbl-u33-verdad
+#| tbl-cap: "Componentes de varianza estimados frente a los valores del proceso generador. El efecto de planta actúa como 0.45·u_planta, con u_planta de desviación típica sigma_planta, de ahí el 0.45·0.28."
+verdad <- attr(banco, "verdad")
+vc <- glmmTMB::VarCorr(m_glmm)$cond
+
+tibble::tibble(
+  componente = c("intercepto máquina", "pendiente máquina", "intercepto planta"),
+  estimado = round(c(attr(vc$id_maquina, "stddev")[1],
+                     attr(vc$id_maquina, "stddev")[2],
+                     attr(vc$id_planta, "stddev")[1]), 3),
+  verdadero = round(c(verdad$sigma_b0, verdad$sigma_b1,
+                      0.45 * verdad$sigma_planta), 3))
+```
+
+El intercepto de máquina se recupera casi exacto y la pendiente muy de cerca. El de planta queda
+**subestimado** (por debajo de su valor verdadero): con solo **12 plantas** hay poquísima información
+para estimar esa varianza, y los GLMM tienden además a **encoger** hacia cero las componentes pequeñas
+mal identificadas. Es una limitación honesta del dato —no un fallo del modelo—, y la razón por la que
+un diseño con más grupos estimaría mejor ese nivel. Aun así, lo esencial se cumple: el **parámetro de
+dispersión** $\hat\phi$ del GLMM ya no tiene que absorber la variabilidad de planta, porque ahora está
+donde debe. El círculo que abrimos en 3.1 se cierra aquí.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.3)
-<!-- TODO -->
+Sobre el banco de vuestro equipo:
+
+1. Ajustad el GLMM Gamma con intercepto y pendiente aleatorios por máquina y decidid, con un contraste,
+   si la **pendiente aleatoria** es necesaria. Interpretad su desviación típica en términos de negocio:
+   ¿cuánto varía el ritmo de degradación entre máquinas?
+2. Añadid y quitad el término de **planta**. ¿Cambian los efectos fijos? ¿Cambia $\hat\phi$? Explicad
+   por qué omitir la planta «devuelve» variabilidad a la dispersión.
+3. Comparad, para una máquina concreta, la predicción **marginal** y la **condicional** a dos años.
+   ¿Cuál usaríais para decidir si conviene intervenir esa máquina, y por qué?
+4. Ajustad como alternativa un **LMM gaussiano sobre `log(degradacion)`** (`lmer`). ¿Coinciden los
+   componentes de varianza? ¿Qué se gana y qué se pierde frente al GLMM Gamma?
+5. Calculad el $R^2$ marginal y condicional e interpretad la diferencia: ¿cuánta de la variación
+   explicada procede de *conocer la máquina* frente a las covariables?
 :::

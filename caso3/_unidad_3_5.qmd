@@ -1,34 +1,206 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-.
+     Cox como FRONTERA del marco GLM: semiparamétrico, verosimilitud parcial, no es GLM.
+     Diagnóstico de proporcionalidad (Schoenfeld). Datos: banco$modelo_supervivencia (basal) y
+     banco$modelo_intervalos (start-stop, covariable dependiente del tiempo).
+     NOTA: el efecto NO proporcional del DGP vive en 'tiempo desde mantenimiento' (dependiente del
+     tiempo), NO en el plan fijo -> el plan NO viola PH; se ve con el Cox extendido. -->
 
-# 5 · Del importe al tiempo: modelos de vida acelerada {#sec-u35}
+# 5 · Cox como frontera del marco {#sec-u35}
 
-<!-- TODO intro: espiral de supervivencia. Los TIEMPOS son también positivos continuos; los modelos
-     paramétricos de supervivencia (AFT) son GLM-like sobre log(T). Cierra el círculo con el Caso 1. -->
+Todo lo anterior ha sido un GLM o un pariente cercano: elegíamos una **distribución** para la respuesta
+(Gamma, Weibull) y estimábamos por máxima verosimilitud. El modelo de **Cox** da un paso al lado. No
+especifica ninguna distribución para el tiempo de fallo: deja el **riesgo de base libre** y estima solo
+cómo lo desplazan las covariables. Esa renuncia —no comprometerse con una forma— es su gran fortaleza y
+la razón de su popularidad, pero también lo saca del marco: **Cox no es un GLM**. Esta unidad lo sitúa
+como la **frontera** del recorrido y aprovecha para lo que mejor enseña: el **diagnóstico de la
+proporcionalidad**, que sobre este banco depara una sorpresa instructiva.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **supervivencia** (espiral) — modelos de **vida acelerada** (AFT) para tiempos
-positivos continuos (Weibull, log-normal, log-logístico); interpretación y censura.
+Objetivo general: **supervivencia** (espiral) — el modelo de **riesgos proporcionales de Cox**: qué
+estima, **por qué no es un GLM**, y el **diagnóstico de la proporcionalidad**.
 :::
 
-## 5.1 Qué es y de dónde viene: tiempos como positivos continuos {#sec-u35-contexto}
+## 5.1 Riesgos proporcionales {#sec-u35-contexto}
 
-<!-- TODO: T > 0 continuo (duración hasta un evento); nexo con la Gamma y con el Caso 1. -->
+El modelo de Cox [@cox1972] escribe el **hazard** —el riesgo instantáneo de fallar en el momento $t$,
+dado que se ha llegado vivo hasta $t$— como
+$$h(t\mid x) = h_0(t)\,\exp(\beta_1 x_1 + \dots + \beta_p x_p).$$
+Dos piezas: un **riesgo de base** $h_0(t)$ **común a todas las máquinas y sin forma prefijada**, y un
+factor multiplicativo $\exp(x^\top\beta)$ que no depende del tiempo. De ahí el nombre: dos máquinas
+con perfiles distintos tienen hazards que se mantienen en **proporción constante** a lo largo de toda
+su vida. El cociente de hazards entre dos perfiles,
+$$\text{HR}=\frac{h(t\mid x_1)}{h(t\mid x_2)}=\exp\!\big((x_1-x_2)^\top\beta\big),$$
+es el **hazard ratio**, y es constante en $t$ —ese es exactamente el supuesto de *proporcionalidad*—.
 
-## 5.2 El modelo AFT {#sec-u35-modelo}
+Frente al AFT de la [Unidad 3.4](#sec-u34), el contraste es de lente: el AFT **estira o encoge el
+reloj** (factor de aceleración sobre el tiempo); Cox **multiplica el riesgo** (hazard ratio). Son dos
+formas de mirar el mismo fenómeno, y para la Weibull —que es a la vez AFT y PH— resultan equivalentes;
+lo veremos numéricamente en un momento.
 
-<!-- TODO: log(T) = x'beta + sigma·e; factor de aceleración exp(beta); Weibull / lognormal /
-     loglogístico; survival::survreg; papel de la CENSURA (a diferencia de 3.1). -->
+## 5.2 Verosimilitud parcial: por qué Cox no es un GLM {#sec-u35-noglm}
 
-## 5.3 Interpretación y comparación con Cox {#sec-u35-interpretacion}
+Si $h_0(t)$ queda **sin especificar**, no hay densidad completa y, por tanto, no hay verosimilitud
+ordinaria que maximizar. La idea de Cox [@cox1975] fue prescindir de $h_0(t)$ mediante una
+**verosimilitud parcial**: en cada instante en que ocurre un fallo, se pregunta *¿cuál de las máquinas
+entonces en riesgo fue la que falló?*, y esa probabilidad
+$$\frac{\exp(x_{(i)}^\top\beta)}{\sum_{j\in R(t_i)}\exp(x_j^\top\beta)}$$
+**no contiene $h_0(t)$** —se cancela entre numerador y denominador—. El producto de esas
+probabilidades sobre todos los fallos es la verosimilitud parcial, y de ella salen los $\hat\beta$.
 
-<!-- TODO: factor de aceleración vs hazard ratio; AFT vs PH; cuándo cada uno. -->
+::: {.callout-important}
+## Aquí se acaba el marco GLM
+Fíjate en lo que falta. No hay **familia exponencial** para la respuesta, no hay **función de enlace**,
+no hay una **componente aleatoria** con distribución especificada: solo un orden de fallos y unos
+conjuntos de riesgo. Cox no encaja en la tríada del GLM (componente aleatoria + enlace + predictor
+lineal), y por eso lo llamamos **semiparamétrico** y lo situamos **fuera** del marco, como su frontera.
+Lo que sí conserva es el predictor lineal y la lectura multiplicativa —por eso se siente familiar—,
+pero el motor de estimación es otro.
+:::
 
-## 5.4 Bondad de ajuste y diagnóstico {#sec-u35-diagnostico}
+## 5.3 Estimación e interpretación {#sec-u35-interpretacion}
 
-<!-- TODO: residuos de supervivencia; elección de la distribución; validación DGP. -->
+Ajustamos el Cox con las mismas covariables basales del AFT:
+
+```{r}
+#| label: u35-cox
+cox <- coxph(Surv(tiempo, fallo) ~ plan_mantenimiento + antiguedad_anios +
+               carga_media + tipo + fabricante, data = surv)
+
+summary(cox)
+```
+
+Los coeficientes se leen como **hazard ratios** al exponenciar:
+
+```{r}
+#| label: tbl-u35-hr
+#| tbl-cap: "Hazard ratios del modelo de Cox (coeficientes exponenciados) con intervalo de confianza al 95 %. Un HR < 1 protege (menos riesgo de fallo); un HR > 1 lo agrava."
+broom::tidy(cox, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::transmute(term,
+                   HR = round(estimate, 3),
+                   conf.low = round(conf.low, 3),
+                   conf.high = round(conf.high, 3),
+                   p.value = signif(p.value, 3))
+```
+
+El **plan preventivo** tiene un hazard ratio **menor que 1**: reduce el riesgo instantáneo de fallo, a
+igualdad del resto —la misma conclusión que el AFT, ahora en la escala del riesgo—. La **carga** es de
+nuevo el factor dominante (hazard mucho mayor), y el **fabricante B** vuelve a aparecer como protector,
+coherente con lo que vimos sobre la vida útil en 3.4.
+
+Sobre los **empates**: cuando dos máquinas fallan en el mismo instante, la verosimilitud parcial admite
+varias aproximaciones. `coxph` usa por defecto la de **Efron** [@efron1977], más precisa que la clásica
+de Breslow [@breslow1974]; aquí casi da igual, porque los tiempos son continuos y **apenas hay
+empates**.
+
+**Cox y AFT son la misma historia contada dos veces.** Como la Weibull es simultáneamente un modelo AFT
+y uno de riesgos proporcionales, su factor de aceleración y su hazard ratio están ligados por
+$\text{HR}=\text{AF}^{-\rho}$, con $\rho$ la forma. Comprobemos que el HR que **implica** el AFT
+Weibull de 3.4 casi coincide con el que estima Cox directamente:
+
+```{r}
+#| label: u35-aft-cox
+hr_implicado_aft <- exp(-coef(aft_w)["plan_mantenimientoPreventivo"] / aft_w$scale)
+hr_cox <- exp(coef(cox)["plan_mantenimientoPreventivo"])
+
+round(c(HR_implicado_por_AFT = unname(hr_implicado_aft),
+        HR_estimado_por_Cox  = unname(hr_cox)), 3)
+```
+
+Que dos rutas tan distintas —una paramétrica, otra semiparamétrica— entreguen prácticamente el mismo
+hazard ratio es tranquilizador: el efecto del plan es robusto a la lente que se use.
+
+## 5.4 Diagnóstico de la proporcionalidad {#sec-u35-ph}
+
+Todo lo anterior descansa en un supuesto: que los hazard ratios son **constantes en el tiempo**. Si el
+efecto de una covariable crece o mengua a lo largo de la vida de la máquina, el HR único que estima Cox
+es un promedio engañoso. El diagnóstico estándar se basa en los **residuos de Schoenfeld**
+[@schoenfeld1982]: si el supuesto se cumple, no deben mostrar tendencia con el tiempo. La prueba formal
+de @grambsch1994 lo contrasta covariable a covariable:
+
+```{r}
+#| label: u35-zph
+ph <- cox.zph(cox)
+ph
+```
+
+```{r}
+#| label: fig-u35-zph
+#| fig-width: 7
+#| fig-height: 4.5
+#| fig-cap: "Residuos de Schoenfeld de la antigüedad frente al tiempo, con banda de confianza. Una línea horizontal respalda la proporcionalidad; la leve pendiente aquí es el aviso —suave— que recoge la prueba de cox.zph."
+plot(ph, var = "antiguedad_anios")
+abline(h = 0, lty = 3, col = "grey50")
+```
+
+Y aquí llega la sorpresa, que conviene leer despacio. **El plan de mantenimiento NO viola la
+proporcionalidad** (su $p$ es alto): su hazard ratio es razonablemente constante. Quien aparece marcada
+—de forma leve— es la **antigüedad**. ¿No habíamos dicho que el DGP incorpora a propósito un efecto de
+mantenimiento **no proporcional**? Sí, y la aparente contradicción es justo la lección:
+
+::: {.callout-warning}
+## Dónde vive la no proporcionalidad
+El efecto protector del mantenimiento **sí** decae con el tiempo en el DGP —es fuerte justo después de
+una intervención y se desvanece—. Pero eso es una propiedad del **tiempo transcurrido desde la última
+intervención**, no del **plan** como etiqueta fija. Como el mantenimiento preventivo se repite cada
+pocos meses, el efecto del *plan* promediado sobre toda la vida de la máquina resulta aproximadamente
+constante, y por eso `cox.zph` no lo marca. La no proporcionalidad real está en una covariable
+**dependiente del tiempo** que el modelo basal ni siquiera incluye. El aviso leve sobre la antigüedad
+es otra cosa —probablemente forma funcional: el riesgo de base crece de forma no lineal con la edad—, y
+recuerda que la prueba de Schoenfeld es **sensible** y no todo aviso es una violación grave.
+:::
+
+La moraleja metodológica es importante: **un modelo basal puede pasar el diagnóstico de
+proporcionalidad y aun así perderse el mecanismo más interesante**, simplemente porque no ha incluido
+la variable que lo contiene.
+
+## 5.5 Cuando el efecto cambia con el tiempo: Cox extendido {#sec-u35-noph}
+
+Para capturar el efecto que decae necesitamos la tabla **`modelo_intervalos`**, donde cada máquina
+aparece troceada en intervalos y arrastra covariables que **cambian dentro de su seguimiento** —entre
+ellas `mantenimiento_reciente`, que vale 1 mientras la última intervención esté fresca—. El Cox
+**extendido** admite esa respuesta en formato *start-stop*, `Surv(tstart, tstop, fallo)`:
+
+```{r}
+#| label: u35-cox-tv
+cox_tv <- coxph(
+  Surv(tstart, tstop, fallo) ~ antiguedad_anios + carga + mantenimiento_reciente +
+    tipo + fabricante,
+  data = banco$modelo_intervalos)
+
+broom::tidy(cox_tv, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::transmute(term, HR = round(estimate, 3),
+                   conf.low = round(conf.low, 3), conf.high = round(conf.high, 3),
+                   p.value = signif(p.value, 3))
+```
+
+Ahora sí aflora el mecanismo: `mantenimiento_reciente` tiene un hazard ratio **muy por debajo de 1**
+—una intervención fresca recorta drásticamente el riesgo de fallo—, y ese efecto es **local en el
+tiempo**, no una etiqueta permanente. Es exactamente el `-1.45\,e^{-d/115}` que el DGP inyecta en el
+log-hazard, visto a través de un indicador. Lo que en el modelo basal era una no proporcionalidad
+**invisible** se vuelve, con la covariable dependiente del tiempo, un efecto **nítido y bien estimado**.
+
+::: {.callout-note}
+## El puente a la síntesis
+Acabamos de tratar el fallo con datos **troceados por intervalos** y covariables que cambian en el
+tiempo. Ese es, exactamente, el formato sobre el que la [Unidad 3.6](#sec-u36) montará las **tres
+lentes** —tiempo discreto, Poisson a trozos y Cox— para comparar qué estima cada una del mismo
+proceso. La frontera del marco GLM que hemos cruzado aquí es el punto de partida del cierre.
+:::
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.5)
-<!-- TODO -->
+Sobre el banco de vuestro equipo:
+
+1. Ajustad un modelo de Cox con las covariables basales e interpretad los hazard ratios del plan, la
+   carga y la antigüedad. Comparad el HR del plan con el factor de aceleración del AFT de 3.4: ¿son
+   coherentes?
+2. Aplicad `cox.zph` y examinad los residuos de Schoenfeld. ¿Qué covariables, si alguna, ponen en duda
+   la proporcionalidad? Distinguid una violación real de un problema de forma funcional.
+3. Explicad, con vuestras palabras, **por qué el plan de mantenimiento no viola la proporcionalidad**
+   pese a que su efecto protector decae. ¿Dónde ha ido a parar esa no proporcionalidad?
+4. Ajustad el Cox extendido sobre `modelo_intervalos` con `mantenimiento_reciente` e interpretad su
+   hazard ratio. ¿Qué representa, y por qué solo se puede estimar con datos troceados en el tiempo?
+5. Argumentad en qué sentido el modelo de Cox está **fuera** del marco GLM. ¿Qué componente del GLM
+   sustituye la verosimilitud parcial?
 :::

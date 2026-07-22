@@ -38,12 +38,12 @@ una póliza a otra, ajustamos una **Poisson con el *offset* de la exposición** 
 partes por unidad de tiempo, como en la [Unidad 2.1](#sec-u21)—. Ese es el modelo `m_pois`, que
 usaremos como referencia en toda la unidad.
 
-Un vistazo exploratorio justifica esos predictores: la **tasa** de partes por daños (partes por año de
+Un vistazo exploratorio justifica esos predictores: la **tasa** de partes por daños (partes por unidad de
 exposición) no es plana frente a ninguno de ellos:
 
 ```{r}
 #| label: fig-u22-eda-modelo
-#| fig-cap: "Tasa de `n_danos` (partes por año de exposición) según cada predictor del modelo. Sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican los términos que se ajustan."
+#| fig-cap: "Tasa de `n_danos` (partes por unidad de exposición) según cada predictor del modelo. Sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican los términos que se ajustan."
 #| fig-width: 9
 #| fig-height: 5
 dplyr::bind_rows(
@@ -58,7 +58,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por año)")
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
 ```
 
 La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
@@ -75,7 +75,7 @@ la **media** y la **varianza** observadas. Construimos la @fig-u22-media-varianz
 4. Representamos varianza frente a media y superponemos tres **formas de referencia** —la Poisson y dos alternativas que trabajamos en esta unidad para mejorar el ajuste—: la recta
    $\mathrm{Var}=\mathrm{media}$ (Poisson), la recta $\mathrm{Var}=\hat\phi\,\mathrm{media}$ (dispersión
    **lineal**) y la curva
-   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Las dos últimas anticipan modelos de las secciones 2.3–2.4; aquí solo nos interesa **qué forma
+   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Las dos últimas anticipan modelos de las secciones 2.2–2.3; aquí solo nos interesa **qué forma
    siguen los puntos**.
 
 ```{r}
@@ -108,8 +108,8 @@ ggplot() +
   geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
   scale_colour_manual(values = c(
     "Poisson: Var = media"             = "grey55",
-    "Lineal: phi·media"    = "darkorange",
-    "Cuadratica: media+a·media²" = "steelblue")) +
+    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
+    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
   labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
 ```
 
@@ -262,7 +262,7 @@ exceso es significativo y **de qué forma** es.
 
 El contraste de referencia es el de **Cameron–Trivedi** (`AER::dispersiontest`):
 enfrenta $H_0:\mathrm{Var}=\mu$ a la alternativa $\mathrm{Var}=\mu+\alpha\,g(\mu)$ y decide si
-$\alpha>0$. Los tests `performance` y `DHARMa` lo acompañan con un test por **simulación**, más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea:
+$\alpha>0$. `performance::check_overdispersion` da la versión analítica (el índice de Pearson y su $\chi^2$), y `DHARMa`, una por **simulación**, más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea:
 
 ```{r}
 #| label: u22-tests
@@ -499,41 +499,17 @@ La quasi-Poisson corrige los errores estándar, pero no da una distribución. La
 
 ### El modelo: una mezcla Poisson–Gamma
 
-Supongamos que cada póliza tiene su propia media $\mu_i\varepsilon_i$, donde $\varepsilon_i$ es un
-factor de **heterogeneidad no observada** (la «fragilidad» de esa póliza) que se reparte como una
-**Gamma de media 1**. Condicionada a $\varepsilon_i$, la respuesta es Poisson; al integrar sobre la
-Gamma, la distribución marginal es una **binomial negativa**:
-
-$$Y_i\mid\varepsilon_i\sim\text{Poisson}(\mu_i\varepsilon_i),\qquad \varepsilon_i\sim\text{Gamma}(\text{media}=1)\ \Longrightarrow\ Y_i\sim\text{NB}.$$
-
-La media marginal sigue siendo $\mu_i=\exp(\eta_i)$ —el enlace log y la lectura en IRR **no cambian**—,
-pero la varianza se agranda. **Cómo** se agranda depende de la **forma** que demos a esa Gamma, y de ahí
-salen las dos parametrizaciones:
-
-- Si la Gamma tiene **forma constante** $\theta$ (la misma para todas las pólizas),
-  $\varepsilon_i\sim\text{Gamma}(\text{forma}=\theta,\ \text{tasa}=\theta)$, con media 1 y varianza
-  $1/\theta$. Entonces $\mathrm{Var}[\mu_i\varepsilon_i]=\mu_i^2/\theta$ y la varianza marginal es
-  $\mu_i+\mu_i^2/\theta$: crece de forma **cuadrática**. Es la **NB2**.
-- Si la Gamma tiene **forma proporcional a la media**, $\text{forma}=\mu_i/\alpha$ (tasa $1/\alpha$), su
-  varianza es $\alpha\mu_i$ y la varianza marginal queda $\mu_i+\alpha\mu_i=\mu_i(1+\alpha)$: crece de
-  forma **lineal**. Es la **NB1**.
-
-Es decir, la misma mezcla da la NB2 o la NB1 según la heterogeneidad sea **constante** (NB2) o **escale
-con el tamaño esperado** de la póliza (NB1).
-
-### Las dos parametrizaciones: de la lineal a la cuadrática
-
-Escritas con una **misma** $\alpha$, la única diferencia es el exponente de la media:
+Las dos binomiales negativas más habituales son la NB1 y NB2, y cada una captura una estructura específica para la varianza. Ambas se pueden obtener como una mixtura de una distribución de Poisson $Y|V \sim Po(\mu \cdot V)$ y una Gamma para la variable de confusión $V$, que debe tener una media de 1, $E(V)=1$:
 
 - **NB1** (varianza **lineal**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu=\mu(1+\alpha)$. Es la misma forma que
   la quasi-Poisson (con $\phi=1+\alpha$), pero con distribución propia. Se ajusta con
-  `glmmTMB(family = nbinom1)`.
-- **NB2** (varianza **cuadrática**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu^2$. Es la de `MASS::glm.nb`, que
-  la reparametriza con $\theta=1/\alpha$: $\mathrm{Var}[Y]=\mu+\mu^2/\theta$. Un $\theta$ **grande**
-  ($\alpha$ pequeño) acerca a la Poisson, y $\theta\to\infty$ la recupera.
+  `glmmTMB(family = nbinom1)`. Aquí $V \sim Ga(shape=\mu/\phi,rate=\mu/\phi)$, con $Var(V)=\phi/\mu$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2(\phi/\mu)=\mu+\phi\mu$.
+- **NB2** (varianza **cuadrática**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu^2$. Es la de `MASS::glm.nb` y `glmmTMB(family = nbinom2)`, que  la reparametriza con $\theta=1/\alpha$: $\mathrm{Var}[Y]=\mu+\mu^2/\theta$. Un $\theta$ **grande**
+  ($\alpha$ pequeño) acerca a la Poisson, y $\theta\to\infty$ la recupera. Aquí $V \sim Ga(shape=\phi,rate=\phi)$, con $Var(V)=1/\phi$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2/\phi$.
+
 
 La NB2 es el **caballo de batalla** —la opción por defecto— y la que encaja con la huella cuadrática que
-vimos en la cartera; la NB1 nos servirá para contrastarla con la quasi-Poisson.
+vimos en la cartera de seguros; la NB1 nos servirá para contrastarla con la quasi-Poisson.
 
 ### Estimación
 
@@ -680,7 +656,7 @@ poniendo cada término en su propia escala (van de $\sim 0.007$ a $\sim -0.34$):
 
 ```{r}
 #| label: fig-u22-comp-modelos
-#| fig-cap: "Estimaciones (punto) y ±1 error estándar (barra) de tres coeficientes en los cuatro modelos, cada término en su propia escala. Los puntos apenas se mueven entre modelos —la media es la misma—; lo que cambia es la longitud de la barra: la Poisson da el EE más pequeño, y la quasi-Poisson y la NB1 lo agrandan por igual (misma varianza lineal)."
+#| fig-cap: "Estimaciones (punto) y ±1 error estándar (barra) de tres coeficientes en los cuatro modelos, cada término en su propia escala. Los puntos apenas se mueven entre modelos —la media es la misma—; lo que cambia es la longitud de la barra: la Poisson da el EE más pequeño, y la quasi-Poisson y la NB1 lo agrandan de forma parecida (misma varianza lineal)."
 #| fig-width: 8.5
 #| fig-height: 3.4
 ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
@@ -702,7 +678,7 @@ purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
 
 Las estimaciones apenas se mueven (los puntos quedan casi a la misma altura en cada faceta); lo que
 cambia es la **longitud de la barra**: la Poisson da los errores más pequeños; la quasi-Poisson y la
-**NB1** los agrandan por igual —del orden de $\sqrt{\hat\phi}\approx 1.5$ veces— (son la misma varianza
+**NB1** los agrandan de forma parecida —del orden de $\sqrt{\hat\phi}\approx 1.5$ veces— (son la misma varianza
 lineal); y la **NB2** queda en una magnitud parecida, con su propia varianza cuadrática.
 
 ### La decisión formal: AIC y LRT
@@ -875,12 +851,16 @@ pediremos en el estudio de caso —ajustar a ciegas y validar al final contra `a
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.2) — resuelve la Pregunta 4 del caso
-Sobre la cohorte de tu equipo, aborda la **Pregunta 4** de la dirección ([Unidad 2.7](#sec-u27)): *unos
-pocos asegurados concentran muchísimas urgencias y la mayoría casi ninguna; ¿refleja bien tu modelo esa
-variabilidad o se queda corto?* Parte de la respuesta de conteos con más dispersión, **diagnostica** la
-sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
-quasi-Poisson y binomial negativa, y **decide y justifica** cuál captura mejor esa variabilidad
-—comparando por AIC y re-diagnosticando—. Interpreta en IRR y **valida** el $\theta$ estimado contra la
-verdad del DGP (`attr(cohorte, "verdad")`).
+## Tarea del estudiante (2.2) — Preguntas 6 y 7 del caso
+Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.7](#sec-u27)):
+
+- **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
+  la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
+  quasi-Poisson y binomial negativa, y **decide y justifica** cuál la captura mejor —AIC y re-diagnóstico—.
+  Explica qué cambia —y qué no— en los **errores estándar** y en la **tarifa**.
+- **P7 · ¿De dónde viene?** Razona esa variabilidad extra como **heterogeneidad no observada** (fragilidad):
+  pólizas intrínsecamente más siniestrosas que las variables no capturan. Deja el puente hacia los mixtos
+  ([2.4](#sec-u24)) y la supervivencia ([2.5](#sec-u25)).
+
+Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`attr(cartera, "verdad")$theta_frail`).
 :::

@@ -1,6 +1,6 @@
 ---
-title: "DGP para el bloque 3 de GLM: mantenimiento industrial"
-subtitle: "Datos continuos, efectos aleatorios y supervivencia mediante GLM"
+title: "[REFERENCIA · superado] DGP original del bloque 3: mantenimiento industrial"
+subtitle: "Documento de diseño. Generador activo: caso3/R/dgp_continuas.R (cargar_industrial())"
 author: "Curso de Modelos Lineales Generalizados"
 format:
   html:
@@ -18,6 +18,29 @@ execute:
 editor: visual
 lang: es
 ---
+
+::: {.callout-important}
+## ⚠️ Documento de REFERENCIA — no es el generador activo del curso
+
+Este `.qmd` es el **DGP original** del Caso 3, conservado solo como **referencia de diseño**
+(justificación del banco, variantes A–E y preguntas didácticas). **No forma parte del pipeline activo**
+y **no se renderiza** (no está en `_quarto.yml`).
+
+**El generador activo es `caso3/R/dgp_continuas.R`** (funciones `simular_industrial()` y
+`cargar_industrial()`), que es el que usan el documento del caso y todas sus unidades.
+
+**Cuidado si vuelves a renderizar ESTE documento**, porque generaría datos distintos y en otra carpeta:
+
+| | Este documento (referencia) | `dgp_continuas.R` (activo) |
+|---|---|---|
+| Carpeta de salida | `caso3/datos_glm_industrial/` (**vieja**) | `caso3/datos/` |
+| Tabla de intervalos | `modelo_poisson_intervalos.csv` | `modelo_intervalos.csv` |
+| Calibración | sin calibrar (censura ~5 %, `sigma_b1 = 0,018`, planta ×0,12) | calibrado (censura ~40 %, `sigma_b1 = 0,10`, planta ×0,45) |
+| Semilla / formato | `set.seed(20260717)`, tablas sueltas | `SEMILLA_CURSO`, lista con `attr(., "verdad")` + caché `.rds` |
+
+En resumen: **para generar o leer los datos del curso, usa `cargar_industrial()`**; este documento solo
+se conserva para consultar el porqué del diseño.
+:::
 
 # Finalidad didáctica
 

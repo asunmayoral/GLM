@@ -1,43 +1,594 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_1.qmd >}}. Sin YAML. Chunks u31-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_1.qmd >}}. Sin YAML. Chunks u31-.
+     Unidad fundacional del Caso 3 (GLM Gamma). Estructura espejo de 2.1:
+     Contexto · Modelización y estimación · Interpretación · Inferencia y selección ·
+     Bondad de ajuste, diagnóstico y predicción. -->
 
 # 1 · GLM Gamma {#sec-u31}
 
-<!-- TODO intro: la respuesta es un IMPORTE positivo y asimétrico a la derecha; el modelo lineal
-     gaussiano no vale. La Gamma es la distribución de referencia (Var = phi·mu^2, CV constante).
-     Recorrido completo de 2.1 (modelo único). -->
+El Caso 1 preguntaba *si* ocurría un evento y el Caso 2 *cuántas veces*. Ahora la respuesta es un
+**importe**: lo que cuesta una intervención de mantenimiento. Es una magnitud **continua**,
+**estrictamente positiva** y **asimétrica a la derecha** —unas pocas reparaciones se disparan mientras
+la mayoría se agrupa en valores modestos—, y esas tres propiedades bastan para descartar el modelo
+lineal gaussiano. La maquinaria del GLM ya la tenemos; aquí ponemos el peso en lo propio de una
+respuesta positiva: la distribución **Gamma**, el enlace **log** y el parámetro de **dispersión**.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **continuas positivas** — el GLM **Gamma** (enlaces log/inverso), el parámetro de
-dispersión φ, la interpretación multiplicativa y el diagnóstico.
+Objetivo general: **continuas positivas** — el GLM **Gamma** (enlaces log e inverso), el parámetro de
+dispersión $\phi$, la interpretación **multiplicativa** y el diagnóstico.
 :::
 
 ## 1.1 Contexto: qué modela {#sec-u31-contexto}
 
-<!-- TODO: el coste de siniestro (positivo, asimétrico); por qué el gaussiano falla; gráfico de la
-     distribución del importe y de su relación con predictores. -->
+Trabajamos con `modelo_base`: una fila por máquina, con la **primera intervención observada** y su
+coste. Empecemos mirando la respuesta.
 
-## 1.2 Modelización y estimación {#sec-u31-modelo}
+```{r}
+#| label: u31-datos
+base <- banco$modelo_base
+c(n = nrow(base),
+  media = mean(base$coste_euros),
+  mediana = median(base$coste_euros),
+  minimo = min(base$coste_euros),
+  maximo = max(base$coste_euros)) |> round(1)
+```
 
-<!-- TODO: Y ~ Gamma(media mu, dispersión phi); Var = phi·mu^2; enlace LOG (efectos multiplicativos)
-     frente al INVERSO (canónico); estimación por MV / IWLS; phi estimado por deviance/Pearson. -->
+La media supera a la mediana y el máximo queda muy lejos de ambas: la señal típica de una
+**distribución asimétrica a la derecha**.
+
+```{r}
+#| label: fig-u31-asimetria
+#| fig-width: 9
+#| fig-height: 3.4
+#| fig-cap: "Distribución del coste de la intervención en escala original (izquierda) y logarítmica (derecha). En la escala original la cola derecha es larga; en escala log la forma se vuelve casi simétrica, lo que anticipa que el modelo debe ser multiplicativo."
+p1 <- ggplot(base, aes(coste_euros)) +
+  geom_histogram(bins = 40, fill = "steelblue") +
+  labs(x = "coste de la intervención (€)", y = "nº de intervenciones")
+
+p2 <- ggplot(base, aes(coste_euros)) +
+  geom_histogram(bins = 40, fill = "steelblue") +
+  scale_x_log10() +
+  labs(x = "coste (€, escala log)", y = NULL)
+
+p1 + p2
+```
+
+**¿Por qué no vale el modelo lineal gaussiano?** No es una objeción estética: falla en tres frentes
+que podemos comprobar. El primero es de principio —el gaussiano puede predecir lo imposible, y basta
+**un solo** coste negativo para delatar que su soporte es el equivocado—.
+
+```{r}
+#| label: u31-ols-falla
+ols <- lm(coste_euros ~ antiguedad_anios + log(degradacion) * tipo_intervencion +
+            tipo + fabricante, data = base)
+
+c(predicciones_negativas = sum(fitted(ols) < 0),
+  prediccion_minima      = round(min(fitted(ols)), 1))
+```
+
+Aunque sean pocas, esas predicciones negativas no son admisibles: el gaussiano tiene soporte en toda
+la recta real, mientras que el coste vive en $(0,\infty)$. No es un problema de cuántas fallan, sino de
+que el modelo *pueda* producirlas. El segundo frente es la
+**heterocedasticidad**: la dispersión no es constante, sino que crece con el nivel del coste.
+
+```{r}
+#| label: fig-u31-heterocedasticidad
+#| fig-width: 9
+#| fig-height: 3.4
+#| fig-cap: "Residuos del ajuste lineal gaussiano frente a los valores ajustados (izquierda) y QQ-plot normal de esos residuos (derecha). El abanico creciente delata heterocedasticidad y la curvatura en la cola, la asimetría: dos supuestos del modelo lineal que aquí no se sostienen."
+d_ols <- tibble::tibble(ajustado = fitted(ols), residuo = resid(ols))
+
+q1 <- ggplot(d_ols, aes(ajustado, residuo)) +
+  geom_point(alpha = 0.35) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_smooth(se = FALSE, colour = "firebrick") +
+  labs(x = "valor ajustado (€)", y = "residuo")
+
+q2 <- ggplot(d_ols, aes(sample = residuo)) +
+  stat_qq(alpha = 0.35) + stat_qq_line(colour = "firebrick") +
+  labs(x = "cuantiles teóricos", y = "cuantiles muestrales")
+
+q1 + q2
+```
+
+El tercer frente es más sutil y es el que da nombre a la familia que usaremos: en datos de importes,
+lo que suele mantenerse aproximadamente **constante no es la varianza sino el coeficiente de
+variación** —la dispersión *relativa*—. Una reparación de 5.000 € varía en cientos de euros; una de
+500 €, en decenas. Comprobémoslo por tramos de coste:
+
+```{r}
+#| label: tbl-u31-cv
+#| tbl-cap: "Media, desviación típica y coeficiente de variación del coste por tramos (quintiles del valor ajustado). La desviación típica crece con la media, pero el CV se mantiene mucho más estable: es la firma de la familia Gamma."
+base |>
+  dplyr::mutate(tramo = dplyr::ntile(fitted(ols), 5)) |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(n = dplyr::n(),
+                   media = mean(coste_euros),
+                   sd    = sd(coste_euros),
+                   cv    = sd / media, .groups = "drop") |>
+  dplyr::mutate(dplyr::across(c(media, sd), \(x) round(x, 1)),
+                cv = round(cv, 3))
+```
+
+Fíjate en la magnitud del contraste: al pasar del primer al último tramo la **desviación típica se
+multiplica por más de cuatro**, mientras el **CV se mueve en una banda estrecha** en torno a 0,45. Esa
+es exactamente la estructura que codifica la **Gamma**: $\operatorname{Var}(Y)\propto\mu^2$, es decir,
+desviación típica proporcional a la media y **CV constante** [@mccullagh1989, cap. 8].
+
+El último tramo se desvía algo al alza, y conviene no barrerlo bajo la alfombra: ahí viven las
+reparaciones más caras, la cola es larga y con pocas observaciones por grupo el CV se estima con
+ruido. No invalida la lectura —el contraste entre multiplicar por cuatro la desviación y mover el CV
+unas centésimas es contundente—, pero es el tipo de detalle que volveremos a mirar con herramientas
+formales en la [Sección 1.5](#sec-u31-diagnostico).
+
+Y una última mirada al contexto sustantivo, porque el modelo debe responder a una pregunta industrial:
+¿de qué depende el coste?
+
+```{r}
+#| label: fig-u31-predictores
+#| fig-width: 9
+#| fig-height: 3.6
+#| fig-cap: "Coste frente a degradación (escala log-log) según el tipo de intervención (izquierda) y distribución del coste por tipo de máquina (derecha). Las correctivas son más caras y, sobre todo, parecen responder más intensamente a la degradación: las pendientes no son paralelas."
+r1 <- ggplot(base, aes(degradacion, coste_euros, colour = tipo_intervencion)) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "degradación (log)", y = "coste (€, log)", colour = NULL) +
+  theme(legend.position = "top")
+
+r2 <- ggplot(base, aes(tipo, coste_euros)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  scale_y_log10() +
+  labs(x = NULL, y = "coste (€, log)")
+
+r1 + r2
+```
+
+Dos hechos para el modelo: el coste crece con la **degradación**, y esa pendiente **no es la misma**
+en preventivas y correctivas. Eso pide un término de **interacción**.
+
+## 1.2 Modelización y estimación {#sec-u31-modelizacion}
+
+### El modelo genérico
+
+Una respuesta continua y positiva pide una distribución con soporte en $(0,\infty)$. La de referencia
+es la **Gamma**, y el modelo reúne los tres ingredientes de todo GLM [@nelder1972]:
+
+- **Componente aleatoria:** $Y_i \sim \text{Gamma}(\mu_i,\phi)$, con soporte $(0,\infty)$. Su rasgo
+  distintivo es la relación media-varianza
+  $$\operatorname{Var}(Y_i)=\phi\,\mu_i^{2},$$
+  de donde el **coeficiente de variación** $\sqrt{\operatorname{Var}(Y_i)}/\mu_i=\sqrt{\phi}$ **no
+  depende de $\mu_i$**: es constante. Ese es el supuesto que acabamos de ver plausible en la
+  @tbl-u31-cv.
+- **Enlace log:** $\log\mu_i=\eta_i$, de modo que $\mu_i=e^{\eta_i}>0$ —garantiza una media positiva y
+  hace que los efectos sean **multiplicativos**—.
+- **Predictor lineal:** $\eta_i=\beta_0+\beta_1x_{i1}+\dots+\beta_px_{ip}$.
+
+La Gamma pertenece a la familia exponencial, con $\phi$ como parámetro de dispersión
+[@dobson2018, cap. 3], de modo que hereda toda la maquinaria del marco: IWLS, deviance e inferencia.
+
+### Enlace log frente a enlace inverso
+
+El enlace **canónico** de la Gamma no es el log sino el **inverso**, $\eta=1/\mu$
+[@mccullagh1989, §8.3.3]. Que el canónico exista no obliga a usarlo: la elección debe responder a la
+interpretación y al ajuste.
+
+| | Enlace log | Enlace inverso (canónico) |
+|---|---|---|
+| Forma | $\log\mu=\eta$ | $1/\mu=\eta$ |
+| Efectos | **multiplicativos**: $e^{\beta}$ es un factor | aditivos sobre la *tasa* $1/\mu$ |
+| Positividad | garantizada para todo $\eta$ | **no** garantizada ($\eta$ puede ser $\le 0$) |
+| Interpretación | directa en importes | poco natural en costes |
+
+Para importes trabajaremos con el **log**: es el que da la lectura multiplicativa que necesitamos y el
+que evita predicciones inadmisibles [@mccullagh1989, §8.3.4].
+
+### Qué predictores entran, y cuáles no {#sec-u31-candidatos}
+
+`modelo_base` trae más variables de las que necesitamos, a propósito. Antes de escribir la fórmula
+conviene mirarlas todas frente a la respuesta. Empezamos por las **continuas**:
+
+```{r}
+#| label: fig-u31-candidatas-cont
+#| fig-width: 9.5
+#| fig-height: 5
+#| fig-cap: "Coste (eje logarítmico) frente a cada predictor continuo candidato, con un suavizado loess. La degradación es el predictor más fuerte y su relación es claramente cóncava en esta escala —lo que motiva entrar en logaritmo—. Carga, temperatura y vibración también muestran asociación, un hecho al que volveremos enseguida."
+base |>
+  dplyr::select(coste_euros, antiguedad_anios, degradacion, carga, temperatura, vibracion) |>
+  tidyr::pivot_longer(-coste_euros, names_to = "predictor", values_to = "valor") |>
+  ggplot(aes(valor, coste_euros)) +
+  geom_point(alpha = 0.18, size = 0.7) +
+  geom_smooth(method = "loess", se = FALSE, colour = "firebrick") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  scale_y_log10() +
+  labs(x = NULL, y = "coste (€, escala log)")
+```
+
+Y las **categóricas**:
+
+```{r}
+#| label: fig-u31-candidatas-cat
+#| fig-width: 9.5
+#| fig-height: 4.6
+#| fig-cap: "Distribución del coste (eje logarítmico) por cada predictor categórico candidato. El tipo de intervención separa con claridad; el tipo de máquina algo menos; el fabricante apenas separa nada."
+base |>
+  dplyr::select(coste_euros, tipo, fabricante, plan_mantenimiento, tipo_intervencion) |>
+  dplyr::mutate(dplyr::across(-coste_euros, as.character)) |>
+  tidyr::pivot_longer(-coste_euros, names_to = "predictor", values_to = "nivel") |>
+  ggplot(aes(nivel, coste_euros)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 1) +
+  scale_y_log10() +
+  labs(x = NULL, y = "coste (€, escala log)")
+```
+
+De aquí salen cuatro decisiones, y conviene razonarlas una a una.
+
+**1) La degradación entra en logaritmo.** En la @fig-u31-candidatas-cont su relación con el coste es
+cóncava en escala log del eje vertical; al pasar *también* el eje horizontal a logaritmo se endereza
+(lo vimos en la @fig-u31-predictores). Que ambas escalas logarítmicas linealicen la relación es
+justamente lo que significa una **elasticidad constante**, y eso es lo que codifica `log(degradacion)`.
+
+**2) La interacción con el tipo de intervención.** Ya en la @fig-u31-predictores las dos rectas no
+eran paralelas: la degradación encarece más las correctivas que las preventivas. Eso es un término
+`log(degradacion):tipo_intervencion`.
+
+**3) Carga, temperatura y vibración se quedan fuera** —aunque en la @fig-u31-candidatas-cont parezcan
+tener señal—. La razón es que están **correlacionadas con la degradación**, porque son precisamente
+lo que la produce:
+
+```{r}
+#| label: tbl-u31-correlaciones
+#| tbl-cap: "Correlaciones entre los predictores continuos candidatos (degradación y vibración en escala logarítmica). Carga, temperatura y vibración están correlacionadas con la degradación: no son información independiente."
+base |>
+  dplyr::transmute(log_degradacion = log(degradacion), carga, temperatura,
+                   log_vibracion = log(vibracion), antiguedad_anios) |>
+  cor() |> round(2)
+```
+
+Su asociación con el coste es **indirecta**: actúan *a través* de la degradación. Si la degradación ya
+está en el modelo, no deberían aportar nada más. Comprobémoslo, que es más convincente que afirmarlo
+—adelantamos aquí el ajuste que formalizaremos en el apartado siguiente—:
+
+```{r}
+#| label: tbl-u31-aporte-condicional
+#| tbl-cap: "Aporte de cada sensor cuando se añade a un modelo que ya incluye log(degradacion): coeficiente, valor p y cambio en el AIC. Un ΔAIC positivo indica que el modelo empeora al añadir la variable."
+m_ref <- glm(coste_euros ~ antiguedad_anios + log(degradacion) * tipo_intervencion +
+               tipo + fabricante, family = Gamma(link = "log"), data = base)
+
+purrr::map_dfr(c("carga", "temperatura", "log(vibracion)"), \(v) {
+  m_v <- update(m_ref, as.formula(paste(". ~ . +", v)))
+  tibble::tibble(anadido = v,
+                 coeficiente = round(coef(m_v)[v], 4),
+                 p_valor = round(summary(m_v)$coefficients[v, 4], 3),
+                 delta_AIC = round(AIC(m_v) - AIC(m_ref), 1))
+})
+```
+
+::: {.callout-warning}
+## Asociación marginal no es efecto
+Este es el error más común al construir un modelo a partir de descriptivos: pasar al modelo *todo lo
+que correlaciona con la respuesta*. La vibración correlaciona con el coste, pero **no lo causa**: es
+un síntoma del mismo deterioro que encarece la reparación. Meterla junto a la degradación no añade
+información y sí enturbia la lectura del coeficiente de la degradación, que es el que nos interesa.
+:::
+
+**4) `plan_mantenimiento` tampoco entra**, y aquí la razón es estructural más que estadística:
+
+```{r}
+#| label: tbl-u31-plan-vs-intervencion
+#| tbl-cap: "Plan de mantenimiento × tipo de intervención. Una máquina sin plan preventivo solo puede recibir intervenciones correctivas: la celda correspondiente es un cero estructural."
+table(plan = base$plan_mantenimiento, intervencion = base$tipo_intervencion)
+```
+
+Una máquina con plan **correctivo** no puede tener una intervención **preventiva**: esa celda es cero
+por construcción, no por azar. `plan_mantenimiento` actúa sobre el coste *a través* del tipo de
+intervención, así que incluir ambos solaparía información. El plan volverá —y con papel
+protagonista— cuando preguntemos por la **vida útil** en la [Unidad 3.4](#sec-u34).
+
+**Qué sí conservamos, y por qué.** `antiguedad_anios` muestra una relación positiva y razonablemente
+lineal, y es un efecto propio, no mediado por la degradación. `tipo` separa moderadamente. Y
+mantenemos **`fabricante` a sabiendas de que no parece separar nada**: nos sirve de **control
+interno**, un predictor que esperamos ver declarado irrelevante por la inferencia de la
+[Sección 1.4](#sec-u31-inferencia). Un modelo que «encuentra» efectos donde no los hay es un modelo
+del que desconfiar.
+
+Queda una fuente de variación que **no** podemos meter: las máquinas se agrupan en **plantas**, y
+plantas distintas pueden tener costes sistemáticamente distintos. Aquí la ignoramos deliberadamente
+—volveremos sobre ella en la [Sección 1.5](#sec-u31-diagnostico) y, ya con herramientas, en la
+[Unidad 3.3](#sec-u33)—.
+
+### El modelo del caso
+
+Con todo lo anterior, la fórmula se justifica sola:
+
+```{r}
+#| label: u31-ajuste
+m_gamma <- glm(coste_euros ~ antiguedad_anios + log(degradacion) * tipo_intervencion +
+                 tipo + fabricante,
+               family = Gamma(link = "log"), data = base)   # el mismo m_ref de más arriba
+
+summary(m_gamma)
+```
+
+Sobre la **estimación**: los $\hat\beta$ se obtienen por máxima verosimilitud mediante IWLS, igual que
+en los casos anteriores. La novedad es $\phi$: **no se estima por máxima verosimilitud junto a los
+$\beta$**, sino aparte. R devuelve por defecto la estimación basada en el estadístico de Pearson,
+$$\hat\phi=\frac{1}{n-p}\sum_i\frac{(y_i-\hat\mu_i)^2}{\hat\mu_i^{2}},$$
+que es la recomendada frente a la basada en la deviance, más sesgada cuando la Gamma tiene forma
+pequeña [@mccullagh1989, §8.3.6].
+
+```{r}
+#| label: u31-dispersion
+c(phi_pearson = summary(m_gamma)$dispersion,
+  cv_implicado = sqrt(summary(m_gamma)$dispersion),
+  forma_implicada = 1 / summary(m_gamma)$dispersion) |> round(3)
+```
+
+::: {.callout-tip}
+## Ojo: CV condicional, no marginal
+$\sqrt{\hat\phi}$ estima el CV **condicional** —la dispersión relativa de máquinas *con el mismo
+perfil*—. El CV marginal de `coste_euros` es mayor, porque además mezcla la variación *sistemática*
+entre perfiles. Confundirlos es un error frecuente al leer $\phi$.
+:::
 
 ## 1.3 Interpretación {#sec-u31-interpretacion}
 
-<!-- TODO: con enlace log, exp(beta) = factor multiplicativo del importe medio; coeficiente de
-     variación constante; lectura de phi. -->
+Con enlace log, el modelo es **multiplicativo**:
+$$\mu_i=e^{\beta_0}\cdot e^{\beta_1x_{i1}}\cdots e^{\beta_px_{ip}},$$
+así que $e^{\beta_j}$ es el **factor** por el que se multiplica el coste medio cuando $x_j$ aumenta en
+una unidad, con el resto fijo. Un $e^{\beta}=1{,}05$ significa «un 5 % más caro».
+
+```{r}
+#| label: tbl-u31-coeficientes
+#| tbl-cap: "Coeficientes del GLM Gamma exponenciados: factor multiplicativo sobre el coste medio e intervalo de confianza al 95 %."
+broom::tidy(m_gamma, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::select(term, estimate, conf.low, conf.high, p.value) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), \(x) round(x, 3)),
+                p.value = signif(p.value, 3))
+```
+
+Lecturas, término a término:
+
+- **`antiguedad_anios`.** El factor $e^{\hat\beta}$ multiplica el coste medio por cada año adicional
+  de antigüedad. Como el coeficiente es pequeño, la aproximación $e^{\beta}\approx1+\beta$ (para
+  $\beta$ próximo a 0) da una lectura cómoda: un factor de $1{,}04$ equivale a «un 4 % más caro por
+  año» aproximadamente. Lee el valor exacto en la columna `estimate` de la tabla.
+- **`tipo`.** El nivel de referencia es `Fresadora` (orden alfabético). El factor de `tipoPrensa` mide
+  cuánto más cara es una prensa que una fresadora **a igualdad del resto**.
+- **`fabricante`.** Atención a este: es un **predictor sin efecto real** sobre el coste, y esperamos
+  que el modelo lo diga (intervalos que contienen el 1). Sirve de control interno.
+
+**La interacción.** El término `log(degradacion):tipo_intervencionCorrectiva` es el más sustantivo del
+modelo y no se lee directamente en la tabla. Como la degradación entra en logaritmo y la respuesta
+también, el coeficiente de `log(degradacion)` es una **elasticidad**: el porcentaje en que varía el
+coste medio ante un 1 % más de degradación. La interacción dice que esa elasticidad **cambia** según
+el tipo de intervención. La forma limpia de leerla es pedir la pendiente en cada grupo:
+
+```{r}
+#| label: tbl-u31-interaccion
+#| tbl-cap: "Elasticidad del coste respecto de la degradación, por tipo de intervención: variación relativa del coste medio ante un aumento del 1 % en la degradación."
+emmeans::emtrends(m_gamma, ~ tipo_intervencion, var = "log(degradacion)")
+```
+
+La lectura industrial: en una intervención **preventiva** el coste sube con la degradación de forma
+moderada, mientras que en una **correctiva** la misma degradación se traduce en un encarecimiento
+mayor. Dicho de otro modo, **dejar que la máquina se degrade sale caro sobre todo cuando la reparación
+llega tarde** —que es justo el argumento económico a favor del plan preventivo, y la pregunta que el
+estudio de caso tendrá que cuantificar—.
+
+Ahora bien, mira los **intervalos de confianza** de las dos elasticidades: se solapan parcialmente. La
+diferencia apunta en la dirección esperada, pero está estimada **con poca precisión**. Lo
+confirmaremos en la [Sección 1.4](#sec-u31-inferencia), donde el contraste de la interacción queda
+justo en el filo de la significación.
+
+::: {.callout-tip}
+## Las interacciones piden muchos más datos
+Un efecto principal se estima con toda la muestra; una interacción se estima, en la práctica, con la
+*diferencia* entre submuestras, y esa diferencia es mucho más volátil. Es habitual que una interacción
+real —y aquí **sabemos** que es real, porque está en el proceso generador— aparezca como
+«marginalmente significativa» con tamaños muestrales que sobran para los efectos principales. No
+significativo no es lo mismo que inexistente.
+:::
+
+Y las **predicciones**, que son lo que la dirección de mantenimiento querrá ver, en euros:
+
+```{r}
+#| label: fig-u31-prediccion
+#| fig-width: 6.5
+#| fig-height: 3.6
+#| fig-cap: "Coste medio predicho por el GLM Gamma frente a la degradación, por tipo de intervención, con banda de confianza al 95 %. Las curvas divergen: es el efecto de la interacción."
+marginaleffects::plot_predictions(
+  m_gamma, condition = c("degradacion", "tipo_intervencion")) +
+  labs(x = "degradación", y = "coste medio predicho (€)", colour = NULL, fill = NULL)
+```
 
 ## 1.4 Inferencia y selección {#sec-u31-inferencia}
 
-<!-- TODO: Wald / LRT / contraste F (phi desconocida); AIC. -->
+Con $\phi$ **desconocida y estimada**, el contraste de referencia para comparar modelos anidados no es
+el $\chi^2$ sino el **contraste F**, igual que en el modelo lineal: la deviance debe escalarse por una
+estimación de la dispersión.
 
-## 1.5 Bondad de ajuste y diagnóstico {#sec-u31-diagnostico}
+```{r}
+#| label: u31-anova-f
+anova(m_gamma, test = "F")
+```
 
-<!-- TODO: residuos (deviance / cuantil aleatorizados), DHARMa, QQ-plot; enlace al compendio de bondad
-     de ajuste. Validación contra el DGP. -->
+::: {.callout-warning}
+## Por qué F y no $\chi^2$
+En Poisson y binomial la dispersión es conocida ($\phi=1$) y la diferencia de deviances es
+asintóticamente $\chi^2$. En la Gamma, $\phi$ se estima a partir de los datos, así que el cociente de
+deviances escaladas sigue una $F$. Usar `test = "Chisq"` aquí produce valores $p$ demasiado pequeños.
+:::
+
+Contrastemos formalmente si la **interacción** es necesaria, que es la decisión de modelización más
+importante de la unidad —y, como anticipábamos, la más delicada—:
+
+```{r}
+#| label: u31-lrt-interaccion
+m_sin_int <- glm(coste_euros ~ antiguedad_anios + log(degradacion) + tipo_intervencion +
+                   tipo + fabricante,
+                 family = Gamma(link = "log"), data = base)
+
+anova(m_sin_int, m_gamma, test = "F")
+```
+
+El contraste queda **justo por debajo de 0,05**: la interacción entra, pero por los pelos. Y aquí hay
+una decisión que conviene tomar con la cabeza y no con la tabla. La retenemos por tres razones: es la
+pregunta **sustantiva** del caso (¿encarece más la degradación cuando la reparación llega tarde?), el
+signo es el esperado, y el descriptivo de la @fig-u31-predictores ya apuntaba a ello. Descartar un
+término sustantivo porque su $p$ cae del lado incómodo de un umbral convencional es mal criterio; en
+el informe, lo honesto es **declarar la imprecisión**, no esconderla.
+
+Y comprobemos el **control interno**: si quitamos `fabricante` —que sabemos que no influye en el
+coste— el ajuste no debería empeorar de forma apreciable.
+
+```{r}
+#| label: u31-fabricante
+m_sin_fab <- update(m_gamma, . ~ . - fabricante)
+anova(m_sin_fab, m_gamma, test = "F")
+```
+
+El valor $p$ es altísimo: el modelo **no empeora** al quitar el fabricante. El control interno
+funciona, y eso es una buena noticia sobre el procedimiento: cuando metemos ruido, la inferencia lo
+identifica como ruido.
+
+Para comparar modelos **no anidados** o con criterios de parsimonia recurrimos al **AIC**
+[@akaike1974], recordando que en la Gamma el AIC depende de $\phi$ y solo es comparable entre modelos
+ajustados sobre **los mismos datos y la misma familia**:
+
+```{r}
+#| label: tbl-u31-aic
+#| tbl-cap: "Comparación por AIC de los tres modelos anidados considerados."
+AIC(m_sin_fab, m_sin_int, m_gamma) |> round(1)
+```
+
+Léela con cuidado, porque dice dos cosas distintas. El **AIC más bajo** es el del modelo **sin
+`fabricante`**: coherente con todo lo anterior —el fabricante es ruido y el AIC penaliza sus dos
+parámetros inútiles—. En cambio, entre el modelo con interacción y el modelo sin ella la diferencia es
+de apenas **un par de puntos** a favor del primero: el AIC tampoco resuelve con contundencia lo que el
+contraste $F$ dejaba en el filo. Dos criterios distintos, la misma conclusión: la interacción está
+ahí, pero estos datos no alcanzan para clavarla.
+
+::: {.callout-note}
+## El modelo que nos llevamos
+Tras la inferencia, el modelo defendible es el de `m_sin_fab`: coste ~ antigüedad + log(degradación) ×
+tipo de intervención + tipo de máquina. Mantenemos `fabricante` en `m_gamma` a lo largo de la unidad
+**solo** por su valor didáctico como control; en un informe real habría salido aquí.
+:::
+
+## 1.5 Bondad de ajuste, diagnóstico y predicción {#sec-u31-diagnostico}
+
+### Residuos: cuáles usar
+
+Los residuos crudos $y-\hat\mu$ no sirven en un GLM Gamma, porque su dispersión crece con $\hat\mu$
+por construcción. Los de **deviance** corrigen bastante, pero en respuestas muy asimétricas siguen
+mostrando patrones espurios. La herramienta adecuada son los **residuos cuantil aleatorizados**
+[@dunnsmyth1996]: si el modelo es correcto se distribuyen **uniformemente**, sea cual sea la familia,
+lo que hace el diagnóstico visual mucho más fiable.
+
+```{r}
+#| label: fig-u31-dharma
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Diagnóstico con residuos cuantil simulados (DHARMa). Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste, dispersión y valores atípicos. Derecha: residuos frente a valores ajustados; buscamos una nube sin estructura y sin abanico."
+res_sim <- DHARMa::simulateResiduals(m_gamma, n = 1000)
+plot(res_sim)
+```
+
+Lo que buscamos: puntos sobre la diagonal en el QQ-plot y ausencia de tendencia a la derecha. Un
+patrón en forma de embudo indicaría que la relación media-varianza **no** es la de la Gamma —y nos
+llevaría a la [Unidad 3.2](#sec-u32), donde probaremos la inversa gaussiana y la lognormal—.
+
+### ¿Es correcta la función de varianza?
+
+Es el supuesto central, así que merece una comprobación directa: agrupamos por valor ajustado y
+contrastamos si la varianza crece como $\mu^2$ (Gamma), como $\mu$ (Poisson) o como $\mu^3$ (inversa
+gaussiana) [@mccullagh1989, §12.6.2].
+
+```{r}
+#| label: fig-u31-varianza
+#| fig-width: 6
+#| fig-height: 3.6
+#| fig-cap: "Relación media-varianza empírica en escala log-log. La pendiente estimada indica la potencia p en Var(Y) ∝ μ^p: p ≈ 2 respalda la Gamma, p ≈ 1 apuntaría a Poisson y p ≈ 3 a la inversa gaussiana."
+mv <- base |>
+  dplyr::mutate(grupo = dplyr::ntile(fitted(m_gamma), 12)) |>
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(media = mean(coste_euros), varianza = var(coste_euros), .groups = "drop")
+
+pendiente <- coef(lm(log(varianza) ~ log(media), data = mv))[2]
+
+ggplot(mv, aes(media, varianza)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, colour = "firebrick") +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "media del grupo (€, log)", y = "varianza del grupo (log)",
+       subtitle = paste0("pendiente estimada p = ", round(pendiente, 2)))
+```
+
+### Observaciones influyentes
+
+```{r}
+#| label: fig-u31-influencia
+#| fig-width: 6
+#| fig-height: 3.4
+#| fig-cap: "Distancia de Cook por observación. Se marca el umbral orientativo 4/n; los puntos que lo superan merecen inspección, no eliminación automática."
+d_inf <- tibble::tibble(obs = seq_len(nrow(base)), cook = cooks.distance(m_gamma))
+
+ggplot(d_inf, aes(obs, cook)) +
+  geom_col(width = 0.7) +
+  geom_hline(yintercept = 4 / nrow(base), linetype = 2, colour = "firebrick") +
+  labs(x = "observación", y = "distancia de Cook")
+```
+
+### Validación contra el DGP
+
+Aquí está la ventaja de trabajar con datos simulados: podemos comparar lo estimado con la **verdad**.
+
+```{r}
+#| label: tbl-u31-verdad
+#| tbl-cap: "Coeficientes estimados frente a los valores verdaderos del proceso generador, con el intervalo de confianza al 95 %. La columna final indica si el intervalo cubre la verdad."
+verdad <- attr(banco, "verdad")$beta_coste
+
+comparacion <- tibble::tibble(
+  termino = c("(Intercept)", "antiguedad_anios", "log(degradacion)",
+              "tipoPrensa", "tipo_intervencionCorrectiva",
+              "log(degradacion):tipo_intervencionCorrectiva"),
+  verdadero = c(verdad[["int"]], verdad[["antiguedad"]], verdad[["log_degrad"]],
+                verdad[["tipoPrensa"]], verdad[["correctiva"]],
+                verdad[["log_degrad_x_correctiva"]]))
+
+broom::tidy(m_gamma, conf.int = TRUE) |>
+  dplyr::inner_join(comparacion, by = c("term" = "termino")) |>
+  dplyr::transmute(termino = term,
+                   estimado = round(estimate, 3),
+                   verdadero = round(verdadero, 3),
+                   ic = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]"),
+                   cubre = ifelse(conf.low <= verdadero & verdadero <= conf.high, "sí", "NO"))
+```
+
+::: {.callout-important}
+## Un detalle que no es un fallo
+El DGP incluye un **efecto aleatorio de planta** sobre el coste ($\sigma=0{,}10$) que el modelo **no
+puede ver**, porque no incluye `id_planta`. Esa variabilidad no desaparece: se absorbe en $\hat\phi$,
+que por eso queda algo por encima del valor verdadero. Es un ejemplo limpio de heterogeneidad no
+observada, y es exactamente el problema que resolverán los modelos mixtos de la
+[Unidad 3.3](#sec-u33).
+:::
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.1)
-<!-- TODO: sobre la cartera del equipo, modelar el coste medio de siniestro con un GLM Gamma (enlace
-     log); interpretar los factores; diagnosticar. -->
+Sobre el banco de vuestro equipo:
+
+1. Ajustad un GLM Gamma con enlace log para el coste de la primera intervención e **interpretad en
+   euros** los efectos de la antigüedad, el tipo de máquina y el tipo de intervención.
+2. Ajustad el mismo modelo con **enlace inverso**. ¿Mejora el ajuste? ¿Alguna predicción resulta
+   inadmisible? Justificad qué enlace elegís y por qué.
+3. El modelo asume que la elasticidad respecto de la degradación es **constante**. Contrastadlo
+   añadiendo un término cuadrático en `log(degradacion)` y decidid si compensa.
+4. Comparad el GLM Gamma con un modelo lineal gaussiano sobre `log(coste_euros)`. ¿Estiman lo mismo?
+   Cuidado al devolver las predicciones a euros: ahí hay una trampa que discutiremos en la
+   [Unidad 3.2](#sec-u32).
+5. Identificad las intervenciones más influyentes y decidid, **con argumentos técnicos**, si procede
+   hacer algo con ellas.
 :::

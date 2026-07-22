@@ -1,0 +1,46 @@
+
+== Generando cartera de auto ==
+
+[0] Dimensiones y rangos
+  pólizas: 3071 | siniestros: 1703 | filas panel: 14516
+  exposicion [0.01, 1.00] | antiguedad [0.10, 10.00]
+  % con siniestro: 30.8 | % baja: 38.9 | media n_siniestros: 0.555
+  var/media n_siniestros = 2.50  (>1 => sobredispersión por fragilidad; verdad θ=1.20)
+
+[1] Frecuencia (binomial negativa, offset=log(exposicion))
+  θ estimado = 1.15  (verdad = 1.20)
+  IRR estimadas vs verdad (algunas):
+    edad_tramo35-65        est 0.448 | verdad 0.450
+    usocomercial           est 1.358 | verdad 1.246
+    scale(log(densidad))   est 1.335 | verdad 1.419
+    tipo_vehiculomoto      est 1.325 | verdad 1.197
+    sexoH                  est 1.054 | verdad 1.105
+
+[2] Severidad (Gamma, enlace log) a nivel de PARTE
+  coste medio estimado (intercepto) = 1890 €  (verdad base = 1800 €)
+  IRR valor_vehiculo est 1.310 | verdad 1.297
+  IRR tipo moto      est 1.285 | verdad 1.350
+
+[3] Baja / churn: AFT log-logística (no-PH) y test de PH de Cox
+  coef AFT uso=comercial est -0.266 | verdad -0.150 (log-tiempo; - = dura menos)
+  escala AFT est 0.636 | verdad σ_l = 0.600
+  cox.zph (esperamos p pequeño = PH NO se cumple, por diseño AFT):
+                     chisq df      p
+scale(potencia_cv)  0.1362  1 0.7121
+uso                 2.6783  1 0.1017
+edad_tramo         14.6364  3 0.0022
+GLOBAL             17.8780  5 0.0031
+
+[4] Tiempo al primer siniestro: forma Weibull
+  forma Weibull estimada = 0.97 | verdad = 1.15  (survreg scale = 1/forma)
+
+[5] Bonus-malus: tabla de transición prev -> act
+    act
+prev    1    2    3    4    5
+   1 1131   51    2    0    0
+   2  258  384   28    1    0
+   3    0  216  321   37    9
+   4    0    0  142  210   27
+   5    0    0    0   83  171
+
+== Fin de la validación ==

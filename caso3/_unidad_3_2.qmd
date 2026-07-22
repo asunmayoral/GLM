@@ -1,38 +1,282 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_2.qmd >}}. Sin YAML. Chunks u32-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_2.qmd >}}. Sin YAML. Chunks u32-.
+     Unidad de FAMILIA DE ALTERNATIVAS: problema/identificación -> bloque breve por modelo ->
+     comparación al final. Espejo de 2.2/2.3 del Caso 2.
+     TODO BIB: la corrección de Duan (1983, JASA 78(383), 605-610) se cita en texto plano porque
+     los .qmd usan `nocite: @*` y una entrada nueva en references.bib aparecería en la bibliografía
+     de los tres casos. Convertir a cita bibliográfica (clave: duan1983) cuando se resuelva esa
+     decisión editorial. -->
 
-# 2 · Más allá de la Gamma {#sec-u32}
+# 2 · Elegir familia y escala {#sec-u32}
 
-<!-- TODO intro: cuando la Gamma se queda corta. Familia de alternativas -> estructura
-     problema/identificación -> bloque por modelo -> comparación. -->
+En la [Unidad 3.1](#sec-u31) dimos por buena la **Gamma** casi sin discutirla: el coste era positivo y
+asimétrico, el CV parecía estable, y funcionó. Pero «funcionó» no es «era la mejor opción». Hay al
+menos otras dos formas razonables de modelar un importe positivo —la **inversa gaussiana** y la
+**lognormal** ajustada por OLS sobre $\log Y$—, y esta unidad va de saber **elegir entre ellas y
+justificar la elección**. Por el camino aparecerá la trampa que dejamos anunciada: qué ocurre al
+devolver a euros las predicciones de un modelo ajustado en logaritmos.
 
 ::: {.callout-note}
 ## Sobre esta unidad
 Objetivo general: **continuas positivas** — alternativas a la Gamma (**inversa gaussiana**,
-**lognormal**) y **modelar la dispersión** (GLM dobles / heterocedasticidad); saber elegir.
+**lognormal / log-OLS**) y **modelar la dispersión**; saber elegir y justificar la elección.
 :::
 
-## 2.1 Qué es y cómo se identifica {#sec-u32-contexto}
+Trabajamos con el modelo que dejamos como defendible al cerrar la unidad anterior, ya sin
+`fabricante`:
 
-<!-- TODO: la Gamma asume CV constante (Var propto mu^2). ¿Y si la varianza crece distinto, o la
-     asimetría es mayor? Diagnóstico: residuos, relación media-varianza en escala de importe. -->
+```{r}
+#| label: u32-modelo-referencia
+f_coste <- coste_euros ~ antiguedad_anios + log(degradacion) * tipo_intervencion + tipo
+
+m_gam <- glm(f_coste, family = Gamma(link = "log"), data = base)   # = m_sin_fab de la Unidad 3.1
+```
+
+## 2.1 Qué distingue a una familia de otra {#sec-u32-contexto}
+
+Todas las familias que vamos a considerar comparten el enlace log y, por tanto, la misma lectura
+multiplicativa. Lo que **no** comparten es la **función de varianza**: cómo crece la dispersión cuando
+crece la media. Casi todas las candidatas encajan en una misma expresión,
+$$\operatorname{Var}(Y)=\phi\,\mu^{p},$$
+y la familia queda determinada por la potencia $p$:
+
+| $p$ | Familia | Qué supone |
+|---|---|---|
+| 1 | Poisson (cuasi) | desviación típica $\propto\sqrt{\mu}$ |
+| **2** | **Gamma** | desviación típica $\propto\mu$ → **CV constante** |
+| 3 | Inversa gaussiana | desviación típica $\propto\mu^{3/2}$ → colas más pesadas |
+
+Elegir familia es, en buena medida, **elegir $p$**. Y $p$ no hay que adivinarlo: se puede **estimar de
+los datos**, agrupando por valor ajustado y viendo cómo escala la varianza con la media
+[@mccullagh1989, §12.6.2]. Es el diagnóstico más informativo de toda la unidad, así que lo hacemos
+antes que nada.
+
+En la [Unidad 3.1](#sec-u31) ya usamos este gráfico para *comprobar* el supuesto de la Gamma; ahora lo
+usamos para *elegir*, añadiendo las tres pendientes teóricas como referencia visual.
+
+```{r}
+#| label: fig-u32-potencia
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Relación media-varianza empírica del coste, en escala log-log, con las tres pendientes teóricas de referencia. La pendiente ajustada estima la potencia p de Var(Y) ∝ μ^p."
+mv <- base |>
+  dplyr::mutate(grupo = dplyr::ntile(fitted(m_gam), 14)) |>
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(media = mean(coste_euros), varianza = var(coste_euros), .groups = "drop")
+
+p_hat <- coef(lm(log(varianza) ~ log(media), data = mv))[2]
+
+# Rectas teóricas de referencia, ancladas al centroide de la nube en escala log10.
+# Con scale_*_log10(), geom_abline() dibuja log10(y) = intercept + slope * log10(x).
+refs <- tibble::tibble(p = 1:3,
+                       familia = c("p = 1", "p = 2 (Gamma)", "p = 3 (inv. gaussiana)"),
+                       intercepto = mean(log10(mv$varianza)) - p * mean(log10(mv$media)))
+
+ggplot(mv, aes(media, varianza)) +
+  geom_abline(data = refs, aes(slope = p, intercept = intercepto, colour = familia),
+              linetype = 2, linewidth = 0.6) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black", linewidth = 0.7) +
+  scale_x_log10() + scale_y_log10() +
+  scale_colour_manual(values = c("grey55", "firebrick", "steelblue")) +
+  labs(x = "media del grupo (€, log)", y = "varianza del grupo (log)", colour = NULL,
+       subtitle = paste0("pendiente estimada (línea negra): p = ", round(p_hat, 2)))
+```
+
+La pendiente cae muy cerca de **2**. Antes de mirar un solo AIC ya tenemos una respuesta —y una que no
+depende de convenios de cálculo ni de correcciones de escala—. Aun así, ajustemos las alternativas:
+el objetivo de la unidad no es solo acertar, es **saber comparar**.
 
 ## 2.2 Inversa gaussiana {#sec-u32-ig}
 
-<!-- TODO: Var = phi·mu^3; colas más pesadas que la Gamma; family = inverse.gaussian. -->
+La inversa gaussiana mantiene el soporte positivo y el enlace log, pero asume
+$\operatorname{Var}(Y)=\phi\mu^{3}$: la dispersión crece **más deprisa** con la media. Es la elección
+natural cuando la cola derecha es más pesada de lo que la Gamma puede acomodar.
 
-## 2.3 Lognormal (log-OLS) {#sec-u32-lognormal}
+```{r}
+#| label: u32-ig
+m_ig <- glm(f_coste, family = inverse.gaussian(link = "log"), data = base)
 
-<!-- TODO: log(Y) ~ Normal; cuándo; sesgo de retransformación (corrección de Duan / smearing). -->
+broom::tidy(m_ig, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::select(term, estimate, conf.low, conf.high) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+```
+
+Los coeficientes son **muy parecidos** a los de la Gamma, y no es casualidad: con el mismo enlace,
+ambas estiman la misma media y difieren solo en cómo ponderan las observaciones. La diferencia está en
+el **peso relativo de las observaciones caras**: al asumir varianza $\propto\mu^3$, la inversa
+gaussiana confía menos en las predicciones grandes y les da menos influencia. Si la cola no es tan
+pesada como supone, ese descuento sale caro en ajuste.
+
+## 2.3 Lognormal y log-OLS {#sec-u32-lognormal}
+
+La tercera vía es la más tentadora por familiar: si $\log Y$ parece normal —y en la
+@fig-u31-asimetria lo parecía—, ¿por qué no aplicar mínimos cuadrados a $\log Y$ y olvidarnos de los
+GLM?
+
+```{r}
+#| label: u32-lognormal
+m_ln <- lm(log(coste_euros) ~ antiguedad_anios + log(degradacion) * tipo_intervencion + tipo,
+           data = base)
+
+round(coef(summary(m_ln))[, 1:2], 4)
+```
+
+Funciona, y los coeficientes se parecen otra vez. Pero hay una diferencia conceptual que **no** es un
+tecnicismo:
+
+::: {.callout-important}
+## Log-OLS y GLM-log no estiman lo mismo
+El GLM con enlace log modela $\log \operatorname{E}[Y]$ —el logaritmo de la **media**—. El OLS sobre
+$\log Y$ modela $\operatorname{E}[\log Y]$ —la **media de los logaritmos**—. Por la desigualdad de
+Jensen, $\operatorname{E}[\log Y] < \log\operatorname{E}[Y]$: no son la misma cantidad. El segundo
+estima algo próximo a la **mediana** de $Y$, no a su media.
+:::
+
+La consecuencia práctica aparece al volver a euros. Si uno exponencia sin más los valores ajustados,
+**subestima el coste medio de forma sistemática**:
+
+```{r}
+#| label: tbl-u32-retransformacion
+#| tbl-cap: "Coste medio observado frente al predicho por tres vías: exponenciando sin corregir el ajuste log-OLS, aplicando la corrección de smearing de Duan, y directamente con el GLM Gamma."
+y_obs   <- base$coste_euros
+naive   <- exp(fitted(m_ln))                       # retransformación ingenua
+smearing <- mean(exp(resid(m_ln)))                 # factor de Duan (1983)
+duan    <- naive * smearing
+
+tibble::tibble(
+  via = c("observado", "log-OLS sin corregir", "log-OLS + Duan", "GLM Gamma"),
+  coste_medio = round(c(mean(y_obs), mean(naive), mean(duan), mean(fitted(m_gam))), 1)) |>
+  dplyr::mutate(sesgo_pct = round(100 * (coste_medio / mean(y_obs) - 1), 1))
+```
+
+La retransformación ingenua se queda **muy por debajo** del coste medio real. La corrección de
+*smearing* de Duan —multiplicar por la media de los residuos exponenciados, un estimador no
+paramétrico del factor que falta— lo endereza casi por completo. Y el **GLM Gamma acierta sin
+necesitar corrección alguna**, porque modela la media directamente: nunca sale de la escala en la que
+queremos la respuesta.
+
+> Duan, N. (1983). Smearing estimate: a nonparametric retransformation method.
+> *Journal of the American Statistical Association, 78*(383), 605–610.
+
+::: {.callout-warning}
+## Por qué esto importa en un informe
+Un 9 % de sesgo sistemático en el coste medio no es un detalle académico: aplicado a un presupuesto
+anual de mantenimiento, es dinero real mal planificado. Y el error es **silencioso**: el modelo log-OLS
+tiene buen $R^2$, residuos bonitos y nada advierte de que sus predicciones en euros están sesgadas a la
+baja.
+:::
 
 ## 2.4 Modelar la dispersión {#sec-u32-dispersion}
 
-<!-- TODO: heterocedasticidad; GLM dobles (modelo para mu y modelo para phi); dglm / gamlss. -->
+Las tres familias comparten un supuesto que aún no hemos cuestionado: que $\phi$ es **constante**, la
+misma para todas las máquinas. Podría no serlo —quizá las correctivas sean, además de más caras, más
+**impredecibles**—. Para comprobarlo, un truco sencillo: los residuos de Pearson al cuadrado estiman
+la dispersión observación a observación, así que basta **modelarlos** frente a las covariables.
+
+```{r}
+#| label: tbl-u32-dispersion
+#| tbl-cap: "Modelo auxiliar para la dispersión: residuos de Pearson al cuadrado explicados por las covariables. Valores p altos indican que no hay evidencia de dispersión no constante."
+base_disp <- base |>
+  dplyr::mutate(pearson2 = residuals(m_gam, type = "pearson")^2)
+
+m_disp <- glm(pearson2 ~ antiguedad_anios + log(degradacion) + tipo_intervencion + tipo,
+              family = Gamma(link = "log"), data = base_disp)
+
+broom::tidy(m_disp) |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::transmute(term, estimate = round(estimate, 3), p.value = round(p.value, 3))
+```
+
+Ninguna covariable resulta relevante: **no hay evidencia de que la dispersión dependa del perfil de la
+máquina**, lo que respalda el supuesto de $\phi$ constante. Es un resultado negativo, y conviene
+subrayar que un resultado negativo *comprobado* vale mucho más que un supuesto *no cuestionado*.
+
+Cuando sí hay dispersión estructurada, la herramienta formal son los **GLM dobles**: un predictor
+lineal para la media y otro para la dispersión, ajustados conjuntamente [@mccullagh1989, cap. 10].
+En R están en paquetes como `dglm` o `gamlss`; aquí no los necesitamos.
 
 ## 2.5 Elegir, comparar y conectar {#sec-u32-elegir}
 
-<!-- TODO: comparación de alternativas por AIC / bondad de ajuste / predicción; validación DGP. -->
+Llega el momento de comparar las tres familias con un criterio común. Y aquí hay una trampa técnica
+que cuesta disgustos:
+
+::: {.callout-warning}
+## El AIC de la lognormal no es comparable sin corregir
+La Gamma y la inversa gaussiana modelan $Y$ en **euros**; el log-OLS modela $\log Y$. Sus
+verosimilitudes viven en escalas distintas y sus AIC **no se pueden comparar directamente**. Para
+llevar la lognormal a la escala del euro hay que aplicar el **jacobiano** de la transformación, que
+añade el término $-\sum_i \log y_i$ a la log-verosimilitud. Sin esa corrección, la lognormal parece
+ganar por miles de puntos: es puro artefacto de escala.
+:::
+
+```{r}
+#| label: tbl-u32-aic
+#| tbl-cap: "Comparación de las tres familias por AIC en la escala del euro. Se muestra además el AIC de la lognormal SIN el jacobiano, para ilustrar lo engañoso de compararlo tal cual."
+ll_ln  <- as.numeric(logLik(m_ln)) - sum(log(base$coste_euros))   # jacobiano
+gl_ln  <- attr(logLik(m_ln), "df")
+
+tibble::tibble(
+  familia = c("Gamma (log)", "Inversa gaussiana (log)", "Lognormal + jacobiano",
+              "Lognormal SIN jacobiano [no comparable]"),
+  AIC = round(c(AIC(m_gam), AIC(m_ig), -2 * ll_ln + 2 * gl_ln, AIC(m_ln)), 1)) |>
+  dplyr::mutate(delta = ifelse(dplyr::row_number() <= 3, round(AIC - min(AIC[1:3]), 1), NA))
+```
+
+Con las tres en la misma escala, la **Gamma gana**. La **lognormal** corregida queda en segundo lugar,
+a una distancia ya apreciable (una diferencia de AIC por encima de 10 es fuerte), y la **inversa
+gaussiana** es la peor de las tres —coherente con la potencia estimada, mucho más cerca de 2 que de 3—.
+Nótese de paso la magnitud del artefacto de escala: sin el jacobiano, la lognormal exhibía un AIC de
+otro orden por completo, y «habría ganado» por pura ilusión de cálculo.
+
+### Validación contra el DGP
+
+```{r}
+#| label: tbl-u32-verdad
+#| tbl-cap: "Contraste con el proceso generador: la familia y la potencia de la relación media-varianza verdaderas frente a las estimadas, y el parámetro de dispersión."
+verdad <- attr(banco, "verdad")
+
+tibble::tibble(
+  cantidad  = c("familia", "potencia p de Var(Y) ∝ μ^p", "dispersión φ"),
+  verdadero = c("Gamma con enlace log", "2", as.character(round(1 / verdad$forma_coste, 4))),
+  estimado  = c(paste0("Gamma (AIC más bajo de las tres)"),
+                as.character(round(p_hat, 2)),
+                as.character(round(summary(m_gam)$dispersion, 4))))
+```
+
+Las dos vías —el diagnóstico media-varianza y la comparación por AIC— **coinciden y aciertan**. Que
+coincidan es tranquilizador, pero no debe hacernos olvidar el orden de importancia:
+
+::: {.callout-tip}
+## El criterio, en orden
+1. **La función de varianza manda.** Es un diagnóstico de la *estructura* del problema y no depende de
+   convenios de cálculo. Si la potencia estimada está cerca de 2, la Gamma es la candidata natural.
+2. **El AIC arbitra**, pero solo entre modelos ajustados sobre la **misma respuesta y la misma
+   escala**. Comprueba siempre que la comparación sea legítima antes de leerla.
+3. **La interpretabilidad decide los empates.** Entre dos familias con ajuste equivalente, gana la que
+   estima directamente la cantidad que hay que comunicar —la media en euros—, sin correcciones
+   intermedias donde perder el control del sesgo.
+4. Y si dos familias empatan de verdad, **dilo en el informe**. La elección de familia es una decisión
+   del analista, no un dictamen de los datos.
+:::
+
+Una última observación que enlaza con lo que viene. $\hat\phi$ sigue quedando algo por encima de su
+valor verdadero, y ninguna de las tres familias arregla eso: no es un problema de **familia** sino de
+**estructura**. Sobra variabilidad porque las máquinas se agrupan en plantas y el modelo no lo sabe.
+Cambiar la forma de la distribución no puede resolver un problema de dependencia; para eso hacen falta
+los **efectos aleatorios** de la [Unidad 3.3](#sec-u33).
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.2)
-<!-- TODO -->
+Sobre el banco de vuestro equipo:
+
+1. Estimad la potencia $p$ de la relación media-varianza y decidid, **antes de ajustar nada**, qué
+   familia esperáis que gane. Contrastad después vuestra predicción.
+2. Ajustad las tres alternativas y comparadlas por AIC **en la escala del euro**. Documentad
+   explícitamente la corrección del jacobiano: es el paso que más se olvida.
+3. Cuantificad el sesgo de la retransformación ingenua en vuestros datos y corregidlo con *smearing*.
+   ¿Cuánto dinero supondría ese sesgo sobre un presupuesto anual de 500 intervenciones?
+4. Comprobad si la dispersión depende de alguna covariable. Si encontrarais evidencia, ¿qué modelo
+   ajustaríais y qué cambiaría en la interpretación?
+5. Repetid la comparación **usando solo las intervenciones correctivas**. ¿Se mantiene la familia
+   ganadora al reducir el tamaño muestral? ¿Qué os dice eso sobre la fiabilidad del criterio AIC?
 :::

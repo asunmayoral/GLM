@@ -1,11 +1,15 @@
 project:
   type: website
   output-dir: _site
+  # Antes de cada render, invalida la caché `freeze` de un caso si se ha editado
+  # cualquiera de sus ficheros (parciales _unidad_*.qmd o scripts R/). Sin esto,
+  # `freeze: auto` no detecta cambios en los ficheros INCLUIDOS. Ver el script.
+  pre-render: _scripts/invalidar_freeze.R
   render:
     - index.qmd
     - caso1/caso1_binaria_tiempo_evento.qmd
     - caso2/caso2_conteos.qmd
-    - "!caso3/**"   # excluye TODO el caso3 del render (en construcción)
+    - caso3/caso3_continuas_positivas.qmd
 
 website:
   title: "Modelos Lineales Generalizados con R"
@@ -21,8 +25,8 @@ website:
         text: "Caso 1 · Binaria"
       - href: caso2/caso2_conteos.qmd
         text: "Caso 2 · Conteos"
-      # - href: caso3/caso3_continuas_positivas.qmd   # desconectado temporalmente
-      #   text: "Caso 3 · Continuas"
+      - href: caso3/caso3_continuas_positivas.qmd   # desconectado temporalmente
+        text: "Caso 3 · Continuas"
   page-footer:
     center: "Material docente · Grado en Ciencia de Datos e IA · Universidad Miguel Hernández"
 
@@ -38,5 +42,8 @@ format:
     code-copy: true
     df-print: paged
     embed-resources: false
+
+execute:
+  freeze: auto  # sólo renderiza los ficheros que han cambiado (si los detecta)
 
 lang: es

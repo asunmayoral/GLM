@@ -42,7 +42,7 @@ cartera |>
   summarise(media_danos = mean(n_danos), .groups = "drop") |>
   ggplot(aes(tramo, media_danos)) +
   geom_col(fill = "steelblue") +
-  labs(x = "exposición (fracción de año en vigor)", y = "media de partes por daños")
+  labs(x = "exposición (fracción de la antigüedad máxima)", y = "media de partes por daños")
 
 # -----------------------------------------------------------------------------
 # [tbl-u21-contingencia]  ·  1.1 Contexto: qué problemas resuelve este modelo
@@ -79,7 +79,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por año)")
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
 # [u21-fit-conteo]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
@@ -129,7 +129,7 @@ broom::tidy(m_tasa, exponentiate = TRUE, conf.int = TRUE)
 # -----------------------------------------------------------------------------
 perfil <- data.frame(edad_conductor = 45, potencia_cv = 110, zona_circulacion = "urbana",
                      uso = "particular", tipo_vehiculo = "turismo", exposicion = 1)
-predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en un año
+predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en la ventana de exposición
 
 # -----------------------------------------------------------------------------
 # [u21-abs]  ·  1.3 Interpretación > Efecto relativo vs absoluto

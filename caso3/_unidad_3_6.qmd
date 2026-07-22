@@ -1,27 +1,199 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_6.qmd >}}. Sin YAML. Chunks u36-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_6.qmd >}}. Sin YAML. Chunks u36-.
+     Unidad de CIERRE (síntesis): las tres lentes sobre el mismo fallo. REACTIVAR, no reexplicar.
+     Datos: banco$modelo_intervalos (start-stop) y banco$modelo_supervivencia. -->
 
-# 6 · Selección, validación cruzada y regularización {#sec-u36}
+# 6 · Síntesis: las tres lentes {#sec-u36}
 
-<!-- TODO intro: con muchos predictores del importe, selección y regularización; validación
-     out-of-sample. Espejo de la Unidad 2.6 del Caso 2. -->
+Hemos mirado el mismo evento —el primer fallo grave de una máquina— desde ángulos que, a lo largo del
+curso, parecían mundos distintos: en el Caso 1, como una respuesta binaria en tiempo discreto; en el
+Caso 2, como un conteo con *offset*; en este Caso 3, como un tiempo continuo (AFT) y como un hazard
+semiparamétrico (Cox). Esta unidad de cierre reúne esas piezas y muestra que, en el fondo, **hablan de
+lo mismo**. No hay modelos nuevos: hay reencuentro, comparación y criterio.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **continuas positivas** — selección de modelos, **validación cruzada** y
-**regularización** para respuestas positivas.
+Objetivo general: **síntesis** — reunir las tres lecturas del mismo evento (tiempo discreto, riesgos a
+trozos, AFT/Cox), cerrar la selección y la validación, y situar las **fronteras** del marco GLM.
 :::
 
-## 6.1 De la selección clásica a la validación cruzada {#sec-u36-cv}
+## 6.1 El mismo fallo, tres lentes {#sec-u36-lentes}
 
-<!-- TODO: AIC/BIC vs error out-of-sample; métricas para importes (RMSE en escala log, desviación
-     Gamma, pinball si cuantiles). -->
+Trabajamos sobre `modelo_intervalos`: cada máquina troceada en intervalos mensuales, con las
+covariables que cambian dentro de su seguimiento. Sobre esa misma tabla ajustamos las tres lecturas del
+mismo proceso, con **idéntico predictor**:
 
-## 6.2 Regularización {#sec-u36-reg}
+```{r}
+#| label: u36-tres-lentes
+iv  <- banco$modelo_intervalos
+rhs <- "antiguedad_anios + carga + temperatura + log(vibracion) + mantenimiento_reciente + tipo + fabricante"
 
-<!-- TODO: glmnet no soporta Gamma directamente; opciones: regularizar sobre log(Y) (gaussiano),
-     Tweedie/`glmnet` vía HDtweedie, o penalización en gamlss. -->
+# Lente 1 · TIEMPO DISCRETO: binomial con enlace cloglog sobre datos persona-periodo   (Caso 1)
+m_cll <- glm(as.formula(paste("fallo ~", rhs, "+ factor(intervalo) + offset(log(exposicion))")),
+             family = binomial("cloglog"), data = iv)
+
+# Lente 2 · RIESGOS A TROZOS: Poisson con offset e intervalo como factor                (Caso 2)
+m_poi <- glm(as.formula(paste("fallo ~", rhs, "+ factor(intervalo) + offset(log(exposicion))")),
+             family = poisson, data = iv)
+
+# Lente 3 · COX extendido (start-stop)                                                   (Caso 3)
+m_cox <- coxph(as.formula(paste("Surv(tstart, tstop, fallo) ~", rhs)), data = iv)
+```
+
+## 6.2 Qué estima cada una, y cuándo coinciden {#sec-u36-comparacion}
+
+Ponemos los coeficientes lado a lado (omitiendo el riesgo de base a trozos), y añadimos la **verdad**
+del proceso generador:
+
+```{r}
+#| label: tbl-u36-comparacion
+#| tbl-cap: "Coeficientes (log-hazard) del mismo evento por las tres lentes, frente a la verdad del DGP. cloglog, Poisson a trozos y Cox estiman esencialmente lo mismo; Poisson y Cox coinciden casi hasta el decimal."
+sacar <- function(m, nombre) broom::tidy(m) |>
+  dplyr::filter(!grepl("factor\\(intervalo\\)|\\(Intercept\\)", term)) |>
+  dplyr::transmute(term, !!nombre := round(estimate, 3))
+
+verdad_hz <- attr(banco, "verdad")$beta_hazard
+tab_verdad <- tibble::tibble(
+  term = c("antiguedad_anios", "carga", "temperatura", "log(vibracion)",
+           "tipoPrensa", "fabricanteB"),
+  verdad_DGP = c(verdad_hz[["antiguedad"]], verdad_hz[["carga"]], verdad_hz[["temp"]],
+                 verdad_hz[["log_vibracion"]], verdad_hz[["tipoPrensa"]], verdad_hz[["fabricanteB"]]))
+
+sacar(m_cll, "cloglog") |>
+  dplyr::left_join(sacar(m_poi, "Poisson_trozos"), by = "term") |>
+  dplyr::left_join(dplyr::transmute(broom::tidy(m_cox), term, Cox = round(estimate, 3)), by = "term") |>
+  dplyr::left_join(tab_verdad, by = "term")
+```
+
+El resultado es de los que se recuerdan: **las tres columnas son casi idénticas**. No es coincidencia,
+es teoría. Cuando los intervalos son finos, el modelo de **tiempo discreto con enlace `cloglog`**
+estima el mismo hazard proporcional que Cox [@aitkin1980]; y la **regresión de Poisson a trozos** con
+el intervalo como factor **es** un modelo exponencial a trozos, que aproxima el Cox tanto mejor cuanto
+más fino sea el troceado [@holford1980; @laird1981]. Poisson y Cox coinciden hasta el segundo decimal
+porque, con este troceado, son casi el mismo modelo escrito de dos maneras. Es la unificación que
+vertebra el curso: **supervivencia = GLM**, con el enlace y el *offset* adecuados.
+
+::: {.callout-important}
+## El AFT es la lente distinta
+Falta la cuarta lectura, la de la [Unidad 3.4](#sec-u34). El **AFT no** entra en esta tabla porque no
+estima un log-hazard: estima cuánto se **estira el reloj** (un factor de aceleración sobre el tiempo),
+no cuánto se **multiplica el riesgo**. Solo coincide con la familia proporcional en un caso especial
+—la **Weibull**, que es a la vez AFT y PH, como vimos en 3.5—. Fuera de él, AFT y PH responden a
+preguntas distintas y no hay por qué esperar que sus coeficientes se traduzcan. Elegir entre «acelerar
+el tiempo» y «multiplicar el riesgo» es, antes que una cuestión técnica, una cuestión de **qué quieres
+comunicar**.
+:::
+
+Sobre la **validación**: las tres lentes recuperan bien la estructura del DGP —antigüedad, temperatura
+y vibración caen cerca de sus valores verdaderos—. Los coeficientes de `tipo` y `fabricante` quedan
+algo atenuados, y por una razón instructiva: en el proceso generador, las prensas reciben mantenimiento
+preventivo con más frecuencia (la asignación del plan **no** era aleatoria, [Unidad 3.1](#sec-u31)), de
+modo que parte de su efecto sobre el riesgo está **mediado** por el mantenimiento, que también está en
+el modelo. Es confusión por diseño, y verla aquí es el mejor repaso de por qué un coeficiente es
+siempre «a igualdad del resto de lo incluido».
+
+## 6.3 Selección y validación con datos agrupados {#sec-u36-seleccion}
+
+Comparar modelos por AIC es barato, pero mide ajuste dentro de la muestra. Para estimar cómo
+**predicen fuera**, validación cruzada. Y aquí el agrupamiento vuelve a morder: si repartimos **filas**
+al azar, intervalos de una misma máquina —o máquinas de una misma planta— caen a la vez en
+entrenamiento y prueba, y el modelo «adivina» apoyándose en vecinos que no debería ver. La validación
+honesta reparte **grupos enteros**. `rsample` lo hace con `group_vfold_cv`:
+
+```{r}
+#| label: u36-cv-agrupada
+library(rsample)
+sup <- banco$modelo_supervivencia
+
+set.seed(20252026)
+pliegues <- group_vfold_cv(sup, group = id_planta, v = 6)   # se dejan fuera PLANTAS enteras
+
+c_index <- purrr::map_dbl(pliegues$splits, \(sp) {
+  ent <- analysis(sp); pru <- assessment(sp)
+  m   <- coxph(Surv(tiempo, fallo) ~ plan_mantenimiento + antiguedad_anios +
+                 carga_media + tipo + fabricante, data = ent)
+  survival::concordance(m, newdata = pru)$concordance
+})
+
+c(c_index_medio = round(mean(c_index), 3), desv = round(sd(c_index), 3))
+```
+
+Dejando fuera **plantas completas**, el modelo se evalúa en un contexto que no ha visto —el test más
+exigente de generalización, y el que corresponde a este banco jerárquico—. El **índice de
+concordancia** (probabilidad de ordenar bien dos máquinas por su riesgo) resume la capacidad
+discriminante: aquí sale **moderado** —por encima del 0,5 del azar, pero lejos del 1 perfecto—, lo que
+es razonable en la prueba más dura posible (predecir plantas nunca vistas) y honesto sobre lo que un
+modelo de covariables basales puede lograr. No confundir *ajustar bien* con *discriminar bien fuera de
+muestra*: son cosas distintas, y solo la segunda anticipa el comportamiento en producción.
+
+## 6.4 Regularización: un límite conceptual {#sec-u36-regularizacion}
+
+En el Caso 2 usamos `glmnet` para **regularizar** una Poisson con muchos predictores. Sería natural
+querer lo mismo aquí, sobre la Gamma del coste. Pero hay un tope que conviene conocer:
+
+::: {.callout-warning}
+## `glmnet` no implementa la familia Gamma
+`glmnet` cubre las familias `gaussian`, `binomial`, `poisson`, `multinomial`, `cox` y `mgaussian`
+[@friedman2010] —**no** la Gamma—. No es un olvido: el algoritmo de descenso por coordenadas está
+optimizado para esas verosimilitudes. Para regularizar una respuesta positiva como el coste, las
+salidas son: (a) regularizar sobre `log(coste)` con familia **gaussiana** —volviendo a la trampa de
+retransformación de la [Unidad 3.2](#sec-u32)—, o (b) para la supervivencia, usar la familia **`cox`**
+de `glmnet`, penalizando directamente el modelo de riesgos.
+:::
+
+A modo ilustrativo, un lasso sobre el coste en escala log —el camino (a)—:
+
+```{r}
+#| label: u36-glmnet
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Validación cruzada de un lasso (glmnet, familia gaussiana) sobre log(coste). El eje x es la penalización; las líneas verticales marcan el lambda de mínimo error y el de la regla a 1 EE. Es el sustituto operativo, con la salvedad de la retransformación."
+library(glmnet)
+X <- model.matrix(~ antiguedad_anios + log(degradacion) * tipo_intervencion + tipo + fabricante,
+                  data = base)[, -1]
+set.seed(1)
+cvlasso <- cv.glmnet(X, log(base$coste_euros), family = "gaussian", alpha = 1)
+plot(cvlasso)
+```
+
+La regularización es, por tanto, más un **límite conceptual** en la Gamma que una herramienta directa:
+la técnica del Caso 2 no se traslada sin más, y reconocerlo —en lugar de forzar un `glmnet` Gamma que
+no existe— es parte del criterio. La penalización $\ell_1$ y $\ell_2$ como ideas [@tibshirani1996;
+@hastie2009] siguen valiendo; lo que cambia es la implementación disponible.
+
+## 6.5 Más allá del GLM: una mirada {#sec-u36-fronteras}
+
+Cerramos con el mapa de lo que queda fuera, sin desarrollarlo —para saber que existe y cuándo buscarlo—:
+
+- **Tweedie.** Modela el **coste total** por máquina y periodo, que mezcla ceros (periodos sin
+  intervención) y positivos continuos. Es el puente elegante con el Caso 2: coste esperado = frecuencia
+  de intervenciones × coste por intervención. Queda fuera de este temario, pero es la extensión natural
+  de la Gamma cuando aparece masa en el cero.
+- **Efectos temporales suaves (PAMM) y Royston–Parmar.** Cuando el riesgo de base o el efecto de una
+  covariable varían en el tiempo de forma **flexible**, se modelan con *splines* —los modelos aditivos
+  a trozos (PAMM) y los paramétricos flexibles de Royston–Parmar—, que relajan la proporcionalidad sin
+  renunciar a una forma estimable.
+- **Riesgos aditivos de Aalen.** Describen incrementos **absolutos** del hazard en lugar de efectos
+  multiplicativos: otra lente, útil cuando lo relevante es la diferencia de riesgo, no su cociente.
+- **Riesgos competitivos y modelos multiestado.** Distinguen **causas** de fallo, o transiciones entre
+  estados (operativa → degradada → averiada → reparada). Nuestro banco simplifica a un único evento;
+  la realidad industrial rara vez lo hace.
+
+El mensaje de cierre del curso es el que hemos ido tejiendo: **una misma pregunta admite varias lentes,
+y buena parte de ellas son, por debajo, el mismo marco lineal generalizado**. Cox marca la frontera;
+más allá empieza otro país, pero se llega a él con el mapa que hemos dibujado aquí.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.6)
-<!-- TODO -->
+Sobre el banco de vuestro equipo:
+
+1. Ajustad las **tres lentes** (cloglog, Poisson a trozos y Cox) al mismo evento y comparad sus
+   coeficientes. ¿Cuánto se parecen? Explicad, con la teoría, por qué Poisson y Cox casi coinciden.
+2. Añadid a la comparación el **AFT** de 3.4. ¿Por qué sus coeficientes **no** son comparables con los
+   de las otras tres? ¿En qué caso especial sí lo serían?
+3. Validad un modelo con `group_vfold_cv` dejando fuera **plantas** y, alternativamente, **filas** al
+   azar. ¿Cambia el error estimado? ¿Cuál es la validación honesta y por qué?
+4. Justificad, con la documentación de `glmnet`, por qué no podéis regularizar directamente la Gamma
+   del coste. Proponed y ejecutad una alternativa, discutiendo su inconveniente.
+5. Elegid **una** extensión de la Sección 6.5 y argumentad, en un párrafo, en qué situación de vuestro
+   banco la usaríais y qué añadiría sobre los modelos ya vistos.
 :::

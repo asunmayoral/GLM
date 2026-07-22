@@ -140,7 +140,7 @@ vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
 Da un $\chi^2$ enorme (≈ **2913**, $p<2\times10^{-16}$). Con un matiz que conviene enseñar:
 `zero.test()` usa la **media muestral** como tasa —**ignora covariables y *offset***—, así que es un
 contraste **marginal** que **exagera** la inflación, porque atribuye a los ceros parte de lo que en
-realidad explican las covariables (su exceso es mayor que el $1.7$ ajustado de `DHARMa`). Para el
+realidad explican las covariables (su exceso es mayor que el $1.7$ de la Poisson ajustada). Para el
 modelo con covariables son más fieles el covariate-aware `countreg::zitest()` o la **simulación** de
 `DHARMa`.
 
@@ -212,7 +212,7 @@ también varía con ellas, lo que justifica incluirlas:
 
 ```{r}
 #| label: fig-u23-zip-motiv2
-#| fig-cap: "Tasa de `n_fraude` (reclamaciones por año de exposición) según `zona_circulacion` y `tipo_vehiculo`. Ambas mueven el conteo —zona urbana y ciertos vehículos reclaman a más ritmo—, así que entran en la parte de conteo del ZIP."
+#| fig-cap: "Tasa de `n_fraude` (reclamaciones por unidad de exposición) según `zona_circulacion` y `tipo_vehiculo`. Ambas mueven el conteo —zona urbana y ciertos vehículos reclaman a más ritmo—, así que entran en la parte de conteo del ZIP."
 #| fig-width: 7.5
 #| fig-height: 3.2
 dplyr::bind_rows(
@@ -223,7 +223,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x") +
-  labs(x = NULL, y = "tasa de reclamaciones (por año)")
+  labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
 ```
 
 Con esa lectura, la fórmula tiene **dos lados**, separados por `|`: a la izquierda el conteo (con los
@@ -471,7 +471,7 @@ Detección del exceso: score de Van den Broek (`vcdExtra::zero.test`, marginal) 
 
 Ambas familias predicen la **media marginal** $E[Y\mid x]$, pero la componen distinto —el ZI como
 $(1-\pi)\mu$, el hurdle como $p\cdot\mu/(1-e^{-\mu})$—. Como predicen el mismo **promedio** (ya vimos que
-el RMSE era idéntico), sus predicciones puntuales coinciden, aunque el AIC prefiera al ZIP:
+el RMSE era idéntico), sus predicciones puntuales quedan muy próximas, aunque el AIC prefiera al ZIP:
 
 ```{r}
 #| label: u23-pred
@@ -535,12 +535,12 @@ control de calidad que pediremos en el estudio de caso—.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.3) — resuelve la Pregunta 5 del caso
-Sobre la cohorte de tu equipo, aborda la **Pregunta 5** de la dirección ([Unidad 2.7](#sec-u27)): *la
-mayoría nunca tiene un ingreso grave; ¿hay asegurados que sencillamente **no ingresarán**, frente a
-otros que **aún no** lo han hecho, y cómo los distinguimos?* **Diagnostica** el exceso de ceros (frente
-a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y **decide y
-justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca ingresará, o
-proceso en dos etapas?). Interpreta las **dos partes** (quién está en riesgo / a qué ritmo) y **valida**
-la parte estructural contra la verdad del DGP (`attr(cohorte, "verdad")$g_cero`).
+## Tarea del estudiante (2.3) — Pregunta 8 del caso
+Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.7](#sec-u27)): *la mayoría
+de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
+frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
+exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
+**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca la levanta,
+o proceso en dos etapas?). Interpreta las **dos partes** (quién puede levantarla / a qué ritmo) y **valida** la
+parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
 :::

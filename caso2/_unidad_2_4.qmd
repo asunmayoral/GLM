@@ -33,7 +33,7 @@ agrupada por su región:
 
 ```{r}
 #| label: fig-u24-anidamiento
-#| fig-cap: "Tasa de gestiones (por año) de cada agencia (puntos), agrupadas por región; la barra marca la media de cada región y la línea discontinua, la media global. Se ven **dos niveles de variación**: las regiones se separan entre sí y, dentro de cada una, las agencias se dispersan. Es un anidamiento región → agencia → póliza."
+#| fig-cap: "Tasa de gestiones (por unidad de exposición) de cada agencia (puntos), agrupadas por región; la barra marca la media de cada región y la línea discontinua, la media global. Se ven **dos niveles de variación**: las regiones se separan entre sí y, dentro de cada una, las agencias se dispersan. Es un anidamiento región → agencia → póliza."
 #| fig-width: 6.5
 #| fig-height: 4
 tasa_global <- sum(cartera$n_gestiones) / sum(cartera$exposicion)
@@ -44,7 +44,7 @@ cartera |>
   geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
   stat_summary(fun = mean, geom = "crossbar", width = 0.6, colour = "grey25") +
   geom_jitter(width = 0.15, height = 0, size = 2, alpha = 0.8) +
-  labs(x = "región", y = "tasa de gestiones (por año)") +
+  labs(x = "región", y = "tasa de gestiones (por unidad de exposición)") +
   theme(legend.position = "none")
 ```
 
@@ -193,14 +193,19 @@ linealidad del enlace, algo que retomamos en la predicción.
 
 ::: {.callout-note}
 ## Recordatorio · ICC (correlación intraclase)
-Fracción de la varianza total —en la escala latente del log— que aporta cada nivel de agrupamiento;
-equivale a la correlación esperada entre dos observaciones del mismo grupo.
+Fracción de la varianza total —en la escala latente del log— que aporta cada nivel de agrupamiento (su
+*partición de varianza*):
 
 $$\text{ICC}_{\text{nivel}}=\frac{\sigma^2_{\text{nivel}}}{\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}}+\sigma^2_{\text{obs}}}.$$
 
-Para la Poisson-log, $\sigma^2_{\text{obs}}$ es una varianza de observación propia de la distribución (del
-tipo $\ln(1+1/\bar\mu)$), que no hace falta calcular a mano. En R: `performance::icc(m, by_group = TRUE)`
-—mira el *adjusted*, que reparte solo la varianza de los efectos aleatorios—.
+En una jerarquía, la del nivel **superior** (región) coincide con la **correlación** entre dos
+observaciones de la misma región. Para un nivel **anidado** hay que sumar: dos pólizas de la misma agencia
+comparten *también* su región, así que su correlación intraclase es
+$(\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/\text{total}$, **mayor** que la partición del nivel agencia por
+sí sola. Para la Poisson-log, $\sigma^2_{\text{obs}}$ es una varianza de observación propia de la
+distribución (del tipo $\ln(1+1/\bar\mu)$), que no hace falta calcular a mano. En R:
+`performance::icc(m, by_group = TRUE)` —mira el *adjusted*, que reparte solo la varianza de los efectos
+aleatorios—.
 :::
 
 Las desviaciones típicas estimadas son $\sigma_{\text{reg}}\approx$ `r round(sd_reg, 2)` entre regiones y
@@ -277,7 +282,7 @@ de la cartera se predice anulando los efectos aleatorios (media marginal, `re.fo
 #| label: u24-pred
 nd <- cartera |>
   dplyr::slice(1) |>
-  dplyr::mutate(exposicion = 1)                       # tasa anual, misma póliza tipo
+  dplyr::mutate(exposicion = 1)                       # ventana de exposición completa, misma póliza tipo
 
 c(
   condicional = predict(m_glmm, nd, type = "response", re.form = NULL),  # su agencia
@@ -371,6 +376,14 @@ Conviene además comprobar que el ajuste **convergió** y no es **singular** (`i
 componente de varianza colapsado a 0 indicaría un modelo sobreparametrizado para estos datos). Y, como el
 banco es simulado, podemos **validar contra la verdad**: el DGP fijó $\sigma_{\text{reg}}=0.50$ y
 $\sigma_{\text{ag}}=0.60$; el mixto estima `r round(sd_reg, 2)` y `r round(sd_ag, 2)`.
+
+La región se recupera bien, pero la **agencia se queda claramente por debajo** de su valor verdadero,
+hasta el punto de invertir el orden —en la verdad la agencia varía más que la región, y aquí sale al
+revés—. No es un fallo del método, sino la dificultad de estimar el componente de agencia con **pocos
+grupos por región** (unas cinco agencias en cada una): la verosimilitud tiende a **encoger** esa varianza
+y a atribuir parte de ella al nivel superior. Es un aviso útil: los componentes de varianza —y el orden
+entre niveles— se estiman con **mucha** incertidumbre cuando hay pocos grupos, así que conviene leerlos
+con prudencia y no sobreinterpretar cuál pesa más.
 
 ::: {.callout-note}
 ## Bondad de ajuste en modelos mixtos
@@ -488,6 +501,24 @@ performance::compare_performance(
 )
 ```
 
+La columna **RMSE hay que leerla con cuidado**, porque para el OLRE engaña. `compare_performance` la
+calcula con las predicciones **condicionales** del modelo mixto —usando el efecto aleatorio estimado de
+cada observación, su BLUP—, de modo que cada punto se predice casi con su propio valor y el RMSE sale
+artificialmente bajo. No es que el OLRE ajuste muchísimo mejor: es que se evalúa a sí mismo con
+información que los otros modelos no usan. Para una comparación justa hay que forzar la predicción
+**poblacional** (marginal), anulando el efecto aleatorio con `re.form = NA`:
+
+```{r}
+#| label: u24-olre-rmse
+pred_marg <- predict(m_olre, type = "response", re.form = NA)     # población, sin el BLUP
+rmse_olre_marginal <- sqrt(mean((cartera$n_danos - pred_marg)^2))
+rmse_olre_marginal
+```
+
+Así medido, el RMSE del OLRE queda al nivel del de la NB2 y la Poisson —los tres predicen el mismo
+promedio poblacional—, que es lo esperable. Por eso la comparación honesta se apoya en el **AIC**, no en
+el RMSE condicional.
+
 Las dos correcciones dejan muy atrás a la Poisson y, entre sí, suelen quedar **próximas** en AIC: son dos
 lentes —Poisson-lognormal frente a Poisson-Gamma— para la misma sobredispersión. ¿Cuál elegir? La NB da
 una **distribución cerrada**, es más rápida y es la opción por defecto ante sobredispersión pura; el OLRE
@@ -512,10 +543,18 @@ m <- glmer(TICKS ~ YEAR + HEIGHT + (1 | BROOD) + (1 | LOCATION) + (1 | INDEX),
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.4) — resuelve la Pregunta 6 del caso
-Sobre la cohorte del equipo, ajusta el GLMM de Poisson del uso de recursos con un intercepto aleatorio por
-centro, `(1 | centro)`, y `offset(log(exposicion))`. Interpreta los efectos fijos en IRR (condicionales
-al centro), cuantifica con el **ICC** qué parte del ritmo depende del centro y qué esperar de un centro
-**nuevo** (predicción marginal). Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** el
-componente de varianza estimado frente al $\sigma_a$ que fijó el DGP.
+## Tarea del estudiante (2.4) — Preguntas 9 a 12 del caso
+Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, intercepto aleatorio por
+**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.7](#sec-u27)):
+
+- **P9 · ¿Cuánta variación es de agencia?** Interpreta los efectos fijos en IRR (condicionales a la agencia)
+  y cuantifica el **ICC**.
+- **P10 · Territorio.** Añade la **región** al anidamiento (`(1 | id_region/id_agencia)`) y valora si aporta.
+- **P11 · Agencias atípicas.** Con BLUPs / *caterpillar*, identifica las que se **desvían** y comenta el
+  **shrinkage**.
+- **P12 · Agencia nueva.** Distingue predicción **condicional** vs **marginal**: ¿qué esperar de una agencia
+  sin historial?
+
+Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** los componentes de varianza estimados frente a
+$\sigma_a$ y $\sigma_{reg}$ del DGP (`attr(cartera, "verdad")$sigma_ag`, `$sigma_reg`).
 :::

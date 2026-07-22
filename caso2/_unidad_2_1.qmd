@@ -29,7 +29,7 @@ pregunta natural es *cómo influyen las covariables en ese recuento* —qué per
 para responderla necesitamos un modelo cuya respuesta sea, precisamente, un conteo.
 
 **2) Tasas: el papel de la exposición.** Dos pólizas con el mismo perfil no son igual de arriesgadas
-si una ha estado en vigor todo el año y la otra solo unos meses: el recuento bruto **confunde el
+si una lleva mucho más tiempo contratada que la otra: el recuento bruto **confunde el
 riesgo con el tiempo observado**. Se ve de un vistazo —a más exposición, más partes—:
 
 ```{r}
@@ -44,11 +44,24 @@ cartera |>
   summarise(media_danos = mean(n_danos), .groups = "drop") |>
   ggplot(aes(tramo, media_danos)) +
   geom_col(fill = "steelblue") +
-  labs(x = "exposición (fracción de año en vigor)", y = "media de partes por daños")
+  labs(x = "exposición (fracción de la antigüedad máxima)", y = "media de partes por daños")
 ```
 
 Lo correcto no es modelar el **recuento** sino la **tasa** (partes por unidad de exposición). Lo
 haremos incorporando la exposición como *offset*.
+
+::: {.callout-note}
+## La variable `exposicion`: cuánto tiempo llevamos con el cliente
+Cada póliza se observa un tiempo distinto, y `exposicion` lo mide como la **antigüedad del cliente
+relativa a la del más veterano** (el más antiguo y aún vigente), a quien corresponde el valor 1. Un
+cliente que lleva la mitad de tiempo tiene `exposicion = 0.5`. La cartera recoge solo clientes con al
+menos **un tercio** de esa antigüedad máxima, así que `exposicion` va de 0.30 a 1.00.
+
+Como el número de incidencias crece con el tiempo observado, `exposicion` entra en todos los modelos como
+**offset** (`log(exposicion)`): modelamos **tasas** —incidencias por **unidad de exposición**— y no
+recuentos brutos. Los IRR se leen en esa escala; su valor **relativo** (un perfil frente a otro) no
+depende de la unidad temporal que le pongamos a la ventana.
+:::
 
 **3) Tablas de contingencia: ¿asociación o independencia?** A veces cruzamos dos variables categóricas
 y contamos casos en cada celda. ¿La **zona de circulación** se relaciona con sufrir daños, o son
@@ -65,7 +78,7 @@ cartera |>
 ```
 
 La tabla apunta a **asociación**: las pólizas de zona urbana tienen algún parte de daños con más
-frecuencia (~58 %) que las de zona rural (~49 %). Contrastar formalmente esa asociación —y con más de
+frecuencia (~58 %) que las de zona mixta (~49 %) o rural (~52 %). Contrastar formalmente esa asociación —y con más de
 dos variables— es el terreno de los **modelos log-lineales**, que no son más que una regresión de
 Poisson sobre los **recuentos de celda**.
 
@@ -145,12 +158,12 @@ Dos extensiones del mismo modelo, que usaremos enseguida:
 ### Aplicado a los cuatro problemas del contexto
 
 Antes de ajustar, un vistazo exploratorio: ¿cómo se relaciona `n_asistencia` con cada predictor del
-modelo? Representamos su **tasa** (asistencias por año de exposición) por cuartiles de los continuos y
+modelo? Representamos su **tasa** (asistencias por unidad de exposición) por cuartiles de los continuos y
 por nivel de los categóricos:
 
 ```{r}
 #| label: fig-u21-eda-modelo
-#| fig-cap: "Tasa de `n_asistencia` (asistencias por año de exposición) según cada predictor del modelo. La tasa sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican incluir esos términos."
+#| fig-cap: "Tasa de `n_asistencia` (asistencias por unidad de exposición) según cada predictor del modelo. La tasa sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican incluir esos términos."
 #| fig-width: 9
 #| fig-height: 5
 dplyr::bind_rows(
@@ -165,7 +178,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por año)")
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por unidad de exposición)")
 ```
 
 La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
@@ -250,13 +263,13 @@ broom::tidy(m_tasa, exponentiate = TRUE, conf.int = TRUE)
 Se leen en el lenguaje del problema: la **potencia** eleva la tasa de asistencias (IRR > 1 por cada CV
 adicional), y las zonas menos urbanas la reducen frente a la urbana (IRR < 1); cada factor multiplica
 la tasa por su IRR, con el intervalo de confianza como margen. Y una **predicción** cierra la lectura
-—la tasa esperada (asistencias en un año, `exposicion = 1`) de un perfil concreto—:
+—la tasa esperada (asistencias en la ventana de exposición, `exposicion = 1`) de un perfil concreto—:
 
 ```{r}
 #| label: u21-pred
 perfil <- data.frame(edad_conductor = 45, potencia_cv = 110, zona_circulacion = "urbana",
                      uso = "particular", tipo_vehiculo = "turismo", exposicion = 1)
-predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en un año
+predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en la ventana de exposición
 ```
 
 ### Efecto relativo vs absoluto
@@ -434,11 +447,19 @@ Las celdas donde el observado se aparta del esperado bajo independencia son, pre
 delatan la asociación entre zona y daños.
 
 ::: {.callout-important}
-## Tarea del estudiante (2.1) — arranca la Pregunta 1 del caso
-Sobre la cartera de tu equipo, aborda la **Pregunta 1** de la dirección ([Unidad 2.7](#sec-u27)): *¿a
-qué ritmo se producen los siniestros y qué perfiles lo elevan?* Modela la **tasa** con Poisson y
-`offset(log(exposicion))`, lee los factores en **IRR** (con sus intervalos), y **predice** el ritmo
-esperado de una póliza nueva. Cierra comprobando si la Poisson basta —**índice de dispersión**—: si se
-dispara, deja anotado el problema; lo resolverás en la Unidad 2.2. Valida tus estimaciones contra la
-verdad del DGP (`attr(cartera, "verdad")`).
+## Tarea del estudiante (2.1) — Preguntas 1 a 5 del caso
+Sobre la cartera de tu equipo abordas el primer bloque de la dirección ([Unidad 2.7](#sec-u27)):
+
+1. **Ritmo y perfiles (P1).** Modela la **tasa** de `n_siniestros` con Poisson y `offset(log(exposicion))`;
+   lee los factores en **IRR** con sus intervalos.
+2. **Predicción (P2).** Estima el ritmo esperado —con intervalo— de una **póliza nueva** de un perfil dado.
+3. **¿Mismo patrón? (P3).** Repite con `n_asistencia` y compara: ¿los mismos factores, con la misma fuerza,
+   que en `n_siniestros`?
+4. **Asociación (P4).** Cruza `tipo_vehiculo` × `zona_circulacion` × `uso` con *tener o no* siniestro; ajusta
+   un **log-lineal** y distingue asociación de independencia.
+5. **Movilidad (P5).** Con `bonus_malus_prev` → `bonus_malus_act`, contrasta **simetría** y **homogeneidad
+   marginal** y mide la **deriva**.
+
+Cierra comprobando si la Poisson basta —**índice de dispersión**—: si se dispara, anótalo; lo resolverás en la
+Unidad 2.2. Valida contra la verdad del DGP (`attr(cartera, "verdad")`).
 :::

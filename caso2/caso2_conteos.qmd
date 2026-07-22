@@ -31,11 +31,13 @@ editor:
 ---
 
 <!-- ============================================================================
-     Caso 2 (Poisson). Datos vía R/dgp_conteos.R:
-       - contexto "auto"  -> cartera simulada, columna vertebral de la TEORÍA.
-       - contexto "salud" -> cohorte del ESTUDIO DE CASO (Unidad 2.7).
-     Ver PROPUESTA_CASO2.md y ESQUEMA_DATOS_SEGUROS.md.
+     Caso 2 (Poisson).
+       - TEORÍA (unidades 2.1-2.6): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
+         Esquema de diseño: ESQUEMA_DATOS_SEGUROS.md.
+       - ESTUDIO DE CASO (Unidad 2.7) y Caso 3: R/dgp_auto.R -> cartera de auto rica.
+         Diseño: DISENO_DGP_AUTO.md. (La cohorte de salud quedó archivada en ec_seguro_salud/.)
 ============================================================================ -->
+
 
 ```{r}
 #| label: setup
@@ -65,14 +67,17 @@ comparar/seleccionar modelos para conteos y tasas —Poisson y binomial negativa
 tasas—: razones de tasas, sobredispersión y exceso de ceros. Reactiva el objetivo de **mixtos y
 supervivencia** (riesgos a trozos) y culmina en el de **comunicar y reproducir** (estudio de caso).
 
-<!-- TODO: Resultados de aprendizaje ESPECÍFICOS del Caso 2 (se construirán como en el Caso 1, a su
-     debido momento). -->
+Al completar el Caso 2, el estudiante será capaz de:
 
-::: {.callout-note}
-## Pendiente
-Los **resultados de aprendizaje específicos** del Caso 2 se redactarán más adelante, como se hizo con
-el Caso 1.
-:::
+- **RA1 · Poisson, tasas e IRR.** Reconocer cuándo la respuesta es un conteo, ajustar una regresión de Poisson (enlace log) e interpretar sus coeficientes como razones de tasas (IRR), usando el *offset* de la exposición para modelar **tasas** en lugar de recuentos brutos.
+- **RA2 · Modelos log-lineales.** Analizar tablas de contingencia y de cambio (asociación e independencia, simetría, homogeneidad marginal) como una regresión de Poisson sobre los **recuentos de celda**.
+- **RA3 · Sobredispersión.** Diagnosticar la sobredispersión (índice de dispersión, relación media–varianza, contraste de Cameron–Trivedi) y tratarla con **quasi-Poisson** y **binomial negativa** (NB1/NB2), sabiendo cuál elegir.
+- **RA4 · Exceso de ceros.** Detectar el exceso de ceros y modelarlo con modelos **inflados de ceros** (ZIP/ZINB) y de **barrera** (*hurdle*), distinguiendo el mecanismo de mezcla del de barrera.
+- **RA5 · Conteos agrupados (mixtos).** Ajustar e interpretar **GLMM de Poisson** con estructura anidada: componentes de varianza, ICC, BLUP y la distinción entre media **condicional** y **marginal**.
+- **RA6 · Supervivencia como tasa.** Reformular el tiempo a evento como un GLM de Poisson —**riesgos a trozos** sobre datos persona-periodo—, leer los *hazard ratios* y la supervivencia, y conectarlo con Cox, Kaplan–Meier y la **fragilidad**.
+- **RA7 · Bondad de ajuste y diagnóstico.** Evaluar el ajuste de un modelo de conteo con el índice de dispersión, los **residuos simulados** (DHARMa), el rootograma y la calibración, conociendo las restricciones del contraste de *deviance*.
+- **RA8 · Selección, validación y regularización.** Comparar y seleccionar modelos (*deviance*, AIC/BIC, razón de verosimilitudes), validarlos (**validación cruzada**) y **regularizarlos** (ridge, lasso y elastic-net con `glmnet`).
+- **RA9 · Estudio de caso reproducible.** Desarrollar, presentar y defender un **estudio de caso reproducible** que integre las lentes del conteo.
 
 ::: callout-note
 ## Mapa del caso
@@ -82,15 +87,15 @@ preguntamos *«¿cuántas veces y a qué ritmo?»*. Entramos en la familia **Poi
 tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **exceso de ceros**, los
 **conteos agrupados** (mixtos) y el nexo de la supervivencia como **tasa** (riesgos a trozos).
 
-| Unidad | Contenido | Objetivo |
-|-----|------------------------------------|-----|
-| **2.1** | Poisson y log-lineal: *Contexto* (recuentos, tasas, tablas de contingencia y de cambio) · *Modelización y estimación* · *Interpretación* (IRR, asociación) · *Inferencia y selección* · *Bondad de ajuste, diagnóstico y predicción*. | Conteos y tasas |
-| **2.2** | Sobredispersión: causas, diagnóstico, quasi-Poisson y binomial negativa (con OLRE y conexiones). | Conteos y tasas |
-| **2.3** | Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | Conteos y tasas |
-| **2.4** | Conteos agrupados: GLMM de Poisson. | Mixtos (espiral) |
-| **2.5** | Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | Supervivencia (espiral) |
-| **2.6** | Selección, validación cruzada y regularización (`glmnet` Poisson). | Conteos y tasas |
-| **2.7** | Estudio de caso, exposiciones y evaluación. | Comunicar y reproducir |
+| Unidad | Contenido | Objetivos |
+|-----|--------------------------------------|-----|
+| **2.1** | Poisson y log-lineal: *Contexto* (recuentos, tasas, tablas de contingencia y de cambio) · *Modelización y estimación* · *Interpretación* (IRR, asociación) · *Inferencia y selección* · *Bondad de ajuste, diagnóstico y predicción*. | **RA1, RA2** (y primer contacto con RA7 y RA8) |
+| **2.2** | Sobredispersión: causas, diagnóstico, quasi-Poisson y binomial negativa (con OLRE y conexiones). | **RA3** (y RA7 en el diagnóstico) |
+| **2.3** | Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | **RA4** (y RA7) |
+| **2.4** | Conteos agrupados: GLMM de Poisson. | **RA5** (espiral de mixtos; y RA7) |
+| **2.5** | Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | **RA6** (espiral de supervivencia; y RA7) |
+| **2.6** | Selección, validación cruzada y regularización (`glmnet` Poisson). | **RA8** |
+| **2.7** | Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8) |
 :::
 
 # Presentación del caso {#sec-presentacion2}
@@ -103,13 +108,15 @@ Al ser **simulada** conocemos su proceso generador (la «verdad»), lo que nos p
 ajustes —como hicimos con la cohorte del Caso 1—. El estudio de caso ([Unidad 2.7](#sec-u27)) usará
 una **cohorte sanitaria** análoga, generada con el mismo motor.
 
-Cada fila es una **póliza**, observada durante `exposicion` (fracción de año de cobertura). Como el
-número de incidencias depende del tiempo expuesto, la exposición entra como **offset**
+Cada fila es una **póliza**. `exposicion` mide **cuánto tiempo llevamos con ese cliente**: su tiempo
+contratado con nosotros como **fracción de la antigüedad del cliente más antiguo (y aún vigente)**. La
+cartera recoge solo clientes con al menos **un tercio** de esa antigüedad máxima (`exposicion` entre 0.30
+y 1.00). Como el número de incidencias depende del tiempo expuesto, la exposición entra como **offset**
 (`log(exposicion)`) y modelamos **tasas**, no recuentos brutos.
 
 | Papel | Variables |
 |---|---|
-| Estructura | `id_poliza`; `agencia` (oficina que gestiona la póliza — variable de **agrupación**); `region` (agrupa las agencias — nivel superior del **anidamiento**, para la Unidad 2.4); `exposicion` (**fracción del año** en que la póliza estuvo en vigor → *offset*) |
+| Estructura | `id_poliza`; `agencia` (oficina que gestiona la póliza — variable de **agrupación**); `region` (agrupa las agencias — nivel superior del **anidamiento**, para la Unidad 2.4); `exposicion` (tiempo contratado del cliente como **fracción de la antigüedad del más antiguo y vigente**; entre 0.30 y 1.00 → *offset*; no confundir con la variable de ruido `antiguedad_cliente`) |
 | Respuestas (conteos) | `n_asistencia` (asistencias en carretera; frecuentes), `n_danos` (partes por daños propios; heterogéneos), `n_fraude` (reclamaciones **sometidas a revisión antifraude**; con exceso de ceros estructurales), `n_gestiones` (gestiones de siniestro **de la póliza** tramitadas a través de su agencia; una cifra por póliza, con ritmo propio de cada agencia) |
 | Predictores del riesgo | `edad_conductor`, `antiguedad_carnet`, `potencia_cv`, `antiguedad_vehiculo`, `zona_circulacion`, `uso`, `tipo_vehiculo` |
 | Variables adicionales (ruido / selección) | `sexo`, `estado_civil`, `color_vehiculo`, `tiene_garaje`, `forma_pago`, `financiado`, `km_declarados`, `valor_vehiculo`, `n_conductores`, `antiguedad_cliente` |

@@ -108,7 +108,7 @@ dplyr::bind_rows(
   ggplot(aes(nivel, tasa)) +
   geom_col(fill = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x") +
-  labs(x = NULL, y = "tasa de reclamaciones (por año)")
+  labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
 # [u23-zip]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación

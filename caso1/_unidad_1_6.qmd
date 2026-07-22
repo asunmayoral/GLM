@@ -121,7 +121,7 @@ Reflexión.
 ## Cada equipo, una base de datos distinta
 Cada equipo trabaja sobre **su propia cohorte**, generada con una configuración diferente —pero
 coherente— de los parámetros del DGP. Las diez configuraciones y los datos por equipo los produce el
-script `scripts/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` la cohorte
+script `R/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` la cohorte
 (`cohorte.rds` / `.csv`) y su expansión persona-periodo (`pp.rds` / `.csv`). El enunciado y las
 preguntas del cliente son los mismos para todos; lo que cambia de un equipo a otro son las
 **conclusiones numéricas** (efectos, riesgos, plazos). La clave con los parámetros verdaderos
