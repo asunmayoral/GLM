@@ -26,8 +26,9 @@ que se introducen pronto y reaparecen en cada bloque.
 - **[Caso 2 · ¿Cuántas veces y a qué ritmo?](caso2/caso2_conteos.qmd)** *(borrador)* Conteos y
   tasas: Poisson, *offset* e IRR, sobredispersión, exceso de ceros, GLMM de Poisson y riesgos a
   trozos.
-- **Caso 3 · ¿Cuánto?** *(en construcción)* Continuas positivas:
-  Gamma, inversa gaussiana y lognormal, Tweedie (prima pura), GLMM Gamma y modelos de vida acelerada.
+- **[Caso 3 · ¿Cuánto y hasta cuándo?](caso3/caso3_continuas_positivas.qmd)** *(borrador)* Magnitudes
+  positivas y vida útil hasta el fallo: GLM Gamma e inversa gaussiana, elección de familia y escala,
+  GLMM Gamma, modelos de vida acelerada (AFT) y el modelo de Cox como frontera del marco.
 
 ## Cómo usar estas páginas
 

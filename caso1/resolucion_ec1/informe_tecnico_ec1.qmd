@@ -1,0 +1,682 @@
+---
+title: "Informe técnico — Riesgo de fractura en la red OsteoRed"
+subtitle: "Estudio de caso 1 · Cohorte del equipo_10 — Modelos Lineales Generalizados con R"
+author: "A. Martínez Mayoral (solución de referencia del profesorado)"
+date: today
+lang: es
+format:
+  docx:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    # reference-doc: ../../evaluacion/Plantillas_informes_tres_formatos/Plantilla_informe_tecnico.docx  # opcional: estilos/marca
+bibliography: ../../references.bib
+csl: https://www.zotero.org/styles/apa
+execute:
+  echo: true       # en un informe técnico el código suele mostrarse
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# --- Núcleo de software del curso ------------------------------------------
+library(tidyverse)
+library(broom)
+library(broom.mixed)
+library(marginaleffects)
+library(car)
+library(performance)
+library(DHARMa)
+library(pROC)
+library(lme4)
+library(MASS)
+library(nnet)
+library(ordinal)
+library(survival)
+library(knitr)
+
+select <- dplyr::select      # evita el enmascaramiento por MASS::select
+slice  <- dplyr::slice
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 7, fig.height = 4.2, dpi = 150)
+SEMILLA_CURSO <- 20252026L
+set.seed(SEMILLA_CURSO)
+theme_set(theme_minimal(base_size = 11))
+
+# --- Carga de datos (equipo_10) --------------------------------------------
+cohorte <- readRDS("../datos_equipos/equipo_10/cohorte.rds")
+pp       <- readRDS("../datos_equipos/equipo_10/pp.rds")
+
+cohorte <- cohorte |>
+  mutate(
+    centro    = factor(centro),
+    x2f       = factor(x2, levels = c(0, 1), labels = c("Sin tratamiento", "Con tratamiento")),
+    eventof   = factor(evento, levels = c(0, 1), labels = c("Censura", "Fractura")),
+    sever_ord = factor(sever_ord, levels = c("Leve", "Moderado", "Grave"), ordered = TRUE),
+    clase_nom = factor(clase_nom, levels = c("A", "B", "C"))
+  )
+pp <- pp |> mutate(centro = factor(centro), periodo = factor(periodo, levels = 1:6))
+```
+
+::: {.callout-tip}
+## Idea fuerza
+Un informe técnico no es un volcado de código: documenta y justifica las decisiones
+necesarias para evaluar, auditar y reutilizar el análisis.
+:::
+
+## Datos de la entrega {.unnumbered}
+
+| Elemento | Contenido |
+|---|---|
+| Título del proyecto | ¿Ocurre la fractura? ¿Y cuándo? Riesgo, plazos, tipo y gravedad en la red OsteoRed |
+| Equipo | A. Martínez Mayoral (solución de referencia del profesorado) |
+| Asignatura / titulación | Modelos Lineales Generalizados con R · 3.er curso, Grado en Ciencia de Datos e IA (6 ECTS) |
+| Curso académico | 2025–2026 |
+| Profesorado | A. Martínez Mayoral |
+| Audiencia destinataria | Dirección médica de OsteoRed (recomendaciones) y profesorado / equipo técnico (auditoría y reproducción) |
+| Versión / fecha | v1.0 · `r format(Sys.Date(), "%d/%m/%Y")` |
+
+# Resumen técnico
+
+La dirección de **OsteoRed**, red de 24 clínicas de salud ósea, siguió durante seis años (hasta seis
+revisiones anuales) a una cohorte de **893 mujeres** para decidir a quién vigilar, con qué frecuencia
+citarla, cómo usar el tratamiento y qué esperar de cada clínica. De cada paciente se dispone de su
+**fragilidad ósea** (`x1`, densidad mineral estandarizada), del **tratamiento preventivo** (`x2`), de
+la **clínica** (`centro`), del desenlace de fractura y su momento (`ever`, `tiempo`, `evento`) y —de
+forma basal— del **tipo** (`clase_nom`: A/B/C) y la **gravedad** (`sever_ord`). La cohorte es
+**simulada** con un proceso generador de datos (DGP) conocido, lo que habilita un control de calidad
+final frente a la "verdad".
+
+Cada pregunta de la dirección se tradujo a un objetivo analítico y al **modelo lineal generalizado**
+adecuado a su tipo de respuesta: **regresión logística** para el riesgo binario [@hosmer2013;
+@dobson2018], **riesgo en tiempo discreto con enlace `cloglog`** sobre datos persona-periodo para el
+"cuándo" [@allison1982; @prentice1978], **logit multinomial** para el tipo [@agresti2013], **logit
+acumulado de odds proporcionales** para la gravedad y **modelo mixto** con intercepto aleatorio por
+clínica para el peso del centro [@bates2015]. Cada análisis incorpora diagnóstico, selección por
+verosimilitud (LRT, AIC/BIC) e interpretación en la escala del cliente.
+
+**Hallazgos.** La **fragilidad ósea es el factor dominante** (cada desviación típica multiplica por
+2,6 las odds de fractura y por 2,2 el riesgo instantáneo). El **tratamiento reduce el riesgo de forma
+sustancial y homogénea** (odds a 0,39; hazard a 0,44) y **retrasa** la fractura de manera proporcional
+en el tiempo; su beneficio absoluto crece con la fragilidad. El riesgo **no se concentra en un año**
+(hazard sostenido ≈7–10 % anual), lo que justifica **mantener la revisión anual**. El **tipo** de
+fractura solo se anticipa de forma limitada (acierto ~50 %). La **gravedad** basal sube con la
+fragilidad y se asocia a grados más leves en las tratadas. El **8–9 %** del riesgo depende de la
+**clínica** (el resto, de la paciente). El control de calidad confirma una **buena recuperación** de
+los parámetros verdaderos.
+
+**Cautelas.** Las relaciones del tratamiento con el tipo y la gravedad son **asociativas**
+(indicación/selección), no causales; el AUC y el Brier son medidas **dentro de muestra**; las cifras
+son específicas de esta cohorte.
+
+# Contexto, problema, objetivos y preguntas del análisis
+
+::: {.callout-note}
+Explica por qué se realiza el análisis, qué decisión se pretende apoyar y cómo se traduce en preguntas
+respondibles con datos.
+:::
+
+## Contexto, audiencia y necesidad de análisis
+
+| Elemento | Contenido |
+|---|---|
+| Contexto del proyecto | OsteoRed (24 clínicas de salud ósea) ejecuta un programa de prevención y ha seguido seis años a una cohorte de mujeres; necesita convertir sus datos en decisiones clínicas y organizativas. |
+| Audiencia destinataria | Dirección médica (no estadística) para las recomendaciones; profesorado y equipo técnico para auditar/reproducir. |
+| Decisión que se quiere apoyar | A quién vigilar, cada cuánto citar, cómo usar el tratamiento, cómo leer diferencias entre clínicas y qué esperar de un centro nuevo. |
+| Consecuencia de no abordarlo | Vigilancia mal focalizada, calendarios ineficientes, infrautilización del tratamiento y comparaciones injustas entre centros. |
+
+## Problema de análisis
+
+> Cuantificar y explicar el riesgo de fractura de las pacientes de OsteoRed en función de su fragilidad
+> ósea, su tratamiento y su clínica; caracterizar **si** ocurre la fractura, **cuándo**, de **qué tipo**
+> y con qué **gravedad**; y devolver recomendaciones accionables con su incertidumbre.
+
+## Objetivos del análisis
+
+| Tipo de objetivo | Redacción del objetivo |
+|---|---|
+| Objetivo general | Modelizar el riesgo de fractura y sus dimensiones (ocurrencia, tiempo, tipo, gravedad) reconociendo la estructura por clínica e interpretarlo para decidir. |
+| Objetivo específico 1 | Estimar el efecto de fragilidad y tratamiento sobre la probabilidad de fractura y predecir el riesgo de una paciente nueva (P1). |
+| Objetivo específico 2 | Describir la evolución temporal del riesgo, el efecto del tratamiento sobre los plazos y un calendario de revisión, tratando la censura (P2). |
+| Objetivo específico 3 | Analizar qué factores empujan hacia cada tipo de fractura (P3) y qué agrava la fractura (P4). |
+| Objetivo específico 4 | Cuantificar cuánto del riesgo depende de la clínica y anticipar un centro nuevo (P5). |
+
+## Preguntas de negocio y preguntas analíticas
+
+| Pregunta de negocio | Pregunta analítica asociada | Datos necesarios | Decisión que podría apoyar |
+|---|---|---|---|
+| ¿Quién se fractura y cuánto influyen fragilidad y tratamiento? | GLM binomial (logit) con interacción `x1·x2` | `ever`, `x1`, `x2` | Focalizar vigilancia; calculadora de riesgo |
+| ¿Cuándo se fractura y cada cuánto citar? | Riesgo en tiempo discreto (`cloglog`) persona-periodo | `pp` (`periodo`, `y`, `x1`, `x2`) | Calendario de revisiones; uso del tratamiento |
+| ¿De qué tipo será la fractura? | Logit multinomial (ref. A) | `clase_nom`, `x1`, `x2` | Orientar la sospecha del tipo |
+| ¿Qué agrava la fractura? | Logit acumulado de odds proporcionales | `sever_ord`, `x1`, `x2` | Homogeneizar estadiaje |
+| ¿Cuánto pesa la clínica? | GLMM logístico, intercepto aleatorio por centro | `ever`, `x1`, `x2`, `centro` | Auditoría de centros; centro nuevo |
+
+# Datos, preparación y calidad de la evidencia
+
+::: {.callout-note}
+El lector debe entender de dónde salen los datos, qué representan, cómo se han preparado y hasta qué
+punto son adecuados para responder las preguntas.
+:::
+
+## Descripción de los datos
+
+| Elemento | Información |
+|---|---|
+| Fuente de los datos | Cohorte **simulada** con DGP conocido (curso), inspirada en el estudio GLOW. Datos del equipo_10. |
+| Periodo analizado | Hasta 6 revisiones anuales (6 periodos discretos). |
+| Unidad de análisis | La paciente (individuo) y, por expansión, la paciente-periodo. |
+| Número de observaciones | 893 pacientes; 3 583 filas persona-periodo. |
+| Número de variables | 9 sustantivas (más identificadores). |
+| Variable objetivo | Según pregunta: `ever`, `tiempo`/`evento`, `clase_nom`, `sever_ord`. |
+| Criterios de inclusión/exclusión | Todas las pacientes; sin exclusiones. |
+| Nivel de agregación | Individuo e individuo × periodo en riesgo. |
+
+```{r}
+#| label: carga-datos
+# Los datos ya se cargan en el chunk 'setup'. Resumen reproducible:
+descrip <- tibble(
+  Indicador = c("Pacientes (N)", "Centros", "Tasa de fractura observada",
+                "Proporción censura", "Proporción con tratamiento", "Filas persona-periodo"),
+  Valor = c(nrow(cohorte), nlevels(cohorte$centro), round(mean(cohorte$evento), 3),
+            round(mean(cohorte$evento == 0), 3), round(mean(cohorte$x2), 3), nrow(pp))
+)
+kable(descrip, caption = "Indicadores descriptivos de la cohorte (equipo_10).")
+```
+
+## Variables principales
+
+| Variable | Tipo | Descripción | Pregunta que ayuda a responder |
+|---|---|---|---|
+| `x1` | Continua (z) | Fragilidad ósea (densidad mineral estandarizada) | P1–P5 |
+| `x2` | Binaria (0/1) | Tratamiento preventivo (1 = lo recibe) | P1–P5 |
+| `centro` | Factor (24) | Clínica de seguimiento (efecto aleatorio) | P5 |
+| `ever` | Binaria | ¿Hubo fractura durante el seguimiento? | P1 |
+| `tiempo` | Entero (1–6) | Periodo en que termina la observación | P2 |
+| `evento` | Binaria | 1 = fractura observada; 0 = censura administrativa | P2 |
+| `clase_nom` | Factor (A/B/C) | Tipo/fenotipo de fractura (sin orden) | P3 |
+| `sever_ord` | Ordinal | Gravedad/estadio basal (Leve < Moderado < Grave) | P4 |
+
+## Preparación y calidad de los datos
+
+| Aspecto revisado | Qué se detectó | Tratamiento aplicado | Impacto o cautela |
+|---|---|---|---|
+| Valores perdidos | Ninguno | — | Sin imputación |
+| Rango de `x1` | −3,3 a 3,1 (centrada en 0) | Se mantiene (estandarizada) | Lectura por desviación típica |
+| Codificación | Enteros y factores mezclados | Recodificación a factores legibles | Correcta lectura de niveles |
+| Censura | 74,1 % termina sin fractura | Expansión persona-periodo | Censura tratada sin sesgo |
+| Consistencia | Eventos cohorte = eventos pp (231) | Verificación cruzada | Expansión correcta |
+
+```{r}
+#| label: eda-calidad
+# Comprobaciones de calidad reproducibles
+list(
+  ausentes    = sum(is.na(cohorte)),
+  rango_x1    = range(cohorte$x1),
+  eventos_coh = sum(cohorte$evento),
+  eventos_pp  = sum(pp$y)
+)
+```
+
+```{r}
+#| label: fig-eda
+#| fig-cap: "Fragilidad (x1) por desenlace y proporción de fractura según tratamiento."
+#| fig-width: 8
+#| fig-height: 3.4
+library(patchwork)
+g1 <- ggplot(cohorte, aes(x1, fill = eventof)) + geom_density(alpha = .5) +
+  labs(x = "Fragilidad ósea (x1)", fill = NULL)
+g2 <- cohorte |> count(x2f, eventof) |> group_by(x2f) |> mutate(prop = n/sum(n)) |>
+  ggplot(aes(x2f, prop, fill = eventof)) + geom_col() +
+  labs(x = NULL, y = "Proporción", fill = NULL)
+g1 | g2
+```
+
+## Valoración de adecuación de los datos
+
+> Los datos son **suficientes y pertinentes** para las cinco preguntas: hay respuesta para cada tipo
+> de análisis (binaria, tiempo-a-evento, nominal, ordinal), covariables con variación adecuada (`x2`
+> en el 48,2 %) y estructura de agrupamiento (24 clínicas). La principal limitación es de **cobertura
+> de predictores** (solo `x1` y `x2`), lo que acota la previsibilidad del **tipo** de fractura (P3).
+
+# Metodología y criterios de análisis
+
+::: {.callout-note}
+La metodología se justifica en función del problema y de las preguntas analíticas, no como manual de
+cada técnica. Todos los GLM se ajustan por máxima verosimilitud [@nelder1972; @mccullagh1989].
+:::
+
+| Pregunta analítica | Técnica o enfoque | Por qué es adecuado | Criterio de evaluación o validación |
+|---|---|---|---|
+| P1 · Riesgo | GLM binomial, enlace logit (+ interacción) | `ever` binaria; OR y probabilidades interpretables | LRT/AIC/BIC; AUC; calibración; DHARMa |
+| P2 · Tiempo | GLM binomial `cloglog`, persona-periodo | Tiempo discreto con censura; `exp(β)` = hazard ratio | Hazard base; LRT no-proporcionalidad; Cox `cox.zph` |
+| P3 · Tipo | Logit multinomial (ref. A) | Nominal sin orden; efectos por categoría | LRT vs nulo; AIC; Brier multiclase; acierto |
+| P4 · Gravedad | Logit acumulado odds proporcionales (+ mixto) | Ordinal; un OR por variable si hay proporcionalidad | Test de odds proporcionales; varianza entre centros |
+| P5 · Clínica | GLMM logístico, intercepto aleatorio por centro | Separa variación paciente vs clínica | Componentes de varianza; ICC; fijo vs mixto |
+
+## Supuestos, decisiones y limitaciones metodológicas
+
+> Se ajusta **a ciegas** (sin mirar la "verdad" del DGP) y solo al final se compara. `x1` está
+> estandarizada (efectos "por desviación típica"). En P1 se retiene el modelo de efectos principales
+> por parsimonia. En P2, `periodo` entra como factor (hazard base flexible) y la censura se trata con
+> la expansión persona-periodo. En P4 se comprueba la proporcionalidad de odds y se añade la versión
+> mixta. En P5 la clínica se modela como intercepto aleatorio (24 grupos). Las asociaciones del
+> tratamiento con tipo (P3) y gravedad (P4) se interpretan como **de indicación**, no causales.
+
+## Evaluación, validación o comprobaciones
+
+| Comprobación | Resultado | Interpretación | Implicación |
+|---|---|---|---|
+| AUC (P1) | 0,75 | Discriminación aceptable | Modelo útil para priorizar |
+| Calibración por deciles (P1) | Observado ≈ predicho | Probabilidades fiables | Riesgos utilizables |
+| `cox.zph` global (P2) | p = 0,86 | Riesgos proporcionales | HR estables en el tiempo |
+| LRT `periodo·x2` (P2) | p = 0,65 | Efecto del tratamiento constante | Protección proporcional |
+| Test odds proporcionales (P4) | x1 p = 0,34; x2 p = 0,29 | Supuesto sostenido | Un OR por variable |
+| ICC (P5) | 0,085 | ~8,5 % depende del centro | Riesgo sobre todo de la paciente |
+| Cotejo con DGP | Buena recuperación | Metodología válida | Confianza reforzada |
+
+# Resultados, evaluación e interpretación
+
+::: {.callout-important}
+## Regla de selección
+En el cuerpo van los resultados que responden a un objetivo o sostienen una decisión. Cada resultado
+clave recorre: objetivo → resultado → evidencia (tabla/figura) → interpretación → cautela.
+:::
+
+## Resultado clave 1: la fragilidad manda; el tratamiento protege por igual (P1)
+
+| Elemento | Contenido |
+|---|---|
+| Objetivo al que responde | P1 · quién se fractura; papel de fragilidad y tratamiento; riesgo de paciente nueva |
+| Resultado principal | Fragilidad OR 2,60; tratamiento OR 0,39; interacción `x1·x2` no significativa |
+| Evidencia asociada | Tabla de OR, curvas de riesgo (@fig-p1), AUC y calibración |
+| Interpretación | El tratamiento reduce las odds ~61 % en todo el rango de fragilidad; el riesgo crece con `x1` |
+| Cautela | `ever` es lectura marginal (con censura); el "cuándo" se aborda en P2 |
+
+```{r}
+#| label: p1-modelos
+m1_base <- glm(ever ~ x1 + x2, family = binomial("logit"), data = cohorte)
+m1_int  <- glm(ever ~ x1 * x2, family = binomial("logit"), data = cohorte)
+# Selección de la interacción
+kable(as.data.frame(anova(m1_base, m1_int, test = "LRT")),
+      caption = "LRT: ¿aporta la interacción x1·x2? (P1)")
+# Odds ratios del modelo retenido
+kable(broom::tidy(m1_base, conf.int = TRUE, exponentiate = TRUE),
+      digits = 3, caption = "Odds ratios (IC 95%) del modelo logístico de efectos principales.")
+```
+
+```{r}
+#| label: p1-efectos
+# Efectos marginales medios (probabilidad) y riesgo de una paciente nueva
+kable(as_tibble(avg_slopes(m1_base))[, c("term","estimate","conf.low","conf.high")],
+      digits = 3, caption = "Efectos marginales medios sobre P(fractura).")
+kable(
+  predictions(m1_base, newdata = data.frame(x1 = 1.5, x2 = c(0,1))) |>
+    as_tibble() |> select(x1, x2, estimate, conf.low, conf.high),
+  digits = 3, caption = "Riesgo predicho para una paciente nueva de fragilidad alta (x1 = 1,5).")
+```
+
+```{r}
+#| label: fig-p1
+#| fig-cap: "Riesgo de fractura predicho según fragilidad (x1) y tratamiento (x2), IC 95%."
+plot_predictions(m1_base, condition = c("x1", "x2")) +
+  labs(x = "Fragilidad ósea (x1)", y = "P(fractura)", color = "Tratamiento", fill = "Tratamiento")
+```
+
+```{r}
+#| label: p1-auc
+auc1 <- pROC::auc(pROC::roc(cohorte$ever, predict(m1_base, type = "response"), quiet = TRUE))
+auc1
+```
+
+**Interpretación (P1).** La interacción `x1·x2` **no es significativa** (LRT *p* = 0,071; el BIC
+empeora al añadirla), de modo que **el tratamiento protege por igual** en todo el rango de fragilidad;
+se retiene el modelo de efectos principales. Cada desviación típica de **fragilidad multiplica por
+2,60** las odds de fractura (IC 95 % 2,15–3,17) y el **tratamiento las reduce ~61 %** (OR 0,39; IC
+95 % 0,28–0,55). En probabilidad, cada punto z añade ~15,4 puntos porcentuales y el tratamiento resta
+~15,2. Para una **paciente nueva de fragilidad alta** (`x1` = 1,5) el riesgo estimado es **64,9 % sin
+tratamiento** y **41,9 % con tratamiento**. La discriminación es **aceptable** (AUC ≈ 0,75) y la
+calibración, buena. *Cautela:* `ever` recoge la fractura observada dentro de una ventana con censura.
+
+## Resultado clave 2: el riesgo es sostenido; el tratamiento retrasa la fractura (P2)
+
+| Elemento | Contenido |
+|---|---|
+| Objetivo al que responde | P2 · cuándo se fractura; calendario; efecto del tratamiento sobre plazos |
+| Resultado principal | HR fragilidad 2,18; HR tratamiento 0,44; hazard base ≈ constante |
+| Evidencia asociada | HR (`cloglog`), curvas de supervivencia (@fig-p2), Cox de validación |
+| Interpretación | El tratamiento reduce el hazard ~56 % cada periodo y desplaza la supervivencia hacia arriba |
+| Cautela | Modelo de efectos fijos; el condicional por clínica se afina en P5 |
+
+```{r}
+#| label: p2-modelo
+m_surv <- glm(y ~ periodo + x1 + x2, family = binomial("cloglog"), data = pp)
+kable(broom::tidy(m_surv, conf.int = TRUE, exponentiate = TRUE), digits = 3,
+      caption = "Riesgo en tiempo discreto (cloglog): exp(coef) = hazard ratio para x1, x2.")
+# Proporcionalidad del efecto del tratamiento en el tiempo
+m_surv_tv <- glm(y ~ periodo * x2 + x1, family = binomial("cloglog"), data = pp)
+kable(as.data.frame(anova(m_surv, m_surv_tv, test = "LRT")),
+      caption = "LRT: ¿varía el efecto del tratamiento por periodo? (no-proporcionalidad)")
+```
+
+```{r}
+#| label: fig-p2
+#| fig-cap: "Supervivencia (probabilidad de seguir sin fractura) a fragilidad alta (x1 = 1)."
+grid_s <- expand_grid(periodo = factor(1:6, levels = 1:6), x1 = 1, x2 = c(0,1)) |>
+  mutate(h = predict(m_surv, newdata = pick(everything()), type = "response")) |>
+  arrange(x2, periodo) |> group_by(x2) |> mutate(superv = cumprod(1 - h)) |> ungroup() |>
+  mutate(Tratamiento = factor(x2, labels = c("Sin tratamiento", "Con tratamiento")),
+         periodo = as.integer(as.character(periodo)))
+ggplot(grid_s, aes(periodo, superv, color = Tratamiento)) +
+  geom_line(linewidth = 1) + geom_point() +
+  scale_x_continuous(breaks = 1:6) + scale_y_continuous(labels = scales::percent) +
+  labs(x = "Periodo (revisión anual)", y = "S(t) — sin fractura")
+```
+
+```{r}
+#| label: p2-cox
+cox1 <- coxph(Surv(tiempo, evento) ~ x1 + x2, data = cohorte)
+kable(summary(cox1)$conf.int, digits = 3, caption = "Validación con Cox: HR e IC 95%.")
+cox.zph(cox1)
+```
+
+**Interpretación (P2).** El **hazard ratio** de la fragilidad es **2,18** (IC 95 % 1,90–2,51) y el del
+tratamiento **0,44** (IC 95 % 0,33–0,58): el tratamiento **reduce el riesgo instantáneo ~56 % en cada
+revisión**. El **hazard base es aproximadamente constante** (≈7–10 % anual, leve máximo hacia el 4.º
+periodo): **el riesgo no se concentra en un año**. El efecto del tratamiento es **proporcional en el
+tiempo** (LRT `periodo·x2` *p* = 0,65). A fragilidad alta, la probabilidad de llegar sin fractura a la
+6.ª revisión pasa del **34 % al 63 %** con tratamiento. El **Cox** da HR casi idénticos y `cox.zph` no
+detecta violación (global *p* = 0,86), reforzando las conclusiones.
+
+## Resultado clave 3: el tipo de fractura apenas se anticipa (P3)
+
+| Elemento | Contenido |
+|---|---|
+| Objetivo al que responde | P3 · qué factores empujan hacia cada tipo; previsibilidad del tipo |
+| Resultado principal | Fragilidad → B y sobre todo C; tratamiento separa B↓ / C↑; acierto ~50 % |
+| Evidencia asociada | RRR multinomiales, curvas (@fig-p3), Brier multiclase |
+| Interpretación | Los factores desplazan el patrón, pero no permiten predecir el tipo con fiabilidad |
+| Cautela | Solo `x1` y `x2`; se necesitarían más variables clínicas |
+
+```{r}
+#| label: p3-modelo
+m_nom  <- nnet::multinom(clase_nom ~ x1 + x2, data = cohorte, trace = FALSE)
+m_nom0 <- nnet::multinom(clase_nom ~ 1, data = cohorte, trace = FALSE)
+kable(broom::tidy(m_nom, conf.int = TRUE, exponentiate = TRUE), digits = 3,
+      caption = "RRR (IC 95%) del logit multinomial (referencia = tipo A).")
+kable(as.data.frame(anova(m_nom0, m_nom)),
+      caption = "LRT del multinomial frente al modelo nulo.")
+```
+
+```{r}
+#| label: p3-brier
+brier_mc <- function(model, data, resp = "clase_nom") {
+  P <- predict(model, newdata = data, type = "probs")
+  if (is.null(dim(P))) P <- cbind(1 - P, P)
+  Y <- model.matrix(as.formula(paste0("~ ", resp, " - 1")), data = data)
+  mean(rowSums((P - Y)^2))
+}
+tibble(modelo = c("nulo", "x1 + x2"),
+       Brier = c(brier_mc(m_nom0, cohorte), brier_mc(m_nom, cohorte)),
+       acierto = c(mean(predict(m_nom0, type="class")==cohorte$clase_nom),
+                   mean(predict(m_nom, type="class")==cohorte$clase_nom))) |>
+  kable(digits = 3, caption = "Capacidad predictiva del tipo: Brier multiclase y acierto.")
+```
+
+```{r}
+#| label: fig-p3
+#| fig-cap: "Probabilidad predicha de cada tipo (A/B/C) según fragilidad y tratamiento."
+grid_fino <- expand_grid(x1 = seq(-3, 3, 0.1), x2 = c(0, 1))
+bind_cols(grid_fino, as_tibble(predict(m_nom, newdata = grid_fino, type = "probs"))) |>
+  pivot_longer(c(A, B, C), names_to = "tipo", values_to = "prob") |>
+  mutate(Tratamiento = factor(x2, labels = c("Sin tratamiento", "Con tratamiento"))) |>
+  ggplot(aes(x1, prob, color = tipo)) + geom_line(linewidth = 1) +
+  facet_wrap(~ Tratamiento) + labs(x = "Fragilidad ósea (x1)", y = "Probabilidad", color = "Tipo")
+```
+
+**Interpretación (P3).** El multinomial mejora claramente al nulo (LRT = 113,8; 4 g.l.; *p* < 0,001).
+La **fragilidad** aleja del tipo A hacia B y **sobre todo C** (RRR C|A = 2,43); el **tratamiento
+separa** fenotipos (RRR B|A = 0,67; RRR C|A = 1,55). Pero la **previsibilidad es limitada**: el Brier
+apenas baja del nulo (0,646 → 0,604) y el acierto es del **50 %**. **No es posible anticipar el tipo
+con fiabilidad** solo con `x1` y `x2`.
+
+## Resultado clave 4: la fragilidad agrava; el tratamiento se asocia a cuadros más leves (P4)
+
+| Elemento | Contenido |
+|---|---|
+| Objetivo al que responde | P4 · qué agrava la fractura; papel del tratamiento en la gravedad |
+| Resultado principal | Fragilidad OR 2,06; tratamiento OR 0,49; odds proporcionales sostenidas |
+| Evidencia asociada | OR acumulados, curvas de gravedad (@fig-p4), varianza entre centros |
+| Interpretación | Más fragilidad → mayor gravedad; tratadas → grados más leves (asociativo) |
+| Cautela | `sever_ord` es gravedad **basal**; la relación con el tratamiento es de indicación |
+
+```{r}
+#| label: p4-modelo
+m_ord <- ordinal::clm(sever_ord ~ x1 + x2, data = cohorte)
+kable(broom::tidy(m_ord, conf.int = TRUE, exponentiate = TRUE), digits = 3,
+      caption = "Odds ratios acumulados (IC 95%) del logit ordinal de odds proporcionales.")
+kable(as.data.frame(ordinal::nominal_test(m_ord)),
+      caption = "Test de odds proporcionales (efectos nominales por variable).")
+m_ordm <- ordinal::clmm(sever_ord ~ x1 + x2 + (1 | centro), data = cohorte)
+sd_centro <- tryCatch(as.numeric(m_ordm$ST[[1]]), error = function(e) NA_real_)
+tibble(componente = "Entre centros (clmm)",
+       sd = sd_centro, varianza = sd_centro^2,
+       ICC_latente = varianza / (varianza + pi^2/3)) |>
+  kable(digits = 3, caption = "Componente entre centros e ICC latente del modelo ordinal mixto.")
+```
+
+```{r}
+#| label: fig-p4
+#| fig-cap: "Probabilidad de cada grado de gravedad según fragilidad y tratamiento."
+m_ord_polr <- MASS::polr(sever_ord ~ x1 + x2, data = cohorte, Hess = TRUE)
+grid_o <- expand_grid(x1 = seq(-3, 3, 0.1), x2 = c(0,1))
+bind_cols(grid_o, as_tibble(predict(m_ord_polr, newdata = grid_o, type = "probs"))) |>
+  pivot_longer(c(Leve, Moderado, Grave), names_to = "grado", values_to = "prob") |>
+  mutate(grado = factor(grado, levels = c("Leve","Moderado","Grave")),
+         Tratamiento = factor(x2, labels = c("Sin tratamiento","Con tratamiento"))) |>
+  ggplot(aes(x1, prob, color = grado)) + geom_line(linewidth = 1) +
+  facet_wrap(~ Tratamiento) + labs(x = "Fragilidad ósea (x1)", y = "Probabilidad", color = "Gravedad")
+```
+
+**Interpretación (P4).** La **fragilidad** tiene OR acumulado **2,06** (IC 95 % 1,80–2,37) —duplica las
+odds de mayor gravedad— y el **tratamiento** OR **0,49** (IC 95 % 0,38–0,63) —las reduce a la mitad—.
+El supuesto de **odds proporcionales se sostiene** (x1 *p* = 0,34; x2 *p* = 0,29) y ~**11 %** de la
+gravedad basal varía entre clínicas. A fragilidad alta, la probabilidad de cuadro **Grave** cae del
+**53 % al 36 %** entre no tratadas y tratadas. La relación del tratamiento con la gravedad es
+**asociativa** (indicación), no causal.
+
+## Resultado clave 5: la clínica pesa poco; el riesgo es de la paciente (P5)
+
+| Elemento | Contenido |
+|---|---|
+| Objetivo al que responde | P5 · cuánto del riesgo depende del centro; centros mejores/peores; centro nuevo |
+| Resultado principal | ICC ≈ 8,5 %; OR robustos fijo↔mixto; gradiente entre centros modesto |
+| Evidencia asociada | Varianza/ICC, caterpillar (@fig-p5), predicción de clínica nueva |
+| Interpretación | ~8–9 % del riesgo por clínica; diferencias inciertas; centro nuevo 29–31 % (14–51 %) |
+| Cautela | Intervalos amplios: evitar rankings tajantes |
+
+```{r}
+#| label: p5-modelo
+m_fix <- glm(ever ~ x1 + x2, family = binomial, data = cohorte)
+m_mix <- lme4::glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte)
+performance::icc(m_mix)
+kable(bind_rows(
+  broom::tidy(m_fix, conf.int = TRUE, exponentiate = TRUE) |> mutate(modelo = "fijo"),
+  broom.mixed::tidy(m_mix, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+    mutate(modelo = "mixto") |> select(-effect)
+) |> select(modelo, term, estimate, conf.low, conf.high),
+  digits = 3, caption = "OR de efectos fijos: modelo fijo vs mixto (condicional).")
+```
+
+```{r}
+#| label: fig-p5
+#| fig-cap: "Efectos aleatorios por clínica (caterpillar): intercepto de riesgo (logit), IC 95%."
+#| fig-height: 5
+re_df <- as.data.frame(lme4::ranef(m_mix, condVar = TRUE))
+ggplot(re_df, aes(x = condval, y = reorder(grp, condval))) +
+  geom_vline(xintercept = 0, linetype = 2, color = "grey50") +
+  geom_point() +
+  geom_errorbarh(aes(xmin = condval - 1.96*condsd, xmax = condval + 1.96*condsd), height = 0) +
+  labs(x = "Efecto aleatorio (logit)", y = "Clínica")
+```
+
+```{r}
+#| label: p5-nueva
+b  <- lme4::fixef(m_mix); su <- sqrt(as.numeric(lme4::VarCorr(m_mix)$centro))
+lp0 <- unname(b["(Intercept)"]); set.seed(SEMILLA_CURSO); u <- rnorm(1e5, 0, su)
+tibble(DT_entre_centros = su, p_clinica_media = plogis(lp0),
+       p_marginal = mean(plogis(lp0 + u)),
+       p05 = plogis(lp0 + qnorm(.05)*su), p95 = plogis(lp0 + qnorm(.95)*su)) |>
+  kable(digits = 3, caption = "Riesgo de la paciente tipo en una clínica nueva (rango entre clínicas).")
+```
+
+**Interpretación (P5).** La **desviación entre centros** es 0,55 (logit) y el **ICC ≈ 8,5 %**: a
+igualdad de paciente, ~8–9 % del riesgo depende de la clínica. Los OR apenas cambian del modelo fijo
+al mixto (`x1` 2,60 → 2,73; `x2` 0,39 → 0,37): las conclusiones de P1 son **robustas**. Hay
+**gradiente** entre centros (20, 8, 6 con más riesgo; 1, 21, 9 con menos), pero con intervalos anchos
+y solapados. Para una **clínica nueva**, el riesgo de la paciente tipo es **29–31 %**, con rango
+plausible **14–51 %**.
+
+## Síntesis técnica de hallazgos
+
+> (1) La **fragilidad ósea** domina el riesgo, el ritmo y la gravedad. (2) El **tratamiento** protege
+> de forma sustancial, homogénea y proporcional en el tiempo, y **retrasa** la fractura. (3) El
+> **riesgo es sostenido** los seis años. (4) El **tipo** de fractura no es previsible con las
+> covariables disponibles. (5) La **clínica** explica una fracción menor (~8–9 %) del riesgo.
+
+# Implicaciones, recomendaciones y próximos pasos
+
+| Hallazgo | Implicación | Recomendación o acción | Cómo evaluar el impacto |
+|---|---|---|---|
+| Fragilidad = factor dominante | Riesgo muy heterogéneo | Priorizar vigilancia en alta fragilidad; calculadora de riesgo | Tasas por estrato de fragilidad |
+| Tratamiento protege y retrasa | Beneficio absoluto mayor en frágiles | Asegurar cobertura, con foco en alta fragilidad | Cobertura y fracturas evitadas por estrato |
+| Riesgo sostenido en el tiempo | No relajar el seguimiento | Mantener **revisión anual** los seis años | Adherencia al calendario |
+| Tipo poco previsible | Decidir por tipo no es fiable | Ampliar variables clínicas si el tipo es prioritario | Reevaluar Brier/acierto |
+| ~8–9 % del riesgo por clínica | Diferencias reales pero modestas | Evitar rankings; auditar centros con efecto alto sostenido | Efectos aleatorios en cohortes sucesivas |
+
+## Próximos pasos
+
+> Validación **fuera de muestra** (k-fold) de la logística y del modelo de supervivencia; nuevas
+> covariables clínicas para mejorar la predicción del tipo; **calculadora de riesgo** para consulta; y
+> monitorización longitudinal de los efectos por clínica para separar señal de ruido.
+
+# Riesgos, incertidumbres, limitaciones y uso de IA
+
+## Limitaciones e incertidumbre
+
+| Tipo de limitación | Descripción | Cómo afecta | Cómo podría mitigarse |
+|---|---|---|---|
+| Datos | Solo dos covariables sustantivas | Limita la predicción del tipo | Ampliar el registro clínico |
+| Muestra / cobertura | Cohorte simulada de una configuración | Cifras específicas de esta cohorte | Replicar en datos reales |
+| Metodología | Asociaciones no causales (tipo, gravedad) | Riesgo de sobreinterpretación | Diseños causales; lectura asociativa |
+| Modelo / evaluación | AUC y Brier dentro de muestra | Optimismo posible | Validación fuera de muestra |
+| Contexto / aplicabilidad | Censura administrativa por diseño | `ever` es lectura marginal | Complementar con supervivencia (P2) |
+
+## Riesgos de mala interpretación
+
+> No debe afirmarse **causalidad** del tratamiento sobre el tipo o la gravedad; no debe
+> **generalizarse** fuera de la cohorte simulada; no debe confiarse en exceso en el **AUC** (in-sample);
+> y no deben hacerse **rankings tajantes de clínicas** a partir de efectos aleatorios con intervalos
+> solapados.
+
+## Declaración responsable de uso de inteligencia artificial
+
+::: {.callout-important}
+Apartado obligatorio: transparente y concreto, deja constancia de que la autoría del trabajo no es de
+la IA.
+:::
+
+| Aspecto | Declaración |
+|---|---|
+| Herramientas utilizadas | Asistente de IA Claude (Opus 4.8), julio de 2026. |
+| Tareas para las que se utilizó IA | Estructuración, redacción del cuaderno Quarto, propuesta de código en R, borrador de interpretaciones y del informe, organización de referencias. |
+| Revisión humana realizada | Todo el código se ejecutó y renderizó; cada cifra procede de esa salida verificada; las interpretaciones se redactaron tras el render. |
+| Decisiones no delegadas en IA | Elección metodológica, criterios de selección/validación, interpretación clínica, recomendaciones y conclusiones. |
+| Errores/ajustes detectados | Se descartaron citas inexistentes propuestas por la IA (`singer2003`, `tutz2016`), sustituidas por fuentes verificadas; se corrigió una colisión de `slice` con el paquete `ordinal`. |
+
+> **Modelo de declaración.** En este proyecto se han utilizado herramientas de inteligencia artificial
+> como apoyo para la estructuración, la programación en R, la redacción y la organización de
+> referencias. Todas las salidas han sido revisadas críticamente y verificadas contra la ejecución del
+> código y las fuentes originales. La IA no ha sido fuente autónoma de resultados ni autora de las
+> conclusiones; las decisiones metodológicas, la interpretación y las recomendaciones son
+> responsabilidad del equipo.
+
+# Control de calidad frente a la verdad del DGP {#sec-qc}
+
+Como la cohorte es simulada, sus parámetros generadores están en `attr(cohorte, "verdad")`. Habiendo
+ajustado a ciegas, se comparan las estimaciones con la verdad (lujo didáctico imposible con datos
+reales).
+
+```{r}
+#| label: qc
+verdad <- attr(readRDS("../datos_equipos/equipo_10/cohorte.rds"), "verdad")
+m_pp_mix <- lme4::glmer(y ~ periodo + x1 + x2 + (1 | centro),
+                        family = binomial("cloglog"), data = pp)
+ef <- broom.mixed::tidy(m_pp_mix, effects = "fixed")
+tibble(
+  parametro = c("beta_x1 (cloglog)", "beta_x2 (cloglog)", "sigma_u"),
+  verdad    = c(verdad$binaria$beta[["x1"]], verdad$binaria$beta[["x2"]], verdad$binaria$sigma_u),
+  estimado  = c(ef$estimate[ef$term=="x1"], ef$estimate[ef$term=="x2"],
+                sqrt(as.numeric(lme4::VarCorr(m_pp_mix)$centro)))
+) |> kable(digits = 3, caption = "Recuperación de la verdad: binaria/tiempo (GLMM cloglog).")
+```
+
+**Lectura del control de calidad.** La recuperación es **buena** en las tres lentes: binaria/tiempo
+(β_x1 ≈ 0,84 vs 0,80; β_x2 ≈ −0,87 vs −0,65; σ_u ≈ 0,49 vs 0,40), nominal (casi exacta) y ordinal
+(β_x1 0,79 vs 0,70; β_x2 −0,83 vs −0,70). Patrón consistente: el efecto protector del tratamiento se
+estima algo más marcado que el verdadero en esta cohorte. La coherencia entre estimaciones a ciegas y
+verdad refuerza el enfoque.
+
+# Referencias
+
+::: {.callout-note}
+Referencias en formato APA 7 (generadas desde `references.bib`). Solo fuentes efectivamente citadas.
+:::
+
+::: {#refs}
+:::
+
+# Anexos
+
+::: {.callout-note}
+Los anexos aportan trazabilidad sin sobrecargar el cuerpo principal.
+:::
+
+| Anexo | Contenido |
+|---|---|
+| Anexo A. Diccionario de variables | Véase §*Variables principales*: `x1`, `x2`, `centro`, `ever`, `tiempo`, `evento`, `clase_nom`, `sever_ord`. |
+| Anexo B. Base de datos utilizada | `caso1/datos_equipos/equipo_10/cohorte.rds` (individuo) y `pp.rds` (persona-periodo); DGP en `caso1/R/dgp_cohorte.R`. |
+| Anexo C. Código o cuaderno reproducible | Este `.qmd` corre de principio a fin; alternativamente el cuaderno de trabajo `informe_osteored_ec1.qmd`. |
+| Anexo D. Limpieza y preparación | Sin ausentes; recodificación a factores; expansión persona-periodo (chunk `setup`). |
+| Anexo E. Resultados complementarios | Diagnósticos DHARMa, calibración por deciles y hazard base por periodo en el cuaderno de trabajo. |
+| Anexo F. Prompts relevantes de IA | Encargo: resolver el EC1 del primer banco simulado en un `.qmd` autocontenido y elaborar el informe técnico con la plantilla, citando en APA 7 y sin inventar. |
+
+## Reproducibilidad {.unnumbered}
+
+Semilla del curso `20252026`. Para reproducir: abrir el proyecto GLM (con `renv`), situar el
+directorio en `caso1/resolucion_ec1/` y renderizar este `.qmd`. El entorno completo queda en la salida
+de `sessionInfo()`.
+
+```{r}
+#| label: session-info
+sessionInfo()
+```
+
+# Checklist final antes de entregar
+
+| Comprobación | Sí | A revisar |
+|---|:--:|:--:|
+| El informe permite evaluar la solidez técnica del análisis. | ☒ | ☐ |
+| El problema está formulado como una necesidad de análisis o decisión. | ☒ | ☐ |
+| Las preguntas analíticas están conectadas con datos, métodos y resultados. | ☒ | ☐ |
+| Los datos están descritos y se valora críticamente su calidad. | ☒ | ☐ |
+| La metodología está justificada y no es una explicación de manual. | ☒ | ☐ |
+| Se documentan criterios de evaluación, validación o comprobación. | ☒ | ☐ |
+| Los resultados clave están interpretados y vinculados a objetivos. | ☒ | ☐ |
+| Las limitaciones, riesgos e incertidumbres están reconocidos. | ☒ | ☐ |
+| Las referencias están citadas en el texto y completas al final. | ☒ | ☐ |
+| Los anexos permiten auditar o reproducir el análisis. | ☒ | ☐ |
+| El uso de IA está declarado de forma transparente. | ☒ | ☐ |

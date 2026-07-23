@@ -1,0 +1,344 @@
+---
+title: "Plantilla de artículo científico basado en datos"
+subtitle: "Comunicación académica de una pregunta de investigación, método, resultados y discusión"
+author: "[Autor/a o equipo]"
+date: today
+lang: es
+format:
+  docx:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    # reference-doc: plantilla-estilos.docx   # opcional: descomenta para aplicar estilos propios
+# Descomenta para citar con Zotero/BibTeX en formato APA 7:
+# bibliography: references.bib
+# csl: https://www.zotero.org/styles/apa
+# execute:
+#   echo: true      # muestra el código en el documento final
+#   warning: false
+#   message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# Paquetes recomendados del curso (carga los que necesites en tu análisis)
+# library(tidyverse)      # manipulación y visualización
+# library(broom)          # tidy() de modelos
+# library(marginaleffects); library(emmeans); library(ggeffects)
+# library(car); library(DHARMa); library(performance); library(pROC)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+::: {.callout-tip}
+## Idea fuerza
+Un artículo científico no se centra en convencer para decidir, sino en comunicar
+una contribución investigadora con método, evidencia, discusión crítica y referencias.
+:::
+
+::: {.callout-note collapse="true"}
+## Cómo usar esta plantilla
+- Producto esperado: artículo académico breve, estructurado y referenciado.
+- Extensión orientativa: 10–18 páginas sin contar anexos, salvo indicación del profesorado.
+- Sustituye **todo** el texto entre corchetes `[...]` por contenido real y elimina las indicaciones antes de entregar.
+- El artículo debe situar una pregunta de investigación, justificarla con fuentes, explicar
+  datos y método, presentar resultados, discutir su significado y delimitar su alcance.
+- Estructura: (0) Título, autoría, resumen y palabras clave · (1) Introducción · (2) Marco teórico ·
+  (3) Objetivos, preguntas e hipótesis · (4) Datos y metodología · (5) Resultados ·
+  (6) Discusión · (7) Conclusiones, limitaciones y líneas futuras · (8) Referencias y material suplementario.
+:::
+
+# Título, autoría, resumen y palabras clave
+
+## Título
+
+> **Título del artículo:** [Debe ser informativo, preciso y reflejar el problema, fenómeno, método o contexto del estudio.]
+
+## Autoría
+
+| Elemento | Contenido |
+|---|---|
+| Autores/as | [Completar] |
+| Asignatura / titulación | [Completar] |
+| Universidad o centro | [Completar] |
+| Fecha | [Completar] |
+
+## Resumen
+
+::: {.callout-note}
+Extensión orientativa: 150–250 palabras. Debe poder leerse de forma autónoma e incluir:
+contexto o problema, objetivo o pregunta principal, datos y metodología, resultados
+principales, conclusión o contribución y, si es relevante, la limitación esencial.
+:::
+
+> [Texto del resumen del artículo...]
+
+## Palabras clave
+
+> [Incluir 4–6 términos que describan tema, método, datos o contexto.]
+
+# Introducción
+
+::: {.callout-note}
+Explica qué se estudia, por qué importa, qué se sabe hasta ahora y qué pregunta concreta
+aborda el artículo. Las afirmaciones de contexto y literatura deben citarse en el texto.
+:::
+
+| Elemento | Contenido |
+|---|---|
+| Contexto del problema | [Completar con apoyo de fuentes citadas] |
+| Relevancia académica o aplicada | [Completar] |
+| Brecha, tensión o necesidad de estudio | [Completar] |
+| Objetivo general del artículo | [Completar] |
+| Estructura del artículo | [Completar, si procede] |
+
+> [Redactar aquí la introducción del artículo.]
+
+# Marco teórico, antecedentes o revisión breve de literatura
+
+::: {.callout-note}
+Presenta conceptos, estudios previos, enfoques metodológicos o evidencias que sitúan
+la pregunta de investigación. No debe ser una lista de reseñas inconexas.
+:::
+
+| Fuente | Aportación principal | Relación con el artículo |
+|---|---|---|
+| [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
+| [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
+| [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
+
+> **Síntesis del marco o antecedentes:** [Redactar una síntesis argumentada, citando las fuentes en formato APA 7.]
+
+# Objetivos, preguntas de investigación e hipótesis
+
+| Tipo de objetivo | Redacción |
+|---|---|
+| Objetivo general | [Completar] |
+| Objetivo específico 1 | [Completar] |
+| Objetivo específico 2 | [Completar] |
+| Objetivo específico 3 | [Completar] |
+
+## Preguntas de investigación
+
+| Código | Pregunta de investigación | Variable, comparación o evidencia necesaria |
+|---|---|---|
+| P1 | [Completar] | [Completar] |
+| P2 | [Completar] | [Completar] |
+| P3 | [Completar] | [Completar] |
+
+## Hipótesis, si procede
+
+| Hipótesis | Formulación | Justificación teórica o empírica |
+|---|---|---|
+| H1 | [Completar] | [Completar] |
+| H2 | [Completar] | [Completar] |
+
+# Datos y metodología
+
+::: {.callout-note}
+Esta sección debe permitir valorar la validez del estudio: datos, muestra, variables,
+preparación, técnicas y criterios de análisis, con detalle suficiente pero sin ser un manual.
+:::
+
+## Datos, muestra o corpus analizado
+
+| Elemento | Descripción |
+|---|---|
+| Fuente de datos | [Completar] |
+| Población o proceso de referencia | [Completar] |
+| Muestra, registros o unidades analizadas | [Completar] |
+| Periodo analizado | [Completar] |
+| Criterios de inclusión/exclusión | [Completar] |
+| Consideraciones éticas o de privacidad | [Completar] |
+
+## Variables, indicadores o medidas
+
+| Variable o indicador | Tipo / escala | Descripción | Papel en el análisis |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+## Preparación de datos
+
+> [Describir valores perdidos, atípicos, transformaciones, codificación, depuración, criterios de exclusión y posibles sesgos.]
+
+```{r}
+#| label: preparacion-datos
+#| eval: false
+
+# Carga y preparación reproducible de los datos
+# datos <- readr::read_csv("datos/mis_datos.csv")
+# glimpse(datos)
+```
+
+## Técnicas de análisis
+
+| Pregunta u objetivo | Técnica aplicada | Justificación | Criterio de evaluación |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+# Resultados
+
+::: {.callout-note}
+Presenta los resultados de forma objetiva y ordenada por preguntas u objetivos.
+La discusión amplia se reserva para la sección siguiente.
+:::
+
+## Resultado asociado a la pregunta/objetivo 1: [título]
+
+| Elemento | Contenido |
+|---|---|
+| Pregunta u objetivo | [Completar] |
+| Resultado principal | [Completar] |
+| Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
+| Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
+| Cautela inmediata | [Completar si procede] |
+
+```{r}
+#| label: fig-resultado-1
+#| fig-cap: "[Título de la figura/tabla del resultado 1]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado 1
+```
+
+## Resultado asociado a la pregunta/objetivo 2: [título]
+
+| Elemento | Contenido |
+|---|---|
+| Pregunta u objetivo | [Completar] |
+| Resultado principal | [Completar] |
+| Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
+| Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
+| Cautela inmediata | [Completar si procede] |
+
+```{r}
+#| label: fig-resultado-2
+#| fig-cap: "[Título de la figura/tabla del resultado 2]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado 2
+```
+
+## Resultado asociado a la pregunta/objetivo 3: [título]
+
+| Elemento | Contenido |
+|---|---|
+| Pregunta u objetivo | [Completar] |
+| Resultado principal | [Completar] |
+| Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
+| Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
+| Cautela inmediata | [Completar si procede] |
+
+```{r}
+#| label: fig-resultado-3
+#| fig-cap: "[Título de la figura/tabla del resultado 3]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado 3
+```
+
+## Síntesis de resultados
+
+> [Resumir los hallazgos principales antes de pasar a la discusión.]
+
+# Discusión
+
+::: {.callout-note}
+Interpreta los resultados, los relaciona con la literatura, explica mecanismos o razones
+y delimita el alcance. Distingue entre lo que los datos muestran y lo que solo puede
+plantearse como interpretación plausible.
+:::
+
+| Aspecto | Contenido de la discusión |
+|---|---|
+| Resultado principal | [Completar] |
+| Relación con literatura o expectativas | [Completar con citas si procede] |
+| Interpretación razonable | [Completar] |
+| Resultado inesperado o matiz | [Completar] |
+| Alcance y cautela | [Completar] |
+
+> [Redactar aquí la discusión del artículo.]
+
+# Conclusiones, limitaciones y líneas futuras
+
+## Conclusiones
+
+> [Responder de forma directa a las preguntas de investigación, sin repetir todo el informe ni exagerar el alcance de los resultados.]
+
+## Limitaciones
+
+| Tipo de limitación | Descripción | Efecto sobre la interpretación |
+|---|---|---|
+| Datos / muestra | [Completar] | [Completar] |
+| Método | [Completar] | [Completar] |
+| Medición / variables | [Completar] | [Completar] |
+| Generalización | [Completar] | [Completar] |
+
+## Líneas futuras o aplicaciones potenciales
+
+> [Indicar mejoras metodológicas, nuevos datos, preguntas abiertas, replicaciones o posibles aplicaciones derivadas del estudio.]
+
+## Declaración responsable de uso de inteligencia artificial
+
+::: {.callout-important}
+Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe ser
+transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
+:::
+
+| Aspecto | Declaración a completar |
+|---|---|
+| Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
+| Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
+| Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
+| Decisiones no delegadas en IA | [Limpieza de datos, elección metodológica, interpretación, conclusiones...] |
+| Errores, límites o ajustes detectados | [Si la IA inventó, simplificó en exceso o propuso código incorrecto] |
+
+> **Modelo de declaración.** En este proyecto se han utilizado herramientas de inteligencia
+> artificial como apoyo para [indicar tareas concretas]. Todas las salidas generadas por estas
+> herramientas han sido revisadas críticamente por el equipo. La IA no ha sido utilizada como
+> fuente autónoma de resultados, ni como sustituto del análisis estadístico, ni como autora de
+> las conclusiones. Las decisiones sobre limpieza de datos, metodología, interpretación,
+> recomendaciones y redacción final han sido responsabilidad del equipo.
+
+# Referencias
+
+::: {.callout-note}
+Incluir todas las fuentes citadas en el texto en formato APA 7. No incluir bibliografía no citada.
+Si usas `bibliography: references.bib` en el encabezado, las referencias se generan automáticamente aquí.
+:::
+
+::: {#refs}
+:::
+
+> [Si no usas gestor de citas, sustituye este recuadro por la lista de referencias en formato APA 7.]
+
+# Material suplementario o anexos
+
+| Anexo | Contenido recomendado |
+|---|---|
+| Anexo A. Datos o fuente de datos | [Enlace, descripción o información de acceso] |
+| Anexo B. Código o cuaderno reproducible | [Código comentado o enlace a repositorio] |
+| Anexo C. Instrumento, cuestionario o protocolo | [Si procede] |
+| Anexo D. Tablas y resultados complementarios | [Resultados secundarios o pruebas adicionales] |
+| Anexo E. Prompts relevantes de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
+
+# Checklist final antes de entregar
+
+| Comprobación | Sí | A revisar |
+|---|:--:|:--:|
+| El título refleja claramente el tema, contexto o método del estudio. | ☐ | ☐ |
+| El resumen sintetiza objetivo, datos, método, resultados y conclusión. | ☐ | ☐ |
+| La introducción justifica la pregunta con contexto y fuentes citadas. | ☐ | ☐ |
+| El marco teórico conecta literatura previa con el estudio realizado. | ☐ | ☐ |
+| Los objetivos, preguntas o hipótesis están formulados con precisión. | ☐ | ☐ |
+| La metodología permite valorar la validez del análisis. | ☐ | ☐ |
+| Los resultados se presentan sin mezclarlos con discusión excesiva. | ☐ | ☐ |
+| La discusión interpreta y relaciona resultados con literatura o expectativas. | ☐ | ☐ |
+| Las conclusiones no van más allá de lo que los datos permiten afirmar. | ☐ | ☐ |
+| Las limitaciones y líneas futuras están reconocidas. | ☐ | ☐ |
+| Todas las citas tienen su referencia final en formato APA 7. | ☐ | ☐ |
+| El uso de IA está declarado si procede. | ☐ | ☐ |

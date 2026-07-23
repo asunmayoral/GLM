@@ -1,0 +1,14 @@
+---
+title: "Referencias"
+bibliography: references.bib
+nocite: |
+  @*
+csl: https://www.zotero.org/styles/apa
+---
+
+Bibliografía común del curso. Recoge todas las fuentes citadas en los tres casos
+(teoría, métodos y paquetes de R). Las citas del texto —de la forma (Autor, año)—
+remiten a esta lista.
+
+::: {#refs}
+:::

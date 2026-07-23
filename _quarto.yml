@@ -10,6 +10,7 @@ project:
     - caso1/caso1_binaria_tiempo_evento.qmd
     - caso2/caso2_conteos.qmd
     - caso3/caso3_continuas_positivas.qmd
+    - referencias.qmd
 
 website:
   title: "Modelos Lineales Generalizados con R"
@@ -27,6 +28,9 @@ website:
         text: "Caso 2 · Conteos"
       - href: caso3/caso3_continuas_positivas.qmd   # desconectado temporalmente
         text: "Caso 3 · Continuas"
+    right:
+      - href: referencias.qmd
+        text: Referencias
   page-footer:
     center: "Material docente · Grado en Ciencia de Datos e IA · Universidad Miguel Hernández"
 

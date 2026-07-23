@@ -1,7 +1,9 @@
 <!-- Partial · Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML.
      Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía.
      Estudio de caso del Caso 2 sobre la CARTERA DE AUTO (dgp_auto.R). La misma cartera se
-     reutiliza en el Caso 3 (coste y duración) → síntesis "tres lentes". -->
+     reutiliza como ESTUDIO DE CASO del Caso 3 (coste y duración) → síntesis "tres lentes".
+     Nota: la TEORÍA del Caso 3 usa un banco industrial distinto; la cartera de auto vuelve
+     solo en el proyecto del estudiante. -->
 
 # 7 · Estudio de caso, exposición y evaluación {#sec-u27}
 
@@ -10,9 +12,9 @@
 Cierre del Caso 2: estudio de caso de **conteos, tasas e intensidad del riesgo** sobre una cartera de
 auto, con exposición y Q&A individual. No hay teoría nueva; se integra y evalúa todo lo anterior.
 Objetivo general: **comunicar y reproducir** (estudio de caso reproducible), de forma acumulativa sobre
-los hilos de conteos, mixtos y supervivencia. La **misma cartera** volverá en el Caso 3 (coste de los
-siniestros y duración de la póliza): lo que aquí modelas como *frecuencia* será una de las **tres
-lentes** del cliente.
+los hilos de conteos, mixtos y supervivencia. Esta **misma cartera** vuelve como **estudio de caso del
+Caso 3** (coste de los siniestros y duración de la póliza): lo que aquí modelas como *frecuencia* será
+una de las **tres lentes** del cliente.
 :::
 
 ## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
@@ -114,7 +116,7 @@ selección y decidas qué entra en el modelo.
 Esta cartera lleva además el **coste** de cada siniestro y el **tiempo hasta la baja** de la póliza
 (`coste_total`, `coste_medio`, la tabla de siniestros con `attr(cartera, "siniestros")`, y `t_baja`,
 `baja`). No los necesitas para el Caso 2 —aquí modelas **frecuencia**—, pero son las otras dos lentes
-(¿**cuánto** cuesta? ¿**cuánto** dura?) que retomaremos en el **Caso 3**.
+(¿**cuánto** cuesta? ¿**cuánto** dura?) que retomarás en el **estudio de caso del Caso 3**.
 :::
 
 ### Tu trabajo

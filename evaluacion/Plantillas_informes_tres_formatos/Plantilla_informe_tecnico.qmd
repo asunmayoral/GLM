@@ -1,0 +1,369 @@
+---
+title: "Plantilla de informe técnico basado en datos"
+subtitle: "Comunicación técnica rigurosa, trazable y orientada a evaluar la solidez del análisis"
+author: "[Equipo]"
+date: today
+lang: es
+format:
+  docx:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    # reference-doc: plantilla-estilos.docx   # opcional: descomenta para aplicar estilos propios
+# Descomenta para citar con Zotero/BibTeX en formato APA 7:
+# bibliography: references.bib
+# csl: https://www.zotero.org/styles/apa
+# execute:
+#   echo: true      # en un informe técnico el código suele mostrarse
+#   warning: false
+#   message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# Paquetes recomendados del curso (carga los que necesites en tu análisis)
+# library(tidyverse); library(broom)
+# library(marginaleffects); library(emmeans); library(ggeffects); library(car)
+# library(DHARMa); library(performance); library(pROC)
+# library(MASS); library(pscl); library(glmmTMB); library(glmnet); library(lme4)
+# library(survival); library(survminer); library(flexsurv)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+::: {.callout-tip}
+## Idea fuerza
+Un informe técnico no es un volcado de código: documenta y justifica las decisiones
+necesarias para evaluar, auditar y reutilizar el análisis.
+:::
+
+::: {.callout-note collapse="true"}
+## Cómo usar esta plantilla
+- Producto esperado: informe técnico completo, metodológicamente justificado y reproducible
+  en sus aspectos esenciales.
+- Extensión orientativa: 15–25 páginas sin contar anexos, salvo indicación del profesorado.
+- Debe permitir valorar la solidez del análisis: qué datos se han usado, cómo se han preparado,
+  qué metodología se aplicó, cómo se evaluaron los resultados y qué limitaciones condicionan la
+  interpretación. Sustituye el texto entre corchetes `[...]` y elimina las indicaciones.
+- Estructura: (0) Resumen técnico · (1) Contexto, problema, objetivos y preguntas ·
+  (2) Datos, preparación y calidad · (3) Metodología y criterios · (4) Resultados, evaluación
+  e interpretación · (5) Implicaciones, recomendaciones y próximos pasos · (6) Riesgos,
+  limitaciones y uso de IA · (7) Referencias y anexos técnicos.
+:::
+
+## Datos de la entrega {.unnumbered}
+
+| Elemento | Contenido |
+|---|---|
+| Título del proyecto | [Completar] |
+| Equipo | [Completar] |
+| Asignatura / titulación | [Completar] |
+| Curso académico | [Completar] |
+| Profesorado | [Completar] |
+| Audiencia destinataria | [Equipo técnico, profesorado, responsables de datos, equipo mixto...] |
+| Versión / fecha | [Completar] |
+
+# Resumen técnico o ejecutivo
+
+::: {.callout-note}
+Redáctalo al final, aunque aparezca al principio. Debe poder leerse de forma autónoma
+(300–500 palabras) y cubrir: problema o decisión que motiva el análisis; datos, alcance y
+limitaciones principales; enfoque metodológico y criterios de evaluación; hallazgos técnicos
+más relevantes; implicaciones o usos; y cautelas esenciales para interpretar el análisis.
+:::
+
+> [Texto del resumen técnico o ejecutivo...]
+
+# Contexto, problema, objetivos y preguntas del análisis
+
+::: {.callout-note}
+Explica por qué se realiza el análisis, qué decisión o conocimiento se pretende apoyar y
+cómo se traduce esa necesidad en preguntas respondibles con datos.
+:::
+
+## Contexto, audiencia y necesidad de análisis
+
+| Elemento | Contenido |
+|---|---|
+| Contexto del proyecto | [Completar] |
+| Audiencia destinataria | [Completar] |
+| Decisión, proceso o problema que se quiere apoyar | [Completar] |
+| Consecuencia de no abordar el problema | [Completar] |
+
+## Problema de análisis
+
+> [Redactar el problema de forma concreta, evitando formulaciones genéricas como "analizar los datos".]
+
+## Objetivos del análisis
+
+| Tipo de objetivo | Redacción del objetivo |
+|---|---|
+| Objetivo general | [Completar] |
+| Objetivo específico 1 | [Completar] |
+| Objetivo específico 2 | [Completar] |
+| Objetivo específico 3 | [Completar] |
+| Objetivo específico 4, si procede | [Completar] |
+
+## Preguntas de negocio y preguntas analíticas
+
+| Pregunta de negocio | Pregunta analítica asociada | Datos necesarios | Decisión que podría apoyar |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+# Datos, preparación y calidad de la evidencia
+
+::: {.callout-note}
+El lector debe entender de dónde salen los datos, qué representan, cómo se han preparado
+y hasta qué punto son adecuados para responder las preguntas planteadas.
+:::
+
+## Descripción de los datos
+
+| Elemento | Información a completar |
+|---|---|
+| Fuente de los datos | [Base interna, encuesta, datos abiertos, API, experimento, simulación...] |
+| Periodo analizado | [Fechas o intervalo temporal cubierto] |
+| Unidad de análisis | [Cliente, transacción, producto, visita, estudiante, empresa, registro...] |
+| Número de observaciones | [Completar] |
+| Número de variables | [Completar] |
+| Variable objetivo, si existe | [Completar] |
+| Criterios de inclusión/exclusión | [Completar] |
+| Nivel de agregación | [Completar] |
+
+```{r}
+#| label: carga-datos
+#| eval: false
+
+# Carga reproducible de los datos
+# datos <- readr::read_csv("datos/mis_datos.csv")
+# dim(datos); glimpse(datos)
+```
+
+## Variables principales
+
+| Variable | Tipo | Descripción | Objetivo o pregunta que ayuda a responder |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+## Preparación y calidad de los datos
+
+| Aspecto revisado | Qué se detectó | Tratamiento aplicado | Impacto o cautela |
+|---|---|---|---|
+| Valores perdidos | [Completar] | [Completar] | [Completar] |
+| Duplicados | [Completar] | [Completar] | [Completar] |
+| Valores atípicos | [Completar] | [Completar] | [Completar] |
+| Errores de codificación | [Completar] | [Completar] | [Completar] |
+| Transformaciones | [Completar] | [Completar] | [Completar] |
+| Variables derivadas | [Completar] | [Completar] | [Completar] |
+| Sesgos posibles | [Completar] | [Completar] | [Completar] |
+
+```{r}
+#| label: preparacion-datos
+#| eval: false
+
+# Limpieza, transformaciones y variables derivadas (documentadas y reproducibles)
+```
+
+## Valoración de adecuación de los datos
+
+> [Explicar si los datos son suficientes, pertinentes y fiables para responder las preguntas. Señalar qué preguntas quedan limitadas por calidad, cobertura o disponibilidad.]
+
+# Metodología y criterios de análisis
+
+::: {.callout-note}
+Justifica la metodología en función del problema y de las preguntas analíticas. No la
+conviertas en una explicación de manual sobre cada técnica.
+:::
+
+| Pregunta analítica | Técnica o enfoque aplicado | Por qué es adecuado | Criterio de evaluación o validación |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+## Supuestos, decisiones y limitaciones metodológicas
+
+> [Explicar supuestos, selección de variables, particiones entrenamiento/prueba, criterios de validación, pruebas estadísticas, criterios de comparación o decisiones técnicas que condicionen la interpretación.]
+
+## Evaluación, validación o comprobaciones
+
+| Comprobación realizada | Resultado | Interpretación técnica | Implicación para el análisis |
+|---|---|---|---|
+| [Métrica, contraste, validación, sensibilidad, diagnóstico] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+# Resultados, evaluación e interpretación
+
+::: {.callout-important}
+## Regla de selección
+Incluye en el cuerpo principal solo los resultados que respondan a un objetivo, sostengan
+una decisión, cambien la interpretación del problema o aporten una cautela importante.
+Los resultados secundarios van al anexo.
+:::
+
+## Resultado clave 1: [título interpretativo]
+
+| Elemento | Contenido a completar |
+|---|---|
+| Pregunta u objetivo al que responde | [Completar] |
+| Resultado principal | [Completar] |
+| Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
+| Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
+| Relevancia para la decisión o para el análisis | [Completar] |
+| Cautela interpretativa | [Completar] |
+
+```{r}
+#| label: fig-resultado-1
+#| fig-cap: "[Título interpretativo del resultado clave 1]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado clave 1
+```
+
+## Resultado clave 2: [título interpretativo]
+
+| Elemento | Contenido a completar |
+|---|---|
+| Pregunta u objetivo al que responde | [Completar] |
+| Resultado principal | [Completar] |
+| Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
+| Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
+| Relevancia para la decisión o para el análisis | [Completar] |
+| Cautela interpretativa | [Completar] |
+
+```{r}
+#| label: fig-resultado-2
+#| fig-cap: "[Título interpretativo del resultado clave 2]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado clave 2
+```
+
+## Resultado clave 3: [título interpretativo]
+
+| Elemento | Contenido a completar |
+|---|---|
+| Pregunta u objetivo al que responde | [Completar] |
+| Resultado principal | [Completar] |
+| Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
+| Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
+| Relevancia para la decisión o para el análisis | [Completar] |
+| Cautela interpretativa | [Completar] |
+
+```{r}
+#| label: fig-resultado-3
+#| fig-cap: "[Título interpretativo del resultado clave 3]"
+#| eval: false
+
+# Código que genera la figura o tabla del resultado clave 3
+```
+
+## Síntesis técnica de hallazgos
+
+> [Resumir los 3–5 hallazgos principales y preparar el paso hacia implicaciones, recomendaciones o discusión.]
+
+# Implicaciones, recomendaciones y próximos pasos
+
+::: {.callout-note}
+Traduce los resultados a consecuencias prácticas cuando el proyecto tenga finalidad aplicada.
+En proyectos más exploratorios, sustituye por implicaciones y líneas de continuidad.
+:::
+
+| Hallazgo | Implicación | Recomendación o acción | Cómo evaluar el impacto |
+|---|---|---|---|
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+## Próximos pasos
+
+> [Ampliar datos, validar modelo, diseñar piloto, automatizar análisis, mejorar calidad de datos, construir cuadro de mando, etc.]
+
+# Riesgos, incertidumbres, limitaciones y uso de IA
+
+## Limitaciones e incertidumbre
+
+| Tipo de limitación | Descripción | Cómo afecta | Cómo podría mitigarse |
+|---|---|---|---|
+| Datos | [Completar] | [Completar] | [Completar] |
+| Muestra / cobertura | [Completar] | [Completar] | [Completar] |
+| Metodología | [Completar] | [Completar] | [Completar] |
+| Modelo / evaluación | [Completar] | [Completar] | [Completar] |
+| Contexto / aplicabilidad | [Completar] | [Completar] | [Completar] |
+
+## Riesgos de mala interpretación
+
+> [Explicar qué afirmaciones no deben hacerse con estos datos: causalidad no demostrada, generalización indebida, confianza excesiva en una métrica, aplicación directa sin validación, etc.]
+
+## Declaración responsable de uso de inteligencia artificial
+
+::: {.callout-important}
+Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe ser
+transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
+:::
+
+| Aspecto | Declaración a completar |
+|---|---|
+| Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
+| Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
+| Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
+| Decisiones no delegadas en IA | [Limpieza de datos, elección metodológica, interpretación, conclusiones...] |
+| Errores, límites o ajustes detectados | [Si la IA inventó, simplificó en exceso o propuso código incorrecto] |
+
+> **Modelo de declaración.** En este proyecto se han utilizado herramientas de inteligencia
+> artificial como apoyo para [indicar tareas concretas]. Todas las salidas generadas por estas
+> herramientas han sido revisadas críticamente por el equipo. La IA no ha sido utilizada como
+> fuente autónoma de resultados, ni como sustituto del análisis estadístico, ni como autora de
+> las conclusiones. Las decisiones sobre limpieza de datos, metodología, interpretación,
+> recomendaciones y redacción final han sido responsabilidad del equipo.
+
+# Referencias
+
+::: {.callout-note}
+Incluir todas las fuentes citadas en el texto en formato APA 7. Solo referencias efectivamente
+citadas. Incluir también fuentes de datos, documentación técnica y herramientas de IA cuando
+corresponda. Con `bibliography: references.bib` se generan aquí automáticamente.
+:::
+
+::: {#refs}
+:::
+
+> [Si no usas gestor de citas, sustituye este recuadro por la lista de referencias en formato APA 7.]
+
+# Anexos
+
+::: {.callout-note}
+Los anexos aportan trazabilidad sin sobrecargar el cuerpo principal. El lector debe poder
+auditar o ampliar el análisis sin que la argumentación principal dependa de material escondido.
+:::
+
+| Anexo | Contenido recomendado |
+|---|---|
+| Anexo A. Diccionario de variables | [Nombre, tipo, descripción, codificación, unidades y valores posibles] |
+| Anexo B. Base de datos utilizada | [Enlace a base de datos o repositorio, respetando privacidad y condiciones de uso] |
+| Anexo C. Código o cuaderno reproducible | [Código comentado o enlace a Colab, GitHub u otro repositorio] |
+| Anexo D. Limpieza y preparación de datos | [Decisiones sobre perdidos, atípicos, duplicados, transformaciones y derivadas] |
+| Anexo E. Resultados complementarios | [Tablas completas, métricas ampliadas, pruebas alternativas o secundarias] |
+| Anexo F. Prompts relevantes de IA | [Solo si el profesorado lo solicita o si son necesarios para trazabilidad] |
+
+# Checklist final antes de entregar
+
+| Comprobación | Sí | A revisar |
+|---|:--:|:--:|
+| El informe permite evaluar la solidez técnica del análisis. | ☐ | ☐ |
+| El problema está formulado como una necesidad de análisis o decisión. | ☐ | ☐ |
+| Las preguntas analíticas están conectadas con datos, métodos y resultados. | ☐ | ☐ |
+| Los datos están descritos y se valora críticamente su calidad. | ☐ | ☐ |
+| La metodología está justificada y no es una explicación de manual. | ☐ | ☐ |
+| Se documentan criterios de evaluación, validación o comprobación. | ☐ | ☐ |
+| Los resultados clave están interpretados y vinculados a objetivos. | ☐ | ☐ |
+| Las limitaciones, riesgos e incertidumbres están reconocidos. | ☐ | ☐ |
+| Las referencias están citadas en el texto y completas al final. | ☐ | ☐ |
+| Los anexos permiten auditar o reproducir el análisis. | ☐ | ☐ |
+| El uso de IA está declarado de forma transparente, si procede. | ☐ | ☐ |

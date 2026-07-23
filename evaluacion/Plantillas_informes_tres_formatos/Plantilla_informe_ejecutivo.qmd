@@ -1,0 +1,282 @@
+---
+title: "Plantilla de informe ejecutivo basado en datos"
+subtitle: "Comunicación breve, clara y orientada a decisiones empresariales"
+author: "[Equipo]"
+date: today
+lang: es
+format:
+  docx:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    # reference-doc: plantilla-estilos.docx   # opcional: descomenta para aplicar estilos propios
+# Descomenta para citar con Zotero/BibTeX en formato APA 7:
+# bibliography: references.bib
+# csl: https://www.zotero.org/styles/apa
+# execute:
+#   echo: false     # en un ejecutivo el código suele ocultarse
+#   warning: false
+#   message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# Paquetes recomendados del curso (carga los que necesites en tu análisis)
+# library(tidyverse); library(broom)
+# library(marginaleffects); library(ggeffects)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+::: {.callout-tip}
+## Idea fuerza
+Un informe ejecutivo no resume todo el análisis: selecciona la evidencia necesaria para
+decidir qué hacer, por qué hacerlo y con qué cautelas.
+:::
+
+::: {.callout-note collapse="true"}
+## Cómo usar esta plantilla
+- Producto esperado: documento breve para que una audiencia empresarial comprenda el problema,
+  valore la evidencia y decida próximas acciones.
+- Extensión orientativa: 5–10 páginas sin contar anexos, salvo indicación del profesorado.
+- Prioriza claridad, relevancia y acción. No copies la estructura completa de un informe técnico
+  ni acumules gráficos. Sustituye el texto entre corchetes `[...]` y elimina las indicaciones.
+- Estructura: (0) Resumen ejecutivo · (1) Problema y decisión · (2) Evidencia disponible ·
+  (3) Enfoque de análisis · (4) Hallazgos clave · (5) Implicaciones y recomendaciones ·
+  (6) Riesgos, limitaciones y próximos pasos · (7) Referencias, IA y anexo metodológico.
+:::
+
+## Datos de la entrega {.unnumbered}
+
+| Elemento | Contenido |
+|---|---|
+| Título del proyecto | [Completar] |
+| Equipo | [Completar] |
+| Asignatura / titulación | [Completar] |
+| Curso académico | [Completar] |
+| Profesorado | [Completar] |
+| Audiencia destinataria | [Dirección, cliente, responsable de área, comité de decisión...] |
+| Decisión que se quiere apoyar | [Completar] |
+
+# Resumen ejecutivo
+
+::: {.callout-note}
+Redáctalo al final, aunque aparezca al principio. Máximo una página (250–400 palabras).
+Debe cubrir: qué problema o decisión se aborda, qué datos se usaron y su alcance, qué
+hallazgos recordar, qué implicaciones tienen, qué recomendación principal se propone y
+qué cautela o riesgo considerar.
+:::
+
+> [Texto del resumen ejecutivo...]
+
+# Problema de negocio y decisión que se quiere apoyar
+
+::: {.callout-note}
+Sitúa rápidamente a la audiencia: qué ocurre, por qué importa, a quién afecta y qué
+decisión se quiere apoyar con el análisis.
+:::
+
+| Elemento | Contenido ejecutivo |
+|---|---|
+| Situación de partida | [Completar] |
+| Problema de negocio | [Completar] |
+| Audiencia decisora | [Completar] |
+| Decisión o acción que se quiere apoyar | [Completar] |
+| Consecuencia de no actuar | [Completar] |
+| Criterio de éxito o indicador relevante | [Completar] |
+
+> **Formulación breve del problema:** [Redactar en un párrafo el problema y la decisión que la audiencia debe valorar.]
+
+# Evidencia disponible: datos, alcance y calidad
+
+::: {.callout-note}
+La audiencia no necesita todo el detalle técnico, pero sí saber si la evidencia es
+suficiente y qué alcance tienen los datos.
+:::
+
+| Aspecto | Resumen para la audiencia |
+|---|---|
+| Fuente y periodo | [Completar] |
+| Unidad de análisis | [Completar] |
+| Volumen de datos | [Completar] |
+| Variables o indicadores principales | [Completar] |
+| Cobertura y alcance | [Completar] |
+| Principales cautelas de calidad | [Completar] |
+
+> **Mensaje de adecuación de los datos:** [Explicar en 4–6 líneas si los datos permiten apoyar la decisión y qué restricciones considerar.]
+
+# Enfoque de análisis
+
+::: {.callout-note}
+Explica el enfoque metodológico sin convertirlo en una clase técnica. La pregunta clave es:
+por qué este análisis es adecuado para apoyar la decisión.
+:::
+
+| Pregunta que se quería responder | Análisis realizado | Por qué era adecuado |
+|---|---|---|
+| [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] |
+
+> **Nota metodológica breve:** [100–150 palabras como máximo. El detalle técnico va al anexo metodológico.]
+
+# Hallazgos clave
+
+::: {.callout-important}
+## Regla de selección
+Selecciona solo los resultados que cambian la comprensión del problema, priorizan una
+decisión o sostienen una recomendación. Dos o tres hallazgos bien explicados son preferibles
+a muchos gráficos mostrados sin interpretación.
+:::
+
+## Hallazgo clave 1: [título interpretativo]
+
+| Elemento | Contenido |
+|---|---|
+| Mensaje principal | [Completar en una frase interpretativa] |
+| Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
+| Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
+| Interpretación ejecutiva | [Qué significa para la decisión] |
+| Cautela | [Qué no debe sobreinterpretarse] |
+
+```{r}
+#| label: fig-hallazgo-1
+#| fig-cap: "[Título interpretativo de la visualización del hallazgo 1]"
+#| eval: false
+
+# Código que genera la visualización del hallazgo 1
+```
+
+## Hallazgo clave 2: [título interpretativo]
+
+| Elemento | Contenido |
+|---|---|
+| Mensaje principal | [Completar en una frase interpretativa] |
+| Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
+| Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
+| Interpretación ejecutiva | [Qué significa para la decisión] |
+| Cautela | [Qué no debe sobreinterpretarse] |
+
+```{r}
+#| label: fig-hallazgo-2
+#| fig-cap: "[Título interpretativo de la visualización del hallazgo 2]"
+#| eval: false
+
+# Código que genera la visualización del hallazgo 2
+```
+
+## Hallazgo clave 3: [título interpretativo]
+
+| Elemento | Contenido |
+|---|---|
+| Mensaje principal | [Completar en una frase interpretativa] |
+| Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
+| Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
+| Interpretación ejecutiva | [Qué significa para la decisión] |
+| Cautela | [Qué no debe sobreinterpretarse] |
+
+```{r}
+#| label: fig-hallazgo-3
+#| fig-cap: "[Título interpretativo de la visualización del hallazgo 3]"
+#| eval: false
+
+# Código que genera la visualización del hallazgo 3
+```
+
+# Implicaciones y recomendaciones accionables
+
+::: {.callout-note}
+Transforma evidencia en acción. Cada recomendación debe indicar qué hacer, por qué, qué
+beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
+:::
+
+| Prioridad | Acción propuesta | Evidencia que la respalda | Beneficio esperado | Riesgo o condición |
+|---|---|---|---|---|
+| Alta | [Completar] | [Completar] | [Completar] | [Completar] |
+| Media | [Completar] | [Completar] | [Completar] | [Completar] |
+| Baja / futura | [Completar] | [Completar] | [Completar] | [Completar] |
+
+## Decisión recomendada
+
+> [Redactar la decisión o acción que se recomienda adoptar, con la justificación mínima necesaria.]
+
+# Riesgos, limitaciones y próximos pasos
+
+| Riesgo o limitación | Por qué importa | Cómo gestionarlo |
+|---|---|---|
+| Datos | [Completar] | [Completar] |
+| Método | [Completar] | [Completar] |
+| Aplicación de la recomendación | [Completar] | [Completar] |
+| Generalización | [Completar] | [Completar] |
+
+## Próximos pasos propuestos
+
+| Paso | Acción | Responsable o área | Indicador de seguimiento |
+|---|---|---|---|
+| 1 | [Completar] | [Completar] | [Completar] |
+| 2 | [Completar] | [Completar] | [Completar] |
+| 3 | [Completar] | [Completar] | [Completar] |
+
+# Referencias, uso de IA y anexo metodológico breve
+
+## Referencias
+
+::: {.callout-note}
+Incluir fuentes citadas en el texto, datos externos, documentación técnica y herramientas
+de IA si procede, en formato APA 7. Con `bibliography: references.bib` se generan aquí.
+:::
+
+::: {#refs}
+:::
+
+> [Si no usas gestor de citas, sustituye este recuadro por la lista de referencias en formato APA 7.]
+
+## Declaración responsable de uso de inteligencia artificial
+
+::: {.callout-important}
+Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe ser
+transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
+:::
+
+| Aspecto | Declaración a completar |
+|---|---|
+| Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
+| Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
+| Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
+| Decisiones no delegadas en IA | [Limpieza de datos, elección metodológica, interpretación, conclusiones...] |
+| Errores, límites o ajustes detectados | [Si la IA inventó, simplificó en exceso o propuso código incorrecto] |
+
+> **Modelo de declaración.** En este proyecto se han utilizado herramientas de inteligencia
+> artificial como apoyo para [indicar tareas concretas]. Todas las salidas generadas por estas
+> herramientas han sido revisadas críticamente por el equipo. La IA no ha sido utilizada como
+> fuente autónoma de resultados, ni como sustituto del análisis estadístico, ni como autora de
+> las conclusiones. Las decisiones sobre limpieza de datos, metodología, interpretación,
+> recomendaciones y redacción final han sido responsabilidad del equipo.
+
+## Anexo metodológico breve
+
+> [Incluir el detalle mínimo para que el lector interesado conozca técnicas, métricas, validación, supuestos, limpieza de datos o decisiones relevantes, sin sobrecargar el cuerpo ejecutivo.]
+
+# Anexos opcionales
+
+| Anexo | Contenido recomendado |
+|---|---|
+| Anexo A. Nota metodológica | [Detalle técnico resumido del análisis] |
+| Anexo B. Visualizaciones complementarias | [Gráficos o tablas no esenciales para la lectura ejecutiva] |
+| Anexo C. Calidad de datos | [Resumen de incidencias, sesgos y tratamientos aplicados] |
+| Anexo D. Prompts de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
+
+# Checklist final antes de entregar
+
+| Comprobación | Sí | A revisar |
+|---|:--:|:--:|
+| El resumen ejecutivo puede leerse de forma autónoma. | ☐ | ☐ |
+| La decisión que se quiere apoyar aparece claramente formulada. | ☐ | ☐ |
+| Solo se incluyen resultados relevantes para la decisión. | ☐ | ☐ |
+| Los gráficos son pocos, legibles y con títulos interpretativos. | ☐ | ☐ |
+| La metodología se explica de forma breve y comprensible. | ☐ | ☐ |
+| Las recomendaciones son concretas, priorizadas y respaldadas por evidencia. | ☐ | ☐ |
+| Se explican beneficios esperados, riesgos y forma de evaluar impacto. | ☐ | ☐ |
+| Las limitaciones principales están reconocidas sin exceso técnico. | ☐ | ☐ |
+| Las referencias y fuentes de datos están citadas. | ☐ | ☐ |
+| El uso de IA está declarado si procede. | ☐ | ☐ |

@@ -19,8 +19,7 @@ format:
     toc: true
     number-sections: false
 bibliography: ../references.bib
-nocite: |
-  @*
+suppress-bibliography: true
 csl: https://www.zotero.org/styles/apa
 execute:
   warning: false
@@ -31,12 +30,12 @@ editor:
 ---
 
 <!-- ============================================================================
-     Caso 3 (continuas positivas y vida útil). Datos vía R/dgp_continuas.R:
-       simular_industrial() / cargar_industrial() -> sistema de mantenimiento industrial simulado
-       (600 máquinas, 12 plantas, 720 días, ~37% de censura). Caché en caso3/datos.
-       Tablas: modelo_base (coste) · modelo_longitudinal (degradación) ·
-               modelo_supervivencia (tiempo al fallo) · modelo_intervalos (máquina-intervalo).
-     Ver PROPUESTA_CASO3.md.
+     Caso 3 (continuas positivas y vida útil). Datos vía R/dgp_averias.R:
+       simular_averias() / cargar_averias() -> averías en una línea de fabricación
+       de mobiliario (400 máquinas, 5 procesos, 4 años). Caché en caso3/datos.
+       Tablas: maquinas · averias (=costes) · intervalos (tiempos entre fallos) ·
+               seguimiento (start-stop mensual) · panel (máquina-año, Tweedie).
+     Ver DISENO_BANCO_AVERIAS.md.
 ============================================================================ -->
 
 ```{r}
@@ -44,11 +43,11 @@ editor:
 #| include: false
 
 # Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Lista ceñida a lo que usamos; cada unidad añadirá lo suyo cuando la desarrollemos
-# (p. ej. statmod::tweedie en 3.3, o splines/mgcv en efectos suaves de 3.6).
+# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.6).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
 library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
 library(car)             # contrastes, VIF y diagnóstico
@@ -58,13 +57,11 @@ library(marginaleffects) # efectos, contrastes y predicciones ajustadas
 library(emmeans)         # medias marginales y comparaciones
 
 library(lme4)            # lmer y glmer (mixtos)
-library(glmmTMB)         # GLMM Gamma y estructuras flexibles
+library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.6)
 library(glmnet)          # regularización (en 3.6, como límite conceptual en Gamma)
-library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina/planta).
-                         # Es la pieza de tidymodels que usamos; no cargamos el metapaquete
-                         # completo porque parsnip/workflows no envuelven survreg ni glmmTMB.
+library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
 
-library(survival)        # Kaplan-Meier, Cox y datos persona-periodo
+library(survival)        # Kaplan-Meier, Cox y datos start-stop
 library(survminer)       # representación gráfica de supervivencia
 library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
 
@@ -75,12 +72,12 @@ theme_set(theme_minimal(base_size = 12))
 
 ## Objetivos y resultados de aprendizaje del Caso 3 {#sec-ra3}
 
-**Objetivo general (curso).** *Continuas positivas:* ajustar, interpretar, diagnosticar y
-comparar/seleccionar modelos para respuestas **positivas y asimétricas** —Gamma e inversa gaussiana,
-con enlaces log/inverso—: efectos multiplicativos, coeficiente de variación y dispersión; y para
-**tiempos de vida** mediante modelos **AFT** con censura. Reactiva los objetivos de **mixtos** y
-**supervivencia** —con **Cox** como frontera del marco— y culmina en el de **comunicar y reproducir**
-(estudio de caso).
+**Objetivo general (curso).** *Continuas positivas y vida útil:* ajustar, interpretar, diagnosticar y
+comparar/seleccionar modelos para respuestas **positivas y asimétricas** —el **coste** de una avería
+(Gamma e inversa gaussiana, enlaces log/inverso)— y para **tiempos de vida** —el **tiempo entre
+fallos**, mediante modelos **AFT** con censura—. Reactiva los objetivos de **mixtos** (efecto aleatorio
+de máquina) y **supervivencia** —con **Cox** como frontera del marco— y culmina en el de **comunicar y
+reproducir** (estudio de caso).
 
 ::: {.callout-note}
 ## Pendiente
@@ -92,143 +89,185 @@ anteriores.
 ## Mapa del caso
 
 En el Caso 1 preguntábamos *«¿ocurre el evento? ¿y cuándo?»*; en el Caso 2, *«¿cuántas veces y a qué
-ritmo?»*. Ahora la respuesta es una **magnitud positiva y continua**, y la pregunta tiene dos tiempos:
+ritmo?»*. Ahora todo gira sobre un mismo suceso —la **avería** de una máquina— y la pregunta tiene dos
+mitades:
 
-> **¿Cuánto?** — el **coste** de una intervención, la **degradación** acumulada.
-> **¿Hasta cuándo?** — el **tiempo** que la máquina aguanta hasta el primer fallo.
+> **¿Cuánto cuesta una avería?** — la **severidad**: el coste de la reparación (€). Unidades 3.1–3.3.
+> **¿Cada cuánto se avería?** — la **frecuencia**: el tiempo entre fallos (días). Unidades 3.4–3.5.
+> **Y las dos juntas** — la Unidad 3.6 las sintetiza (presupuesto = frecuencia × severidad) y la 3.7 es el estudio de caso.
 
-Ambas son respuestas $Y>0$ asimétricas a la derecha, así que el modelo lineal gaussiano no sirve: es el
-terreno de la **Gamma** y la **inversa gaussiana** (enlace log, efectos multiplicativos). Y como los
-**tiempos** también son positivos continuos, el mismo marco nos lleva a los modelos **AFT** y, con
-ellos, al cierre del hilo de supervivencia: **Cox** como frontera del marco GLM.
+El coste es una magnitud $Y>0$ asimétrica a la derecha: el terreno de la **Gamma** (enlace log, efectos
+multiplicativos). Y como el **tiempo entre fallos** es también positivo continuo, el mismo marco nos
+lleva a los modelos **AFT** y, con ellos, al cierre del hilo de supervivencia: **Cox** como frontera.
 
-| Unidad | Sem. | Contenido | Objetivo |
-|---|---|---|---|
-| **3.1** | 10 | **GLM Gamma**: contexto (dónde falla el gaussiano) · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia y selección · bondad de ajuste, diagnóstico y predicción. | Continuas positivas |
-| **3.2** | 11 | **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; relación media-varianza; modelar la dispersión; comparación y criterio de elección. | Continuas positivas |
-| **3.3** | 11–12 | **Continuas positivas agrupadas: GLMM Gamma**. Interceptos y pendientes aleatorias por máquina, anidamiento en plantas; componentes de varianza; predicción condicional y marginal. | Mixtos (espiral) |
-| **3.4** | 12 | **Del importe al tiempo: AFT**. Kaplan–Meier descriptivo; los tiempos como positivos continuos; exponencial, Weibull y log-normal; **censura en la verosimilitud**; factor de aceleración. | Continuas positivas + supervivencia |
-| **3.5** | 13 | **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; diagnóstico de la proporcionalidad (residuos de Schoenfeld) y efectos no proporcionales. | Supervivencia (espiral) |
-| **3.6** | 13 | **Síntesis: las tres lentes** sobre el mismo fallo — tiempo discreto/`cloglog` (Caso 1), Poisson a trozos (Caso 2), AFT y Cox (Caso 3): qué estima cada una y cuándo coinciden. Selección y validación; la **regularización como límite conceptual** en Gamma; mirada breve a extensiones (Tweedie, PAMM, Royston–Parmar, Aalen, riesgos competitivos). | Síntesis |
-| **3.7** | 14 | **Estudio de caso, exposición y evaluación** (artículo de investigación). | Comunicar y reproducir |
+| Unidad | Contenido | Objetivo |
+|---|---|---|
+| **3.1** | **GLM Gamma**: el coste de una avería. Dónde falla el gaussiano · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia (Wald y $F$) · diagnóstico y validación. | Continuas positivas |
+| **3.2** | **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; la **relación media-varianza** como criterio; retransformación y sesgo (**smearing** de Duan); **modelar la dispersión**; comparación por AIC (con jacobiano). | Continuas positivas |
+| **3.3** | **GLMM Gamma**: el coste con **efecto aleatorio de máquina** (máquinas crónicamente caras); intercepto y **pendiente aleatoria** en la edad (la que asomó en la dispersión de 3.2); condicional vs marginal; se resuelven la $\hat\phi$ inflada y el falso positivo de `fabricante`. | Mixtos (espiral) |
+| **3.4** | **Del coste al tiempo: AFT**. Kaplan–Meier; los **tiempos entre fallos** como positivos continuos; exponencial, Weibull y lognormal; **censura en la verosimilitud**; factor de aceleración; ¿acortar el intervalo de mantenimiento retrasa el fallo? | Continuas positivas + supervivencia |
+| **3.5** | **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; **fragilidad** de máquina; diagnóstico de la proporcionalidad (el mantenimiento la rompe). | Supervivencia (espiral) |
+| **3.6** | **Síntesis: las tres lentes** sobre el fallo (tiempo discreto/`cloglog`, Poisson a trozos, Cox) **+ Tweedie**: coste total por máquina y año (con ceros) = **frecuencia × severidad = presupuesto**. Selección y validación agrupada. | Síntesis |
+| **3.7** | **Estudio de caso, exposición y evaluación** (artículo de investigación). | Comunicar y reproducir |
 :::
 
 # Presentación del caso {#sec-presentacion3}
 
-## El contexto y los datos {#sec-datos-industrial}
+## El contexto y los datos {#sec-datos-averias}
 
-Para vertebrar el caso trabajamos con un **sistema de mantenimiento industrial simulado**: una empresa
-opera **600 máquinas** repartidas en **12 plantas** y las sigue durante un máximo de **720 días**. De
-cada máquina se registran su coste de mantenimiento, la evolución de su **degradación** y el **tiempo
-hasta el primer fallo grave**. Al ser **simulado** conocemos su proceso generador (la «verdad»), lo que
-nos permitirá **validar** los ajustes —como hicimos con la cohorte del Caso 1 y la cartera del Caso 2—.
+Trabajamos con una **fábrica de mobiliario** (mesas de escritorio) cuya producción se organiza en una
+**línea de procesos sucesivos**: **Corte → Mecanizado (CNC) → Lijado → Ensamblaje → Acabado/Barniz**.
+La empresa opera **400 máquinas** repartidas por esos procesos y las sigue durante **4 años**. A lo
+largo de su vida, las máquinas sufren **averías**; de cada avería se registra **cuándo** ocurre, **de
+qué tipo** es y **cuánto cuesta** repararla.
 
-La pregunta que ordena el bloque es **«¿cuánto?»**: cuánto **cuesta** una intervención (severidad),
-cuánta **degradación** acumula la máquina y cuánto **tiempo** aguanta hasta fallar. Todas son respuestas
-**positivas y asimétricas**, el terreno natural del **GLM Gamma** (enlace log, efectos multiplicativos).
+Al ser un banco **simulado** conocemos su proceso generador (la «verdad»), lo que nos permitirá
+**validar** los ajustes —como en los Casos 1 y 2—. Todo el bloque gira sobre la avería y se organiza en
+dos preguntas, que corresponden a las dos mitades del caso:
 
-Del mismo sistema se derivan cuatro tablas de análisis, cada una pensada para un tipo de modelo:
+- **¿Cuánto cuesta una avería?** → `coste_euros`, una magnitud positiva y asimétrica → **GLM Gamma**.
+- **¿Cada cuánto se avería?** → el **tiempo entre fallos** → **supervivencia** (AFT, Cox).
 
-| Tabla | Unidad (una fila es…) | Respuesta principal | Da soporte a |
+Las dos mitades no son independientes: las une un **efecto latente de máquina** (una «fragilidad»). Hay
+máquinas «malas» que **fallan más a menudo y además cuestan más de reparar**. Esa pieza es el **efecto
+aleatorio** del GLMM (Unidad 3.3) y la **fragilidad** de la supervivencia (Unidad 3.5), y es lo que
+hace del caso un todo coherente.
+
+### Las cinco tablas del banco
+
+Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
+
+| Tabla | Una fila es… | Respuesta principal | Da soporte a |
 |---|---|---|---|
-| `modelo_base` | una **intervención** (la primera de cada máquina) | `coste_euros` | GLM Gamma; elección de familia y escala (3.1–3.2) |
-| `modelo_longitudinal` | una **visita** de una máquina (medidas repetidas) | `degradacion` | GLMM Gamma: interceptos y pendientes aleatorias (3.3) |
-| `modelo_supervivencia` | una **máquina** (basal + desenlace) | `tiempo`, `fallo` | Kaplan–Meier, AFT y Cox (3.4–3.5) |
-| `modelo_intervalos` | un **intervalo mensual** de una máquina (formato *start-stop*) | `fallo` (+ `offset`) | Covariables dependientes del tiempo en Cox (3.5); lentes discreta y a trozos (3.6) |
+| `maquinas` | una **máquina** (ficha basal) | — | contexto y covariables |
+| `averias` (= `costes`) | una **avería** | `coste_euros` | 3.1 GLM Gamma · 3.2 familia/escala · 3.3 GLMM Gamma |
+| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | 3.4 AFT · 3.5 Cox |
+| `seguimiento` | una **máquina-mes** (*start-stop*) | `fallo` (+ `offset`) | Cox con covariable temporal (3.5); lentes discreta/a-trozos (3.6) |
+| `panel` | una **máquina-año** | `coste_total` (con ceros) | Tweedie (3.6) |
 
-::: {.callout-tip}
-## Los tiempos de fallo son continuos
-La rejilla de 30 días es solo el **mecanismo de simulación**: dentro de cada intervalo el instante
-exacto del fallo se extrae de una exponencial truncada. Por eso `tiempo` toma valores continuos (sin
-empates) y las unidades [3.4](#sec-u34) y [3.5](#sec-u35) pueden trabajar directamente con
-`Surv(tiempo, fallo)`, sin discretizar nada. La tabla `modelo_intervalos` no sirve para *discretizar*
-el tiempo, sino para dos cosas distintas: aportar **covariables que cambian dentro del seguimiento**
-(formato *start-stop*) y sostener la comparación de lentes de la [Unidad 3.6](#sec-u36).
-:::
+### Descripción detallada de las variables
 
-Las respuestas continuas comparten la mayoría de los **predictores**, y hay más variables de las
-necesarias, a propósito, para practicar la selección. Este es su papel:
+**Ficha de la máquina (`maquinas`).**
 
-| Papel | Variables |
-|---|---|
-| Estructura / agrupación | `id_maquina`; `id_planta` (agrupa las máquinas — nivel superior del **anidamiento**, para la Unidad 3.4); `dia`, `tiempo_anios`, `intervalo` (tiempo de seguimiento) |
-| Respuestas | `coste_euros` (coste de la intervención, €), `degradacion` (índice continuo de deterioro), `tiempo`/`fallo` (tiempo al primer fallo grave y su indicador; `fallo = 0` → **censura** administrativa a 720 días) |
-| Predictores de la máquina | `tipo` (Prensa/Torno/Fresadora), `fabricante` (A/B/C), `antiguedad_anios`, `capacidad_kw`, `carga_media`, `plan_mantenimiento` (Correctivo/Preventivo — **asignado de forma no aleatoria**: confusión) |
-| Covariables dependientes del tiempo | `carga`, `temperatura` (`temperatura_observada` con ausencias), `vibracion` (`vibracion_observada` con ausencias), `dias_desde_mant`, `mantenimiento_reciente` |
-| Contexto de planta | `zona`, `calidad_mantenimiento`, `temperatura_ambiental_media` |
-| Tipo de intervención | `tipo_intervencion` (Preventiva / Correctiva) |
+| Variable | Descripción | Tipo / papel |
+|---|---|---|
+| `id_maquina` | Identificador de la máquina (`M001`…) — clave de **agrupación** del GLMM. | ID / estructura |
+| `proceso` | Etapa de la línea a la que pertenece: Corte, Mecanizado, Lijado, Ensamblaje, Acabado. | Factor (5) · predictor |
+| `criticidad` | Importancia de la máquina para la línea: **Crítica** (su avería detiene la línea), **Importante**, **Auxiliar** (apenas la ralentiza). | Factor (3) · predictor del **coste** |
+| `fabricante` | Fabricante de la máquina (A/B/C). Sin efecto real → **control interno**. | Factor (3) · control |
+| `fecha_alta` | Fecha de **puesta en servicio**. Puede ser anterior al estudio (flota preexistente) o durante él (máquina nueva) → **altas escalonadas**. | Fecha · estructura |
+| `edad_alta` | Edad (años) de la máquina al **entrar en observación**. Las máquinas nuevas entran con edad 0. | Continua · predictor |
+| `exposicion_dias` | Días que la máquina está **bajo observación** (varía por las altas escalonadas). | Continua · **offset** de tasas |
+| `potencia_kw` | Potencia de la máquina (kW). | Continua |
+| `carga` | Nivel medio de **uso** de la máquina (fracción, 0–1). | Continua · predictor |
+| `plan_mantenimiento` | **Correctivo** (solo se repara al fallar) o **Preventivo** (mantenimiento programado). Asignado de forma **no aleatoria** (máquinas viejas y críticas → más preventivo) → **confusión**. | Factor (2) · predictor |
+| `intervalo_mant` | Días entre mantenimientos programados (constante por máquina: 60/90/120). **`NA` en las máquinas de plan correctivo**, que no tienen calendario preventivo. Es la **palanca de decisión** de 3.4–3.5. | Continua · predictor |
 
-El banco incorpora, a propósito, mecanismos que se irán destapando unidad a unidad: respuestas Gamma
-(coste y degradación), **efecto no lineal del tiempo**, **confusión** en la asignación del plan
-preventivo, intercepto y pendiente **aleatorios** por máquina, fragilidad no observada de planta,
-covariables que **cambian en el tiempo**, un efecto protector del mantenimiento que **se debilita**, y
-**datos ausentes** no completamente al azar. La «verdad» de cada mecanismo queda registrada para poder
-contrastar los ajustes.
+**Registro de la avería (`averias`, la tabla estrella).**
 
-Generamos el banco (o lo leemos de la caché si ya existe) y lo miramos por encima:
+| Variable | Descripción | Tipo / papel |
+|---|---|---|
+| `id_averia`, `id_maquina` | Identificadores de la avería y de su máquina. | ID / estructura |
+| `fecha`, `dia` | Fecha (y día de seguimiento) en que ocurre la avería. | Fecha / continua |
+| `n_orden` | Número de orden de la avería en esa máquina (1.ª, 2.ª, …). | Entero · estructura |
+| `antiguedad_anios` | **Edad de la máquina** en el momento de la avería (crece con el tiempo → desgaste). | Continua · predictor |
+| `tiempo_desde_anterior` | Días transcurridos **desde la avería previa** (desde el alta si es la 1.ª). | Continua |
+| `tipo_averia` | Naturaleza del fallo: Mecánica / Eléctrica / Hidráulica / Electrónica. | Factor (4) · predictor del coste |
+| `dias_desde_mant` | Días desde el **último mantenimiento preventivo** (NA si plan correctivo). Covariable **dependiente del tiempo**. | Continua · predictor (3.5) |
+| `turno` | Turno en que ocurre la avería (Mañana/Tarde/Noche). Sin efecto → **control interno**. | Factor (3) · control |
+| `tiempo_parada` | **Horas** que la línea se detiene por la avería (crece con la criticidad). Etiqueta descriptiva del impacto operativo; **no** es la exposición ni se modela. | Continua · etiqueta |
+| `coste_euros` | **Coste de la reparación (€)**. La **respuesta continua positiva** del caso. | Continua · **respuesta** |
+
+*(`averias` incluye además, unidas de la ficha, `proceso`, `criticidad`, `fabricante`, `carga`,
+`plan_mantenimiento` e `intervalo_mant`.)*
+
+**Supervivencia (`intervalos`) y sus derivadas.**
+
+| Variable | Descripción | Tipo / papel |
+|---|---|---|
+| `tiempo_entre` | Duración del intervalo **entre dos fallos** (o entre el último fallo y el cierre). | Continua · **respuesta** (tiempo) |
+| `evento` | 1 = el intervalo termina en **avería**; 0 = **censura** (llega al cierre sin fallar). | Binaria · indicador |
+| `antiguedad_ini` | Edad de la máquina al **empezar** el intervalo. | Continua · predictor |
+| `seguimiento`: <br> `tstart`,`tstop`,`exposicion`,`n_fallos`,
+<br>`fallo`,`dias_desde_mant`,`mant_reciente` | Formato **start-stop** por mes: tramo observado, exposición (offset), nº de fallos del mes, y el estado del mantenimiento en el tramo (covariable temporal). | Counting process |
+| `panel`:<br> `coste_total`,`n_averias`,`exposicion` | Por **máquina-año**: coste total de averías (**0** si no hubo ninguna), nº de averías y fracción de año observada (offset). | Tweedie (3.6) |
+
+El banco incorpora, a propósito, mecanismos que se irán destapando unidad a unidad: coste **Gamma**,
+**fragilidad** de máquina que liga coste y frecuencia, **riesgo creciente con la edad**, **interacción**
+criticidad × proceso, **confusión** en la asignación del plan, mantenimiento preventivo con **efecto
+protector que decae**, y **censura** por ventana de observación. La «verdad» de cada mecanismo queda en
+`attr(banco, "verdad")`.
+
+### Un primer vistazo
+
+Generamos el banco (o lo leemos de la caché si ya existe):
 
 ```{r}
-#| label: banco-industrial
-source("R/dgp_continuas.R")          # define simular_industrial() y cargar_industrial()
-banco <- cargar_industrial()          # lee datos/banco_industrial_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+#| label: banco-averias
+source("R/dgp_averias.R")     # define simular_averias() y cargar_averias()
+banco <- cargar_averias()      # lee datos/banco_averias_*.rds si existe; si no, simula y lo guarda
 
-glimpse(banco$modelo_base)
+glimpse(banco$averias)
 ```
 
-Un **descriptivo básico de las dos respuestas continuas** —media, mediana, mínimo, máximo y el
-**coeficiente de variación** (CV = sd/media), que en una Gamma es aproximadamente **constante** y motiva
-la elección de familia—:
+**¿Cuánto cuesta una avería?** Un descriptivo del coste —media, mediana, mínimo, máximo y el
+**coeficiente de variación** (CV = sd/media)—:
 
 ```{r}
-#| label: tbl-industrial-resp
-#| tbl-cap: "Descriptivo de las respuestas continuas positivas: coste de la intervención y degradación (media, mediana, mínimo, máximo y coeficiente de variación)."
-descriptivo <- function(x) tibble::tibble(
-  media  = round(mean(x), 2),  mediana = round(median(x), 2),
-  minimo = round(min(x), 2),   maximo  = round(max(x), 2),
-  cv     = round(sd(x) / mean(x), 2))
-
-dplyr::bind_rows(
-  dplyr::mutate(descriptivo(banco$modelo_base$coste_euros),        respuesta = "coste_euros (€)"),
-  dplyr::mutate(descriptivo(banco$modelo_longitudinal$degradacion), respuesta = "degradacion"),
-  .id = NULL) |>
-  dplyr::relocate(respuesta)
+#| label: tbl-averias-coste
+#| tbl-cap: "Descriptivo del coste de reparación de una avería (€): media, mediana, mínimo, máximo y coeficiente de variación."
+tibble::tibble(
+  n       = nrow(banco$averias),
+  media   = round(mean(banco$averias$coste_euros)),
+  mediana = round(median(banco$averias$coste_euros)),
+  minimo  = round(min(banco$averias$coste_euros)),
+  maximo  = round(max(banco$averias$coste_euros)),
+  cv      = round(sd(banco$averias$coste_euros) / mean(banco$averias$coste_euros), 2))
 ```
 
-El CV **cercano a un valor estable** en ambas respuestas y la asimetría a la derecha (media > mediana)
-son la firma de una **Gamma**, no de una normal. Y un descriptivo del **desenlace de supervivencia**
-—cuántas máquinas fallan y cuántas quedan censuradas al cierre del estudio—:
+La media supera a la mediana y el máximo queda muy lejos de ambas: el coste es **positivo y asimétrico
+a la derecha**, el terreno del GLM Gamma (lo desarrollamos en la [Unidad 3.1](#sec-u31)).
+
+**¿Cada cuánto se avería?** El número de averías por máquina y el desenlace de supervivencia:
 
 ```{r}
-#| label: tbl-industrial-superv
-#| tbl-cap: "Desenlace de supervivencia: número de máquinas, fallos observados, proporción de fallos, censuras administrativas y seguimiento mediano."
-banco$modelo_supervivencia |>
-  dplyr::summarise(
-    n_maquinas   = dplyr::n(),
-    fallos       = sum(fallo),
-    prop_fallo   = round(mean(fallo), 3),
-    censuras     = sum(fallo == 0),
-    seg_mediano  = median(tiempo))
+#| label: tbl-averias-frecuencia
+#| tbl-cap: "Averías por máquina (media, varianza y cociente varianza/media, que anticipa sobredispersión) e intervalos entre fallos (nº, eventos, censura y duración mediana)."
+n_por_maq <- as.integer(table(factor(banco$averias$id_maquina,
+                                      levels = banco$maquinas$id_maquina)))
+tibble::tibble(
+  averias_media    = round(mean(n_por_maq), 2),
+  averias_var      = round(var(n_por_maq), 2),
+  var_media        = round(var(n_por_maq) / mean(n_por_maq), 2),
+  intervalos       = nrow(banco$intervalos),
+  eventos          = sum(banco$intervalos$evento),
+  censura_pct      = round(mean(banco$intervalos$evento == 0) * 100),
+  gap_mediano_dias = round(median(banco$intervalos$tiempo_entre)))
 ```
 
-Y la distribución de las dos respuestas continuas, con su asimetría característica (eje log para
-legibilidad):
+El cociente **varianza/media claramente > 1** delata que el conteo de averías está **sobredispersado**:
+es la huella de la **fragilidad** de máquina (unas fallan mucho más que otras), y el mismo fenómeno que
+en el Caso 2 llevaba a la binomial negativa. Y en torno a una cuarta parte de los intervalos quedan
+**censurados** (la máquina llega al cierre del estudio sin volver a fallar).
+
+Y su aspecto —el coste (izquierda) y los tiempos entre fallos (derecha), ambos con su asimetría
+característica—:
 
 ```{r}
-#| label: fig-industrial-eda
+#| label: fig-averias-eda
 #| fig-width: 9
 #| fig-height: 4
-#| fig-cap: "Distribución del coste de la intervención (izquierda) y de la degradación (derecha). Ambas son positivas y asimétricas a la derecha: el terreno del GLM Gamma."
-p_coste <- ggplot(banco$modelo_base, aes(coste_euros)) +
+#| fig-cap: "Distribución del coste de reparación (izquierda, eje log) y de los tiempos entre fallos observados (derecha). Ambas magnitudes son positivas y asimétricas a la derecha."
+p_coste <- ggplot(banco$averias, aes(coste_euros)) +
   geom_histogram(bins = 40, fill = "steelblue") +
   scale_x_log10() +
-  labs(x = "coste de la intervención (€, escala log)", y = "nº de intervenciones")
+  labs(x = "coste de la avería (€, escala log)", y = "nº de averías")
 
-p_degrad <- ggplot(banco$modelo_longitudinal, aes(degradacion)) +
+p_gap <- ggplot(subset(banco$intervalos, evento == 1), aes(tiempo_entre)) +
   geom_histogram(bins = 40, fill = "darkorange") +
-  scale_x_log10() +
-  labs(x = "índice de degradación (escala log)", y = "nº de mediciones")
+  labs(x = "tiempo entre fallos (días)", y = "nº de intervalos")
 
-p_coste + p_degrad
+p_coste + p_gap
 ```
 
 # Reproducibilidad {#sec-repro3}
@@ -241,12 +280,8 @@ p_coste + p_degrad
 
 {{< include _unidad_3_3.qmd >}}
 
-{{< include _unidad_3_4.qmd >}}
-
-{{< include _unidad_3_5.qmd >}}
-
-{{< include _unidad_3_6.qmd >}}
-
-{{< include _unidad_3_7.qmd >}}
-
-# Referencias {.unnumbered}
+::: {.callout-warning}
+## Unidades en reconstrucción
+Las unidades **3.4–3.7** se están reescribiendo sobre el banco de **averías** y se reconectarán una a una
+a medida que queden listas. Las Unidades 3.1, 3.2 y 3.3 ya están sobre el banco nuevo.
+:::

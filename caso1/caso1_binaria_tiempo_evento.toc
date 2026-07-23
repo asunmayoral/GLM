@@ -1,0 +1,75 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {subsection}{\nonumberline Resultados de aprendizaje del Caso 1}{1}{subsection*.3}%
+\contentsline {section}{\nonumberline Presentación del caso}{2}{section*.5}%
+\contentsline {subsection}{\nonumberline Dato real --- GLOW}{3}{subsection*.7}%
+\contentsline {subsection}{\nonumberline Cohorte simulada}{5}{subsection*.10}%
+\contentsline {section}{\nonumberline 1 · Cuando la recta no llega: del dato binario al marco GLM}{10}{section*.13}%
+\contentsline {subsection}{\nonumberline 1.1 El modelo lineal en GLOW}{11}{subsection*.15}%
+\contentsline {subsection}{\nonumberline 1.2 Por qué OLS no sirve para una respuesta binaria}{16}{subsection*.21}%
+\contentsline {subsection}{\nonumberline 1.3 Los tres componentes de un GLM}{16}{subsection*.23}%
+\contentsline {subsection}{\nonumberline 1.4 GLM en datos binarios}{19}{subsection*.26}%
+\contentsline {subsection}{\nonumberline Puente a la Unidad 2}{24}{subsection*.30}%
+\contentsline {section}{\nonumberline 2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación}{24}{section*.32}%
+\contentsline {subsection}{\nonumberline 2.1 Familia exponencial y relación media--varianza}{25}{subsection*.34}%
+\contentsline {subsection}{\nonumberline 2.2 El enlace: canónico y alternativas}{29}{subsection*.37}%
+\contentsline {subsection}{\nonumberline 2.3 Interpretación: del coeficiente a la probabilidad}{33}{subsection*.41}%
+\contentsline {subsubsection}{\nonumberline Interpretación en la escala de los odds y log-odds}{34}{subsubsection*.43}%
+\contentsline {subsubsection}{\nonumberline Interpretación en la escala de la probabilidad: efectos marginales}{38}{subsubsection*.46}%
+\contentsline {subsection}{\nonumberline 2.4 Estimación: máxima verosimilitud e IWLS}{41}{subsection*.49}%
+\contentsline {subsection}{\nonumberline 2.5 Inferencia y selección de modelos}{44}{subsection*.52}%
+\contentsline {subsubsection}{\nonumberline La Deviance}{45}{subsubsection*.54}%
+\contentsline {subsubsection}{\nonumberline Inferencia sobre los coeficientes}{46}{subsubsection*.56}%
+\contentsline {subsubsection}{\nonumberline Inferencia sobre bloques: el contraste de razón de verosimilitudes (LRT)}{48}{subsubsection*.58}%
+\contentsline {subsubsection}{\nonumberline Comparar modelos no anidados: AIC y BIC}{50}{subsubsection*.60}%
+\contentsline {subsection}{\nonumberline 2.6 Bondad de ajuste y diagnóstico}{56}{subsection*.62}%
+\contentsline {subsubsection}{\nonumberline El contraste global: ¿aportar o ajustar? (y por qué falla en binaria)}{56}{subsubsection*.64}%
+\contentsline {subsubsection}{\nonumberline Residuos}{57}{subsubsection*.66}%
+\contentsline {subsubsection}{\nonumberline Calibración: ¿son fiables las probabilidades?}{59}{subsubsection*.69}%
+\contentsline {subsubsection}{\nonumberline Separación: cuando el ajuste ``perfecto'' rompe la inferencia.}{62}{subsubsection*.72}%
+\contentsline {subsection}{\nonumberline 2.7 Evaluación como clasificador}{64}{subsection*.74}%
+\contentsline {subsubsection}{\nonumberline Del umbral a la matriz de confusión.}{64}{subsubsection*.76}%
+\contentsline {subsubsection}{\nonumberline ROC y AUC}{67}{subsubsection*.78}%
+\contentsline {subsection}{\nonumberline Puente a la Unidad 3}{71}{subsection*.81}%
+\contentsline {section}{\nonumberline 3 · Extensión de la respuesta binaria: binomial y politómica}{71}{section*.83}%
+\contentsline {subsection}{\nonumberline 3.1 Del dato individual al agrupado: respuesta binomial}{72}{subsection*.85}%
+\contentsline {subsection}{\nonumberline 3.2 Bondad de ajuste y diagnóstico en datos binomiales}{75}{subsection*.88}%
+\contentsline {subsubsection}{\nonumberline Residuos}{75}{subsubsection*.90}%
+\contentsline {subsubsection}{\nonumberline Bondad de ajuste}{78}{subsubsection*.93}%
+\contentsline {subsubsection}{\nonumberline Calibración}{80}{subsubsection*.95}%
+\contentsline {subsubsection}{\nonumberline Sobredispersión}{81}{subsubsection*.98}%
+\contentsline {subsection}{\nonumberline 3.3 Más de dos categorías sin orden: politómica nominal}{83}{subsection*.100}%
+\contentsline {subsection}{\nonumberline 3.4 Categorías ordenadas: el modelo de odds proporcionales}{89}{subsection*.103}%
+\contentsline {section}{\nonumberline 4 · Efectos aleatorios}{94}{section*.106}%
+\contentsline {subsection}{\nonumberline 4.1 Qué son y para qué sirven}{97}{subsection*.109}%
+\contentsline {subsection}{\nonumberline 4.2 Intercepto aleatorio}{98}{subsection*.111}%
+\contentsline {subsubsection}{\nonumberline Intercepto aleatorio en \texttt {cohorte}}{98}{subsubsection*.113}%
+\contentsline {subsubsection}{\nonumberline 1. Componentes de varianza}{102}{subsubsection*.116}%
+\contentsline {subsubsection}{\nonumberline 2. Condicional vs marginal}{104}{subsubsection*.118}%
+\contentsline {subsubsection}{\nonumberline 3. Encogimiento o \emph {shrinkage} (\emph {partial pooling}).}{107}{subsubsection*.122}%
+\contentsline {subsection}{\nonumberline 4.3 Pendiente aleatoria: cuando el efecto varía por grupo}{110}{subsection*.125}%
+\contentsline {subsection}{\nonumberline 4.4 Bondad de ajuste y diagnóstico del modelo mixto}{114}{subsection*.128}%
+\contentsline {subsection}{\nonumberline 4.5 Extensiones: estructuras aleatorias más ricas}{120}{subsection*.133}%
+\contentsline {subsection}{\nonumberline 4.6 El modelo mixto sobre datos reales: GLOW por centro}{121}{subsection*.135}%
+\contentsline {section}{\nonumberline 5 · Supervivencia: del hazard al GLM en tiempo discreto}{125}{section*.138}%
+\contentsline {subsection}{\nonumberline 5.1 La función de supervivencia y la función de riesgo en tiempo discreto}{127}{subsection*.140}%
+\contentsline {subsection}{\nonumberline 5.2 Precedentes en clave de supervivencia: Kaplan--Meier y Cox}{128}{subsection*.142}%
+\contentsline {subsubsection}{\nonumberline Kaplan--Meier: dejar hablar a los datos}{129}{subsubsection*.144}%
+\contentsline {subsubsection}{\nonumberline Riesgos proporcionales, en tiempo discreto}{131}{subsubsection*.147}%
+\contentsline {subsubsection}{\nonumberline Cox: el mismo supuesto en tiempo continuo}{135}{subsubsection*.151}%
+\contentsline {subsection}{\nonumberline 5.3 La modelización GLM del problema de supervivencia}{135}{subsection*.153}%
+\contentsline {subsubsection}{\nonumberline De los datos al modelo: qué es \(T\) y qué asumimos}{136}{subsubsection*.155}%
+\contentsline {subsubsection}{\nonumberline El enlace complementary log-log y por qué es el natural}{137}{subsubsection*.157}%
+\contentsline {subsubsection}{\nonumberline Ajuste en tiempo discreto e interpretación}{139}{subsubsection*.160}%
+\contentsline {subsubsection}{\nonumberline Cloglog frente a logit: ¿cuánto importa el enlace?}{142}{subsubsection*.163}%
+\contentsline {subsubsection}{\nonumberline Qué aporta el GLM en supervivencia}{144}{subsubsection*.166}%
+\contentsline {subsubsection}{\nonumberline Conclusiones para la práctica clínica}{144}{subsubsection*.168}%
+\contentsline {section}{\nonumberline 6 · Estudio de caso, exposición y evaluación}{147}{section*.171}%
+\contentsline {subsection}{\nonumberline 6.1 El estudio de caso (entregable)}{147}{subsection*.173}%
+\contentsline {subsubsection}{\nonumberline El encargo}{147}{subsubsection*.175}%
+\contentsline {subsubsection}{\nonumberline Tu trabajo}{148}{subsubsection*.177}%
+\contentsline {subsubsection}{\nonumberline El formato: un informe técnico}{149}{subsubsection*.179}%
+\contentsline {subsection}{\nonumberline 6.2 Checklist de tareas}{150}{subsection*.181}%
+\contentsline {subsubsection}{\nonumberline ¿Respondida cada pregunta del cliente?}{150}{subsubsection*.183}%
+\contentsline {subsubsection}{\nonumberline Tareas analíticas del proyecto}{151}{subsubsection*.185}%
+\contentsline {section}{\nonumberline Reproducibilidad}{152}{section*.187}%
+\providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
