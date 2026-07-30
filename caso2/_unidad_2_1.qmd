@@ -112,6 +112,16 @@ modelo**: la regresión de **Poisson** y su versión **log-lineal**, ambas con e
 construimos a continuación —y, cuando el Poisson básico se quede corto (la varianza se dispara o
 sobran ceros), lo ampliaremos en las unidades siguientes—.
 
+::: {.callout-note}
+## Los problemas 3 y 4 tienen unidad propia
+En esta unidad los **presentamos** y ajustamos su versión más simple, para que se vea que son el mismo
+`glm(family = poisson)`. Pero cuando el dato es la **celda** y no el sujeto, la lógica inferencial
+cambia —modelos anidados, esquemas de muestreo, recuento de grados de libertad— y la escala de lectura
+pasa a ser el **odds ratio**. Todo eso se desarrolla en la [Unidad 2.2](#sec-u22) (*ampliación*):
+tablas de tres o más vías y su jerarquía, la paradoja de Simpson, el diagnóstico de tablas y los
+modelos de tablas cuadradas.
+:::
+
 ## 1.2 Modelización y estimación {#sec-u21-modelizacion}
 
 ### El modelo genérico
@@ -154,6 +164,26 @@ Dos extensiones del mismo modelo, que usaremos enseguida:
   la **interacción** da el modelo **saturado** (ajuste perfecto), y esa interacción **es** la
   asociación. (Puente con el Caso 1: el log-lineal saturado de una tabla $I\times 2$ equivale a una
   **logística** del factor binario sobre el otro.)
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar un Poisson, el *offset* y el log-lineal
+El ajuste es el `glm()` de siempre; solo cambia la **familia**:
+
+```r
+glm(y ~ ..., family = poisson, data = ...)          # enlace log por defecto
+```
+
+- **`family = poisson`** trae el enlace `log` por defecto (equivale a `poisson(link = "log")`); la
+  estimación es IWLS, idéntica al resto de GLM.
+- **Tasas con *offset*** — se añade **`offset(log(exposicion))`** en la fórmula (o el argumento
+  `offset =`): es un término con **coeficiente fijado a 1**, no se estima. Modelar la tasa $\mu/t$
+  equivale a dejar $\log t$ fuera de la estimación. No confundir con **`weights`**, que reparte precisión,
+  no exposición.
+- **Log-lineal** — no hay función nueva: es un `glm(family = poisson)` sobre los **recuentos de celda**
+  (una fila por celda). Los **efectos principales** (`a + b`) dan el modelo de **independencia**; la
+  **interacción** (`a * b`) da el **saturado** —ajuste perfecto— y **es** la asociación. La **simetría**
+  de una tabla cuadrada es el mismo `glm` sobre un factor que empareja las celdas $(i,j)$ y $(j,i)$.
+:::
 
 ### Aplicado a los cuatro problemas del contexto
 
@@ -242,9 +272,10 @@ m_sim <- glm(Freq ~ par, family = poisson, data = cuad)                   # mode
 head(broom::tidy(m_sim), 5)
 ```
 
-Comparando este modelo con el ajuste perfecto se contrasta si el cambio de bonus-malus es simétrico.
-Es el más sencillo de los **modelos de cambio** (avanzados); la **homogeneidad marginal** y la
-**cuasi-simetría** son extensiones.
+Comparando este modelo con el ajuste perfecto se contrasta si el cambio de bonus-malus es simétrico. Es
+el más sencillo de los **modelos de cambio**: la **cuasi-simetría**, la **homogeneidad marginal** y los
+modelos de **asociación ordinal** —que aprovechan que los niveles están ordenados y resumen la tabla en
+un solo parámetro— se desarrollan en la [Unidad 2.2](#sec-u22-cuadradas).
 
 ## 1.3 Interpretación {#sec-u21-interpretacion}
 
@@ -285,6 +316,19 @@ perfiles <- data.frame(edad_conductor = 45, potencia_cv = 110,
                        tipo_vehiculo = "turismo", exposicion = 1)
 predict(m_tasa, perfiles, type = "response")   # esperadas: urbana vs rural
 ```
+
+::: {.callout-tip}
+## 🔧 En R. Leer IRR y predecir tasas
+Dos gestos, uno para los **coeficientes** y otro para las **predicciones**:
+
+- **`broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)`** devuelve cada coeficiente como $e^{\hat\beta}$
+  —la **razón de tasas (IRR)**— con su intervalo de confianza. Un IRR cuyo intervalo no contiene el **1**
+  es un efecto significativo (el 1 es «sin efecto», como $\beta=0$ en escala log).
+- **`predict(m, newdata, type = "response")`** da la **media esperada** en la escala de los datos (número
+  de eventos), deshaciendo el enlace log. Con *offset*, el `newdata` debe traer la columna de exposición
+  (`exposicion = 1` para leer la tasa en la ventana completa). Sin `type = "response"` se obtiene el
+  predictor lineal $\hat\eta$ en escala log.
+:::
 
 ### En el log-lineal: la asociación
 
@@ -369,7 +413,25 @@ anova(m_red, m_tasa, test = "LRT")
 Comparar así, término a término, se vuelve inviable con **muchos** predictores (y la cartera tiene
 predictores de ruido a propósito). La selección automática por **validación cruzada** y la
 **regularización** (lasso/ridge para Poisson con `glmnet`) se desarrollan en la
-[Unidad 2.6](#sec-u26); aquí basta con la comparación guiada por hipótesis.
+[Unidad 2.7](#sec-u27); aquí basta con la comparación guiada por hipótesis.
+
+::: {.callout-tip}
+## 🔧 En R. Contrastar términos y comparar modelos
+En la Poisson la dispersión es **conocida** ($\phi=1$), así que los contrastes usan la $\chi^2$
+(`test = "LRT"`), no la $F$ de la Gamma:
+
+- **Un término dentro del modelo** — `drop1(m, test = "LRT")` reajusta el modelo quitando cada término y
+  mide la deviance que se pierde. Más fiable que el Wald del `summary` para conteos.
+- **Dos modelos anidados** (¿asociación en la tabla?, ¿sobra un predictor?) — `anova(m_reducido,
+  m_completo, test = "LRT")`. **`update(m, . ~ . - tipo_vehiculo)`** construye el modelo vecino sin
+  reescribir la fórmula entera.
+- **Modelos no anidados** — **`AIC(m1, m2)`** / `BIC(...)`; gana el menor (BIC penaliza más la
+  complejidad).
+
+Dos contrastes de esta unidad son casos particulares: la **independencia** de una tabla es
+`anova(m_indep, m_sat, test = "LRT")`; la **simetría**, la deviance residual del modelo frente a una
+$\chi^2_{gl}$.
+:::
 
 ## 1.5 Bondad de ajuste, diagnóstico y predicción {#sec-u21-diagnostico}
 
@@ -386,7 +448,7 @@ esperadas altas** (medias grandes o datos agrupados)—, y con conteos individua
 lo habitual, la aproximación $\chi^2$ **falla**. Por eso, en la práctica, la bondad de ajuste se apoya en
 piezas más robustas: el **índice de dispersión**, el **rootograma** y los **residuos simulados**
 (`DHARMa`), más el **AIC** para comparar modelos. El compendio completo, con sus restricciones, lo
-reunimos en la [Unidad 2.2](#sec-u22).
+reunimos en la [Unidad 2.3](#sec-u23).
 
 Empezamos por el **índice de dispersión**: la deviance y el $\chi^2$ de Pearson divididos por sus grados
 de libertad deberían rondar **1** si la Poisson ajusta.
@@ -415,7 +477,22 @@ simulateResiduals(m_tasa, plot = TRUE)      # residuos escalados; QQ y dispersi�
 performance::check_overdispersion(m_tasa)   # test formal del índice de dispersión
 ```
 
-### El puente a la sobredispersión (Unidad 2.2)
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico de dispersión y residuos en un Poisson
+La Poisson impone **media = varianza**; comprobarlo es el diagnóstico clave.
+
+- **Índice de dispersión** — `sum(residuals(m, type = "pearson")^2) / df.residual(m)`. Debe rondar **1**;
+  muy por encima señala **sobredispersión** (Unidad 2.3).
+- **Residuos simulados** — `DHARMa::simulateResiduals(m, plot = TRUE)` corrige la discreción del conteo
+  —los residuos crudos engañan—: QQ uniforme + residuos frente a predicho, con los contrastes
+  superpuestos.
+- **Test formal** — `performance::check_overdispersion(m)` contrasta ese índice y da un $p$-valor.
+
+El **compendio completo** de bondad de ajuste para conteos —con el rootograma y las restricciones de cada
+prueba— se reúne en la [Unidad 2.3](#sec-u23).
+:::
+
+### El puente a la sobredispersión (Unidad 2.3)
 
 El índice de dispersión es también el **detector** de sobredispersión. Ajustando la misma Poisson a
 `n_danos` —los partes por daños— se ve el contraste:
@@ -429,7 +506,7 @@ c(asistencia = disp(m_tasa), danos = disp(m_danos))
 
 En `n_danos` el índice se dispara muy por encima de 1: la Poisson **subestima la variabilidad** y sus
 errores estándar quedan demasiado optimistas. Ese es exactamente el problema que aborda la
-[Unidad 2.2](#sec-u22) con quasi-Poisson y binomial negativa.
+[Unidad 2.3](#sec-u23) con quasi-Poisson y binomial negativa.
 
 ### Predicción
 
@@ -447,19 +524,18 @@ Las celdas donde el observado se aparta del esperado bajo independencia son, pre
 delatan la asociación entre zona y daños.
 
 ::: {.callout-important}
-## Tarea del estudiante (2.1) — Preguntas 1 a 5 del caso
-Sobre la cartera de tu equipo abordas el primer bloque de la dirección ([Unidad 2.7](#sec-u27)):
+## Tarea del estudiante (2.1) — Preguntas 1 a 3 del caso
+Sobre la cartera de tu equipo abordas el primer bloque de la dirección ([Unidad 2.8](#sec-u28)):
 
 1. **Ritmo y perfiles (P1).** Modela la **tasa** de `n_siniestros` con Poisson y `offset(log(exposicion))`;
    lee los factores en **IRR** con sus intervalos.
 2. **Predicción (P2).** Estima el ritmo esperado —con intervalo— de una **póliza nueva** de un perfil dado.
 3. **¿Mismo patrón? (P3).** Repite con `n_asistencia` y compara: ¿los mismos factores, con la misma fuerza,
    que en `n_siniestros`?
-4. **Asociación (P4).** Cruza `tipo_vehiculo` × `zona_circulacion` × `uso` con *tener o no* siniestro; ajusta
-   un **log-lineal** y distingue asociación de independencia.
-5. **Movilidad (P5).** Con `bonus_malus_prev` → `bonus_malus_act`, contrasta **simetría** y **homogeneidad
-   marginal** y mide la **deriva**.
 
 Cierra comprobando si la Poisson basta —**índice de dispersión**—: si se dispara, anótalo; lo resolverás en la
-Unidad 2.2. Valida contra la verdad del DGP (`attr(cartera, "verdad")`).
+Unidad 2.3. Valida contra la verdad del DGP (`attr(cartera, "verdad")`).
+
+Las preguntas **P4** (asociación en tablas), **P5** (movilidad del bonus-malus) y **P18** (proxies) se
+abordan con la [Unidad 2.2](#sec-u22).
 :::

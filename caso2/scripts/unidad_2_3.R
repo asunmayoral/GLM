@@ -1,215 +1,305 @@
 # =============================================================================
-# Caso 2 · Unidad 2.3 — 3 · Demasiados ceros
+# Caso 2 · Unidad 2.3 — 3 · Sobredispersión
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_3.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM; localiza
-# la raíz por _quarto.yml y resuelve solo las rutas del DGP y de la caché.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías (idénticas al setup del documento del caso) -------------------
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo.
 library(broom)
 library(tidyverse)
-library(MASS)          # glm.nb
+library(MASS)          # glm.nb (base-recommended)
 library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos
-library(MuMIn); library(glmnet)
-library(vcdExtra)      # zero-inflated
+library(survival)      # riesgos a trozos (base-recommended)
+library(MuMIn); library(glmnet)   # selección / regularización 
+library(vcd)           # mosaicos para tablas de contingencia (2.2)
+library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Datos: cartera de auto (misma llamada que el documento del caso) --------
-# Localiza la raíz del proyecto (donde está _quarto.yml), sea cual sea el wd:
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))  # simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
-cartera <- cargar_cartera("auto")    # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u23-fraude-ceros]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: más ceros de los que el modelo espera
+# [fig-u23-eda-modelo]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
 # -----------------------------------------------------------------------------
-m_fp <- glm(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-            family = poisson, data = cartera)
-obs0 <- mean(cartera$n_fraude == 0)     # proporción observada de ceros
-esp0 <- mean(dpois(0, fitted(m_fp)))    # proporción esperada por la Poisson
-c(observados = obs0, esperados_poisson = esp0, ratio = obs0 / esp0)
+dplyr::bind_rows(
+  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
+                     y = n_danos, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
+  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
+                     y = n_danos, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
+  ggplot(aes(nivel, tasa)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
-# [fig-u23-ceros]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: más ceros de los que el modelo espera
+# [fig-u23-media-varianza]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
 # -----------------------------------------------------------------------------
-mu <- fitted(m_fp); K <- 0:8
+m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                offset(log(exposicion)), family = poisson, data = cartera)
+
+mu_i  <- fitted(m_pois); y <- cartera$n_danos
+phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
+alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
+
+pts <- tibble::tibble(mu = mu_i, y = y) |>
+  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
+
+rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
+curvas <- tibble::tibble(
+  media = rango,
+  `Poisson: Var = media`               = rango,
+  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
+  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
+  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
+
+ggplot() +
+  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
+  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
+  scale_colour_manual(values = c(
+    "Poisson: Var = media"             = "grey55",
+    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
+    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
+  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+
+# -----------------------------------------------------------------------------
+# [fig-u23-heterogeneidad]  ·  3.1 Qué es, de dónde viene y cómo se identifica > De dónde viene
+# -----------------------------------------------------------------------------
+set.seed(2026)
+n <- 5000; media <- 2
+dplyr::bind_rows(
+  tibble::tibble(poblacion = "Poisson homogénea",  y = rpois(n, media)),
+  tibble::tibble(poblacion = "Mezcla heterogénea", y = rpois(n, media * rgamma(n, 1, 1)))) |>
+  dplyr::filter(y <= 8) |>
+  dplyr::count(poblacion, y) |>
+  ggplot(aes(y, n, fill = poblacion)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Poisson homogénea" = "steelblue",
+                               "Mezcla heterogénea" = "darkorange")) +
+  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+
+# -----------------------------------------------------------------------------
+# [u23-indice]  ·  3.1 Qué es, de dónde viene y cómo se identifica > El índice de dispersión
+# -----------------------------------------------------------------------------
+phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
+phi_dev     <- deviance(m_pois) / df.residual(m_pois)
+c(pearson = phi_pearson, deviance = phi_dev)
+
+# -----------------------------------------------------------------------------
+# [fig-u23-rootograma]  ·  3.1 Qué es, de dónde viene y cómo se identifica > El rootograma: ver dónde falla el ajuste
+# -----------------------------------------------------------------------------
+mu <- fitted(m_pois); K <- 0:8
 esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K)))
+observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
 
 tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
   tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de reclamaciones en revisión antifraude", y = "nº de pólizas", fill = NULL)
+  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-mecanismo]  ·  3.1 Qué es, de dónde viene y cómo se identifica > De dónde viene: dos procesos de cero
+# [u23-tests]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
-set.seed(2026)
-n <- 5000; mu <- 2; pi_e <- 0.4
-dplyr::bind_rows(
-  tibble::tibble(poblacion = "Poisson",                       y = rpois(n, mu)),
-  tibble::tibble(poblacion = "Con 40 % de ceros estructurales", y = ifelse(rbinom(n, 1, pi_e) == 1, 0, rpois(n, mu)))) |>
-  dplyr::filter(y <= 8) |>
-  dplyr::count(poblacion, y) |>
-  ggplot(aes(y, n, fill = poblacion)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Poisson" = "steelblue", "Con 40 % de ceros estructurales" = "darkorange")) +
-  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+# Tests de sobredispersión
+print(performance::check_overdispersion(m_pois))
+print(AER::dispersiontest(m_pois))
+print(DHARMa::testDispersion(m_pois, plot = FALSE))
 
 # -----------------------------------------------------------------------------
-# [u23-nb-zerotest]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Cómo se identifica
+# [u23-trafo]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
-m_fnb <- MASS::glm.nb(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                        offset(log(exposicion)), data = cartera)
-DHARMa::testZeroInflation(m_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
+print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
+print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
 
 # -----------------------------------------------------------------------------
-# [u23-scoretest]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Cómo se identifica
+# [u23-trafo-manual]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
-vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
+mu <- fitted(m_pois); y <- cartera$n_danos
+r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
+test_var <- function(formula, etiqueta) {
+  s <- coef(summary(lm(formula)))[1, ]        # coeficiente = alpha estimado
+  data.frame(estructura = etiqueta, alpha = round(s[1], 3),
+             t = round(s[3], 1), p_valor = signif(s[4], 3), row.names = NULL)
+}
+rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = media de r
+      test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
 
 # -----------------------------------------------------------------------------
-# [fig-u23-zip-motiv]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [u23-quasi-fit]  ·  3.2 Quasi-Poisson > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-cartera |>
-  dplyr::mutate(tramo_pot = dplyr::ntile(potencia_cv, 5)) |>
-  dplyr::group_by(tramo_pot, uso) |>
-  dplyr::summarise(`Parte estructural: P(cero)` = mean(n_fraude == 0),
-                   `Parte de conteo: media`     = mean(n_fraude), .groups = "drop") |>
-  tidyr::pivot_longer(-c(tramo_pot, uso), names_to = "parte", values_to = "v") |>
-  dplyr::mutate(parte = factor(parte, levels = c("Parte estructural: P(cero)", "Parte de conteo: media"))) |>
-  ggplot(aes(tramo_pot, v, colour = uso)) +
-  geom_line() + geom_point(size = 2) +
-  facet_wrap(~ parte, scales = "free_y") +
-  labs(x = "quintil de potencia (CV)", y = NULL, colour = NULL)
+m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                 offset(log(exposicion)), family = quasipoisson, data = cartera)
+summary(m_quasi)$dispersion   # phi estimado
 
 # -----------------------------------------------------------------------------
-# [fig-u23-zip-motiv2]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [u23-quasi-comp]  ·  3.2 Quasi-Poisson > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-dplyr::bind_rows(
-  cartera |> dplyr::group_by(predictor = "zona_circulacion", nivel = as.character(zona_circulacion)) |>
-    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop"),
-  cartera |> dplyr::group_by(predictor = "tipo_vehiculo",    nivel = as.character(tipo_vehiculo)) |>
-    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop")) |>
-  ggplot(aes(nivel, tasa)) +
-  geom_col(fill = "steelblue") +
-  facet_wrap(~ predictor, scales = "free_x") +
-  labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
+dplyr::left_join(
+  broom::tidy(m_pois)  |> dplyr::select(term, estimacion = estimate, se_poisson = std.error),
+  broom::tidy(m_quasi) |> dplyr::select(term, se_quasi = std.error),
+  by = "term")
 
 # -----------------------------------------------------------------------------
-# [u23-zip]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [fig-u23-quasi-resid]  ·  🔧 En R. Ajustar una quasi-Poisson > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-m_zip <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-summary(m_zip)
+tibble::tibble(ajustado = fitted(m_quasi),
+               residuo  = residuals(m_quasi, type = "pearson")) |>
+  ggplot(aes(ajustado, residuo)) +
+  geom_point(alpha = 0.2, colour = "steelblue") +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_smooth(se = FALSE, colour = "darkorange") +
+  labs(x = "valor ajustado", y = "residuo de Pearson")
 
 # -----------------------------------------------------------------------------
-# [u23-zinb]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [u23-nb-fit]  ·  3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_zinb <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
-AIC(m_zip, m_zinb)
+m_nb <- MASS::glm.nb(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                       offset(log(exposicion)), data = cartera)
+c(theta = m_nb$theta, se_theta = m_nb$SE.theta)   # dispersion estimada
 
 # -----------------------------------------------------------------------------
-# [u23-zip-diag]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Bondad de ajuste y diagnóstico
+# [u23-nb1]  ·  3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-c(observados    = sum(cartera$n_fraude == 0),
-  esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
+m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                            tipo_vehiculo + offset(log(exposicion)),
+                          family = glmmTMB::nbinom1, data = cartera)
+sigma(m_nb1)   # dispersion alpha de la NB1
 
 # -----------------------------------------------------------------------------
-# [fig-u23-zip-root]  ·  3.2 Modelos zero-inflated (ZIP / ZINB) > Bondad de ajuste y diagnóstico
+# [u23-nb1-quasi]  ·  3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
-tibble::tibble(k = K,
-               Observado      = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `ZIP ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
-  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "ZIP ajustado" = "darkorange")) +
-  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
+se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
+se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
+data.frame(term = names(se_q), se_quasi = round(se_q, 4),
+           se_nb1 = round(se_nb1[names(se_q)], 4))
 
 # -----------------------------------------------------------------------------
-# [u23-hurdle]  ·  3.3 Modelos hurdle > Ajuste e interpretación
+# [u23-nb-disp]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-m_hp <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-summary(m_hp)
+disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
+round(c(NB2 = disp(m_nb), NB1 = disp(m_nb1)), 3)
 
 # -----------------------------------------------------------------------------
-# [u23-hurdle-diag]  ·  3.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [fig-u23-nb2-dharma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-c(observados       = sum(cartera$n_fraude == 0),
-  esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
+DHARMa::simulateResiduals(m_nb, plot = TRUE)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-hurdle-root]  ·  3.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [fig-u23-nb1-dharma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
-tibble::tibble(k = K,
-               Observado         = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `Hurdle ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
-  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Hurdle ajustado" = "darkorange")) +
-  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
+DHARMa::simulateResiduals(m_nb1, plot = TRUE)
 
 # -----------------------------------------------------------------------------
-# [u23-hurdle-nb]  ·  3.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [fig-u23-nb-rootograma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-m_hnb <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
-AIC(m_hp, m_hnb)
+mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
+esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
+esp_nb   <- sapply(K, function(k) if (k < 8) sum(dnbinom(k, size = th, mu = mu_n)) else sum(1 - pnbinom(7, size = th, mu = mu_n)))
+observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
+
+tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb) |>
+  tidyr::pivot_longer(c(Observado, Poisson, `NB2`), names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, colour = fuente, group = fuente)) +
+  geom_line(linewidth = 0.7) + geom_point(size = 2) +
+  scale_colour_manual(values = c("Observado" = "grey30", "Poisson" = "darkorange", "NB2" = "steelblue")) +
+  labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [u23-aic]  ·  3.4 Elegir, comparar y conectar > Los modelos, lado a lado
+# [fig-u23-comp-modelos]  ·  3.4 Elegir, comparar y conectar > Los cuatro modelos, lado a lado
 # -----------------------------------------------------------------------------
-mods <- list(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
-             `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb)
-data.frame(modelo = names(mods),
-           df  = sapply(mods, function(m) attr(logLik(m), "df")),
-           AIC = round(sapply(mods, AIC), 1)) |>
+ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
+  s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
+  data.frame(term = rownames(s), estimate = s[, 1], std.error = s[, 2])
+}
+mods <- list(Poisson = m_pois, `Quasi-Poisson` = m_quasi, NB1 = m_nb1, NB2 = m_nb)
+
+purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
+  dplyr::filter(term %in% c("potencia_cv", "zona_circulacionrural", "usocomercial")) |>
+  dplyr::mutate(modelo = factor(modelo, levels = names(mods))) |>
+  ggplot(aes(modelo, estimate, colour = modelo)) +
+  geom_hline(yintercept = 0, linetype = 3, colour = "grey60") +
+  geom_pointrange(aes(ymin = estimate - std.error, ymax = estimate + std.error)) +
+  facet_wrap(~ term, scales = "free_y") +
+  labs(x = NULL, y = "estimación (± 1 EE)", colour = NULL) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+# -----------------------------------------------------------------------------
+# [u23-aic-comp]  ·  3.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
+# -----------------------------------------------------------------------------
+mods_lik <- list(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb)
+data.frame(modelo = names(mods_lik),
+           df  = sapply(mods_lik, function(m) attr(logLik(m), "df")),
+           AIC = round(sapply(mods_lik, AIC), 1)) |>
   dplyr::arrange(AIC)
 
 # -----------------------------------------------------------------------------
-# [u23-perf]  ·  3.4 Elegir, comparar y conectar > Los modelos, lado a lado
+# [u23-lrt]  ·  3.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
 # -----------------------------------------------------------------------------
-performance::compare_performance(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
-                                 `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb,
+LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
+c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
+
+# -----------------------------------------------------------------------------
+# [u23-perf]  ·  3.4 Elegir, comparar y conectar > Una lectura estándar de bondad de ajuste
+# -----------------------------------------------------------------------------
+performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
                                  metrics = c("AIC", "BIC", "RMSE"))
 
 # -----------------------------------------------------------------------------
-# [u23-pred]  ·  3.4 Elegir, comparar y conectar > Predicción: dos recetas, casi el mismo número
+# [u23-pred-comp]  ·  🔧 En R. Bondad de ajuste en modelos de conteo > Predicciones: misma media, distinto riesgo
 # -----------------------------------------------------------------------------
-nuevas <- cartera[1:5, ]
-cbind(ZIP    = predict(m_zip, nuevas, type = "response"),
-      Hurdle = predict(m_hp,  nuevas, type = "response"))
+i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
+mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
+mu_n <- unname(predict(m_nb,   cartera[i, ], type = "response"))   # media predicha (NB2)
+round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguales
+        P0_pois    = dpois(0, mu_p),        P0_nb    = dnbinom(0, size = m_nb$theta, mu = mu_n),      # P(Y = 0)
+        Pge10_pois = 1 - ppois(9, mu_p),    Pge10_nb = 1 - pnbinom(9, size = m_nb$theta, mu = mu_n)), # P(Y >= 10)
+      3)
 
 # -----------------------------------------------------------------------------
-# [u23-validacion]  ·  3.4 Elegir, comparar y conectar > Validación contra el DGP
+# [fig-u23-pred-dist]  ·  🔧 En R. Bondad de ajuste en modelos de conteo > Predicciones: misma media, distinto riesgo
 # -----------------------------------------------------------------------------
-v <- attr(cartera, "verdad")
-v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
+K <- 0:16
+mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
+dist <- tibble::tibble(k = K,
+                       Poisson = dpois(K, mu_p),
+                       NB1 = dnbinom(K, size = mu_n1 / sigma(m_nb1), mu = mu_n1),   # NB1: Var = mu(1+alpha)
+                       NB2 = dnbinom(K, size = m_nb$theta, mu = mu_n))
+dist |>
+  tidyr::pivot_longer(-k, names_to = "modelo", values_to = "prob") |>
+  ggplot(aes(k, prob, colour = modelo, group = modelo)) +
+  geom_line(linewidth = 0.7) + geom_point(size = 1.6) +
+  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue")) +
+  labs(x = "nº de partes", y = "probabilidad", colour = NULL)
+
+# -----------------------------------------------------------------------------
+# [u23-validacion]  ·  Cuándo cada una > Validación contra el DGP
+# -----------------------------------------------------------------------------
+verdad <- attr(cartera, "verdad")
+c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))
+

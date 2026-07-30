@@ -1,546 +1,916 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_3.qmd >}}. Sin YAML. Chunks u23-. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_3.qmd >}}. Sin YAML. Chunks u23-.
+     Tratamiento exhaustivo: la sobredispersión es EL problema central del conteo. -->
 
-# 3 · Demasiados ceros {#sec-u23}
+# 3 · Sobredispersión {#sec-u23}
 
-Aun con la binomial negativa, algunos conteos traen **más ceros de los que el azar del conteo explica**:
-apuntan a un **proceso aparte** que los genera. Es el caso de `n_fraude` en la cartera —reclamaciones
-**sometidas a revisión antifraude**—: cerca de la mitad de las pólizas registra un cero, **bastantes
-más** de los que una Poisson predeciría. Modelar bien ese cero exige distinguir **dos historias** que lo
-producen:
+La Poisson de la [Unidad 2.1](#sec-u21) trae una condición de fábrica —**media = varianza**— que en la
+práctica casi nunca se cumple: los conteos reales suelen variar **más** de lo que la Poisson permite.
+Lo detectamos al final de 2.1 con el índice de dispersión de `n_danos`. Esta unidad se ocupa de ello
+en serio, porque es la patología más frecuente del conteo y la puerta de entrada a los ceros
+([Unidad 2.4](#sec-u24)) y al agrupamiento ([Unidad 2.5](#sec-u25)).
 
-- **Ceros estructurales**: pólizas que **no pueden** generar el evento —no están «en riesgo»—, como un
-  asegurado que nunca cometería fraude. Un proceso aparte las fija en cero, pase lo que pase.
-- **Ceros muestrales**: pólizas sí **en riesgo**, pero que en el periodo observado no tuvieron ningún
-  caso (podrían haberlo tenido).
-
-La Poisson y la NB **mezclan** ambos tipos, y por eso se quedan cortas cuando los estructurales
-abundan. Dos familias de modelos los separan: los **zero-inflated** (ZIP/ZINB,
-[Sección 3.2](#sec-u23-zi)) y los **hurdle** ([Sección 3.3](#sec-u23-hurdle)).
-
-Como en la Unidad 2.2, seguimos el recorrido de la 2.1 aplicado al **problema** y a la **familia**, no a
-cada modelo: primero **qué es y cómo se identifica** (§3.1), luego un **bloque breve por modelo**
-(§3.2–3.3) y al final la **comparación y selección** (§3.4). Empezamos por **detectar** el exceso.
+Seguimos el mismo recorrido de la Unidad 2.1 —contexto, modelización, interpretación, selección y
+bondad de ajuste—, pero con un giro: como ahora hay **varios modelos candidatos** para un mismo
+problema, no repetimos el recorrido en cada uno. Lo aplicamos al **problema** (identificarlo) y a la
+**familia** (compararla): primero **qué es y cómo se identifica** (§3.1), luego un **bloque breve por
+modelo** (§3.2–3.3), y al final la **comparación y selección** (§3.4).
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **Conteos y tasas** — modelar el **exceso de ceros** con modelos *hurdle* y
-*zero-inflated* (ZIP/ZINB); interpretar y comparar.
+Objetivo general: **Conteos y tasas** — diagnosticar la **sobredispersión**, tratarla (quasi-Poisson,
+binomial negativa) y saber elegir.
 :::
 
-## 3.1 Qué es, de dónde viene y cómo se identifica {#sec-u23-ceros}
+## 3.1 Qué es, de dónde viene y cómo se identifica {#sec-u23-causas}
 
-### La huella: más ceros de los que el modelo espera
+La Poisson tiene **un solo parámetro**, $\mu$, que gobierna a la vez el centro y la dispersión:
+$\mathrm{E}[Y]=\mathrm{Var}[Y]=\mu$. Es la **equidispersión**, y es una restricción rígida. Cuando la
+varianza observada supera a la media hablamos de **sobredispersión** (el caso habitual); si se queda
+por debajo, de subdispersión (mucho más raro). El síntoma no es que el modelo prediga mal la media
+—los coeficientes siguen siendo razonables—, sino que **miente sobre su propia precisión**.
 
-El síntoma se ve directo: comparar los ceros **observados** con los que **predice** el modelo. Ajustamos
-una Poisson a `n_fraude` y contamos cuántos ceros espera frente a los que hay:
+### La huella: media frente a varianza
+
+Fijémonos en una respuesta concreta: **`n_danos`**, el número de partes por daños propios que registra
+cada póliza a lo largo del periodo. Queremos explicarlo en función de las variables de riesgo (edad del
+conductor, potencia, zona de circulación, uso, tipo de vehículo). Como el tiempo de cobertura varía de
+una póliza a otra, ajustamos una **Poisson con el *offset* de la exposición** —modelamos la tasa de
+partes por unidad de tiempo, como en la [Unidad 2.1](#sec-u21)—. Ese es el modelo `m_pois`, que
+usaremos como referencia en toda la unidad.
+
+Un vistazo exploratorio justifica esos predictores: la **tasa** de partes por daños (partes por unidad de
+exposición) no es plana frente a ninguno de ellos:
 
 ```{r}
-#| label: u23-fraude-ceros
-m_fp <- glm(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-            family = poisson, data = cartera)
-obs0 <- mean(cartera$n_fraude == 0)     # proporción observada de ceros
-esp0 <- mean(dpois(0, fitted(m_fp)))    # proporción esperada por la Poisson
-c(observados = obs0, esperados_poisson = esp0, ratio = obs0 / esp0)
+#| label: fig-u23-eda-modelo
+#| fig-cap: "Tasa de `n_danos` (partes por unidad de exposición) según cada predictor del modelo. Sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican los términos que se ajustan."
+#| fig-width: 9
+#| fig-height: 5
+dplyr::bind_rows(
+  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
+                     y = n_danos, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
+  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
+    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
+                     y = n_danos, e = exposicion) |>
+    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
+  ggplot(aes(nivel, tasa)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
 ```
 
-Los ceros observados (≈ 57 %) casi **doblan** a los que la Poisson espera (≈ 33 %): un ratio de $1.7$.
-El rootograma lo enseña de un vistazo —la barra del **0** se dispara y falta masa en los positivos—:
+La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
+baja algo con la **edad**: hay señal en todos, lo que justifica el modelo. Ahora bien, ese modelo
+describe bien la **media**; el problema —lo veremos— está en la **varianza**. La forma más directa de
+*ver* si sostiene su hipótesis de equidispersión es enfrentar, por grupos de pólizas de riesgo parecido,
+la **media** y la **varianza** observadas. Construimos la @fig-u23-media-varianza en cuatro pasos:
+
+1. Con `m_pois` obtenemos, para cada póliza, su número **esperado** de partes $\hat\mu_i$ =
+   `fitted(m_pois)` —su riesgo según el modelo—.
+2. Ordenamos las pólizas por ese $\hat\mu_i$ y las repartimos en **12 grupos** de igual tamaño
+   (`ntile(mu, 12)`): dentro de cada grupo, las pólizas tienen un riesgo esperado parecido.
+3. En cada grupo calculamos la **media** y la **varianza** observadas de `n_danos`.
+4. Representamos varianza frente a media y superponemos tres **formas de referencia** —la Poisson y dos alternativas que trabajamos en esta unidad para mejorar el ajuste—: la recta
+   $\mathrm{Var}=\mathrm{media}$ (Poisson), la recta $\mathrm{Var}=\hat\phi\,\mathrm{media}$ (dispersión
+   **lineal**) y la curva
+   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Las dos últimas anticipan modelos de las secciones 3.2–3.3; aquí solo nos interesa **qué forma
+   siguen los puntos**.
 
 ```{r}
-#| label: fig-u23-ceros
-#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por la Poisson ajustada. El exceso en el 0 (y el déficit en 1, 2, …) delata la inflación de ceros que la Poisson no capta."
+#| label: fig-u23-media-varianza
+#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan muy por encima de la recta Var = media (sobredispersión) y, entre las dos formas de dispersión, siguen la curva cuadrática (NB2), no la recta lineal (quasi/NB1): la varianza crece con el cuadrado de la media."
+#| fig-width: 8
+#| fig-height: 4
+m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                offset(log(exposicion)), family = poisson, data = cartera)
+
+mu_i  <- fitted(m_pois); y <- cartera$n_danos
+phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
+alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
+
+pts <- tibble::tibble(mu = mu_i, y = y) |>
+  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
+
+rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
+curvas <- tibble::tibble(
+  media = rango,
+  `Poisson: Var = media`               = rango,
+  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
+  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
+  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
+
+ggplot() +
+  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
+  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
+  scale_colour_manual(values = c(
+    "Poisson: Var = media"             = "grey55",
+    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
+    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
+  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+```
+
+- **Qué esperamos.** Si la Poisson describiera bien los datos, en cada grupo la varianza igualaría a la
+media y los doce puntos caerían sobre la recta $\mathrm{Var}=\mathrm{media}$. 
+- **Qué vemos.** Todos los puntos quedan muy por encima de esa recta —hay sobredispersión— y, además, **no siguen la recta lineal**
+($\hat\phi\,\mathrm{media}$) sino que se **curvan hacia arriba**, pegándose a la curva cuadrática: la
+varianza crece con el **cuadrado** de la media. No es un fallo al predecir el promedio —`m_pois` acierta
+con el nivel—, sino en la dispersión. Esa forma cuadrática anticipa un ajuste mejorado que conseguiremos en la [Sección 3.3](#sec-u23-nb) con un modelo binomial-negativo, alternativo al Poisson para asumir la sobredispersión observada.
+
+### De dónde viene
+
+La sobredispersión rara vez es un accidente: casi siempre señala **estructura no modelada**. Las
+causas típicas:
+
+- **Heterogeneidad no observada.** Es la más común: dos pólizas con el mismo perfil observado no tienen
+  el mismo riesgo real (conducción, cuidado del vehículo, azar individual). El modelo ve una media
+  común donde hay un abanico de medias, y ese abanico añade varianza.
+- **Agrupamiento.** Si las pólizas se agrupan (por agencia, por región) y comparten factores no
+  medidos, los conteos dentro de un grupo se parecen entre sí: correlación positiva que infla la
+  varianza (lo trataremos como efecto aleatorio en la [Unidad 2.5](#sec-u25)).
+- **Exceso de ceros.** A veces el problema no es la cola, sino un montón de ceros «de más» respecto a
+  los que la Poisson espera (pólizas que sencillamente nunca reclaman). La [Unidad 2.4](#sec-u24) lo
+  separa; a menudo se confunde con sobredispersión.
+- **Predictores omitidos o mal especificados.** Una covariable relevante que falta, o una relación no
+  lineal ignorada, reaparece como varianza extra.
+- **Dependencia entre eventos.** Si un evento hace más probable el siguiente (contagio, reincidencia),
+  los recuentos se agolpan y dejan de ser Poisson.
+
+El mecanismo de la primera —**mezcla** de Poissons con medias distintas— se ve simulando dos escenarios
+con la **misma media**: una población homogénea (una sola Poisson) y otra heterogénea (cada individuo
+con su propia media, repartida al azar):
+
+```{r}
+#| label: fig-u23-heterogeneidad
+#| fig-cap: "Dos poblaciones con la misma media (2 eventos). En azul, una Poisson homogénea; en naranja, una mezcla en la que cada individuo tiene su propia media (heterogeneidad no observada). La mezcla acumula más ceros y una cola más larga: misma media, más varianza. Así nace la sobredispersión."
 #| fig-width: 6
 #| fig-height: 3.4
-mu <- fitted(m_fp); K <- 0:8
+set.seed(2026)
+n <- 5000; media <- 2
+dplyr::bind_rows(
+  tibble::tibble(poblacion = "Poisson homogénea",  y = rpois(n, media)),
+  tibble::tibble(poblacion = "Mezcla heterogénea", y = rpois(n, media * rgamma(n, 1, 1)))) |>
+  dplyr::filter(y <= 8) |>
+  dplyr::count(poblacion, y) |>
+  ggplot(aes(y, n, fill = poblacion)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Poisson homogénea" = "steelblue",
+                               "Mezcla heterogénea" = "darkorange")) +
+  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+```
+
+### Por qué importa
+
+Ignorar la sobredispersión **no** sesga mucho los coeficientes, pero **subestima sus errores
+estándar** (aproximadamente en un factor $\sqrt{\phi}$, con $\phi$ el índice de dispersión). La
+consecuencia es una inferencia **demasiado optimista**: estadísticos de Wald inflados, intervalos de
+confianza demasiado estrechos y contrastes (LRT incluido) que declaran significativo lo que no lo es.
+Por eso conviene diagnosticarla —la [medimos y contrastamos](#sec-u23-diagnostico) más abajo— antes de
+fiarse de ningún $p$-valor.
+
+### Dónde aparece
+
+Es la regla, más que la excepción, en casi todo conteo real: **siniestros por póliza** en seguros (unos
+pocos asegurados concentran la mayoría), **uso de recursos sanitarios** por paciente (crónicos que
+acumulan visitas e ingresos), **individuos por parcela** en ecología (hábitat en manchas), **defectos
+por lote** en fiabilidad, **casos por región** en epidemiología o **accidentes por conductor**. En
+todos, unas pocas unidades acumulan mucho y la mayoría casi nada.
+
+Reconocido el fenómeno, toca **identificarlo con números**. Ver la nube de puntos por encima de la recta
+es sugerente, pero conviene **medir** y **contrastar** la sobredispersión antes de cambiar de modelo.
+
+### El índice de dispersión {#sec-u23-diagnostico}
+
+La medida de referencia es el **índice de dispersión** $\hat\phi$: la suma de los residuos de Pearson
+al cuadrado dividida por los grados de libertad. Se puede calcular también con la deviance, pero la
+versión de Pearson es más fiable:
+
+```{r}
+#| label: u23-indice
+phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
+phi_dev     <- deviance(m_pois) / df.residual(m_pois)
+c(pearson = phi_pearson, deviance = phi_dev)
+```
+
+En `n_danos`, $\hat\phi$ sale **muy por encima de 1** (en torno a **2.5** por Pearson, 2.1 por
+deviance): cada póliza varía bastante más de lo que la Poisson tolera. Un matiz sobre las dos versiones. La basada en la **deviance** (`deviance/gl`) es
+popular pero **traicionera** con conteos escasos: cuando las medias son bajas o hay muchos patrones de
+covariables, la deviance no sigue una $\chi^2$ y el cociente puede rondar 1 **aunque haya
+sobredispersión real**. Por eso nos quedamos con el de **Pearson** como indicador rápido y no nos
+fiamos de un número suelto sin un contraste que lo respalde.
+
+El cociente cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** es la
+varianza. Lo primero se ve mejor que se cuenta; lo segundo se contrasta. Empecemos por mirar.
+
+### El rootograma: ver dónde falla el ajuste
+
+Un **rootograma** enseña la sobredispersión **conteo a conteo**. Es una herramienta gráfica de bondad
+de ajuste para modelos de recuento: sobre las frecuencias **observadas** de cada valor $0,1,2,\dots$
+superpone las que **predice** el modelo ajustado. Se obtiene así: para cada conteo $k$, la frecuencia
+esperada es la suma, sobre todas las pólizas, de la probabilidad $\Pr(Y_i=k)$ que asigna el modelo
+—aquí $\sum_i \mathrm{dpois}(k,\hat\mu_i)$—, y se compara con el número de pólizas que realmente tienen
+$k$ partes. En su forma clásica (`countreg::rootogram`) las barras «cuelgan» de la curva esperada y las
+frecuencias van en escala raíz —de ahí el nombre—, para que los conteos raros no se pierdan; aquí
+usamos una versión lado a lado, más directa de leer. Su valor está en que muestra **dónde** falla el
+modelo, no solo cuánto:
+
+```{r}
+#| label: fig-u23-rootograma
+#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson ajustada. La Poisson se queda corta en los ceros y en la cola alta, y sobra en los valores intermedios: el patrón típico de la sobredispersión."
+#| fig-width: 6.5
+#| fig-height: 3.6
+mu <- fitted(m_pois); K <- 0:8
 esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K)))
+observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
 
 tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
   tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de reclamaciones en revisión antifraude", y = "nº de pólizas", fill = NULL)
+  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
 ```
 
-### De dónde viene: dos procesos de cero
+El patrón es el típico de la sobredispersión: la Poisson **subestima los ceros** y **la cola** (las
+pocas pólizas que acumulan muchos partes) y **sobreestima los valores intermedios**. No acierta con la
+forma de la distribución, solo con su promedio. En la [Sección 3.3](#sec-u23-nb) repetiremos este
+rootograma con la binomial negativa, que endereza los dos extremos.
 
-Ya lo adelantamos: detrás de un cero hay **dos historias** —el **estructural** (no está en riesgo) y el
-**muestral** (en riesgo, pero sin evento aún)—. El exceso nace de **sumar**, a la Poisson de los que sí
-están en riesgo, una **masa de ceros estructurales** de los que nunca reclamarán. Se ve simulando una
-Poisson pura frente a esa misma Poisson con un 40 % de ceros estructurales añadidos:
+### Los contrastes: ¿hay sobredispersión y de qué tipo?
+
+El rootograma deja claro que la Poisson se queda corta; para tratarlo hay tres modelos habituales, y se
+distinguen justamente por la **forma que le dan a la varianza**:
+
+- **quasi-Poisson** ([Sección 3.2](#sec-u23-quasi)): $\mathrm{Var}=\phi\,\mu$. Infla la varianza por un
+  factor **constante** —crece de forma **lineal** con $\mu$— y solo corrige los errores estándar, sin
+  cambiar de distribución.
+- **binomial negativa NB1**: $\mathrm{Var}=\mu\,(1+\alpha)=\mu+\alpha\,\mu$. También **lineal**, pero
+  con una distribución propia (permite predecir probabilidades).
+- **binomial negativa NB2** ([Sección 3.3](#sec-u23-nb)): $\mathrm{Var}=\mu+\alpha\,\mu^{2}$.
+  **Cuadrática**: la varianza se dispara más deprisa en las pólizas de mayor riesgo esperado.
+
+**La elección no es cosmética.** Si la varianza real crece de forma cuadrática y aplicamos una corrección
+lineal (quasi-Poisson o NB1), nos quedaremos cortos justo en la **cola** —donde están las pólizas más
+costosas—; y a la inversa, sobre-corregiríamos. De modo que conviene **contrastar qué estructura**
+describe mejor los datos. Tres herramientas complementarias, todas sobre `m_pois`, deciden **si** el
+exceso es significativo y **de qué forma** es.
+
+**¿Hay sobredispersión?** 
+
+El contraste de referencia es el de **Cameron–Trivedi** (`AER::dispersiontest`):
+enfrenta $H_0:\mathrm{Var}=\mu$ a la alternativa $\mathrm{Var}=\mu+\alpha\,g(\mu)$ y decide si
+$\alpha>0$. `performance::check_overdispersion` da la versión analítica (el índice de Pearson y su $\chi^2$), y `DHARMa`, una por **simulación**, más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea:
 
 ```{r}
-#| label: fig-u23-mecanismo
-#| fig-cap: "Dos poblaciones con la misma parte de conteo (Poisson de media 2): a la derecha se añade un 40 % de ceros estructurales. El 0 se dispara y los positivos se encogen proporcionalmente: así aparece el exceso de ceros."
-#| fig-width: 6
-#| fig-height: 3.4
-set.seed(2026)
-n <- 5000; mu <- 2; pi_e <- 0.4
-dplyr::bind_rows(
-  tibble::tibble(poblacion = "Poisson",                       y = rpois(n, mu)),
-  tibble::tibble(poblacion = "Con 40 % de ceros estructurales", y = ifelse(rbinom(n, 1, pi_e) == 1, 0, rpois(n, mu)))) |>
-  dplyr::filter(y <= 8) |>
-  dplyr::count(poblacion, y) |>
-  ggplot(aes(y, n, fill = poblacion)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Poisson" = "steelblue", "Con 40 % de ceros estructurales" = "darkorange")) +
-  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+#| label: u23-tests
+# Tests de sobredispersión
+print(performance::check_overdispersion(m_pois))
+print(AER::dispersiontest(m_pois))
+print(DHARMa::testDispersion(m_pois, plot = FALSE))
 ```
 
-### Por qué importa
+Como vemos, los tres tests concluyen a favor de sobredispersión (rechazando la hipótesis nula de conformidad con la Poisson). Ahora viene el punto de descubrir qué estructura tiene la varianza, con el fin de optar por el modelo más apropiado para capturarla.
 
-Ignorar el exceso de ceros **distorsiona las dos caras** del problema. Al mezclar los ceros
-estructurales con los muestrales, el modelo reparte los eventos entre demasiadas pólizas e **infravalora
-la tasa** de las que sí están en riesgo, además de sesgar la inferencia. Y, sobre todo, se pierde una
-pregunta de negocio: *¿quién no está en riesgo, y quién simplemente no ha reclamado todavía?* —dos
-grupos con implicaciones muy distintas.
+**¿De qué tipo es la sobredispersión?** 
 
-### Dónde aparece
-
-Es habitual siempre que conviven una subpoblación «inmune» y otra en riesgo: **seguros** (asegurados que
-nunca reclaman), **salud** (pacientes que no ingresarán), **ecología** (parcelas sin hábitat para la
-especie), **fiabilidad** (lotes sin defecto posible), **encuestas de consumo** (no consumidores). El
-cero de unos y otros es idéntico en el dato; distinto en su origen.
-
-### Cómo se identifica
-
-Un aviso primero, que enlaza con la [Unidad anterior](#sec-u22): el exceso debe medirse frente a la
-**mejor NB**, no a la Poisson, porque la sobredispersión de la NB **ya fabrica** ceros de más y podría
-absorber el exceso. De hecho, en la cartera `n_danos` (sobredispersa) y `n_fraude` (con ceros) tienen
-**casi el mismo** cociente varianza/media ($\approx 3$): en el margen se confunden, y solo mirando los
-**ceros** se distinguen.
-
-El contraste práctico es `DHARMa::testZeroInflation`, que compara los ceros observados con los simulados
-del modelo ajustado. Lo aplicamos a una **NB** de `n_fraude`: si aún sobran ceros, la inflación es
-**genuina** y no mera sobredispersión.
+El mismo contraste elige la **forma** de la varianza mediante el argumento `trafo`, que
+fija $g$: con $g(\mu)=\mu$ prueba la alternativa **lineal** (quasi-Poisson / NB1) y con $g(\mu)=\mu^2$,
+la **cuadrática** (NB2):
 
 ```{r}
-#| label: u23-nb-zerotest
-m_fnb <- MASS::glm.nb(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                        offset(log(exposicion)), data = cartera)
-DHARMa::testZeroInflation(m_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
+#| label: u23-trafo
+print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
+print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
 ```
 
-Aquí ocurre algo instructivo: la NB **reduce** el exceso a un ratio de apenas **1.06** —casi iguala los
-ceros—, aunque con $n\approx 3000$ el test siga siendo significativo. Es la moraleja de fondo: una NB
-flexible **imita** bastante bien la inflación de ceros, así que la distinción fina no la zanja este
-contraste, sino la **comparación de modelos** ([Sección 3.4](#sec-u23-elegir)) y la **pregunta** —¿hay
-una subpoblación que nunca reclama?—. Que aquí sepamos, por el DGP, que los ceros son estructurales es
-un lujo de laboratorio.
+Concluimos pues, que $\alpha>1$ de modo significativo, tanto en la estructura lineal ($Var = \mu + \alpha·\mu$), como en la cuadrática, ($Var = \mu + \alpha·\mu^2$), de forma que probablemente sea preciso usar un modelo con varianza cuadrática para capturar eficazmente la variabilidad.
 
-La alternativa **paramétrica** clásica es el test de score de **Van den Broek** [@vandenbroek1995],
-implementado en `vcdExtra::zero.test()`:
+**La versión transparente: regresión sobre el residuo** 
+
+La misma idea se puede reproducir a mano —y así se ve el resultado aunque falte
+`AER`—. Cameron–Trivedi parte de que, bajo la Poisson, el residuo estandarizado,
+$r_i=\dfrac{(y_i-\hat\mu_i)^2-y_i}{\hat\mu_i}$, tiene media cero; bajo la alternativa, su media es
+$\alpha\,g(\hat\mu_i)/\hat\mu_i$. Basta una **regresión auxiliar** de $r$ para estimar $\alpha$: sobre
+una **constante** para la forma lineal (NB1) y sobre la media estimada $\hat\mu$ para la **cuadrática** (NB2):
 
 ```{r}
-#| label: u23-scoretest
-vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
+#| label: u23-trafo-manual
+mu <- fitted(m_pois); y <- cartera$n_danos
+r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
+test_var <- function(formula, etiqueta) {
+  s <- coef(summary(lm(formula)))[1, ]        # coeficiente = alpha estimado
+  data.frame(estructura = etiqueta, alpha = round(s[1], 3),
+             t = round(s[3], 1), p_valor = signif(s[4], 3), row.names = NULL)
+}
+rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = media de r
+      test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
 ```
 
-Da un $\chi^2$ enorme (≈ **2913**, $p<2\times10^{-16}$). Con un matiz que conviene enseñar:
-`zero.test()` usa la **media muestral** como tasa —**ignora covariables y *offset***—, así que es un
-contraste **marginal** que **exagera** la inflación, porque atribuye a los ceros parte de lo que en
-realidad explican las covariables (su exceso es mayor que el $1.7$ de la Poisson ajustada). Para el
-modelo con covariables son más fieles el covariate-aware `countreg::zitest()` o la **simulación** de
-`DHARMa`.
+En la cartera, todas las vías coinciden en lo esencial: el índice da $\hat\phi\approx 2.4$ (más del
+doble de lo admisible) y los contrastes rechazan la equidispersión de forma abrumadora ($z\approx 12$
+en Cameron–Trivedi; $p<2\times10^{-16}$ también por simulación con `DHARMa`). Sobre la **forma** de la
+varianza conviene ser prudentes: los dos contrastes —lineal y cuadrático— salen fuertemente
+significativos porque $\mu$ y $\mu^2$ están muy correlacionadas y ambos «ven» el mismo exceso, de modo
+que **comparar sus estadísticos no decide** cuál es la estructura correcta. Esa decisión se toma
+**ajustando** los dos modelos y comparándolos por AIC y re-diagnóstico (NB2 frente a NB1): los ajustamos
+en la [Sección 3.3](#sec-u23-nb) y los comparamos formalmente en la [Sección 3.4](#sec-u23-elegir).
 
-Confirmado el exceso, ¿son esos ceros **estructurales** o **muestrales**? El dato no lo dice; lo fijan
-el **modelo** y su interpretación. Los *zero-inflated* y los *hurdle* formalizan cada historia, cada uno
-con un supuesto distinto. Es lo que vemos a continuación.
+Lo que sí podemos hacer aquí, por ser datos **simulados**, es un **control de calidad**: la alternativa
+cuadrática estima $\hat\alpha\approx 1.03$, que coincide con el $1/\theta$ del DGP ($\theta=1$). Pero ojo: ese «1» solo lo conocemos porque generamos los datos; en un caso real, $\alpha$ **no tiene ningún valor de referencia**.
 
-## 3.2 Modelos zero-inflated (ZIP / ZINB) {#sec-u23-zi}
-
-### El modelo: una mezcla de dos poblaciones
-
-El *zero-inflated* [@lambert1992] toma en serio las dos historias del cero y las **modela como una
-mezcla**. Con probabilidad $\pi_i$ la póliza es un **cero estructural** (nunca reclamará, aporta un 0
-seguro); con probabilidad $1-\pi_i$ es del grupo **en riesgo**, y ahí el conteo sigue una distribución
-$f$ (Poisson o NB). La probabilidad de cada valor combina las dos fuentes:
-
-$$P(Y_i=0)=\pi_i+(1-\pi_i)\,f(0),\qquad P(Y_i=k>0)=(1-\pi_i)\,f(k).$$
-
-Son, en el fondo, **dos submodelos** con enlaces distintos, que pueden usar predictores distintos:
-
-- un **logit** para la parte estructural, $\pi_i=\operatorname{logit}^{-1}(\mathbf{z}_i'\boldsymbol\gamma)$
-  —quién no está en riesgo—;
-- un **log** para la parte de conteo, $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ —a qué ritmo reclaman
-  los que sí lo están—.
-
-Si $f$ es la Poisson tenemos el **ZIP**; si los positivos están además sobredispersos, se usa la NB y
-tenemos el **ZINB**.
-
-### Verosimilitud y estimación
-
-Cada observación contribuye a la log-verosimilitud según sea cero o positiva (con
-$\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$, más el *offset*, y $\pi_i$ del logit):
-
-$$\ell_i=\begin{cases}\log\!\bigl(\pi_i+(1-\pi_i)\,e^{-\mu_i}\bigr) & y_i=0,\\[2pt]\log(1-\pi_i)+y_i\log\mu_i-\mu_i-\log(y_i!) & y_i>0.\end{cases}$$
-
-(En el ZINB, $e^{-\mu_i}$ y el núcleo Poisson se sustituyen por la masa y la pmf de la NB.) Las dos
-partes se estiman **conjuntamente** por máxima verosimilitud —los ceros están «repartidos» entre ambos
-procesos, así que no se pueden separar—. Al haber una **pertenencia latente** (¿es esta póliza un cero
-estructural o un cero muestral?), el método natural es el algoritmo **EM** [@dempster1977], que alterna
-estimar esa pertenencia y reajustar los dos submodelos; también se optimiza directamente. En R,
-`pscl::zeroinfl` (o `glmmTMB` con `ziformula`).
-
-### Ajuste e interpretación
-
-Antes de ajustar, conviene mirar **qué mueve cada parte**. La proporción de ceros baja al crecer la
-potencia y cambia con el uso —eso alimenta la parte **estructural**—; y la media de reclamaciones sube
-con la potencia —eso, la parte de **conteo**—:
-
-```{r}
-#| label: fig-u23-zip-motiv
-#| fig-cap: "Motivación de las dos partes del ZIP. Izquierda (parte estructural): la proporción de ceros de `n_fraude` baja al crecer la potencia y difiere por uso. Derecha (parte de conteo): la media de reclamaciones sube con la potencia. Cada relación justifica un submodelo."
-#| fig-width: 7.5
-#| fig-height: 3.4
-cartera |>
-  dplyr::mutate(tramo_pot = dplyr::ntile(potencia_cv, 5)) |>
-  dplyr::group_by(tramo_pot, uso) |>
-  dplyr::summarise(`Parte estructural: P(cero)` = mean(n_fraude == 0),
-                   `Parte de conteo: media`     = mean(n_fraude), .groups = "drop") |>
-  tidyr::pivot_longer(-c(tramo_pot, uso), names_to = "parte", values_to = "v") |>
-  dplyr::mutate(parte = factor(parte, levels = c("Parte estructural: P(cero)", "Parte de conteo: media"))) |>
-  ggplot(aes(tramo_pot, v, colour = uso)) +
-  geom_line() + geom_point(size = 2) +
-  facet_wrap(~ parte, scales = "free_y") +
-  labs(x = "quintil de potencia (CV)", y = NULL, colour = NULL)
-```
-
-La parte de conteo lleva además `zona_circulacion` y `tipo_vehiculo`; su **tasa** de reclamaciones
-también varía con ellas, lo que justifica incluirlas:
-
-```{r}
-#| label: fig-u23-zip-motiv2
-#| fig-cap: "Tasa de `n_fraude` (reclamaciones por unidad de exposición) según `zona_circulacion` y `tipo_vehiculo`. Ambas mueven el conteo —zona urbana y ciertos vehículos reclaman a más ritmo—, así que entran en la parte de conteo del ZIP."
-#| fig-width: 7.5
-#| fig-height: 3.2
-dplyr::bind_rows(
-  cartera |> dplyr::group_by(predictor = "zona_circulacion", nivel = as.character(zona_circulacion)) |>
-    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop"),
-  cartera |> dplyr::group_by(predictor = "tipo_vehiculo",    nivel = as.character(tipo_vehiculo)) |>
-    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop")) |>
-  ggplot(aes(nivel, tasa)) +
-  geom_col(fill = "steelblue") +
-  facet_wrap(~ predictor, scales = "free_x") +
-  labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
-```
-
-Con esa lectura, la fórmula tiene **dos lados**, separados por `|`: a la izquierda el conteo (con los
-predictores de riesgo), a la derecha la parte de ceros (con lo que hace a una póliza «no reclamante»:
-`uso` y `potencia_cv`):
-
-```{r}
-#| label: u23-zip
-m_zip <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-summary(m_zip)
-```
-
-Se lee en **dos bloques**. En el de **conteo** (enlace log), $\exp(\beta)$ es una **razón de tasas**
-(IRR) entre las pólizas en riesgo: la **potencia** sube el ritmo ($\exp(0.0071)\approx 1.007$ por CV, es
-decir $\times 1.4$ por cada 50 CV extra); las zonas menos urbanas lo bajan (rural $\times 0.81$ frente a
-urbana); y la **moto** lo eleva ($\times 1.26$). En el de **ceros** (enlace logit), $\exp(\gamma)$ es el
-**odds ratio de ser un cero estructural** (no reclamante): el uso **comercial** lo reduce a menos de la
-mitad ($\exp(-0.78)\approx 0.46$: mucho más a menudo en riesgo) y la **potencia** también (por cada 50
-CV, $\times 0.59$). Dos preguntas —*quién está en riesgo* y *a qué ritmo reclama quien lo está*—
-respondidas a la vez. (Los signos coinciden con el DGP: `g_cero` penaliza a comercial y potencia; lo
-validaremos en la [Sección 3.4](#sec-u23-elegir).)
-
-¿Hace falta la NB en el conteo? Se ajusta el **ZINB** (`dist = "negbin"`) y se compara por AIC:
-
-```{r}
-#| label: u23-zinb
-m_zinb <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
-AIC(m_zip, m_zinb)
-```
-
-El AIC apenas se mueve —**8582** (ZIP) frente a **8584** (ZINB)—: la NB **no aporta nada** en el
-conteo, así que por **parsimonia** nos quedamos con el **ZIP**. Sabemos, por el DGP, que el conteo se
-generó con una Poisson (la sobredispersión venía **solo** de los ceros), lo que lo explica; pero en un
-caso real **eso no se sabe**: quien decide es el AIC (y el re-diagnóstico), no un conocimiento previo.
-
-### Bondad de ajuste y diagnóstico
-
-Tres comprobaciones de **bondad de ajuste**: que el modelo reproduce los **ceros**, que ajusta los
-**positivos** (¿sobredispersos?) y que la **forma** general encaja.
-
-**Ceros.** Comparamos los observados con los que predice el ZIP (sumando $\hat P(Y_i=0)$ sobre las
-pólizas):
-
-```{r}
-#| label: u23-zip-diag
-c(observados    = sum(cartera$n_fraude == 0),
-  esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
-```
-
-Coinciden: el exceso está absorbido (y `testZeroInflation` sobre el ZIP ya no rechazaría).
-
-**Positivos.** Ya lo vimos: el **ZINB no mejora** al ZIP (AIC 8582 vs 8584), así que el conteo de las
-pólizas en riesgo es Poisson, **sin sobredispersión extra**.
-
-**Forma.** El rootograma confirma que el ZIP sigue de cerca tanto el 0 como los positivos:
-
-```{r}
-#| label: fig-u23-zip-root
-#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el ZIP. A diferencia de la Poisson (que erraba el 0), el ZIP reproduce el pico de ceros y también los conteos positivos."
-#| fig-width: 6
-#| fig-height: 3.2
-esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
-tibble::tibble(k = K,
-               Observado      = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `ZIP ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
-  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "ZIP ajustado" = "darkorange")) +
-  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
-```
-
-Ceros reproducidos, positivos Poisson y forma ajustada: el **ZIP ajusta bien**. La comparación con el
-hurdle y los demás modelos va en la [Sección 3.4](#sec-u23-elegir).
-
-¿Y hace falta el ZIP frente a la **Poisson** a secas? Ya lo sabemos por vías fiables: el score test y
-`DHARMa` ([Sección 3.1](#sec-u23-ceros)) detectaron el exceso, y el **AIC** lo ratifica al comparar
-modelos ([Sección 3.4](#sec-u23-elegir)).
-
-::: {.callout-warning}
-## No uses el test de Vuong para esto
-En casi cualquier tutorial de *zero-inflation* verás el **test de Vuong** (`pscl::vuong`) para decidir
-Poisson vs ZIP. **Se desaconseja**: Vuong exige modelos **no anidados**, y la Poisson es un caso
-particular del ZIP ($\pi=0$), así que sus supuestos fallan y su $p$-valor no es interpretable
-[@wilson2015]. Quédate con el **score test**, `DHARMa` y el **AIC**.
+::: {.callout-tip}
+En suma: el índice **mide** el exceso, el rootograma **enseña dónde** está, los contrastes
+**confirman** que la Poisson se queda corta, y la **forma** de la varianza se zanja **comparando
+modelos**, no sólo con estos tests.
 :::
 
-## 3.3 Modelos hurdle {#sec-u23-hurdle}
+::: {.callout-tip}
+## 🔧 En R. Diagnosticar la sobredispersión
+Todo se calcula sobre el Poisson ya ajustado (`m_pois`):
 
-### El modelo: una barrera y un conteo truncado
+- **Índice de dispersión** — `sum(residuals(m, type = "pearson")^2) / df.residual(m)`; $\gg 1$ señala
+  sobredispersión. Preferible a `deviance(m) / df.residual(m)`, traicionero con conteos escasos.
+- **Contraste formal** — `AER::dispersiontest(m)` (Cameron–Trivedi) da $z$ y $p$;
+  `performance::check_overdispersion(m)` es la versión analítica y `DHARMa::testDispersion(m)` una por
+  **simulación**, más fiable con medias bajas.
+- **Forma de la varianza** — `AER::dispersiontest(m, trafo = 1)` prueba la lineal (quasi / NB1) y
+  `trafo = 2` la cuadrática (NB2). **Aviso:** ambas salen significativas porque $\mu$ y $\mu^2$ están muy
+  correlacionadas; la forma se decide **ajustando** los modelos y comparándolos por AIC, no con estos
+  contrastes.
+- **Rootograma** — enfrenta frecuencias observadas y esperadas ($\sum_i \Pr(Y_i=k)$) conteo a conteo y
+  muestra **dónde** falla el ajuste: `countreg::rootogram(m)`, o a mano con `dpois` / `dnbinom`.
+:::
 
-El *hurdle* [@mullahy1986] cuenta **otra historia**: un proceso **en dos etapas**. Primero se cruza (o
-no) una **barrera** —¿ocurre **algún** evento?—; y solo si se cruza, un conteo dice **cuántos**, pero
-ya **sin posibilidad de cero** (truncado en 0). Con $p_i=\Pr(Y_i>0)$ la probabilidad de cruzar y $f$ la
-distribución de conteo:
+::: {.callout-tip}
+## 🔧 En R. Panorama de modelos para la sobredispersión
 
-$$P(Y_i=0)=1-p_i,\qquad P(Y_i=k>0)=p_i\,\frac{f(k)}{1-f(0)}.$$
+Las **tres herramientas** que desarrollaremos en esta unidad, ordenadas por la forma de su varianza:
 
-La diferencia con el ZI es de raíz: aquí **todos** los ceros vienen de **un único** proceso (no cruzar
-la barrera); cruzada, el conteo es $\ge 1$. No hay «ceros muestrales» mezclados con los positivos.
+| Modelo | Varianza | En una frase | Se desarrolla en |
+|---|---|---|---|
+| **quasi-Poisson** | $\phi\,\mu$ (lineal) | corrige los errores estándar, sin distribución propia | [§3.2](#sec-u23-quasi) |
+| **NB1** | $\mu(1+\alpha)$ (lineal) | la gemela de la quasi, pero con verosimilitud | [§3.3](#sec-u23-nb) |
+| **NB2** | $\mu+\mu^2/\theta$ (cuadrática) | mezcla Poisson–Gamma; la opción por defecto | [§3.3](#sec-u23-nb) |
 
-### Verosimilitud y estimación
+Cubren la mayoría de los casos, pero **no son las únicas** herramientas en R:
 
-La gran ventaja es que las dos partes **no comparten parámetros**, así que la log-verosimilitud se
-**separa** y cada parte se estima por su cuenta (sin EM):
+- **Conway–Maxwell–Poisson** (COM-Poisson): un parámetro extra de dispersión que captura tanto
+  **sobre-** como **subdispersión** —`glmmTMB(family = compois)` o el paquete `COMPoissonReg`—.
+- **Poisson generalizada**: alternativa flexible en ambos sentidos —`VGAM::genpoisson` o
+  `glmmTMB(family = genpois)`—.
+- **Colas aún más pesadas que la NB**: la **Poisson-inversa gaussiana** (PIG) y las familias Delaporte
+  o Sichel, disponibles en `gamlss`, para conteos con colas muy largas.
 
-$$\ell_i=\begin{cases}\log(1-p_i) & y_i=0,\\[2pt]\log p_i+\log f(y_i)-\log\!\bigl(1-f(0)\bigr) & y_i>0.\end{cases}$$
+Hay una vía más, el **efecto aleatorio a nivel de observación** (OLRE, o Poisson-lognormal): cada
+observación recibe su propio impulso $N(0,\sigma^2)$ sobre el logaritmo de la tasa, lo que infla la varianza y
+modela la sobredispersión como una mezcla Poisson-lognormal. Es en realidad un **modelo mixto** —un
+intercepto aleatorio por observación—, así que lo tratamos y ejemplificamos en la
+[Unidad 2.5](#sec-u25-olre). Y un recordatorio: si el exceso proviene de **demasiados ceros** o de
+**agrupamiento**, la solución no es otra distribución de cola, sino un modelo de ceros
+([Unidad 2.4](#sec-u24)) o un modelo mixto ([Unidad 2.5](#sec-u25)).
+:::
 
-Es decir: un **GLM binomial** para la barrera (0 vs $>0$) y un **conteo truncado en cero** (Poisson o
-NB) para los positivos, ajustables por separado por máxima verosimilitud. En R, `pscl::hurdle`.
+## 3.2 Quasi-Poisson {#sec-u23-quasi}
+
+La respuesta más económica a la sobredispersión es no cambiar de distribución, sino **relajar la
+restricción de la varianza**.
+
+### El modelo y su estimación
+
+La quasi-Poisson mantiene la media $\mu=\exp(\eta)$ pero admite
+
+$$\mathrm{Var}[Y]=\phi\,\mu,$$
+
+con un **parámetro de dispersión** $\phi$ que se estima de los datos. Si $\phi=1$ recuperamos la
+Poisson; si $\phi>1$, sobredispersión.
+
+El fundamento es la **cuasi-verosimilitud** [@mccullagh1989]: en lugar de postular una distribución
+completa, se especifican solo la **media** y la **varianza**, $\mathrm{E}[Y_i]=\mu_i$ y
+$\mathrm{Var}[Y_i]=\phi\,V(\mu_i)$ con función de varianza $V(\mu)=\mu$. La cuasi-log-verosimilitud $Q$
+se define por su derivada,
+
+$$\frac{\partial Q(\mu_i;y_i)}{\partial\mu_i}=\frac{y_i-\mu_i}{\phi\,V(\mu_i)}=\frac{y_i-\mu_i}{\phi\,\mu_i},$$
+
+que es cuanto hace falta para estimar. Las **ecuaciones de estimación** resultantes,
+
+$$\sum_{i=1}^{n}\frac{y_i-\mu_i}{\phi\,\mu_i}\,\frac{\partial\mu_i}{\partial\boldsymbol\beta}=\mathbf{0}\ \Longleftrightarrow\ \sum_{i=1}^{n}(y_i-\mu_i)\,\mathbf{x}_i=\mathbf{0},$$
+
+son **idénticas** a las de la Poisson (el factor $\phi$ se cancela): de ahí que $\hat{\boldsymbol\beta}$
+**no cambie**. La dispersión se estima aparte con el estadístico de Pearson,
+
+$$\hat\phi=\frac{1}{n-p}\sum_{i=1}^{n}\frac{(y_i-\hat\mu_i)^2}{\hat\mu_i},$$
+
+—justo el índice de la [Sección 3.1](#sec-u23-diagnostico)— y entra en la matriz de covarianzas de
+$\hat{\boldsymbol\beta}$, que queda **inflada** en un factor $\hat\phi$: por eso los **errores estándar
+se multiplican por $\sqrt{\hat\phi}$**, aunque las estimaciones puntuales sean las de la Poisson.
 
 ### Ajuste e interpretación
 
-Misma fórmula de dos lados (`conteo | barrera`):
+Ajustamos con `family = quasipoisson` y leemos el $\hat\phi$ estimado:
 
 ```{r}
-#| label: u23-hurdle
-m_hp <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-summary(m_hp)
+#| label: u23-quasi-fit
+m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                 offset(log(exposicion)), family = quasipoisson, data = cartera)
+summary(m_quasi)$dispersion   # phi estimado
 ```
 
-Ojo al **cambio de signo** respecto al ZI: aquí el bloque binario modela la probabilidad de **cruzar la
-barrera** (tener $\ge 1$ evento), no la de ser un cero estructural. Así, un coeficiente **positivo** en
-`uso` comercial significa que esas pólizas cruzan la barrera **con más frecuencia** (tienen algún parte
-más a menudo) —la misma realidad que en el ZI salía como «menos cero estructural», leída al revés—. El
-bloque de conteo se interpreta en IRR, sobre el conteo **truncado** (el ritmo entre quienes ya han
-cruzado).
+Comparando los errores estándar de la Poisson y de la quasi-Poisson se ve el efecto —los coeficientes
+son idénticos; los errores, mayores—:
+
+```{r}
+#| label: u23-quasi-comp
+dplyr::left_join(
+  broom::tidy(m_pois)  |> dplyr::select(term, estimacion = estimate, se_poisson = std.error),
+  broom::tidy(m_quasi) |> dplyr::select(term, se_quasi = std.error),
+  by = "term")
+```
+
+Los `se_quasi` son aproximadamente `se_poisson` $\times\sqrt{\hat\phi}$. Al ensancharse los errores,
+algún efecto que la Poisson daba por significativo puede dejar de serlo: esa es, precisamente, la
+corrección que buscábamos.
+
+### Qué se puede (y qué no) contrastar
+
+La quasi-Poisson **no es una verosimilitud propia**, sino una **cuasi-verosimilitud**: solo especifica
+la media y la varianza, no una distribución completa. Por eso:
+
+- No hay `logLik` ni `AIC` (R los devuelve como `NA`); para comparar modelos anidados se usa el contraste
+  **F** —`anova(m1, m2, test = "F")`—, no el LRT, y para selección, el **QAIC** [@burnham2002], el AIC
+  penalizado por la sobredispersión.
+
+- Al no ser un modelo generativo, no produce probabilidades de cada conteo ni un rootograma propio: es
+  una **corrección de los errores estándar**, no una descripción de la forma de la distribución.
+
+El **QAIC** sustituye la log-verosimilitud por su versión escalada por el factor de sobredispersión
+$\hat c=\hat\phi$:
+
+$$\mathrm{QAIC} = -\,\frac{2\,\ell(\hat{\boldsymbol\beta})}{\hat c} + 2K,$$
+
+con $\ell$ la log-verosimilitud del modelo base (aquí la Poisson), $K$ el número de parámetros —incluido
+el de dispersión— y $\hat c$ **común** a todos los modelos comparados (si $\hat c = 1$, se recupera el
+AIC ordinario).
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar una quasi-Poisson
+```r
+m <- glm(y ~ ..., family = quasipoisson, data = ...)   # mismos beta que poisson; solo cambian los EE
+summary(m)$dispersion                                  # phi estimado (indice de Pearson)
+```
+
+- **`family = quasipoisson`** deja los coeficientes **idénticos** a los de `poisson` y multiplica los
+  errores estándar por $\sqrt{\hat\phi}$. El $\hat\phi$ se lee en `summary(m)$dispersion`.
+- **No hay `logLik` ni `AIC`** (es cuasi-verosimilitud; R los da como `NA`). Para modelos anidados se usa
+  **`anova(m1, m2, test = "F")`** —no el LRT—, y para seleccionar, el **QAIC** —el AIC escalado por
+  $\hat\phi$— (p. ej. `bbmle::qAICc`, o a mano).
+- Al no ser generativa, **no admite rootograma ni residuos simulados**: su ajuste se juzga por los
+  residuos de Pearson (media bien especificada) y por que la varianza sea de verdad **lineal**.
+:::
 
 ### Bondad de ajuste y diagnóstico
 
-El hurdle ajusta los ceros **exactamente por construcción** —la parte binaria reproduce la proporción
-observada—, así que «¿ajusta el 0?» es trivialmente sí:
+Que la quasi-Poisson no tenga verosimilitud no nos deja sin diagnóstico. Conviene primero tener claro
+**qué queremos verificar**, que son dos cosas distintas:
+
+1. **La estructura de la media**, esto es, que $\log\mu=\eta$ esté bien especificada, con los predictores correctos y forma funcional adecuada, y sin indicios de no-linealidad ignorada.
+2. **La estructura de la varianza**: que se cumpla el supuesto $\mathrm{Var}=\phi\,\mu$, es decir, que la dispersión crezca proporcional a la media, y no más deprisa.
+
+Para lo **primero**, el análisis de residuos sigue en pie. Con conteos, el estándar son los **residuos
+cuantil aleatorizados** [@dunnsmyth1996] —que bajo un modelo correcto se distribuyen como una normal—,
+pero `DHARMa` [@hartig2022] los obtiene **simulando** del modelo ajustado, y la quasi-Poisson **no es
+generativa** (no define una distribución de la que simular). Hay dos salidas: (a) mirar los **residuos
+de Pearson (o de deviance) frente al valor ajustado**, que deben formar una **banda sin tendencia ni
+embudo** en torno a 0 —una curva delataría no linealidad, y un abanico, una media mal especificada—; y
+(b) como la quasi-Poisson comparte los mismos $\hat\mu$ que la Poisson, **aprovechar los residuos
+simulados de la Poisson equivalente** (`m_pois`) —con una cautela: esos residuos recogen **también** la
+sobredispersión, de modo que la **media** se juzga por la ausencia de **tendencias** frente al predicho,
+no por el test global de dispersión (que saldrá significativo por la propia sobredispersión)—. Usamos
+aquí la vía directa, esto es, residuos de Pearson frente a valores ajustados:
 
 ```{r}
-#| label: u23-hurdle-diag
-c(observados       = sum(cartera$n_fraude == 0),
-  esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
-```
-
-En efecto, 1755 = 1755. El diagnóstico se centra, pues, en la **parte positiva** (el conteo truncado):
-¿reproduce la forma de los conteos $>0$, o hay sobredispersión que pida NB? El **rootograma** debería
-ajustar también los positivos:
-
-```{r}
-#| label: fig-u23-hurdle-root
-#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el hurdle-Poisson. El 0 coincide por construcción; los conteos positivos también se reproducen bien."
+#| label: fig-u23-quasi-resid
+#| fig-cap: "Residuos de Pearson de la quasi-Poisson frente al valor ajustado. Buscamos una nube sin tendencia ni embudo, con la línea suavizada plana en torno a 0: eso indica que la media está bien especificada. (La hipótesis sobre la varianza se contrasta aparte.)"
 #| fig-width: 6
-#| fig-height: 3.2
-esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
-tibble::tibble(k = K,
-               Observado         = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `Hurdle ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
-  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Hurdle ajustado" = "darkorange")) +
-  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
+#| fig-height: 3.4
+tibble::tibble(ajustado = fitted(m_quasi),
+               residuo  = residuals(m_quasi, type = "pearson")) |>
+  ggplot(aes(ajustado, residuo)) +
+  geom_point(alpha = 0.2, colour = "steelblue") +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_smooth(se = FALSE, colour = "darkorange") +
+  labs(x = "valor ajustado", y = "residuo de Pearson")
 ```
 
-Y para saber si los positivos necesitan **NB**, ajustamos el hurdle-NB y comparamos por AIC —si no
-mejora, la Poisson truncada basta—:
+Para lo **segundo** —el supuesto sobre la varianza— hay dos miradas complementarias. La primera es
+**visual**: en la relación media–varianza (@fig-u23-media-varianza) se aprecia la **forma**. Si los
+puntos siguen una **recta** ($\mathrm{Var}=\phi\,\mu$), la dispersión es lineal y la quasi-Poisson es
+adecuada; si se **curvan hacia arriba** ($\mathrm{Var}=\mu+\mu^2/\theta$), crece de forma cuadrática y un
+$\hat\phi$ único se queda corto. Eso es justo lo que significa que «la varianza crece más deprisa»: la
+nube se despega de la recta. La segunda mirada es **decisiva**: como ese gráfico es ruidoso (pocos
+grupos, y estimar una varianza es inestable), la elección firme entre la varianza lineal
+(quasi-Poisson / NB1) y la cuadrática (NB2) se toma **ajustando ambos modelos y comparándolos por AIC**
+([Sección 3.3](#sec-u23-nb)). El gráfico **sugiere** la forma; el AIC la **confirma**.
+
+**Bondad de ajuste.** Al no ser generativa, la quasi-Poisson no admite rootograma ni residuos simulados;
+su ajuste se juzga por los **residuos de Pearson** (media bien especificada, sin patrón) y por que la
+varianza sea realmente **lineal**. Aquí lo primero se cumple, pero lo segundo **no** —la varianza es
+cuadrática—, así que la quasi-Poisson corrige los errores pero no es el mejor modelo para estos datos.
+
+En resumen, la quasi-Poisson es la opción adecuada cuando la varianza crece de forma **aproximadamente
+lineal** con la media y solo buscamos una inferencia honesta con una variación mínima de los
+supuestos; cuando crece más deprisa, o cuando necesitamos un modelo generativo (probabilidades,
+predicción de conteos), damos el paso a la binomial negativa.
+
+## 3.3 Binomial negativa {#sec-u23-nb}
+
+La quasi-Poisson corrige los errores estándar, pero no da una distribución. La **binomial negativa**
+(NB) sí: es un modelo generativo completo que nace, precisamente, del mecanismo que simulamos en la
+[Sección 3.1](#sec-u23-causas) —la **mezcla Poisson–Gamma**—.
+
+### El modelo: una mezcla Poisson–Gamma
+
+Las dos binomiales negativas más habituales son la NB1 y NB2, y cada una captura una estructura específica para la varianza. Ambas se pueden obtener como una mixtura de una distribución de Poisson $Y|V \sim Po(\mu \cdot V)$ y una Gamma para la variable de confusión $V$, que debe tener una media de 1, $E(V)=1$:
+
+- **NB1** (varianza **lineal**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu=\mu(1+\alpha)$. Es la misma forma que
+  la quasi-Poisson (con $\phi=1+\alpha$), pero con distribución propia. Se ajusta con
+  `glmmTMB(family = nbinom1)`. Aquí $V \sim Ga(shape=\mu/\phi,rate=\mu/\phi)$, con $Var(V)=\phi/\mu$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2(\phi/\mu)=\mu+\phi\mu$.
+- **NB2** (varianza **cuadrática**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu^2$. Es la de `MASS::glm.nb` y `glmmTMB(family = nbinom2)`, que  la reparametriza con $\theta=1/\alpha$: $\mathrm{Var}[Y]=\mu+\mu^2/\theta$. Un $\theta$ **grande**
+  ($\alpha$ pequeño) acerca a la Poisson, y $\theta\to\infty$ la recupera. Aquí $V \sim Ga(shape=\phi,rate=\phi)$, con $Var(V)=1/\phi$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2/\phi$.
+
+
+La NB2 es el **caballo de batalla** —la opción por defecto— y la que encaja con la huella cuadrática que
+vimos en la cartera de seguros; la NB1 nos servirá para contrastarla con la quasi-Poisson.
+
+### Estimación
+
+Ambas son verosimilitudes propias. Lo más limpio es ver **cómo contribuye cada observación** a la
+log-verosimilitud, $\ell=\sum_i \ell_i$, con $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ (más el
+*offset*):
+
+- **NB2** (tamaño $\theta$ **constante**):
+$$\ell_i(\boldsymbol\beta,\theta)=\log\frac{\Gamma(y_i+\theta)}{\Gamma(\theta)\,y_i!}+\theta\log\frac{\theta}{\theta+\mu_i}+y_i\log\frac{\mu_i}{\theta+\mu_i}.$$
+- **NB1** (misma forma, pero con tamaño $r_i=\mu_i/\alpha$ que **varía** con la póliza y probabilidad
+  constante $p=\tfrac{1}{1+\alpha}$):
+$$\ell_i(\boldsymbol\beta,\alpha)=\log\frac{\Gamma(y_i+r_i)}{\Gamma(r_i)\,y_i!}+r_i\log p+y_i\log(1-p),\qquad r_i=\frac{\mu_i}{\alpha}.$$
+
+La clave está en el **tamaño**: constante en la NB2 (de ahí la varianza cuadrática) y proporcional a
+$\mu_i$ en la NB1 (de ahí la lineal). Ambas se maximizan por **máxima verosimilitud**: `MASS::glm.nb`
+estima la NB2 de forma **alternada** (fijado $\theta$, un GLM por IWLS —como en la
+[Sección 1.2](#sec-u21-modelizacion)—; luego actualiza $\theta$; itera), y `glmmTMB` estima la NB1 (y
+también la NB2) por ML numérica directa.
+
+### Ajuste e interpretación
+
+**NB2**, con `MASS::glm.nb`:
 
 ```{r}
-#| label: u23-hurdle-nb
-m_hnb <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
-AIC(m_hp, m_hnb)
+#| label: u23-nb-fit
+m_nb <- MASS::glm.nb(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                       offset(log(exposicion)), data = cartera)
+c(theta = m_nb$theta, se_theta = m_nb$SE.theta)   # dispersion estimada
 ```
 
-**Conclusión:** los ceros son exactos por construcción, los positivos se reproducen bien en el
-rootograma y el hurdle-NB no aporta (el conteo truncado es Poisson): el hurdle **ajusta bien**. La
-comparación con el ZI —y con qué criterio elegir— va en la [Sección 3.4](#sec-u23-elegir).
+El $\hat\theta\approx 0.97$ implica una heterogeneidad $\hat\alpha=1/\hat\theta\approx 1.03$: notable
+(recordemos que $\theta\to\infty$ sería la Poisson). Los coeficientes se leen en IRR igual que en la
+Poisson (`broom::tidy(m_nb, exponentiate = TRUE)`).
+
+**NB1**, con `glmmTMB`:
+
+```{r}
+#| label: u23-nb1
+m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                            tipo_vehiculo + offset(log(exposicion)),
+                          family = glmmTMB::nbinom1, data = cartera)
+sigma(m_nb1)   # dispersion alpha de la NB1
+```
+
+Su dispersión sale $\hat\alpha\approx 1.47$, de modo que $1+\hat\alpha\approx 2.5$ reproduce —salvo el
+método de estimación— el $\hat\phi\approx 2.39$ de la quasi-Poisson: primera señal de que NB1 y quasi
+son la misma cosa vista de dos maneras. Se confirma comparando los errores estándar término a término,
+que salen **del mismo orden**:
+
+```{r}
+#| label: u23-nb1-quasi
+se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
+se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
+data.frame(term = names(se_q), se_quasi = round(se_q, 4),
+           se_nb1 = round(se_nb1[names(se_q)], 4))
+```
+
+(la NB1 los da algo más ajustados, por estimarlos con verosimilitud en vez de por momentos). La
+diferencia de fondo es **conceptual**: la quasi-Poisson corrige los errores estándar por momentos
+(estima $\phi$ con Pearson, sin verosimilitud), mientras que la NB1 es un **modelo generativo con
+verosimilitud propia** —tiene `logLik`/`AIC` y predice probabilidades—. La NB1 le da a la quasi el
+estatus de distribución que le faltaba. (La comparación formal por AIC de **todos** los modelos
+va en la [Sección 3.4](#sec-u23-elegir).)
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar una binomial negativa (NB1 y NB2)
+```r
+MASS::glm.nb(y ~ ..., data = ...)             # NB2: Var = mu + mu^2/theta  (varianza cuadratica)
+glmmTMB::glmmTMB(y ~ ..., family = nbinom2)   # la misma NB2, por ML directa
+glmmTMB::glmmTMB(y ~ ..., family = nbinom1)   # NB1: Var = mu(1 + alpha)    (varianza lineal)
+```
+
+- **NB2** (por defecto) — `MASS::glm.nb` la estima alternando IWLS y actualización de $\theta$; el
+  parámetro está en **`m$theta`** (con $\alpha = 1/\theta$). También `glmmTMB(family = nbinom2)`.
+- **NB1** — la «gemela con verosimilitud» de la quasi-Poisson (misma varianza lineal), solo en
+  `glmmTMB(family = nbinom1)`; su dispersión $\hat\alpha$ se lee con **`sigma(m)`**.
+- Los coeficientes se leen en **IRR** igual que en la Poisson —`broom::tidy(m, exponentiate = TRUE)`—, y
+  al ser generativas **sí** tienen `logLik` / `AIC` y predicen probabilidades
+  (`dnbinom(k, size = theta, mu = ...)`).
+:::
+
+### Bondad de ajuste y diagnóstico
+
+Ajustadas las dos NB, ¿han **absorbido** de verdad la sobredispersión? Verificamos tres cosas, en ambos
+modelos: que la varianza ya cuadre (índice de dispersión $\approx 1$), que los residuos no muestren
+patrón, y que la **forma** de la distribución predicha reproduzca la observada (rootograma).
+
+Primero, el **índice de dispersión** recalculado sobre cada NB debe quedar **cerca de 1** (en la Poisson
+rondaba 2.4): si lo hace, el modelo ha recogido el exceso.
+
+```{r}
+#| label: u23-nb-disp
+disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
+round(c(NB2 = disp(m_nb), NB1 = disp(m_nb1)), 3)
+```
+
+Segundo, los **residuos cuantil aleatorizados** de `DHARMa`: su QQ-plot debe seguir la diagonal y el
+test de dispersión no debe rechazar. Para la NB2 (el modelo elegido):
+
+```{r}
+#| label: fig-u23-nb2-dharma
+#| fig-cap: "Residuos simulados (DHARMa) de la NB2: QQ-plot frente a la uniforme (izquierda) y residuos frente al predicho (derecha). Si los puntos siguen la diagonal y las líneas de cuantil salen planas, el ajuste es adecuado."
+#| fig-width: 8
+#| fig-height: 5.5
+DHARMa::simulateResiduals(m_nb, plot = TRUE)
+```
+
+Y, para comparar, la NB1:
+
+```{r}
+#| label: fig-u23-nb1-dharma
+#| fig-cap: "Residuos simulados (DHARMa) de la NB1. Al imponer una varianza lineal, puede quedarse algo corta en la cola frente a la NB2, cuya varianza cuadrática se ajusta mejor a estos datos."
+#| fig-width: 8
+#| fig-height: 5.5
+DHARMa::simulateResiduals(m_nb1, plot = TRUE)
+```
+
+Tercero, el **rootograma**. Recordemos ([Sección 3.1](#sec-u23-diagnostico)) que enfrenta, conteo a
+conteo, las frecuencias **observadas** con las **esperadas** por el modelo ($\sum_i\Pr(Y_i=k)$): muestra
+**dónde** ajusta. Aquí lo leemos comprobando que la NB «se pega» a los observados en el 0 y en la cola,
+justo donde la Poisson fallaba:
+
+```{r}
+#| label: fig-u23-nb-rootograma
+#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson y por la NB2. La NB sigue de cerca los ceros y la cola; la Poisson se queda corta en ambos extremos."
+#| fig-width: 6.5
+#| fig-height: 3.8
+mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
+esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
+esp_nb   <- sapply(K, function(k) if (k < 8) sum(dnbinom(k, size = th, mu = mu_n)) else sum(1 - pnbinom(7, size = th, mu = mu_n)))
+observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
+
+tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb) |>
+  tidyr::pivot_longer(c(Observado, Poisson, `NB2`), names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, colour = fuente, group = fuente)) +
+  geom_line(linewidth = 0.7) + geom_point(size = 2) +
+  scale_colour_manual(values = c("Observado" = "grey30", "Poisson" = "darkorange", "NB2" = "steelblue")) +
+  labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
+```
+
+**Conclusión de bondad de ajuste.** La **NB2** pasa las tres pruebas —índice de dispersión $\approx 1$,
+residuos de `DHARMa` sin desviaciones marcadas y rootograma que sigue de cerca ceros y cola—: describe
+bien estos conteos. La **NB1** cumple casi igual (su dispersión también baja a $\approx 1$), pero, al
+imponer una varianza lineal, se queda algo corta en la cola; el AIC ratificará la ventaja de la NB2
+([Sección 3.4](#sec-u23-elegir)). Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
+ceros que la NB no explica—, el paso siguiente serían los modelos de la [Unidad 2.4](#sec-u24). La
+comparación integral de los cuatro modelos y la validación contra el DGP van en la
+[Sección 3.4](#sec-u23-elegir).
 
 ## 3.4 Elegir, comparar y conectar {#sec-u23-elegir}
 
-Hemos ajustado seis modelos para `n_fraude` —Poisson, NB, ZIP, ZINB, hurdle-Poisson y hurdle-NB—. Toca
-compararlos, ver qué cambia en la predicción y **validar** contra el DGP.
+Hemos ajustado cuatro modelos para el mismo problema —**Poisson**, **quasi-Poisson**, **NB1** y
+**NB2**—. Toca ponerlos frente a frente: comparar coeficientes y errores, decidir formalmente por
+información, ver qué cambia en la predicción, y **validar** el resultado contra el DGP.
 
-### Los modelos, lado a lado
+### Los cuatro modelos, lado a lado
 
-Todos tienen verosimilitud propia, así que se comparan por **AIC**, que no exige que estén anidados
-(usamos los seis ya ajustados, incluido el `m_hnb` de la [Sección 3.3](#sec-u23-hurdle)):
+El modelo de la media es el mismo en los cuatro, de modo que los **coeficientes** (y las IRR) son casi
+idénticos; lo que cambia son los **errores estándar**. Se ve mejor en un gráfico que en una tabla,
+poniendo cada término en su propia escala (van de $\sim 0.007$ a $\sim -0.34$):
 
 ```{r}
-#| label: u23-aic
-mods <- list(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
-             `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb)
-data.frame(modelo = names(mods),
-           df  = sapply(mods, function(m) attr(logLik(m), "df")),
-           AIC = round(sapply(mods, AIC), 1)) |>
+#| label: fig-u23-comp-modelos
+#| fig-cap: "Estimaciones (punto) y ±1 error estándar (barra) de tres coeficientes en los cuatro modelos, cada término en su propia escala. Los puntos apenas se mueven entre modelos —la media es la misma—; lo que cambia es la longitud de la barra: la Poisson da el EE más pequeño, y la quasi-Poisson y la NB1 lo agrandan de forma parecida (misma varianza lineal)."
+#| fig-width: 8.5
+#| fig-height: 3.4
+ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
+  s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
+  data.frame(term = rownames(s), estimate = s[, 1], std.error = s[, 2])
+}
+mods <- list(Poisson = m_pois, `Quasi-Poisson` = m_quasi, NB1 = m_nb1, NB2 = m_nb)
+
+purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
+  dplyr::filter(term %in% c("potencia_cv", "zona_circulacionrural", "usocomercial")) |>
+  dplyr::mutate(modelo = factor(modelo, levels = names(mods))) |>
+  ggplot(aes(modelo, estimate, colour = modelo)) +
+  geom_hline(yintercept = 0, linetype = 3, colour = "grey60") +
+  geom_pointrange(aes(ymin = estimate - std.error, ymax = estimate + std.error)) +
+  facet_wrap(~ term, scales = "free_y") +
+  labs(x = NULL, y = "estimación (± 1 EE)", colour = NULL) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+Las estimaciones apenas se mueven (los puntos quedan casi a la misma altura en cada faceta); lo que
+cambia es la **longitud de la barra**: la Poisson da los errores más pequeños; la quasi-Poisson y la
+**NB1** los agrandan de forma parecida —del orden de $\sqrt{\hat\phi}\approx 1.5$ veces— (son la misma varianza
+lineal); y la **NB2** queda en una magnitud parecida, con su propia varianza cuadrática.
+
+### La decisión formal: AIC y LRT
+
+El **AIC** solo compara modelos con verosimilitud propia —Poisson, NB1 y NB2, **no** la quasi-Poisson—.
+No es una laguna: como la **NB1 es la gemela con verosimilitud de la quasi-Poisson** (misma varianza
+lineal), su AIC hace de sustituto del que la quasi no tiene.
+
+```{r}
+#| label: u23-aic-comp
+mods_lik <- list(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb)
+data.frame(modelo = names(mods_lik),
+           df  = sapply(mods_lik, function(m) attr(logLik(m), "df")),
+           AIC = round(sapply(mods_lik, AIC), 1)) |>
   dplyr::arrange(AIC)
 ```
 
-El resultado es nítido: los que **tratan los ceros** dejan muy atrás a la Poisson (AIC ≈ 11003) y a la
-NB (9188). Entre ellos, como el conteo es Poisson, las versiones **NB no aportan** (ZINB 8584 ≈ ZIP
-8582; hurdle-NB 8594 ≈ hurdle-P 8592, con un parámetro más). Y —lo interesante— el **ZIP (8582) gana al
-hurdle-Poisson (8592) por unos 10 puntos de AIC**: aunque sus coeficientes de conteo son casi idénticos
-(la misma historia del ritmo), el ZIP ajusta mejor los **ceros**, porque el DGP los generó por
-**inflación estructural**, no por una barrera. Así que aquí los datos **sí** distinguen ZI de hurdle —el
-peso de Akaike se lo lleva el ZIP (≈ 0.72)—.
+La **NB2** gana con holgura (AIC $\approx$ 9418, frente a 9488 de la NB1 y 10766 de la Poisson): su
+varianza **cuadrática** es la que piden estos datos, coherente con la huella del gráfico media–varianza
+y con que se generaron como mezcla Poisson–Gamma; y que la NB2 supere también a la NB1 confirma que la
+forma es cuadrática, no lineal. Como la Poisson está **anidada** en la NB2 (su límite $\theta\to\infty$),
+un LRT lo remacha —con la cautela de que $\theta\to\infty$ cae en el **borde** del espacio de
+parámetros, lo que reparte a la mitad el $p$-valor—:
 
-La misma lectura estándar de bondad de ajuste (**AIC**, **BIC**, **RMSE**) para los seis modelos:
+```{r}
+#| label: u23-lrt
+LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
+c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
+```
+
+### Una lectura estándar de bondad de ajuste
+
+`performance::compare_performance()` reúne de un vistazo las medidas habituales de bondad de ajuste
+—**AIC**, **BIC** y **RMSE**— de los modelos con verosimilitud (la quasi-Poisson queda fuera por carecer
+de ella). Omitimos el pseudo-$R^2$ porque la NB1 de `glmmTMB` no lo admite:
 
 ```{r}
 #| label: u23-perf
-performance::compare_performance(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
-                                 `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb,
+performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
                                  metrics = c("AIC", "BIC", "RMSE"))
 ```
 
-Aquí hay una lección: el **RMSE es casi idéntico** (≈ 1.85) en los seis modelos —todos predicen la misma
-**media**—, pero el **AIC y el BIC** los separan con claridad, y el peso de Schwarz (BIC) casi entero se
-lo lleva el **ZIP** (≈ 0.98). El error de predicción **puntual** (RMSE) no distingue estos modelos; la
-bondad de ajuste **distribucional** (AIC/BIC), sí.
+El **RMSE** sale casi igual en los tres (≈ 1.92): todos predicen la misma **media**. Lo que separa es el
+**AIC/BIC**, y ahí la **NB2** se lleva todo el peso de Akaike ($\approx 1$). Otra cara de lo mismo que ya
+sabíamos: el promedio no distingue los modelos; su **forma** (la distribución), sí.
 
 ::: {.callout-tip}
-## Compendio: bondad de ajuste con exceso de ceros
+## 🔧 En R. Bondad de ajuste en modelos de conteo
 
-Vale todo lo del [compendio de la Unidad 2.2](#sec-u22-elegir) —dispersión, AIC/BIC, pseudo-$R^2$,
-rootograma, `DHARMa`—, con **tres añadidos** propios del exceso de ceros:
+No hay un único $R^2$ como en la regresión lineal. El repertorio estándar es:
 
-- **Contrasta frente a la NB, no a la Poisson**: la NB ya fabrica ceros; el exceso genuino es el que
-  sobra **por encima** de ella.
-- **Comprueba el ajuste del 0** (observados vs $\sum_i\hat P(Y_i{=}0)$): en el **hurdle** es exacto por
-  construcción; en el **ZI** no lo es —hay que verificarlo—.
-- **Diagnostica las dos partes**: los ceros/barrera **y** el conteo de los positivos (¿piden NB? →
-  ZINB / hurdle-NB, por AIC).
+- **Índice de dispersión** (Pearson/gl): la cifra rápida; $\approx 1$ es buen ajuste, $\gg 1$ señala
+  estructura sin modelar.
+- **Contraste de deviance / Pearson $\chi^2$** frente a $\chi^2_{n-p}$: el «de libro», pero **solo
+  válido con medias altas o datos agrupados**; con conteos escasos (nuestro caso) **no es fiable**.
+- **AIC / BIC**: ajuste **relativo**, para **comparar** modelos, no absoluto.
+- **Pseudo-$R^2$** (McFadden y otros): análogo del $R^2$; `performance::r2()` (no todas las clases de
+  modelo lo admiten —p. ej. la NB1 de `glmmTMB`—).
+- **Rootograma** y **residuos simulados** (`DHARMa`): agnósticos a la distribución y fiables con
+  conteos escasos → los que más usamos.
 
-Detección del exceso: score de Van den Broek (`vcdExtra::zero.test`, marginal) o, mejor,
-`DHARMa::testZeroInflation`.
+**Ojo con la quasi-Poisson:** al no tener verosimilitud, se queda **sin** AIC/BIC ni pseudo-$R^2$; su
+bondad se juzga solo por **dispersión + residuos**. La NB, ZIP/ZINB y hurdle sí admiten todo lo demás.
 :::
 
-### Predicción: dos recetas, casi el mismo número
+### Predicciones: misma media, distinto riesgo
 
-Ambas familias predicen la **media marginal** $E[Y\mid x]$, pero la componen distinto —el ZI como
-$(1-\pi)\mu$, el hurdle como $p\cdot\mu/(1-e^{-\mu})$—. Como predicen el mismo **promedio** (ya vimos que
-el RMSE era idéntico), sus predicciones puntuales quedan muy próximas, aunque el AIC prefiera al ZIP:
+Un punto clave y a menudo malentendido: la **predicción de la media** es casi idéntica en los cuatro
+modelos, porque comparten $\mu=\exp(\eta)$. Lo que difiere es la **distribución** predicha —y con ella
+la probabilidad de valores extremos—. Para verlo tomamos la **póliza de mayor riesgo esperado**
+(`i`, la de mayor $\hat\mu$ según la NB, donde la diferencia se nota más) y calculamos, bajo la Poisson
+y la NB2, tres cantidades:
+
+- `media_pois`, `media_nb`: la **media predicha** de partes para esa póliza ($\hat\mu$, con
+  `predict(type = "response")`);
+- `P0_pois`, `P0_nb`: la probabilidad de que esa póliza tenga **cero** partes, $P(Y=0)$;
+- `Pge10_pois`, `Pge10_nb`: la probabilidad de que tenga **diez o más**, $P(Y\ge 10)=1-P(Y\le 9)$.
 
 ```{r}
-#| label: u23-pred
-nuevas <- cartera[1:5, ]
-cbind(ZIP    = predict(m_zip, nuevas, type = "response"),
-      Hurdle = predict(m_hp,  nuevas, type = "response"))
+#| label: u23-pred-comp
+i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
+mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
+mu_n <- unname(predict(m_nb,   cartera[i, ], type = "response"))   # media predicha (NB2)
+round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguales
+        P0_pois    = dpois(0, mu_p),        P0_nb    = dnbinom(0, size = m_nb$theta, mu = mu_n),      # P(Y = 0)
+        Pge10_pois = 1 - ppois(9, mu_p),    Pge10_nb = 1 - pnbinom(9, size = m_nb$theta, mu = mu_n)), # P(Y >= 10)
+      3)
 ```
 
-Lo que las distingue no es el número, sino la **lectura de las dos partes**: `predict(type = "zero")` y
-`predict(type = "count")` dan, en cada modelo, la probabilidad estructural / de cruzar la barrera y la
-intensidad. Cada familia responde a una pregunta distinta.
+Para esa misma póliza (media $\approx 5$ partes), Poisson y NB predicen casi el **mismo promedio**, pero
+la NB lo reparte sobre una distribución mucho **más dispersa**: acumula bastante más probabilidad en el
+**0** (0.17 frente a 0.006) y en la **cola lejana** ($P(Y\ge 10)$ pasa de 0.04 a 0.17), a costa de
+vaciar el centro. Mismo promedio, mucha más varianza. Se ve en la distribución predicha:
+
+```{r}
+#| label: fig-u23-pred-dist
+#| fig-cap: "Distribución de conteos predicha para una póliza de alto riesgo (media ≈ 5), con la misma media en todos los modelos. La NB2 (varianza cuadrática) acumula más probabilidad en el 0 y en la cola lejana; la NB1 (varianza lineal) queda entre la Poisson y la NB2; la Poisson concentra todo en el centro."
+#| fig-width: 6.5
+#| fig-height: 3.6
+K <- 0:16
+mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
+dist <- tibble::tibble(k = K,
+                       Poisson = dpois(K, mu_p),
+                       NB1 = dnbinom(K, size = mu_n1 / sigma(m_nb1), mu = mu_n1),   # NB1: Var = mu(1+alpha)
+                       NB2 = dnbinom(K, size = m_nb$theta, mu = mu_n))
+dist |>
+  tidyr::pivot_longer(-k, names_to = "modelo", values_to = "prob") |>
+  ggplot(aes(k, prob, colour = modelo, group = modelo)) +
+  geom_line(linewidth = 0.7) + geom_point(size = 1.6) +
+  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue")) +
+  labs(x = "nº de partes", y = "probabilidad", colour = NULL)
+```
+
+La consecuencia es práctica: si lo que importa es el **promedio** (p. ej. la prima media), los cuatro
+modelos coinciden; si importa la **cola** (probabilidad de muchos siniestros, reservas, percentiles
+altos), la Poisson —y, en menor medida, la NB1— **infravaloran el riesgo extremo** frente a la NB2, que
+es la que mejor describe esa cola.
+
+### quasi-Poisson, NB1 y NB2: cuándo cada una
 
 ::: {.callout-note}
-## ZI o hurdle: cuándo cada uno
+## Cuándo cada una
 
-A menudo ajustan parecido y la elección es de **modelo mental**; pero cuando un mecanismo generó de
-verdad los datos, el **AIC puede favorecerlo** —aquí el ZIP le gana al hurdle porque los ceros son
-estructurales, no de barrera—:
+| Modelo | Varianza | ¿Distribución? | ¿AIC/LRT? | Cuándo |
+|---|---|---|---|---|
+| quasi-Poisson | $\phi\,\mu$ (lineal) | No (cuasi-verosim.) | No (QAIC) | Solo corregir EE, mínimos supuestos |
+| NB1 | $\mu(1+\alpha)$ (lineal) | Sí | Sí | Varianza lineal, con distribución |
+| NB2 | $\mu+\mu^2/\theta$ (cuadrática) | Sí | Sí | Varianza cuadrática (lo habitual) |
 
-- **Zero-inflated** si crees que hay una **subpoblación estructural** —pólizas que *nunca* reclamarán,
-  mezcladas con las de riesgo—. La parte de ceros estima *quién es inmune*.
-- **Hurdle** si lo ves como un **proceso en dos etapas** —primero «¿ocurre algo?», luego «¿cuánto?»—.
-  La parte binaria estima *quién cruza la barrera*.
-
-Si además hay sobredispersión en los **positivos**, la versión **NB** (ZINB / hurdle-NB); si no, basta
-la Poisson.
+Si el exceso es **exceso de ceros**, ve a la [Unidad 2.4](#sec-u24); si es **agrupamiento**, a la
+[Unidad 2.5](#sec-u25): a veces lo que parece sobredispersión es una de esas dos cosas.
 :::
 
 ### Validación contra el DGP
 
-Como los datos son simulados, comprobamos que el análisis **recupera la verdad**. El DGP generó los
-ceros por inflación estructural (`g_cero`) sobre un conteo Poisson (`b_ceros`):
+Como la cartera es **simulada**, podemos hacer lo que en un caso real no: contrastar el resultado con la
+**verdad**. El proceso generó `n_danos` como una mezcla Poisson–Gamma (una NB2) con dispersión
+$\theta=1$; nuestro análisis, a ciegas, ha elegido la **NB2** y ha estimado un $\hat\theta$ que debería
+rondar 1:
 
 ```{r}
 #| label: u23-validacion
-v <- attr(cartera, "verdad")
-v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
+verdad <- attr(cartera, "verdad")
+c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))
 ```
 
-Los signos coinciden con el ZIP ajustado: en la parte estructural, `uso` comercial y `potencia` con
-coeficiente **negativo** (menos «no reclamantes») —el ajuste dio $-0.78$ y $\approx -0.4$ en escala
-estandarizada—; y el AIC prefiere el **ZIP** frente al ZINB (el conteo se generó **Poisson**) **y**
-frente al hurdle (los ceros son **estructurales**, no de barrera). Es decir, la comparación de modelos
-señala el mecanismo correcto. Es decir, a ciegas hemos elegido el modelo correcto y recuperado sus parámetros —el
-control de calidad que pediremos en el estudio de caso—.
+El $\hat\theta\approx 0.97$ recupera el $\theta=1$ del DGP casi al dedillo, y la **forma de modelo**
+elegida (NB2, cuadrática) coincide con el mecanismo generador. Los signos de las IRR también concuerdan
+con el diseño (mayor potencia, zona urbana, uso comercial o moto → más partes). Es decir: no solo hemos
+ajustado un modelo que encaja, sino **el modelo correcto**. Ese es el sentido del control de calidad que
+pediremos en el estudio de caso —ajustar a ciegas y validar al final contra `attr(., "verdad")`—.
 
 ### Una estrategia general
 
 ::: {.callout-tip}
-## Receta para el exceso de ceros
+## Receta para conteos sobredispersos
 
-1. **Ajusta Poisson y NB** y **diagnostica los ceros**: rootograma y `testZeroInflation` **frente a la
-   NB** (no a la Poisson).
-2. Si aún sobran ceros, **elige la historia**: subpoblación inmune → **ZI**; proceso en dos etapas →
-   **hurdle**.
-3. **Ajusta** ZIP/ZINB o hurdle-P/NB; decide la distribución del conteo (NB si los positivos están
-   sobredispersos) por **AIC** y re-diagnóstico.
-4. **Compara** ZI vs hurdle por AIC **y por la pregunta** (suelen empatar en ajuste).
-5. **Interpreta las dos partes** (estructural/barrera + intensidad) y **predice** la media marginal.
-6. **Valida** (contra el DGP en el curso; fuera de muestra en la práctica → [Unidad 2.6](#sec-u26)).
+1. **Ajusta la Poisson** (con `offset` si hay exposición) como punto de partida y lee las IRR.
+2. **Diagnostica**: índice de dispersión, rootograma y residuos simulados. Si $\hat\phi\approx 1$, la
+   Poisson basta y aquí acabas.
+3. Si $\hat\phi>1$, **identifica la causa** con el rootograma y los residuos: ¿exceso de ceros
+   ([2.4](#sec-u24)), agrupamiento ([2.5](#sec-u25)) o heterogeneidad general?
+4. Para la heterogeneidad, **contrasta la estructura** de la varianza (Cameron–Trivedi, `trafo`):
+   lineal → quasi-Poisson / NB1; cuadrática → NB2.
+5. **Ajusta la alternativa** y **re-diagnostica** (dispersión $\approx 1$, `DHARMa`); compara por AIC
+   (o QAIC con la quasi-Poisson).
+6. **Interpreta** en IRR (no cambian) con los EE corregidos, y **predice** con la distribución
+   adecuada, según necesites la media o la cola.
+7. **Valida**: contra el DGP (en el curso) y fuera de muestra en la práctica ([Unidad 2.7](#sec-u27)).
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.3) — Pregunta 8 del caso
-Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.7](#sec-u27)): *la mayoría
-de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
-frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
-exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
-**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca la levanta,
-o proceso en dos etapas?). Interpreta las **dos partes** (quién puede levantarla / a qué ritmo) y **valida** la
-parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
+## Tarea del estudiante (2.3) — Preguntas 6 y 7 del caso
+Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.8](#sec-u28)):
+
+- **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
+  la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
+  quasi-Poisson y binomial negativa, y **decide y justifica** cuál la captura mejor —AIC y re-diagnóstico—.
+  Explica qué cambia —y qué no— en los **errores estándar** y en la **tarifa**.
+- **P7 · ¿De dónde viene?** Razona esa variabilidad extra como **heterogeneidad no observada** (fragilidad):
+  pólizas intrínsecamente más siniestrosas que las variables no capturan. Deja el puente hacia los mixtos
+  ([2.5](#sec-u25)) y la supervivencia ([2.6](#sec-u26)).
+
+Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`attr(cartera, "verdad")$theta_frail`).
 :::

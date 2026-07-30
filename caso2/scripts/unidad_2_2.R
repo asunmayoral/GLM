@@ -1,299 +1,282 @@
 # =============================================================================
-# Caso 2 · Unidad 2.2 — 2 · Sobredispersión
+# Caso 2 · Unidad 2.2 — 2 · Modelos log-lineales para tablas
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_2.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM; localiza
-# la raíz por _quarto.yml y resuelve solo las rutas del DGP y de la caché.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías (idénticas al setup del documento del caso) -------------------
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo.
 library(broom)
 library(tidyverse)
-library(MASS)          # glm.nb
+library(MASS)          # glm.nb (base-recommended)
 library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos
-library(MuMIn); library(glmnet)
-library(vcdExtra)      # zero-inflated
+library(survival)      # riesgos a trozos (base-recommended)
+library(MuMIn); library(glmnet)   # selección / regularización 
+library(vcd)           # mosaicos para tablas de contingencia (2.2)
+library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Datos: cartera de auto (misma llamada que el documento del caso) --------
-# Localiza la raíz del proyecto (donde está _quarto.yml), sea cual sea el wd:
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))  # simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
-cartera <- cargar_cartera("auto")    # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [fig-u22-eda-modelo]  ·  2.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
+# [u22-de-ficha-a-tabla]  ·  2.1 Contexto: cuando el dato es la celda > De la ficha a la tabla
 # -----------------------------------------------------------------------------
-dplyr::bind_rows(
-  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
-                     y = n_danos, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
-  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
-                     y = n_danos, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
-  ggplot(aes(nivel, tasa)) +
-  geom_col(fill = "steelblue") +
-  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
+# Trabajamos sobre una copia con el indicador de daños; no modificamos `cartera`, que las
+# unidades siguientes siguen usando tal cual. El nivel "con" va segundo: será el "éxito".
+cart_tab <- cartera |> dplyr::mutate(danos = factor(ifelse(n_danos > 0, "con", "sin"),
+                                                    levels = c("sin", "con")))
+tab2 <- xtabs(~ zona_circulacion + danos, data = cart_tab)
+addmargins(tab2)
 
 # -----------------------------------------------------------------------------
-# [fig-u22-media-varianza]  ·  2.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
+# [u22-gl]  ·  La regla práctica: fija en el modelo lo que estaba fijo en el diseño > Grados de libertad: contar celdas y contar parámetros
 # -----------------------------------------------------------------------------
-m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                offset(log(exposicion)), family = poisson, data = cartera)
-
-mu_i  <- fitted(m_pois); y <- cartera$n_danos
-phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
-alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
-
-pts <- tibble::tibble(mu = mu_i, y = y) |>
-  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
-
-rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
-curvas <- tibble::tibble(
-  media = rango,
-  `Poisson: Var = media`               = rango,
-  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
-  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
-  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
-
-ggplot() +
-  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
-  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
-  scale_colour_manual(values = c(
-    "Poisson: Var = media"             = "grey55",
-    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
-    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
-  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+d2 <- as.data.frame(tab2)                                   # una fila por celda; columna Freq
+m_ind <- glm(Freq ~ zona_circulacion + danos, family = poisson, data = d2)
+c(celdas = nrow(d2), parametros = length(coef(m_ind)), gl_residuales = df.residual(m_ind))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-heterogeneidad]  ·  2.1 Qué es, de dónde viene y cómo se identifica > De dónde viene
+# [u22-dosvias-fit]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El modelo y su lectura
 # -----------------------------------------------------------------------------
-set.seed(2026)
-n <- 5000; media <- 2
-dplyr::bind_rows(
-  tibble::tibble(poblacion = "Poisson homogénea",  y = rpois(n, media)),
-  tibble::tibble(poblacion = "Mezcla heterogénea", y = rpois(n, media * rgamma(n, 1, 1)))) |>
-  dplyr::filter(y <= 8) |>
-  dplyr::count(poblacion, y) |>
-  ggplot(aes(y, n, fill = poblacion)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Poisson homogénea" = "steelblue",
-                               "Mezcla heterogénea" = "darkorange")) +
-  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+m_sat <- glm(Freq ~ zona_circulacion * danos, family = poisson, data = d2)
+anova(m_ind, m_sat, test = "LRT")     # H0: independencia
 
 # -----------------------------------------------------------------------------
-# [u22-indice]  ·  2.1 Qué es, de dónde viene y cómo se identifica > El índice de dispersión
+# [u22-dosvias-or]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El modelo y su lectura
 # -----------------------------------------------------------------------------
-phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
-phi_dev     <- deviance(m_pois) / df.residual(m_pois)
-c(pearson = phi_pearson, deviance = phi_dev)
+broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl(":", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high)
 
 # -----------------------------------------------------------------------------
-# [fig-u22-rootograma]  ·  2.1 Qué es, de dónde viene y cómo se identifica > El rootograma: ver dónde falla el ajuste
+# [u22-puente-logit]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El puente con la logística
 # -----------------------------------------------------------------------------
-mu <- fitted(m_pois); K <- 0:8
-esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
-  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
+m_logit <- glm(danos ~ zona_circulacion, family = binomial, data = cart_tab)
+rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
+      logistica = coef(m_logit)[-1]) |> round(4)
 
 # -----------------------------------------------------------------------------
-# [u22-tests]  ·  2.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u22-tab3]  ·  2.3 Tres vías: la jerarquía de modelos
 # -----------------------------------------------------------------------------
-# Tests de sobredispersión
-print(performance::check_overdispersion(m_pois))
-print(AER::dispersiontest(m_pois))
-print(DHARMa::testDispersion(m_pois, plot = FALSE))
+tab3 <- xtabs(~ zona_circulacion + tipo_vehiculo + danos, data = cart_tab)
+d3   <- as.data.frame(tab3)
+ftable(tab3)
 
 # -----------------------------------------------------------------------------
-# [u22-trafo]  ·  2.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u22-jerarquia]  ·  2.3 Tres vías: la jerarquía de modelos > Los cinco modelos
 # -----------------------------------------------------------------------------
-print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
-print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
+f <- function(fml) glm(fml, family = poisson, data = d3)
+mods <- list(
+  mutua       = f(Freq ~ zona_circulacion + tipo_vehiculo + danos),
+  conjunta    = f(Freq ~ zona_circulacion * tipo_vehiculo + danos),
+  condicional = f(Freq ~ zona_circulacion * danos + tipo_vehiculo * danos),
+  homogenea   = f(Freq ~ (zona_circulacion + tipo_vehiculo + danos)^2),
+  saturado    = f(Freq ~ zona_circulacion * tipo_vehiculo * danos))
+
+purrr::map_dfr(names(mods), ~ {
+  m <- mods[[.x]]; gl <- df.residual(m)
+  tibble::tibble(
+    modelo   = .x,
+    gl       = gl,
+    deviance = round(deviance(m), 2),
+    # el saturado no tiene gl residuales: no hay contraste de ajuste que hacerle
+    p_ajuste = if (gl > 0) round(pchisq(deviance(m), gl, lower.tail = FALSE), 4) else NA_real_,
+    AIC      = round(AIC(m), 1))})
 
 # -----------------------------------------------------------------------------
-# [u22-trafo-manual]  ·  2.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u22-lrt-jerarquia]  ·  Ajuste absoluto: aquí sí, y por qué > La selección, término a término
 # -----------------------------------------------------------------------------
-mu <- fitted(m_pois); y <- cartera$n_danos
-r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
-test_var <- function(formula, etiqueta) {
-  s <- coef(summary(lm(formula)))[1, ]        # coeficiente = alpha estimado
-  data.frame(estructura = etiqueta, alpha = round(s[1], 3),
-             t = round(s[3], 1), p_valor = signif(s[4], 3), row.names = NULL)
-}
-rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = media de r
-      test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
+anova(mods$homogenea, mods$saturado, test = "LRT")        # ¿hay interacción de 3 vías?
+anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dados los daños?
 
 # -----------------------------------------------------------------------------
-# [u22-quasi-fit]  ·  2.2 Quasi-Poisson > Ajuste e interpretación
+# [u22-simpson]  ·  Ajuste absoluto: aquí sí, y por qué > Simpson: la asociación marginal puede mentir
 # -----------------------------------------------------------------------------
-m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                 offset(log(exposicion)), family = quasipoisson, data = cartera)
-summary(m_quasi)$dispersion   # phi estimado
+# DGP explícito: Z está asociado a la vez con X y con Y. En z1 son raros tanto X=sí como
+# Y=sí; en z2 son frecuentes los dos. Dentro de CADA estrato X protege levemente (OR < 1),
+# pero al colapsar sobre Z la mezcla desigual invierte el signo.
+toy <- expand.grid(Z = c("z1", "z2"), X = c("no", "si"), Y = c("no", "si"))
+toy$Freq <- c(900,  50,  150, 300,      # Y = no
+              225, 200,   15, 480)      # Y = sí
+tt <- xtabs(Freq ~ X + Y + Z, data = toy)
+
+or <- function(m) (m[1,1] * m[2,2]) / (m[1,2] * m[2,1])
+round(c(condicional_z1 = or(tt[, , "z1"]),
+        condicional_z2 = or(tt[, , "z2"]),
+        marginal       = or(margin.table(tt, c(1, 2)))), 3)
 
 # -----------------------------------------------------------------------------
-# [u22-quasi-comp]  ·  2.2 Quasi-Poisson > Ajuste e interpretación
+# [u22-simpson-modelos]  ·  Ajuste absoluto: aquí sí, y por qué > Simpson: la asociación marginal puede mentir
 # -----------------------------------------------------------------------------
-dplyr::left_join(
-  broom::tidy(m_pois)  |> dplyr::select(term, estimacion = estimate, se_poisson = std.error),
-  broom::tidy(m_quasi) |> dplyr::select(term, se_quasi = std.error),
-  by = "term")
+anova(glm(Freq ~ X*Z + Y*Z, family = poisson, data = toy),    # X _||_ Y | Z
+      glm(Freq ~ (X + Y + Z)^2, family = poisson, data = toy), test = "LRT")
 
 # -----------------------------------------------------------------------------
-# [fig-u22-quasi-resid]  ·  2.2 Quasi-Poisson > Bondad de ajuste y diagnóstico
+# [u22-cuatro-vias]  ·  Cuándo se puede colapsar una tabla > Cuatro factores o más: trabajar por orden de interacción
 # -----------------------------------------------------------------------------
-tibble::tibble(ajustado = fitted(m_quasi),
-               residuo  = residuals(m_quasi, type = "pearson")) |>
-  ggplot(aes(ajustado, residuo)) +
-  geom_point(alpha = 0.2, colour = "steelblue") +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_smooth(se = FALSE, colour = "darkorange") +
-  labs(x = "valor ajustado", y = "residuo de Pearson")
+tab4 <- xtabs(~ zona_circulacion + tipo_vehiculo + uso + danos, data = cart_tab)
+d4   <- as.data.frame(tab4)
+
+ordenes <- list(
+  "1 · solo principales"  = Freq ~ zona_circulacion + tipo_vehiculo + uso + danos,
+  "2 · todas las dobles"  = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^2,
+  "3 · todas las triples" = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^3,
+  "4 · saturado"          = Freq ~ zona_circulacion * tipo_vehiculo * uso * danos)
+
+purrr::map_dfr(names(ordenes), ~ {
+  m <- glm(ordenes[[.x]], family = poisson, data = d4); gl <- df.residual(m)
+  tibble::tibble(orden = .x, parametros = length(coef(m)), gl = gl,
+                 deviance = round(deviance(m), 2),
+                 p_ajuste = if (gl > 0) round(pchisq(deviance(m), gl, lower.tail = FALSE), 4)
+                            else NA_real_)})
 
 # -----------------------------------------------------------------------------
-# [u22-nb-fit]  ·  2.3 Binomial negativa > Ajuste e interpretación
+# [u22-residuos]  ·  2.4 Diagnóstico: dónde falla el modelo > Residuos ajustados
 # -----------------------------------------------------------------------------
-m_nb <- MASS::glm.nb(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                       offset(log(exposicion)), data = cartera)
-c(theta = m_nb$theta, se_theta = m_nb$SE.theta)   # dispersion estimada
+d3$r_aj <- rstandard(mods$condicional, type = "pearson")   # residuos AJUSTADOS
+d3 |>
+  dplyr::mutate(esperado = round(fitted(mods$condicional), 1), r_aj = round(r_aj, 2)) |>
+  dplyr::arrange(dplyr::desc(abs(r_aj))) |>
+  head(6)
 
 # -----------------------------------------------------------------------------
-# [u22-nb1]  ·  2.3 Binomial negativa > Ajuste e interpretación
+# [fig-u22-mosaico-mutua]  ·  2.4 Diagnóstico: dónde falla el modelo > El mosaico
 # -----------------------------------------------------------------------------
-m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
-                            tipo_vehiculo + offset(log(exposicion)),
-                          family = glmmTMB::nbinom1, data = cartera)
-sigma(m_nb1)   # dispersion alpha de la NB1
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,   # por defecto: ~ zona + tipo + danos
+            main = "Independencia mutua",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 
 # -----------------------------------------------------------------------------
-# [u22-nb1-quasi]  ·  2.3 Binomial negativa > Ajuste e interpretación
+# [fig-u22-mosaico-condicional]  ·  2.4 Diagnóstico: dónde falla el modelo > El mosaico
 # -----------------------------------------------------------------------------
-se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
-se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
-data.frame(term = names(se_q), se_quasi = round(se_q, 4),
-           se_nb1 = round(se_nb1[names(se_q)], 4))
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
+            expected = ~ zona_circulacion * danos + tipo_vehiculo * danos,
+            main = "Independencia condicional",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 
 # -----------------------------------------------------------------------------
-# [u22-nb-disp]  ·  2.3 Binomial negativa > Bondad de ajuste y diagnóstico
+# [u22-escasez]  ·  Pearson frente a ajustados > Tablas escasas y ceros
 # -----------------------------------------------------------------------------
-disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
-round(c(NB2 = disp(m_nb), NB1 = disp(m_nb1)), 3)
+c(celdas = length(tab4), minimo = min(tab4),
+  menores_de_5 = sum(tab4 < 5), vacias = sum(tab4 == 0))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-nb2-dharma]  ·  2.3 Binomial negativa > Bondad de ajuste y diagnóstico
+# [u22-cuadrada]  ·  2.5 Tablas cuadradas: modelizar el cambio
 # -----------------------------------------------------------------------------
-DHARMa::simulateResiduals(m_nb, plot = TRUE)
+cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera)) |>
+  dplyr::rename(prev = bonus_malus_prev, act = bonus_malus_act) |>
+  dplyr::mutate(i = as.integer(prev), j = as.integer(act),
+                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))
+xtabs(Freq ~ prev + act, data = cuad) |> addmargins()
 
 # -----------------------------------------------------------------------------
-# [fig-u22-nb1-dharma]  ·  2.3 Binomial negativa > Bondad de ajuste y diagnóstico
+# [u22-simetria]  ·  2.5 Tablas cuadradas: modelizar el cambio > Simetría
 # -----------------------------------------------------------------------------
-DHARMa::simulateResiduals(m_nb1, plot = TRUE)
+m_sim <- glm(Freq ~ par, family = poisson, data = cuad)
+c(deviance = round(deviance(m_sim), 2), gl = df.residual(m_sim),
+  p = signif(pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE), 3))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-nb-rootograma]  ·  2.3 Binomial negativa > Bondad de ajuste y diagnóstico
+# [u22-cuasisimetria]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuasi-simetría y homogeneidad marginal
 # -----------------------------------------------------------------------------
-mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
-esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
-esp_nb   <- sapply(K, function(k) if (k < 8) sum(dnbinom(k, size = th, mu = mu_n)) else sum(1 - pnbinom(7, size = th, mu = mu_n)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb) |>
-  tidyr::pivot_longer(c(Observado, Poisson, `NB2`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, colour = fuente, group = fuente)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 2) +
-  scale_colour_manual(values = c("Observado" = "grey30", "Poisson" = "darkorange", "NB2" = "steelblue")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
+m_qs <- glm(Freq ~ prev + act + par, family = poisson, data = cuad)
+c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-comp-modelos]  ·  2.4 Elegir, comparar y conectar > Los cuatro modelos, lado a lado
+# [u22-homogeneidad-marginal]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuasi-simetría y homogeneidad marginal
 # -----------------------------------------------------------------------------
-ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
-  s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
-  data.frame(term = rownames(s), estimate = s[, 1], std.error = s[, 2])
-}
-mods <- list(Poisson = m_pois, `Quasi-Poisson` = m_quasi, NB1 = m_nb1, NB2 = m_nb)
-
-purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
-  dplyr::filter(term %in% c("potencia_cv", "zona_circulacionrural", "usocomercial")) |>
-  dplyr::mutate(modelo = factor(modelo, levels = names(mods))) |>
-  ggplot(aes(modelo, estimate, colour = modelo)) +
-  geom_hline(yintercept = 0, linetype = 3, colour = "grey60") +
-  geom_pointrange(aes(ymin = estimate - std.error, ymax = estimate + std.error)) +
-  facet_wrap(~ term, scales = "free_y") +
-  labs(x = NULL, y = "estimación (± 1 EE)", colour = NULL) +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+anova(m_sim, m_qs, test = "LRT")   # H0: homogeneidad marginal (dada la cuasi-simetría)
 
 # -----------------------------------------------------------------------------
-# [u22-aic-comp]  ·  2.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
+# [u22-deriva]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuánta deriva, y en qué sentido
 # -----------------------------------------------------------------------------
-mods_lik <- list(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb)
-data.frame(modelo = names(mods_lik),
-           df  = sapply(mods_lik, function(m) attr(logLik(m), "df")),
-           AIC = round(sapply(mods_lik, AIC), 1)) |>
-  dplyr::arrange(AIC)
+niv <- as.integer(cartera$bonus_malus_prev); nva <- as.integer(cartera$bonus_malus_act)
+c(nivel_medio_previo = round(mean(niv), 3),
+  nivel_medio_actual = round(mean(nva), 3),
+  deriva             = round(mean(nva - niv), 3),
+  pct_empeora        = round(100 * mean(nva > niv), 1),
+  pct_mejora         = round(100 * mean(nva < niv), 1))
 
 # -----------------------------------------------------------------------------
-# [u22-lrt]  ·  2.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
+# [u22-ordinal]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
-LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
-c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
+m_indep_c <- glm(Freq ~ prev + act,               family = poisson, data = cuad)
+m_unif    <- glm(Freq ~ prev + act + I(i * j),    family = poisson, data = cuad)
+anova(m_indep_c, m_unif, test = "LRT")
+c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
+  OR_local        = round(exp(coef(m_unif)["I(i * j)"]), 3))
 
 # -----------------------------------------------------------------------------
-# [u22-perf]  ·  2.4 Elegir, comparar y conectar > Una lectura estándar de bondad de ajuste
+# [u22-ordinal-ajuste]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
-performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
-                                 metrics = c("AIC", "BIC", "RMSE"))
+c(deviance = round(deviance(m_unif), 1), gl = df.residual(m_unif))
 
 # -----------------------------------------------------------------------------
-# [u22-pred-comp]  ·  2.4 Elegir, comparar y conectar > Predicciones: misma media, distinto riesgo
+# [u22-movilidad]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
-i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
-mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
-mu_n <- unname(predict(m_nb,   cartera[i, ], type = "response"))   # media predicha (NB2)
-round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguales
-        P0_pois    = dpois(0, mu_p),        P0_nb    = dnbinom(0, size = m_nb$theta, mu = mu_n),      # P(Y = 0)
-        Pge10_pois = 1 - ppois(9, mu_p),    Pge10_nb = 1 - pnbinom(9, size = m_nb$theta, mu = mu_n)), # P(Y >= 10)
-      3)
+cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
+m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
+anova(m_unif, m_mov, test = "LRT")
+c(deviance = round(deviance(m_mov), 1), gl = df.residual(m_mov))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-pred-dist]  ·  2.4 Elegir, comparar y conectar > Predicciones: misma media, distinto riesgo
+# [u22-proxy-control]  ·  2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
-K <- 0:16
-mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
-dist <- tibble::tibble(k = K,
-                       Poisson = dpois(K, mu_p),
-                       NB1 = dnbinom(K, size = mu_n1 / sigma(m_nb1), mu = mu_n1),   # NB1: Var = mu(1+alpha)
-                       NB2 = dnbinom(K, size = m_nb$theta, mu = mu_n))
-dist |>
-  tidyr::pivot_longer(-k, names_to = "modelo", values_to = "prob") |>
-  ggplot(aes(k, prob, colour = modelo, group = modelo)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 1.6) +
-  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue")) +
-  labs(x = "nº de partes", y = "probabilidad", colour = NULL)
+tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + danos, data = cart_tab))
+m_ci  <- glm(Freq ~ sexo * danos + tipo_vehiculo * danos, family = poisson, data = tp)
+m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + danos)^2,      family = poisson, data = tp)
+anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | danos  (no hay proxy)
 
 # -----------------------------------------------------------------------------
-# [u22-validacion]  ·  2.4 Elegir, comparar y conectar > Validación contra el DGP
+# [u22-proxy-control-tamano]  ·  2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
-verdad <- attr(cartera, "verdad")
-c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))
+broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl("^sexo.*:tipo", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+
+# -----------------------------------------------------------------------------
+# [u22-proxy-simulado]  ·  Este es un falso positivo, y lo sabemos con certeza
+# -----------------------------------------------------------------------------
+set.seed(SEMILLA_CURSO)
+n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
+# Niveles EXPLÍCITOS: "M" es la referencia, así el coeficiente se llama `sH` y se lee
+# "hombres frente a mujeres". Sin declararlos, R ordena alfabéticamente (H antes que M)
+# y el coeficiente saldría invertido.
+s <- factor(sample(c("M", "H"), n, TRUE), levels = c("M", "H"))        # factor prohibido
+v <- factor(ifelse(runif(n) < ifelse(s == "H", 0.30, 0.05), "moto", "otro"),
+            levels = c("otro", "moto"))                               # PERMITIDA, asociada a s
+y <- rbinom(n, 1, plogis(-0.8 + 1.20 * (v == "moto") + 0.20 * (s == "H")))
+sim <- as.data.frame(xtabs(~ s + v + y))
+
+anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
+      glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
+
+# -----------------------------------------------------------------------------
+# [u22-proxy-fuga]  ·  Este es un falso positivo, y lo sabemos con certeza
+# -----------------------------------------------------------------------------
+d_sim <- data.frame(y = y, s = s, v = v)
+or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
+c(OR_marginal    = round(or_s(y ~ s),     3),   # lo que se ve sin controlar el proxy
+  OR_ajustado    = round(or_s(y ~ s + v), 3),   # el efecto directo del factor prohibido
+  verdad_directa = round(exp(0.20),       3))   # el valor con el que se generaron los datos
+

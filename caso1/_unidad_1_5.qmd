@@ -586,6 +586,25 @@ centro**, los efectos crecen algo en magnitud ($x_1: 0.84\!\to\!0.89$;
 $x_2: -0.45\!\to\!-0.47$): es el salto marginal→condicional de 1.4, ahora sobre el hazard,
 aunque leve porque $\hat\sigma_u$ es pequeño.
 
+:::: {.callout-tip}
+## 🔧 En R. El GLM de supervivencia en persona-periodo
+```r
+pp <- expandir_persona_periodo(cohorte)                                   # 1 fila por paciente y periodo
+m  <- glm(y ~ periodo + x1 + x2, family = binomial("cloglog"), data = pp) # hazard discreto
+```
+
+- **Formato persona-periodo** — `y = 1` solo en el periodo del evento; la **censura se trata sola** (la
+  paciente aporta filas `y = 0` hasta su último periodo observado, sin fila de evento).
+- **El factor `periodo`** estima el **hazard base** $\alpha_t$ (un intercepto por revisión); las
+  covariables entran como en cualquier GLM y su $e^{\hat\beta}$ es un ***hazard ratio*** con `cloglog`
+  (un **odds ratio** si se usa `binomial("logit")`, la logística de tiempo discreto).
+- **Del hazard a la supervivencia** — `predict(m, newdata, type = "response")` da $\hat h_t$ por periodo;
+  la supervivencia se acumula con `cumprod(1 - h)` (y el riesgo acumulado es `1 - S`).
+- **Fragilidad** — un intercepto aleatorio por grupo, `+ (1 | centro)`, lo convierte en un **GLMM
+  cloglog**: `lme4::glmer(..., family = binomial("cloglog"))`, con `VarCorr(m)` para $\hat\sigma_u$ y
+  `fixef(m)` para los efectos condicionales.
+::::
+
 ### Cloglog frente a logit: ¿cuánto importa el enlace? {#sec-u15-logit}
 
 Elegimos el `cloglog` por una razón estructural: preserva los riesgos proporcionales. Pero los

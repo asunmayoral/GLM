@@ -20,13 +20,13 @@ que se introducen pronto y reaparecen en cada bloque.
 
 ## Los tres casos
 
-- **Caso 1 · ¿Ocurre el evento? ¿Y cuándo?** Respuestas binarias y tiempo hasta
+- **[Caso 1 · ¿Ocurre el evento? ¿Y cuándo?](caso1/caso1_binaria.qmd)** Respuestas binarias y tiempo hasta
   el evento en tiempo discreto: regresión logística, evaluación de
   clasificadores, intercepto aleatorio y enlace complementario log-log.
-- **[Caso 2 · ¿Cuántas veces y a qué ritmo?](caso2/caso2_conteos.qmd)** *(borrador)* Conteos y
+- **[Caso 2 · ¿Cuántas veces y a qué ritmo?](caso2/caso2_conteos.qmd)** Conteos y
   tasas: Poisson, *offset* e IRR, sobredispersión, exceso de ceros, GLMM de Poisson y riesgos a
   trozos.
-- **[Caso 3 · ¿Cuánto y hasta cuándo?](caso3/caso3_continuas_positivas.qmd)** *(borrador)* Magnitudes
+- **[Caso 3 · ¿Cuánto y hasta cuándo?](caso3/caso3_continuas_positivas.qmd)** Magnitudes
   positivas y vida útil hasta el fallo: GLM Gamma e inversa gaussiana, elección de familia y escala,
   GLMM Gamma, modelos de vida acelerada (AFT) y el modelo de Cox como frontera del marco.
 
@@ -35,7 +35,7 @@ que se introducen pronto y reaparecen en cada bloque.
 Cada caso se lee como un cuaderno reproducible: teoría al servicio del problema,
 **código R visible** (puedes desplegarlo y copiarlo para estudiar y reproducir
 los análisis) e interpretación de los resultados. Empieza por el
-[Caso 1](caso1/caso1_binaria_tiempo_evento.qmd).
+[Caso 1](caso1/caso1_binaria.qmd).
 
 ## Software
 

@@ -29,7 +29,7 @@ editor:
 ---
 
 <!-- ============================================================================
-     RESOLUCIÓN DEL ESTUDIO DE CASO 2 (Unidad 2.7) SOBRE LA CARTERA equipo_01.
+     RESOLUCIÓN DEL ESTUDIO DE CASO 2 (Unidad 2.8) SOBRE LA CARTERA equipo_01.
      Enunciado común: caso2/_unidad_2_7.qmd (17 preguntas de la dirección técnica).
      Trabajamos A CIEGAS con cartera.csv y validamos AL FINAL con cartera.rds
      (attr(cartera,"verdad")).  Semilla de equipo: 260101 (mult_efecto = 0.90).
@@ -58,12 +58,24 @@ select <- dplyr::select
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
+
+# --- Utilidades para citar cifras EN EL TEXTO --------------------------------
+# Las respuestas a la dirección usan R en línea en lugar de números escritos a mano:
+# así el informe sigue siendo cierto aunque se regeneren los datos del equipo.
+f  <- function(x, d = 1) formatC(x, format = "f", digits = d, big.mark = ".", decimal.mark = ",")
+pv <- function(x) if (is.na(x)) "—" else if (x < 1e-4) "< 0,0001" else sub("\\.", ",", format(round(x, 4), scientific = FALSE))
+
+# Extractores sobre una tabla de broom::tidy(exponentiate = TRUE)
+irr <- function(tab, t) tab$estimate[match(t, tab$term)]
+pt  <- function(tab, t) tab$p.value[match(t, tab$term)]
+# IRR -> variación porcentual, con signo y redondeo ("+20" / "-39")
+pc  <- function(x, d = 0) sprintf("%+.*f", d, (x - 1) * 100)
 ```
 
 ## Presentación {#sec-intro}
 
 Resolvemos el encargo de la dirección técnica de la aseguradora
-([enunciado en la Unidad 2.7](../_unidad_2_7.qmd)) sobre **nuestra cartera**
+([enunciado en la Unidad 2.8](../_unidad_2_8.qmd)) sobre **nuestra cartera**
 (`equipo_01`). Cada fila es una **póliza** observada durante su `antiguedad`; la
 **exposición** entra como *offset* (`offset(log(exposicion))`) para modelar
 **tasas** —incidencias por unidad de tiempo expuesto— y no recuentos brutos.
@@ -171,7 +183,7 @@ dispersión real; la medida limpia es el **índice de dispersión** del modelo a
 que calculamos en Q1.)
 :::
 
-# Bloque 2.1 · Ritmo y perfiles (Q1–Q5) {#sec-b21}
+# Bloques 2.1–2.2 · Ritmo, perfiles y asociación (Q1–Q5) {#sec-b21}
 
 ## Q1 · ¿A qué ritmo tienen siniestros las pólizas y qué factores lo mueven —y cuánto? {#sec-q1}
 
@@ -201,43 +213,93 @@ irr_sin
 ```{r}
 #| label: q1-lrt
 # Aporte de cada predictor por razón de verosimilitudes (más fiable que Wald)
-drop1(m_sin, test = "LRT")
+d1_sin <- drop1(m_sin, test = "LRT")
+d1_sin
 ```
 
 ```{r}
 #| label: q1-dispersion
-# ¿Basta la Poisson? Índice de dispersión (puente a la Unidad 2.2 / Q6)
+# ¿Basta la Poisson? Índice de dispersión (puente a la Unidad 2.3 / Q6)
 disp_idx <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
-c(deviance_gl = deviance(m_sin) / df.residual(m_sin),
-  indice_dispersion = disp_idx(m_sin))
+disp_sin <- disp_idx(m_sin)
+c(deviance_gl = deviance(m_sin) / df.residual(m_sin), indice_dispersion = disp_sin)
+```
+
+```{r}
+#| label: q1-cifras
+#| include: false
+rel <- rownames(d1_sin)[-1][d1_sin$`Pr(>Chi)`[-1] < 0.05]           # aportan señal
+irr_ <- rownames(d1_sin)[-1][d1_sin$`Pr(>Chi)`[-1] >= 0.05]         # no aportan
+esp  <- function(v) c(edad_tramo = "la edad", z_carnet = "la antigüedad del carnet",
+                      z_pot = "la potencia", z_antv = "la antigüedad del vehículo",
+                      z_km = "los kilómetros", z_dens = "la densidad",
+                      zona_circulacion = "la zona", uso = "el uso",
+                      tipo_vehiculo = "el tipo de vehículo",
+                      combustible = "el combustible")[v]
+# Coeficientes significativos, ordenados por tamaño del efecto, con nombre legible
+etq <- c("z_dens" = "densidad del domicilio (por DE)", "z_km" = "kilómetros anuales (por DE)",
+         "z_pot" = "potencia (por DE)", "z_antv" = "antigüedad del vehículo (por DE)",
+         "z_carnet" = "antigüedad del carnet (por DE)",
+         "tipo_vehiculomoto" = "moto frente a turismo",
+         "tipo_vehiculofurgoneta" = "furgoneta frente a turismo",
+         "combustiblediesel" = "diésel frente a gasolina",
+         "usocomercial" = "uso comercial", "zona_circulacionmixta" = "zona mixta",
+         "zona_circulacionrural" = "zona rural",
+         "edad_tramo25-35" = "edad 25–35", "edad_tramo35-65" = "edad 35–65",
+         "edad_tramo65+" = "edad 65+")
+sig <- irr_sin |>
+  filter(term != "(Intercept)", p.value < 0.05, term %in% names(etq)) |>
+  mutate(nombre = etq[term]) |> arrange(desc(abs(log(estimate))))
+vinieta <- function(d) paste0("- **", d$nombre, "**: ", pc(d$estimate), " % (IRR ",
+                              f(d$estimate, 3), ", *p* = ", vapply(d$p.value, pv, ""), ").",
+                              collapse = "\n")
+q1 <- list(base = irr(irr_sin, "(Intercept)"),
+           suben = sig |> filter(estimate > 1), bajan = sig |> filter(estimate < 1),
+           relevantes = paste(esp(rel), collapse = ", "),
+           irrelevantes = paste(esp(irr_), collapse = ", "),
+           p_zona = d1_sin["zona_circulacion", "Pr(>Chi)"],
+           disp = disp_sin)
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q1)
-El **ritmo base** —perfil de referencia: 18–25 años, zona urbana, turismo de
-gasolina, uso particular y continuos en su media— es de **≈1.2 siniestros por año**
-de exposición. Sobre él, los factores que **suben** la tasa son:
+El **ritmo base** —perfil de referencia: 18–25 años, zona urbana, turismo de gasolina,
+uso particular y continuos en su media— es de **≈ `r f(q1$base, 2)` siniestros por año**
+de exposición. Sobre él, los factores que **suben** la tasa de forma significativa son:
 
-- **Densidad** del domicilio: **+20 %** por cada DE (IRR 1.198, *p* < 1e-9).
-- **Kilómetros anuales**: **+19 %** por DE (IRR 1.186, *p* < 1e-10).
-- **Moto** frente a turismo: **+31 %** (IRR 1.308, *p* < 0.001).
-- **Diésel** frente a gasolina: **+21 %** (IRR 1.210, *p* = 0.001).
+`r vinieta(q1$suben)`
 
-Y el factor que más la **baja** es la **edad**: los tramos 25–35 y 35–65 tienen un
-**39 %** y un **47 %** menos de tasa que los 18–25 (IRR 0.605 y 0.527, *p* < 1e-5);
-el tramo 65+ no se distingue del joven (IRR 0.79, *p* = 0.20).
+Y los que la **bajan**:
 
-El contraste por razón de verosimilitudes (`drop1`, más fiable que Wald) confirma
-como **relevantes**: edad, km, densidad, zona (en conjunto), tipo de vehículo y
-combustible. **No aportan** señal sobre la tasa: antigüedad del carnet, potencia,
-antigüedad del vehículo ni uso. La **zona** sale significativa en bloque
-(LRT *p* = 3.6e-4: rural ≈ −21 % frente a urbana) pese a que la densidad ya está en
-el modelo, con la que **solapa** (la zona se deriva de la densidad); en la selección
-final conviene quedarse con una de las dos ([Q16](#sec-q16)).
+`r vinieta(q1$bajan)`
 
-**Aviso técnico:** el **índice de dispersión es 1.43** (> 1). Hay **sobredispersión**,
-así que los errores estándar de Wald son algo optimistas; la inferencia se revisa con
-quasi-Poisson / binomial negativa en [Q6](#sec-q6).
+Conviene no leer de más los factores que **no** alcanzan significación: sus intervalos
+incluyen el 1, así que con estos datos no hay evidencia de que muevan la tasa, por
+sugerentes que parezcan sus estimaciones puntuales.
+
+::: {.callout-note}
+## Por qué las dos listas no dicen exactamente lo mismo
+La lista de arriba usa contrastes de **Wald nivel a nivel** («esta categoría frente a su
+referencia»); el `drop1` de abajo contrasta el **factor completo** por razón de
+verosimilitudes («¿aporta algo *el tipo de vehículo*, con todos sus niveles?»). Responden
+a preguntas distintas, así que **pueden discrepar**: un nivel concreto puede rozar la
+significación mientras el factor en bloque no la alcanza, sobre todo si sus otras
+categorías no aportan nada.
+
+Cuando eso ocurre, la lectura prudente es la del **LRT en bloque**: es más fiable con
+conteos y no depende de qué categoría se haya elegido como referencia. Por eso la
+recomendación final de [Q16](#sec-q16) se apoya en él y no en los asteriscos de la tabla.
+:::
+
+El contraste por razón de verosimilitudes (`drop1`, más fiable que Wald) confirma como
+**relevantes**: `r q1$relevantes`. **No aportan** señal sobre la tasa:
+`r q1$irrelevantes`. Ojo con la **zona**: aunque salga significativa en bloque
+(LRT *p* = `r pv(q1$p_zona)`), **solapa** con la densidad —la zona se deriva de ella—,
+así que en la selección final conviene quedarse con una de las dos ([Q16](#sec-q16)).
+
+**Aviso técnico:** el **índice de dispersión es `r f(q1$disp, 2)`**
+`r if (q1$disp > 1.1) "(> 1). Hay **sobredispersión**, así que los errores estándar de Wald son algo optimistas; la inferencia se revisa con quasi-Poisson / binomial negativa en" else "(≈ 1). La Poisson basta; aun así revisamos la dispersión en"`
+[Q6](#sec-q6).
 :::
 
 ## Q2 · Ritmo esperado, con su margen, de una póliza nueva {#sec-q2}
@@ -278,9 +340,10 @@ c(tasa_esperada = est, ic95_inf = ic["lo"], ic95_sup = ic["hi"])
 ## Respuesta a la dirección (Q2)
 Para una **póliza nueva** de perfil *35–65 años, turismo de gasolina, uso
 particular, zona urbana, 140 CV, 15.000 km/año, densidad 1.500 hab/km², 18 años de
-carnet y 8 de antigüedad del vehículo*, el modelo estima **≈ 0.88 siniestros al año**
-(ventana de exposición completa), con **IC 95 % [0.73, 1.05]** —algo menos de un
-parte anual, con un margen de ±15 %—.
+carnet y 8 de antigüedad del vehículo*, el modelo estima
+**≈ `r f(est, 2)` siniestros al año** (ventana de exposición completa), con
+**IC 95 % [`r f(ic[["lo"]], 2)`, `r f(ic[["hi"]], 2)`]** —un margen de
+±`r f((ic[["hi"]] - ic[["lo"]]) / 2 / est * 100)` %—.
 
 **Cautela:** ese intervalo recoge solo la **incertidumbre de estimación** de los
 coeficientes. La sobredispersión detectada ([Q6](#sec-q6)–[Q7](#sec-q7)) implica que
@@ -317,87 +380,154 @@ comp <- irr_sin |>
 comp
 ```
 
+```{r}
+#| label: q3-cifras
+#| include: false
+g <- function(t) list(s = irr(irr_sin, t), a = irr(irr_asist, t),
+                      ps = pt(irr_sin, t), pa = pt(irr_asist, t))
+q3 <- list(km = g("z_km"), dens = g("z_dens"), dies = g("combustiblediesel"),
+           moto = g("tipo_vehiculomoto"), com = g("usocomercial"), ed = g("edad_tramo35-65"))
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q3)
-**No siguen el mismo patrón.** Coinciden en dos cosas: la tasa baja con la edad y
-sube con los kilómetros (IRR ≈ 1.18 en ambas respuestas). Pero **divergen** en el
-resto:
+**No siguen el mismo patrón.** Coinciden en lo que depende de la **exposición**: ambas
+suben con los kilómetros (IRR `r f(q3$km$s, 2)` en siniestros y `r f(q3$km$a, 2)` en
+asistencias) y bajan con la edad. Pero **divergen** en el resto:
 
-- Los **siniestros** los mueven la **densidad** (IRR 1.198\*\*\*), el **diésel**
-  (1.210\*\*) y la **moto** (1.308\*\*\*) —factores que en las **asistencias** son
-  planos (densidad 0.99, diésel 1.04, moto 1.10\*)—.
-- Al revés, las **asistencias** las dispara el **uso comercial** (IRR 1.172\*\*\*),
-  que en los siniestros es **indiferente** (1.02, *p* = 0.80).
-- La **edad** pesa mucho más en los siniestros (35–65: −47 %) que en las asistencias
-  (−21 %).
+- Los **siniestros** los mueven la **densidad** (IRR `r f(q3$dens$s, 3)`,
+  *p* = `r pv(q3$dens$ps)`), el **diésel** (`r f(q3$dies$s, 3)`) y la **moto**
+  (`r f(q3$moto$s, 3)`) —factores que en las **asistencias** son prácticamente planos:
+  densidad `r f(q3$dens$a, 2)` (*p* = `r pv(q3$dens$pa)`), diésel `r f(q3$dies$a, 2)`,
+  moto `r f(q3$moto$a, 2)`—.
+- Al revés, las **asistencias** las dispara el **uso comercial**
+  (IRR `r f(q3$com$a, 3)`, *p* = `r pv(q3$com$pa)`), que en los siniestros es
+  **indiferente** (`r f(q3$com$s, 2)`, *p* = `r pv(q3$com$ps)`).
+- La **edad** pesa más en los siniestros (35–65: `r pc(q3$ed$s)` %) que en las
+  asistencias (`r pc(q3$ed$a)` %).
 
-Para la dirección: las **asistencias en carretera responden sobre todo a la
-exposición y el uso** (kilómetros y uso comercial) y **no replican el mapa de riesgo
-de siniestralidad**. Gestionarlas o tarificarlas con el modelo de siniestros sería
-un error: son fenómenos con estructuras de riesgo distintas.
+Para la dirección: las **asistencias responden sobre todo a la exposición y al uso**
+—kilómetros y uso comercial— y **no replican el mapa de riesgo de siniestralidad**.
+Gestionarlas o tarificarlas con el modelo de siniestros sería un error: son fenómenos
+con estructuras de riesgo distintas.
 :::
 
-## Q4 · ¿Están asociados tipo de vehículo, zona y uso con tener o no siniestro? {#sec-q4}
+## Q4 · ¿Quién está asociado con quién: tipo, zona, combustible y siniestro? {#sec-q4}
 
 ::: {.callout-note}
 ## Lo que pregunta la dirección (Q4)
-> ¿Están **asociados** el tipo de vehículo, la zona y el uso con tener o no algún
-> siniestro, o son **independientes** entre sí?
+> ¿Están **asociados** entre sí el tipo de vehículo, la zona y el combustible, y con
+> tener o no algún siniestro? Nos interesa saber **quién con quién**: si dos de ellos
+> parecen ir juntos solo porque ambos se relacionan con un tercero, no queremos
+> confundirnos.
 :::
 
-**Objetivo y método.** Construimos la **tabla de contingencia** de los recuentos de
-celda `tipo_vehiculo × zona_circulacion × uso × tuvo_siniestro` y ajustamos
-**modelos log-lineales** de Poisson sobre esas frecuencias, comparando
-independencia mutua frente a modelos con asociación (LRT y AIC).
+**Objetivo y método.** El dato aquí no es la póliza sino la **celda**: cruzamos los
+cuatro factores y modelamos las **frecuencias de celda** con log-lineales de Poisson
+([Unidad 2.2](../caso2_conteos.qmd#sec-u22)). Con cuatro factores no tiene sentido
+enumerar modelos, así que recorremos la jerarquía **por orden de interacción**, fijamos
+el orden máximo necesario y podamos dentro de él.
 
 ```{r}
 #| label: q4-tabla
 tab4 <- cartera |>
   mutate(siniestro = ifelse(tuvo_siniestro > 0, "si", "no")) |>
-  count(tipo_vehiculo, zona_circulacion, uso, siniestro, name = "n") |>
-  tidyr::complete(tipo_vehiculo, zona_circulacion, uso, siniestro,
-                  fill = list(n = 0))   # incluye celdas vacías (frecuencia 0)
-head(tab4)
+  count(tipo_vehiculo, zona_circulacion, combustible, siniestro, name = "n") |>
+  tidyr::complete(tipo_vehiculo, zona_circulacion, combustible, siniestro,
+                  fill = list(n = 0))   # conserva las celdas de frecuencia 0
 
-# Independencia mutua (solo efectos principales) vs modelo homogéneo (todas las
-# interacciones de 2 factores) vs saturado.
-f_indep  <- n ~ tipo_vehiculo + zona_circulacion + uso + siniestro
-f_homog  <- n ~ (tipo_vehiculo + zona_circulacion + uso + siniestro)^2
-f_sat    <- n ~ tipo_vehiculo * zona_circulacion * uso * siniestro
-
-m4_indep <- glm(f_indep, family = poisson, data = tab4)
-m4_homog <- glm(f_homog, family = poisson, data = tab4)
-m4_sat   <- glm(f_sat,   family = poisson, data = tab4)
-
-AIC(m4_indep, m4_homog, m4_sat)
-anova(m4_indep, m4_homog, test = "LRT")
+# Antes de cualquier p-valor: ¿hay datos suficientes en todas las celdas?
+c(celdas = nrow(tab4), minimo = min(tab4$n),
+  menores_de_5 = sum(tab4$n < 5), vacias = sum(tab4$n == 0))
 ```
 
 ```{r}
-#| label: q4-asociacion-siniestro
-# ¿Con qué factores se asocia específicamente 'tener siniestro'? Añadimos, una a una,
-# la interacción de cada factor con 'siniestro' sobre el modelo de independencia.
-add1(m4_indep, scope = ~ . + tipo_vehiculo:siniestro + zona_circulacion:siniestro +
-       uso:siniestro, test = "LRT")
+#| label: q4-jerarquia
+F <- c("tipo_vehiculo", "zona_circulacion", "combustible", "siniestro")
+ordenes <- list(
+  "1 · solo principales"  = reformulate(F, "n"),
+  "2 · todas las dobles"  = reformulate(sprintf("(%s)^2", paste(F, collapse = " + ")), "n"),
+  "3 · todas las triples" = reformulate(sprintf("(%s)^3", paste(F, collapse = " + ")), "n"),
+  "4 · saturado"          = reformulate(paste(F, collapse = " * "), "n"))
+
+purrr::map_dfr(names(ordenes), ~ {
+  m <- glm(ordenes[[.x]], family = poisson, data = tab4); gl <- df.residual(m)
+  tibble::tibble(orden = .x, parametros = length(coef(m)), gl = gl,
+                 deviance = round(deviance(m), 2),
+                 p_ajuste = if (gl > 0) round(pchisq(deviance(m), gl, lower.tail = FALSE), 4)
+                            else NA_real_,
+                 AIC = round(AIC(m), 1))})
+```
+
+Fijado el orden, **podamos dentro de él**: partimos del modelo de independencia mutua y
+añadimos, una a una, cada asociación de dos factores.
+
+```{r}
+#| label: q4-poda
+m4_indep <- glm(ordenes[["1 · solo principales"]], family = poisson, data = tab4)
+add1(m4_indep,
+     scope = ~ . + tipo_vehiculo:zona_circulacion + tipo_vehiculo:combustible +
+       tipo_vehiculo:siniestro + zona_circulacion:combustible +
+       zona_circulacion:siniestro + combustible:siniestro,
+     test = "LRT")
+```
+
+```{r}
+#| label: q4-modelo-final
+# Modelo que sobrevive a la poda: cada factor de perfil con el siniestro, y nada más.
+m4_final <- glm(n ~ tipo_vehiculo + zona_circulacion + combustible + siniestro +
+                  tipo_vehiculo:siniestro + zona_circulacion:siniestro +
+                  combustible:siniestro,
+                family = poisson, data = tab4)
+c(deviance = round(deviance(m4_final), 2), gl = df.residual(m4_final),
+  p_ajuste = round(pchisq(deviance(m4_final), df.residual(m4_final),
+                          lower.tail = FALSE), 4))
+
+# Diagnóstico de celda: ¿falla el modelo en alguna combinación concreta?
+tab4 |>
+  mutate(esperado = round(fitted(m4_final), 1),
+         r_ajustado = round(rstandard(m4_final, type = "pearson"), 2)) |>
+  arrange(desc(abs(r_ajustado))) |>
+  head(5)
+```
+
+**¿Cambia la conclusión al colapsar?** La pregunta de la dirección —«si dos van juntos
+solo por culpa de un tercero»— se responde comparando el odds ratio **marginal** de un
+factor con el siniestro y el **condicional** a los otros dos.
+
+```{r}
+#| label: q4-marginal-vs-condicional
+or_marg <- exp(coef(glm(I(siniestro == "si") ~ zona_circulacion, family = binomial,
+                        weights = n, data = tab4))[-1])
+or_cond <- exp(coef(glm(I(siniestro == "si") ~ zona_circulacion + tipo_vehiculo +
+                          combustible, family = binomial, weights = n, data = tab4))[2:3])
+rbind(marginal = or_marg, condicional = or_cond) |> round(3)
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q4)
-**Se rechaza la independencia.** El log-lineal de independencia mutua ajusta peor que
-el de todas las interacciones de dos factores (LRT: deviance 29.7, 13 gl,
-*p* = 0.005; y el AIC prefiere el homogéneo, 236.5 frente a 240.3).
+La respuesta corta: **los tres factores de perfil son independientes entre sí, y cada
+uno se asocia por separado con tener o no siniestro.** No hay ningún par que «vaya
+junto» por culpa de un tercero.
 
-Mirando específicamente **con qué se asocia tener o no siniestro** (`add1`):
+Cómo se llega ahí. Subiendo por orden de interacción, **no hace falta pasar del segundo
+orden**: las interacciones triples no aportan. Y al podar dentro del segundo orden,
+sobreviven exactamente las tres asociaciones **de cada factor con el siniestro**
+(`tipo:siniestro`, `zona:siniestro`, `combustible:siniestro`) y **ninguna** de las tres
+que emparejarían los factores de perfil entre sí. En notación log-lineal, el modelo es
+$[TS][ZS][CS]$, que se lee así:
 
-- **Zona de circulación**: asociación **fuerte** (LRT 15.8, *p* = 3.6e-4).
-- **Tipo de vehículo**: asociación **moderada** (LRT 8.3, *p* = 0.016).
-- **Uso**: **sin** asociación con tener siniestro (LRT 0.54, *p* = 0.46).
+> **tipo, zona y combustible son mutuamente independientes dado el siniestro**, y cada
+> uno modifica por su cuenta la probabilidad de tenerlo.
 
-Es coherente con [Q1](#sec-q1): **zona y tipo de vehículo discriminan** el riesgo de
-sufrir algún parte; el **uso, no**. Leído como cocientes de ventajas, las zonas más
-urbanas y la moto elevan las probabilidades de tener al menos un siniestro. (Los tres
-factores de perfil sí están asociados **entre sí** —el modelo homogéneo mejora al de
-independencia—, pero para la dirección lo relevante es su asociación con el siniestro.)
+Esto tiene una consecuencia práctica que responde literalmente a la pregunta: como los
+factores de perfil **no** están asociados entre sí, **colapsar la tabla es legítimo** y
+los odds ratios marginales y condicionales coinciden (última tabla). Es decir: podéis
+mirar cada factor por separado sin miedo a confundiros —algo que **no** hay que dar por
+supuesto, y que aquí hemos comprobado en vez de suponerlo—.
+
+Es además coherente con [Q1](#sec-q1): los mismos factores que mueven la **tasa** de
+siniestros mueven la **probabilidad de tener al menos uno**.
 :::
 
 ## Q5 · Movilidad del bonus-malus: ¿vaivén equilibrado o deriva? {#sec-q5}
@@ -406,12 +536,16 @@ independencia—, pero para la dirección lo relevante es su asociación con el 
 ## Lo que pregunta la dirección (Q5)
 > Reevaluamos el **bonus-malus** cada año: ¿cómo se mueven las pólizas de un nivel
 > a otro? ¿Es un vaivén equilibrado o hay **deriva** (empeoran más de las que
-> mejoran)?
+> mejoran)? ¿Y tiene ese movimiento alguna **regularidad** que podamos resumir en
+> pocos números, o hay que mirar las 25 casillas una a una?
 :::
 
 **Objetivo y método.** Sobre la **tabla cuadrada** `bonus_malus_prev × bonus_malus_act`
-contrastamos **simetría** y **homogeneidad marginal** (modelos log-lineales para
-tablas cuadradas) y medimos la **deriva**.
+contrastamos **simetría** y **homogeneidad marginal** (modelos log-lineales para tablas
+cuadradas) y medimos la **deriva**. Después aprovechamos que los niveles están
+**ordenados** para buscar la regularidad que pide la dirección: un modelo de
+**asociación uniforme** que resuma la tabla en un solo parámetro, más un término de
+**inercia** para la diagonal.
 
 ```{r}
 #| label: q5-tabla
@@ -460,26 +594,94 @@ c(media_previo = mean(prev_num), media_actual = mean(act_num),
   pct_estable  = round(mean(act_num == prev_num) * 100, 1))
 ```
 
+**¿Hay regularidad, o hay que mirar las 25 casillas?** El saturado gasta $(5-1)^2 = 16$
+grados de libertad en la asociación. Como los niveles están **ordenados**, probamos a
+resumirla en **uno solo** (asociación uniforme) y añadimos después un indicador de
+**permanencia** en el nivel:
+
+```{r}
+#| label: q5-ordinal
+m_ind_c <- glm(Freq ~ factor(i) + factor(j),                family = poisson, data = cuad)
+m_unif  <- glm(Freq ~ factor(i) + factor(j) + I(i * j),     family = poisson, data = cuad)
+
+cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
+m_mov <- glm(Freq ~ factor(i) + factor(j) + I(i * j) + diagonal,
+             family = poisson, data = cuad)
+
+# ¿Aporta cada término? ¿Y ajusta el modelo en términos absolutos?
+anova(m_ind_c, m_unif, m_mov, test = "LRT")
+
+purrr::map_dfr(list(independencia = m_ind_c, uniforme = m_unif, `uniforme+inercia` = m_mov),
+               ~ tibble::tibble(gl = df.residual(.x), deviance = round(deviance(.x), 1),
+                                p_ajuste = round(pchisq(deviance(.x), df.residual(.x),
+                                                        lower.tail = FALSE), 4)),
+               .id = "modelo")
+
+# El nivel de referencia de `diagonal` es "mueve", así que el coeficiente mide
+# cuántas veces más poblada está la diagonal de lo que predice la asociación suave.
+c(OR_local = round(exp(coef(m_unif)[["I(i * j)"]]), 3),
+  factor_permanencia = round(exp(coef(m_mov)[["diagonalqueda"]]), 2))
+```
+
+```{r}
+#| label: q5-cifras
+#| include: false
+# Cifras que se citan en la respuesta, calculadas (no escritas a mano) para que el
+# texto siga siendo cierto si se regeneran los datos.
+q5 <- list(
+  dev_sim  = deviance(m_sim),  gl_sim = df.residual(m_sim),
+  p_sim    = pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE),
+  dev_hm   = test_hm$Deviance[2], gl_hm = test_hm$Df[2], p_hm = test_hm$`Pr(>Chi)`[2],
+  mejora   = mean(act_num < prev_num) * 100,
+  empeora  = mean(act_num > prev_num) * 100,
+  estable  = mean(act_num == prev_num) * 100,
+  m_prev   = mean(prev_num), m_act = mean(act_num),
+  deriva   = mean(act_num - prev_num),
+  or_local = exp(coef(m_unif)[["I(i * j)"]]),
+  perman   = exp(coef(m_mov)[["diagonalqueda"]]),
+  dev_ind  = deviance(m_ind_c),
+  dev_unif = deviance(m_unif), gl_unif = df.residual(m_unif),
+  dev_mov  = deviance(m_mov),  gl_mov  = df.residual(m_mov),
+  p_inercia = anova(m_unif, m_mov, test = "LRT")$`Pr(>Chi)`[2])
+q5$sentido <- if (q5$deriva < 0) "hacia **mejor** (hacia *bonus*)" else "hacia **peor** (hacia *malus*)"
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q5)
-El cambio de bonus-malus **no es simétrico ni marginalmente homogéneo**: se rechazan
-ambas hipótesis con contundencia (simetría: deviance 436.2, 10 gl, *p* ≈ 1.8e-87;
-homogeneidad marginal —simetría dada la cuasi-simetría—: deviance 409.6, 4 gl,
-*p* ≈ 2.3e-87). Hay **deriva**, pero **hacia mejor, no hacia peor**:
+**No es un vaivén equilibrado.** El cambio de bonus-malus no es ni simétrico ni
+marginalmente homogéneo: se rechazan ambas hipótesis (simetría: deviance
+`r f(q5$dev_sim)` con `r q5$gl_sim` gl, *p* = `r format.pval(q5$p_sim, digits = 2)`;
+homogeneidad marginal, como simetría dada la cuasi-simetría: `r f(q5$dev_hm)` con
+`r q5$gl_hm` gl, *p* = `r format.pval(q5$p_hm, digits = 2)`).
 
-- El **22.5 %** de las pólizas **mejora** de nivel (baja hacia *bonus*), frente a
-  solo un **4.3 %** que **empeora**; el **73.1 %** se mantiene.
-- El nivel medio cae de **2.11 a 1.93** (deriva −0.18).
-- Los marginales lo confirman: el mejor nivel (1) pasa del **43.7 % al 51.8 %** de la
-  cartera, mientras los niveles peores se vacían.
+Hay **deriva**, y va `r q5$sentido`:
 
-Para la dirección: **no es un vaivén equilibrado**; el sistema de bonificación actúa
-como un mecanismo de **mejora neta** —la cartera migra año a año hacia tarifas más
-bajas—. Conviene incorporarlo al proyectar ingresos por primas (la prima media por
-bonus-malus tenderá a bajar si el patrón se mantiene).
+- El **`r f(q5$mejora)` %** de las pólizas **mejora** de nivel, frente al
+  **`r f(q5$empeora)` %** que **empeora**; el **`r f(q5$estable)` %** se mantiene.
+- El nivel medio pasa de **`r f(q5$m_prev, 2)`** a **`r f(q5$m_act, 2)`**
+  (deriva `r f(q5$deriva, 3)`).
+
+**Y sí, hay una regularidad muy fuerte: basta un número.** No hace falta mirar las 25
+casillas.
+
+- Un solo parámetro de **asociación uniforme** —un odds ratio local de
+  **`r f(q5$or_local, 1)`**, el mismo para cualquier par de niveles contiguos— sustituye
+  a los 16 grados de libertad de la interacción saturada por **uno**, y absorbe el
+  **`r f((1 - q5$dev_unif / q5$dev_ind) * 100)` %** de la asociación: la deviance cae de
+  `r f(q5$dev_ind, 0)` (independencia) a `r f(q5$dev_unif, 1)`.
+- Añadir un término de **inercia** para la diagonal
+  `r if (q5$p_inercia < 0.05) paste0("aporta algo más (la deviance baja a ", f(q5$dev_mov, 1), ", *p* = ", pv(q5$p_inercia), ")") else paste0("**ya no aporta** (*p* = ", pv(q5$p_inercia), "): el gradiente ordinal se basta para explicar la concentración en la diagonal")`.
+- Aviso de rigor: aunque la simplificación sea espectacular, el modelo **no ajusta en
+  términos absolutos** (deviance `r f(q5$dev_unif, 1)` con `r q5$gl_unif` gl). Es un
+  resumen excelente, no una descripción exacta.
+
+El mensaje operativo: **la mayoría de las pólizas no se mueve, y entre las que se mueven
+el salto tiende a ser corto y con una dirección neta clara**. Para proyectar ingresos
+por primas, eso permite modelar la transición con **un solo parámetro de movilidad**
+más los marginales, en lugar de con una matriz entera de 25 casillas.
 :::
 
-# Bloque 2.2–2.3 · Variabilidad y ceros (Q6–Q8) {#sec-b22}
+# Bloques 2.3–2.4 · Variabilidad y ceros (Q6–Q8) {#sec-b22}
 
 ## Q6 · ¿Refleja el modelo la enorme variabilidad, o se queda corto? {#sec-q6}
 
@@ -490,7 +692,7 @@ bonus-malus tenderá a bajar si el patrón se mantiene).
 > **tarifa** y para lo fiables que son vuestros números?
 :::
 
-**Objetivo y método.** En Q1 vimos un índice de dispersión **1.43 > 1**: la Poisson
+**Objetivo y método.** En Q1 vimos un índice de dispersión **> 1**: la Poisson
 **subestima la variabilidad**. Comparamos tres tratamientos de la **sobredispersión**
 sobre `n_siniestros`: Poisson (referencia), **quasi-Poisson** (corrige los errores
 estándar con un factor de escala) y **binomial negativa** (NB2: añade un parámetro de
@@ -538,27 +740,41 @@ c(AIC_pois = AIC(m_pois), AIC_nb = AIC(m_nb),
   LRT_theta = as.numeric(2 * (logLik(m_nb) - logLik(m_pois))))
 ```
 
+```{r}
+#| label: q6-cifras
+#| include: false
+q6 <- list(phi = summary(m_quasi)$dispersion, theta = m_nb$theta,
+           aic_p = AIC(m_pois), aic_nb = AIC(m_nb),
+           lrt = as.numeric(2 * (logLik(m_nb) - logLik(m_pois))),
+           ensancha = mean(comp_se$se_nb / comp_se$se_pois, na.rm = TRUE))
+# términos que dejan de ser significativos al usar errores honestos
+fr <- comp_se$term[comp_se$p_pois < 0.05 & comp_se$p_nb >= 0.05]
+q6$frontera <- if (length(fr)) unname(ifelse(is.na(etq[fr]), fr, etq[fr])) else character(0)
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q6)
 **El modelo Poisson se queda corto: subestima la variabilidad.** El parámetro de
-dispersión quasi es **1.43** (test de sobredispersión *p* < 0.001), es decir, la
-varianza real es un 43 % mayor que la que asume la Poisson. Las tres lecturas:
+dispersión quasi es **`r f(q6$phi, 2)`** (test de sobredispersión *p* < 0,001): la
+varianza real es un **`r pc(q6$phi)` %** mayor que la que asume la Poisson. Tres
+lecturas:
 
-- **Los puntos no cambian** —las tasas estimadas (IRR) son las mismas—, lo que
-  cambia son los **márgenes**.
-- **Quasi-Poisson** ensancha los errores estándar por un factor √1.43 ≈ 1.20; la
-  **binomial negativa** (NB2, θ = 0.94) los ensancha algo más y **ajusta mucho
-  mejor** (AIC 4608 frente a 4802; el parámetro extra gana un LRT de 197 sobre 1 gl).
-- Con esos **errores honestos**, los predictores fuertes (edad, km, densidad, moto,
-  diésel) **siguen siendo significativos**, pero los de frontera se caen: la zona
-  rural pasa de *p* = 0.08 (Poisson) a *p* = 0.36 (NB) —deja de ser evidencia—.
+- **Los puntos no cambian** —las tasas estimadas (IRR) son las mismas—; lo que cambia
+  son los **márgenes**.
+- **Quasi-Poisson** ensancha los errores estándar por un factor
+  √`r f(q6$phi, 2)` ≈ `r f(sqrt(q6$phi), 2)`; la **binomial negativa**
+  (NB2, θ = `r f(q6$theta, 2)`) los ensancha en promedio un
+  **`r pc(q6$ensancha)` %** y **ajusta mucho mejor**: AIC `r f(q6$aic_nb, 0)` frente a
+  `r f(q6$aic_p, 0)`, con el parámetro extra ganando un LRT de `r f(q6$lrt, 0)` sobre 1 gl.
+- Con esos **errores honestos**, los predictores fuertes **siguen siendo
+  significativos**`r if (length(q6$frontera)) paste0(", pero los que estaban en la frontera dejan de serlo: ", paste(q6$frontera, collapse = ", ")) else " y ninguno se cae por el camino"`.
 
 **Qué implica para la tarifa.** El ritmo medio por perfil no cambia, pero su
-**fiabilidad sí**: los intervalos correctos son ~20–30 % más anchos que los que daba
-la Poisson. Recomendamos la **binomial negativa** como modelo de referencia (es una
+**fiabilidad sí**: los intervalos correctos son sensiblemente más anchos que los de la
+Poisson. Recomendamos la **binomial negativa** como modelo de referencia —es una
 verosimilitud completa, permite intervalos de predicción y modela la heterogeneidad
-—[Q7](#sec-q7)—); usar la Poisson simple daría una falsa sensación de precisión y
-provisiones/recargos infravalorados.
+([Q7](#sec-q7))—; usar la Poisson simple daría una falsa sensación de precisión y
+provisiones o recargos infravalorados.
 :::
 
 ## Q7 · ¿Hay pólizas intrínsecamente más siniestrosas que las variables no capturan? {#sec-q7}
@@ -602,14 +818,15 @@ c(var_gamma_implicada_NB = 1 / m_nb$theta, var_lognormal_OLRE = sigma2)
 ## Respuesta a la dirección (Q7)
 **Sí: hay pólizas intrínsecamente más siniestrosas que las variables no capturan.**
 El intercepto aleatorio por póliza (OLRE) estima una **fragilidad** con varianza
-**1.13** en la escala log, lo que equivale a un **multiplicador de riesgo** individual
-con **coeficiente de variación ≈ 1.45**: más allá de edad, km, densidad, etc., unas
-pólizas arrastran un riesgo varias veces superior al de otras del mismo perfil.
+**`r f(sigma2, 2)`** en la escala log, lo que equivale a un **multiplicador de riesgo**
+individual con **coeficiente de variación ≈ `r f(sqrt(exp(sigma2) - 1), 2)`**: más allá
+de edad, km, densidad, etc., unas pólizas arrastran un riesgo varias veces superior al
+de otras del mismo perfil.
 
-Las **dos rutas coinciden**: la binomial negativa (mezcla Poisson-**Gamma**) implica
-una varianza de fragilidad de 1/θ = **1.07**, y el OLRE (mezcla Poisson-**lognormal**)
-da **1.13** —esencialmente lo mismo—. Es decir, la sobredispersión de [Q6](#sec-q6)
-**no es ruido**: es **heterogeneidad no observada** real.
+Las **dos rutas coinciden**: la binomial negativa (mezcla Poisson-**Gamma**) implica una
+varianza de fragilidad de 1/θ = **`r f(1 / m_nb$theta, 2)`**, y el OLRE (mezcla
+Poisson-**lognormal**) da **`r f(sigma2, 2)`** —esencialmente lo mismo—. Es decir, la
+sobredispersión de [Q6](#sec-q6) **no es ruido**: es **heterogeneidad no observada** real.
 
 Esta fragilidad es el **hilo que recorre el caso**: reaparecerá como **efecto
 aleatorio** cuando la agrupación sea la agencia ([Q9](#sec-q9), mixtos) y como
@@ -666,26 +883,42 @@ pscl::vuong(m_zip, m_pois_fr)
 summary(m_zip)
 ```
 
+```{r}
+#| label: q8-cifras
+#| include: false
+aics <- AIC(m_pois_fr, m_zip, m_zinb, m_hurdle)
+vg   <- pscl::vuong(m_zip, m_pois_fr)
+cz   <- coef(summary(m_zip))
+q8 <- list(pct_ceros = mean(cartera$n_fraude == 0) * 100,
+           mejor = rownames(aics)[which.min(aics$AIC)],
+           aic = setNames(round(aics$AIC), rownames(aics)),
+           p_estructural = plogis(cz$zero["(Intercept)", "Estimate"]) * 100,
+           b_pot_zero = cz$zero["z_pot", "Estimate"],
+           p_pot_zero = cz$zero["z_pot", "Pr(>|z|)"],
+           b_uso_cnt  = cz$count["usocomercial", "Estimate"],
+           p_uso_cnt  = cz$count["usocomercial", "Pr(>|z|)"])
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q8)
-**Sí, hay dos tipos de póliza, y el modelo de mezcla lo captura.** El **inflado de
-ceros** (ZIP) es el que mejor ajusta —AIC 2815, frente a 2894 del Poisson simple y
-**2986 del *hurdle***— y bate al Poisson en el test de Vuong (*z* = 4.35,
-*p* < 1e-5). Que la **mezcla** (zero-inflated) gane a la **barrera** (hurdle) es la
-clave conceptual: los ceros **no** vienen de un único mecanismo de barrera, sino de
-una **mezcla** de pólizas "inmunes" (que por su naturaleza nunca levantan revisión)
-con pólizas que siguen un proceso de conteo (y que también pueden dar cero).
+**Sí, hay dos tipos de póliza, y el modelo de mezcla lo captura.** Con un
+**`r f(q8$pct_ceros)` %** de ceros en `n_fraude`, el **inflado de ceros** (ZIP) es el que
+mejor ajusta —AIC `r q8$aic[["m_zip"]]`, frente a `r q8$aic[["m_pois_fr"]]` del Poisson
+simple y `r q8$aic[["m_hurdle"]]` del *hurdle*— y bate al Poisson en el test de Vuong
+(*z* = `r f(vg[1, "z-statistic"], 2)`). Que la **mezcla** (zero-inflated) gane a la
+**barrera** (hurdle) es la clave conceptual: los ceros **no** vienen de un único
+mecanismo de barrera, sino de una **mezcla** de pólizas «inmunes» —que por su naturaleza
+nunca levantan revisión— con pólizas que siguen un proceso de conteo y que también
+pueden dar cero.
 
 Las **dos partes** del modelo:
 
-- **Parte de inflación** (logit de ser un *cero estructural*, "nunca levanta
-  revisión"): probabilidad base ≈ 59 % (intercepto 0.36, *p* = 0.03). Depende sobre
-  todo de la **potencia** (coef. −0.60 por DE, *p* < 0.001): **a más potencia, menos
-  probabilidad de ser "inmune"** —los coches potentes acaban levantando revisión—; y,
-  más débilmente, del uso comercial (−0.53, *p* = 0.11).
-- **Parte de conteo** (riesgo de fraude entre las que *sí pueden* levantarlo): la
-  sube el **uso comercial** (coef. +0.34, *p* = 0.05); potencia y tipo no se
-  distinguen aquí.
+- **Parte de inflación** (logit de ser un *cero estructural*): probabilidad base
+  ≈ `r f(q8$p_estructural)` %. Depende sobre todo de la **potencia**
+  (coef. `r f(q8$b_pot_zero, 2)` por DE, *p* = `r pv(q8$p_pot_zero)`): **a más potencia,
+  menos probabilidad de ser «inmune»** —los coches potentes acaban levantando revisión—.
+- **Parte de conteo** (riesgo de fraude entre las que *sí pueden* levantarlo): la sube
+  el **uso comercial** (coef. `r f(q8$b_uso_cnt, 2)`, *p* = `r pv(q8$p_uso_cnt)`).
 
 **Cómo distinguir ambos tipos.** No con certeza póliza a póliza, pero el modelo
 asigna a cada cero una **probabilidad posterior de ser estructural**: las de **baja
@@ -694,7 +927,7 @@ potencia / uso comercial** son "aún no lo han hecho" (esperables de revisar). E
 permite **priorizar recursos antifraude** sobre el segundo grupo.
 :::
 
-# Bloque 2.4 · Agencias y territorio (Q9–Q12) {#sec-b24}
+# Bloque 2.5 · Agencias y territorio (Q9–Q12) {#sec-b24}
 
 ## Q9 · ¿El volumen de gestiones depende de la agencia? ¿Cuánta variación es suya? {#sec-q9}
 
@@ -719,7 +952,8 @@ summary(m_gest_ag)
 
 ```{r}
 #| label: q9-icc
-performance::icc(m_gest_ag)
+icc_ag <- performance::icc(m_gest_ag)
+icc_ag
 
 # Varianza de agencia (escala log) y su lectura multiplicativa
 vc_ag <- glmmTMB::VarCorr(m_gest_ag)$cond$id_agencia
@@ -730,15 +964,15 @@ c(sd_agencia_log = sd_ag,
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q9)
-**El volumen de gestiones depende, y mucho, de la agencia.** El **ICC es 0.33**: un
-**33 % de la variación** (una vez descontado el perfil de la póliza) es **entre
-agencias**, no de la propia póliza. La desviación típica de agencia es 0.45 en escala
-log, lo que se traduce en un **rango multiplicativo** amplio: una agencia situada una
-DE por encima de la media tramita **≈ +58 %** de gestiones por unidad de exposición, y
-una DE por debajo, **≈ −37 %** (factores ×1.58 y ×0.63). Del lado del perfil, solo la
-**potencia** mueve las gestiones (+11 %/DE); edad y uso apenas. Conclusión: gran parte
-del volumen es **efecto de la agencia**, lo que justifica modelizarla como nivel
-propio y no meterla como una covariable más.
+**El volumen de gestiones depende, y mucho, de la agencia.** El **ICC es
+`r f(icc_ag$ICC_adjusted, 2)`**: un **`r f(icc_ag$ICC_adjusted * 100)` % de la
+variación** —descontado ya el perfil de la póliza— es **entre agencias**, no de la
+propia póliza. La desviación típica de agencia es `r f(sd_ag, 2)` en escala log, lo que
+se traduce en un **rango multiplicativo** amplio: una agencia situada una DE por encima
+de la media tramita **≈ `r pc(exp(sd_ag))` %** de gestiones por unidad de exposición, y
+una DE por debajo, **≈ `r pc(exp(-sd_ag))` %** (factores ×`r f(exp(sd_ag), 2)` y
+×`r f(exp(-sd_ag), 2)`). Conclusión: gran parte del volumen es **efecto de la agencia**,
+lo que justifica modelizarla como **nivel propio** y no meterla como una covariable más.
 :::
 
 ## Q10 · ¿Hay efecto de región por encima de las agencias? {#sec-q10}
@@ -767,19 +1001,23 @@ c(var_region = var_reg, var_agencia = var_ag,
   pct_region_del_agrupamiento = round(var_reg / (var_reg + var_ag) * 100, 1))
 
 # ¿Aporta la región? LRT del modelo con y sin nivel región
-anova(m_gest_ag, m_gest_reg)
+lrt_reg <- anova(m_gest_ag, m_gest_reg)
+lrt_reg
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q10)
-**Sí hay un efecto de región por encima de las agencias**, aunque menor que el de
-agencia. Al añadir el nivel territorial, la variación de agrupamiento (0.207) se
-reparte en **región 0.081** y **agencia 0.126**: un **39 % es territorial** y el
-**61 % restante es propio de cada agencia** dentro de su región. El contraste confirma
-que la región **aporta** (LRT χ² = 5.5, 1 gl, *p* = 0.019). En términos prácticos, las
-regiones difieren entre sí (una DE regional ≈ ±30 % de tasa), pero **dónde está la
-agencia dentro de la región pesa más** que la región en sí: la gestión es sobre todo
-un fenómeno **local de agencia**, con un fondo regional real pero secundario.
+**Sí hay un efecto de región por encima de las agencias**, aunque menor que el de la
+agencia. Al añadir el nivel territorial, la variación de agrupamiento se reparte en
+**región `r f(var_reg, 3)`** y **agencia `r f(var_ag, 3)`**: un
+**`r f(var_reg / (var_reg + var_ag) * 100)` % es territorial** y el resto es propio de
+cada agencia dentro de su región. El contraste confirma que la región **aporta**
+(LRT χ² = `r f(lrt_reg$Chisq[2], 1)`, `r lrt_reg[["Chi Df"]][2]` gl,
+*p* = `r pv(lrt_reg[["Pr(>Chisq)"]][2])`). En términos prácticos, las regiones difieren
+entre sí (una DE regional ≈ ±`r f((exp(sqrt(var_reg)) - 1) * 100)` % de tasa), pero
+**dónde está la agencia dentro de la región pesa más** que la región en sí: la gestión
+es sobre todo un fenómeno **local de agencia**, con un fondo regional real pero
+secundario.
 :::
 
 ## Q11 · ¿Qué agencias se desvían más o menos de lo esperable? {#sec-q11}
@@ -814,11 +1052,12 @@ ggplot(re_ag, aes(rank, condval, color = atipica)) +
        color = "atípica")
 
 # Agencias atípicas y su efecto multiplicativo sobre la tasa
-re_ag |>
+atipicas <- re_ag |>
   filter(atipica) |>
   transmute(agencia = grp, blup = round(condval, 3),
             factor_tasa = round(exp(condval), 2)) |>
   arrange(desc(blup))
+atipicas
 ```
 
 ```{r}
@@ -837,23 +1076,26 @@ head(shrink[order(shrink$n_polizas), ], 8)   # las de menor cartera: más shrink
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q11)
-**Nueve agencias se desvían de forma significativa** (su intervalo no cruza el 0),
-ajustadas por su cartera:
+**`r nrow(atipicas)` agencias se desvían de forma significativa** —su intervalo no
+cruza el 0—, ya ajustadas por la cartera que gestionan:
 
-- **Por encima** (más gestiones de lo esperable): agencias **23** (×1.66), **16**
-  (×1.64), **5** (×1.49), **9** (×1.48) y **15** (×1.40).
-- **Por debajo**: agencias **22** (×0.58), **27** (×0.60), **10** (×0.64) y **13**
-  (×0.64).
+- **Por encima** (más gestiones de lo esperable):
+  `r paste0("**", atipicas$agencia[atipicas$blup > 0], "** (×", f(atipicas$factor_tasa[atipicas$blup > 0], 2), ")", collapse = ", ")`.
+- **Por debajo**:
+  `r paste0("**", atipicas$agencia[atipicas$blup < 0], "** (×", f(atipicas$factor_tasa[atipicas$blup < 0], 2), ")", collapse = ", ")`.
 
-Es decir, la agencia 23 tramita un 66 % más de gestiones por unidad de exposición que
-la media, y la 22 un 42 % menos. Son las candidatas naturales a **auditoría** (las
-altas) y a **exportar buenas prácticas** (las bajas), o viceversa según lo que la
-gestión signifique operativamente.
+Es decir, la agencia más alta tramita un **`r pc(max(atipicas$factor_tasa))` %** de
+gestiones por unidad de exposición respecto a la media, y la más baja un
+**`r pc(min(atipicas$factor_tasa))` %**. Son las candidatas naturales a **auditoría**
+(las altas) y a **exportar buenas prácticas** (las bajas) —o al revés, según lo que la
+gestión signifique operativamente—.
 
 Los BLUPs incorporan ***shrinkage***: las agencias con **poca cartera** se **encogen
-hacia la media** para no sobre-reaccionar al ruido (p. ej. la agencia 8, con solo 74
-pólizas, tenía una media cruda alta pero su BLUP queda mucho más moderado). Así el
-ranking descansa en **evidencia**, no en el azar de pocas pólizas.
+hacia la media** para no sobre-reaccionar al ruido. Se ve en la tabla anterior: la de
+menor cartera (`r shrink$n_polizas[which.min(shrink$n_polizas)]` pólizas) tiene una
+media cruda de `r f(shrink$log_tasa_cruda[which.min(shrink$n_polizas)], 2)` en log-tasa
+y un BLUP de solo `r f(shrink$blup[which.min(shrink$n_polizas)], 2)`. Así el ranking
+descansa en **evidencia**, no en el azar de pocas pólizas.
 :::
 
 ## Q12 · Si abrimos una agencia nueva, ¿qué deberíamos esperar? {#sec-q12}
@@ -890,10 +1132,10 @@ c(tasa_tipica_agencia_nueva = tasa_tipica,
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q12)
 Para una **agencia nueva** (sin historial), la mejor apuesta puntual es la de una
-agencia **típica**: **≈ 1.66 gestiones por año** de exposición para el perfil base.
-Pero la expectativa honesta debe reconocer la **dispersión entre agencias**: una
-agencia nueva podría situarse plausiblemente en un **rango del 95 % de [0.68, 4.04]**
-gestiones/año.
+agencia **típica**: **≈ `r f(tasa_tipica, 2)` gestiones por año** de exposición para el
+perfil base. Pero la expectativa honesta debe reconocer la **dispersión entre
+agencias**: una agencia nueva podría situarse plausiblemente en un **rango del 95 % de
+[`r f(rango_nueva[["inf"]], 2)`, `r f(rango_nueva[["sup"]], 2)`]** gestiones/año.
 
 La clave es la distinción **condicional vs marginal**: para una agencia **conocida**
 usamos su **BLUP** y la predicción es **estrecha** (sabemos dónde cae); para una
@@ -904,7 +1146,7 @@ pero **dimensionar capacidad para el rango** hasta que la agencia acumule histor
 podamos estimar su efecto propio.
 :::
 
-# Bloque 2.5 · El riesgo en el tiempo (Q13–Q15) {#sec-b25}
+# Bloque 2.6 · El riesgo en el tiempo (Q13–Q15) {#sec-b25}
 
 ## Q13 · ¿Cómo cambia el riesgo del primer siniestro con la antigüedad? {#sec-q13}
 
@@ -952,7 +1194,9 @@ m_cox <- coxph(Surv(t_primer_sin, evento) ~ edad_tramo + z_km + z_dens + tipo_ve
 hr_pw  <- broom::tidy(m_pw, exponentiate = TRUE) |>
   filter(!grepl("tramo|Intercept", term)) |> select(term, HR_poisson = estimate)
 hr_cox <- broom::tidy(m_cox, exponentiate = TRUE) |> select(term, HR_cox = estimate)
-left_join(hr_pw, hr_cox, by = "term") |> mutate(across(where(is.numeric), ~ round(.x, 3)))
+comp_hr <- left_join(hr_pw, hr_cox, by = "term") |>
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+comp_hr
 ```
 
 ```{r}
@@ -962,17 +1206,30 @@ km <- survfit(Surv(t_primer_sin, evento) ~ 1, data = cartera)
 summary(km, times = c(1, 2, 3, 4, 5))
 ```
 
+```{r}
+#| label: q13-cifras
+#| include: false
+sk  <- summary(km, times = c(1, 5))
+q13 <- list(h_ini = mean(hazard_base$hazard[1:2]),
+            h_fin = mean(hazard_base$hazard[6:9]),
+            s1 = sk$surv[1], s5 = sk$surv[2],
+            hr = comp_hr)
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q13)
 **El riesgo del primer siniestro es más alto al principio y baja con la antigüedad.**
-El hazard base pasa de **≈0.08 en los dos primeros años** a **≈0.03–0.05 a partir del
-6.º–9.º** (el repunte del tramo 10 es ruido: quedan muy pocas pólizas en riesgo). En
-términos de supervivencia (Kaplan–Meier), un **7 % declara su primer siniestro el
-primer año** y un **30 % lo ha declarado a los 5 años** (supervivencia 0.93 → 0.70).
+El hazard base pasa de **≈ `r f(q13$h_ini, 3)` en los dos primeros años** a
+**≈ `r f(q13$h_fin, 3)` a partir del 6.º–9.º** (el repunte del último tramo es ruido:
+quedan muy pocas pólizas en riesgo). En términos de supervivencia (Kaplan–Meier), un
+**`r f((1 - q13$s1) * 100)` % declara su primer siniestro el primer año** y un
+**`r f((1 - q13$s5) * 100)` % lo ha declarado a los 5 años** (supervivencia
+`r f(q13$s1, 2)` → `r f(q13$s5, 2)`).
 
 Los **hazard ratios** por riesgos a trozos coinciden **exactamente con los de Cox**
-(km +15 %/DE, densidad +18 %/DE, moto +26 %, furgoneta +17 %): confirma que *riesgos a
-trozos ≡ Poisson ≡ Cox*.
+—la discrepancia máxima es de
+`r format(max(abs(q13$hr$HR_poisson - q13$hr$HR_cox)), digits = 2)`—: confirma que
+*riesgos a trozos ≡ Poisson ≡ Cox*.
 
 **Matiz importante (para la dirección):** que el riesgo **poblacional** baje **no**
 significa que cada póliza sea menos arriesgada con el tiempo —de hecho el proceso
@@ -1014,25 +1271,31 @@ m_rec <- glmmTMB::glmmTMB(
 
 # IRR de 'ya_tuvo' (¿los siguientes difieren del primero tras la fragilidad?)
 sm <- summary(m_rec)$coefficients$cond
-est <- sm["ya_tuvo", "Estimate"]; se <- sm["ya_tuvo", "Std. Error"]
-c(IRR_ya_tuvo = exp(est), IC_inf = exp(est - 1.96 * se), IC_sup = exp(est + 1.96 * se),
-  p_valor = sm["ya_tuvo", "Pr(>|z|)"])
+# OJO: nombres propios; `est` ya se usa en Q2 y no conviene pisarlo
+b_rec <- sm["ya_tuvo", "Estimate"]; se_rec <- sm["ya_tuvo", "Std. Error"]
+rec <- c(IRR_ya_tuvo = exp(b_rec),
+         IC_inf = exp(b_rec - 1.96 * se_rec), IC_sup = exp(b_rec + 1.96 * se_rec),
+         p_valor = sm["ya_tuvo", "Pr(>|z|)"])
+rec
 
 # Varianza de la fragilidad de recurrencia (correlación entre partes de una misma póliza)
-glmmTMB::VarCorr(m_rec)$cond$id_poliza
+vc_rec  <- glmmTMB::VarCorr(m_rec)$cond$id_poliza
+var_rec <- as.numeric(attr(vc_rec, "stddev"))^2
+vc_rec
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q14)
 **Los siguientes siniestros se comportan igual que el primero.** Una vez que la
-**fragilidad por póliza** absorbe la correlación del historial, el indicador de "haber
-tenido ya algún parte" es **irrelevante**: IRR = **0.93**, IC 95 % [0.77, 1.12],
-*p* = 0.47. Es decir, **no hay "contagio"** ni dependencia de estado: haber declarado
-un siniestro no cambia por sí mismo el ritmo de los siguientes.
+**fragilidad por póliza** absorbe la correlación del historial, el indicador de «haber
+tenido ya algún parte» es **irrelevante**: IRR = **`r f(rec["IRR_ya_tuvo"], 2)`**,
+IC 95 % [`r f(rec["IC_inf"], 2)`, `r f(rec["IC_sup"], 2)`],
+*p* = `r pv(rec["p_valor"])`. Es decir, **no hay «contagio»** ni dependencia de estado:
+haber declarado un siniestro no cambia por sí mismo el ritmo de los siguientes.
 
 Lo que sí hay es **mucha heterogeneidad entre pólizas**: la fragilidad de recurrencia
-tiene **varianza ≈ 1.45** (aún mayor que la ≈1.1 del primer siniestro en [Q7](#sec-q7),
-porque aquí usa **todo** el historial). Traducción: las pólizas acumulan partes en
+tiene **varianza ≈ `r f(var_rec, 2)`** —mayor que la de `r f(sigma2, 2)` del primer
+siniestro en [Q7](#sec-q7), porque aquí usa **todo** el historial—. Traducción: las pólizas acumulan partes en
 racimo **no porque un parte llame a otro, sino porque algunas son intrínsecamente de
 alta intensidad**. Para la dirección: basta un **modelo de frecuencia con fragilidad
 (Poisson mixto / binomial negativa)**; no hacen falta términos de "orden del siniestro".
@@ -1063,26 +1326,27 @@ sf <- survfit(m_cox, newdata = rbind(perfil_hi, perfil_lo))
 # tiempo hasta incidencia acumulada 25% (supervivencia 0.75)
 t_umbral <- function(i) { idx <- which(sf$surv[, i] <= 0.75)[1]
   if (is.na(idx)) NA_real_ else round(sf$time[idx], 2) }
-c(alto_riesgo_años_hasta_25pct = t_umbral(1),
-  bajo_riesgo_años_hasta_25pct = t_umbral(2))
+t_hi <- t_umbral(1); t_lo <- t_umbral(2)
+c(alto_riesgo_anios_hasta_25pct = t_hi, bajo_riesgo_anios_hasta_25pct = t_lo)
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q15)
 El horizonte hasta que **una de cada cuatro** pólizas del perfil tiene su primer
-siniestro depende radicalmente del riesgo: **1.2 años** en un perfil de **alto riesgo**
-(joven, muchos km, alta densidad, moto) frente a **7.2 años** en uno de **bajo riesgo**
-(35–65, pocos km, baja densidad, turismo).
+siniestro depende radicalmente del riesgo: **`r f(t_hi, 1)` años** en un perfil de
+**alto riesgo** (joven, muchos km, alta densidad, moto) frente a **`r f(t_lo, 1)` años**
+en uno de **bajo riesgo** (35–65, pocos km, baja densidad, turismo) —una diferencia de
+un factor `r f(t_lo / t_hi, 1)`—.
 
-**Recomendación de cadencia:** revisar las pólizas de **alto riesgo con periodicidad
-≈ anual** y las de **bajo riesgo cada 5–7 años**. Además, como el riesgo del primer
+**Recomendación de cadencia:** revisar las pólizas de **alto riesgo** con periodicidad
+**≈ anual** y las de **bajo riesgo** cada **`r f(t_lo, 0)`–`r f(t_lo + 2, 0)` años**. Además, como el riesgo del primer
 parte se **concentra en los primeros años** ([Q13](#sec-q13)), conviene **adelantar** la
 vigilancia al inicio del contrato: una póliza de alto riesgo que ha aguantado 2–3 años
 sin parte está revelándose como de baja fragilidad y puede **espaciarse** su revisión.
 Priorizar los primeros años rinde más que revisar por igual toda la vida de la póliza.
 :::
 
-# Bloque 2.6 · Modelo fiable y responsable (Q16–Q17) {#sec-b26}
+# Bloques 2.7 y 2.2 · Modelo fiable y responsable (Q16–Q19) {#sec-b26}
 
 ## Q16 · Con tantas variables, ¿cuáles conservar sin perder fiabilidad? {#sec-q16}
 
@@ -1140,25 +1404,50 @@ cv_short <- boot::cv.glm(cartera, m_bic,  K = 10)$delta[1]
 c(cv_error_full = round(cv_full, 4), cv_error_corto = round(cv_short, 4))
 ```
 
+```{r}
+#| label: q16-cifras
+#| include: false
+bonito <- c(edad_tramo = "edad", "edad_tramo35-65" = "edad", z_km = "kilómetros",
+            z_dens = "densidad", zona_circulacion = "zona", tipo_vehiculo = "tipo de vehículo",
+            combustible = "combustible", n_conductores = "nº de conductores",
+            z_antv = "antigüedad del vehículo", valor_vehiculo = "valor del vehículo",
+            z_pot = "potencia", z_carnet = "antigüedad del carnet", uso = "uso")
+nom <- function(v) { r <- bonito[v]; unique(ifelse(is.na(r), v, r)) }
+q16 <- list(
+  lasso = nom(setdiff(sel, "(Intercept)")),
+  bic   = nom(setdiff(all.vars(formula(m_bic))[-1], "exposicion")),
+  aic   = nom(setdiff(all.vars(formula(m_aic))[-1], "exposicion")),
+  cv_f = cv_full, cv_c = cv_short)
+q16$mejora <- q16$cv_f >= q16$cv_c
+q16$solo_stepwise <- setdiff(q16$bic, q16$lasso)
+```
+
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q16)
 **Un puñado de variables basta.** Las tres estrategias convergen en un núcleo estable:
 
-- **Lasso** (versión parsimoniosa): retiene solo **edad, kilómetros y densidad**.
-- **BIC**: edad, km, densidad, zona, combustible y nº de conductores.
-- **AIC** (el más generoso): añade además antigüedad del vehículo y tipo de vehículo.
+- **Lasso** (versión parsimoniosa): retiene solo **`r paste(q16$lasso, collapse = ", ")`**.
+- **BIC**: `r paste(q16$bic, collapse = ", ")`.
+- **AIC** (el más generoso): `r paste(q16$aic, collapse = ", ")`.
 
-**No se pierde fiabilidad al acortar:** el error de validación cruzada del modelo corto
-(BIC) es **0.606**, incluso algo **mejor** que el del modelo completo (**0.619**) —las
-variables de ruido no ayudan, estorban—.
+**`r if (q16$mejora) "No se pierde fiabilidad al acortar" else "El acortamiento tiene un coste pequeño"`:**
+el error de validación cruzada del modelo corto (BIC) es **`r f(q16$cv_c, 3)`**, frente
+a **`r f(q16$cv_f, 3)`** del modelo completo
+`r if (q16$mejora) "—las variables de ruido no ayudan, estorban—" else ""`.
 
-**Recomendación:** un modelo **corto** con **edad, kilómetros y densidad** como columna
-vertebral, más **tipo de vehículo y combustible** (efectos reales, aunque moderados).
-Conviene quedarse con **una** de las dos —zona o densidad— por su solapamiento
-([Q1](#sec-q1)), y **desconfiar de `n_conductores`**, que el paso a paso retiene pero el
-lasso descarta: es candidato a falso positivo. Todo el ruido restante (color, estado
-civil, forma de pago, nivel de estudios, medio de contacto, valor, cilindrada) se
-descarta correctamente.
+**Recomendación:** un modelo **corto** construido sobre el núcleo que el lasso retiene
+(**`r paste(q16$lasso, collapse = ", ")`**), que además coincide con lo que el contraste
+de razón de verosimilitudes daba por relevante en [Q1](#sec-q1). Conviene quedarse con
+**una** de las dos —zona o densidad— por su solapamiento, y **desconfiar** de lo que el
+paso a paso retiene pero el lasso descarta
+(`r if (length(q16$solo_stepwise)) paste(q16$solo_stepwise, collapse = ", ") else "nada, en este caso"`):
+son los candidatos naturales a **falso positivo**, y lo confirmamos contra la verdad del
+DGP en la validación final.
+
+Nótese que el AIC, más generoso, arrastra alguna variable de ruido que el BIC y el lasso
+descartan. Es el comportamiento esperado —penaliza menos la complejidad— y una razón
+práctica para preferir criterios más severos cuando el objetivo es **tarificar** y no
+solo predecir.
 :::
 
 ## Q17 · Sexo: predice, pero la ley lo prohíbe. ¿Selección responsable sin proxies? {#sec-q17}
@@ -1185,35 +1474,225 @@ broom::tidy(m_sexo, exponentiate = TRUE, conf.int = TRUE)
 
 ```{r}
 #| label: q17-proxy
-# (iii) ¿Reconstruyen el sexo las variables permitidas? (detección de proxies)
+# (iii) ¿Reconstruyen el sexo las variables permitidas? (cribado global de proxies)
 m_proxy <- glm(I(sexo == "H") ~ z_pot + cilindrada + tipo_vehiculo + z_km + z_dens +
                  valor_vehiculo + uso, family = binomial, data = cartera)
 broom::tidy(m_proxy) |> mutate(across(where(is.numeric), ~ round(.x, 4)))
 
-# Capacidad discriminante del "reconstructor" de sexo (AUC): ~0.5 => sin proxies
-pROC::auc(cartera$sexo, predict(m_proxy, type = "response"))
+# Capacidad discriminante del "reconstructor": 0.5 = ninguna; >0.5 = hay fuga
+auc_proxy <- pROC::auc(cartera$sexo, predict(m_proxy, type = "response"))
+auc_proxy
+```
+
+```{r}
+#| label: q17-cifras
+#| include: false
+q17 <- list(
+  irr_sexo = exp(-coef(m_sexo)[["sexoM"]]),          # H frente a M
+  auc      = as.numeric(auc_proxy))
 ```
 
 ::: {.callout-tip}
 ## Respuesta a la dirección (Q17)
-**Sí, el sexo predice**, pero se excluye. Los hombres tienen una tasa de siniestros
-**≈17 % mayor** que las mujeres (IRR de `sexoM` = 0.854, *p* = 0.008; es decir, H frente
-a M ≈ 1.17). Pese a ello, **no entra** en el modelo de tarificación (primas unisex,
-*Test-Achats*, TJUE C-236/09).
+**Sí, el sexo predice**: los hombres tienen una tasa de siniestros
+**≈ `r f((q17$irr_sexo - 1) * 100)` % mayor** que las mujeres. Y aun así **no entra** en
+el modelo de tarificación: la ley lo prohíbe (primas unisex, *Test-Achats*, TJUE
+C-236/09).
 
-**¿Se cuela por proxies?** En esta cartera, **no**. Un modelo que intenta **reconstruir
-el sexo** a partir de las variables permitidas (potencia, cilindrada, tipo, km,
-densidad, valor, uso) **no lo consigue**: ningún predictor es significativo y el
-**AUC es 0.53** —casi una moneda al aire—. Excluir `sexo` es, aquí, una exclusión
-**limpia**: su señal se pierde (o queda absorbida por la fragilidad de [Q7](#sec-q7)),
-sin fuga por la puerta de atrás.
+**Pero excluirlo no basta.** El modelo que intenta reconstruir el sexo desde las
+variables permitidas **lo consigue por encima del azar** (AUC = `r f(q17$auc, 3)`, donde
+0,5 sería una moneda al aire). Hay al menos una variable de tarificación que lleva
+información del sexo incorporada: el cribado dice **que la hay**, y los coeficientes
+apuntan a **`tipo_vehiculo`**.
+
+Este cribado es una **alarma**, no un diagnóstico: mezcla todas las candidatas y no
+cuantifica el daño. Identificar cuál es el proxy y **cuánto** transporta es
+exactamente lo que pide [Q18](#sec-q18), y allí lo contrastamos formalmente.
 
 **Selección responsable (criterio general):** (i) **excluir** el atributo protegido;
-(ii) **auditar proxies** con exactamente esta prueba de reconstrucción + AUC; (iii) si
-apareciera un proxy fuerte (AUC alto), no basta con incluirlo ingenuamente: habría que
-decidir entre descartarlo o aplicar un ajuste *fairness-aware*. En `equipo_01` la
-auditoría **se supera**, pero el procedimiento debe repetirse en datos reales, donde
-potencia o tipo de vehículo sí suelen correlacionar con el sexo.
+(ii) **auditar** con el cribado global y con contrastes de independencia condicional
+variable a variable; (iii) **medir la fuga** que queda; y (iv) decidir de forma
+**explícita y documentada** qué se hace con el proxy —porque, como se ve en Q18, la
+decisión no es estadística sino de política de empresa—.
+:::
+
+## Q18 · ¿Qué variable permitida está sustituyendo al sexo, y cuánto se nos cuela? {#sec-q18}
+
+::: {.callout-note}
+## Lo que pregunta la dirección (Q18)
+> Y si lo quitamos del modelo, ¿estamos ya tranquilos? ¿Hay alguna de las variables que
+> **sí** podemos usar que vaya tan de la mano del sexo que en realidad lo esté
+> sustituyendo? Si es así, decidnos **cuál** y **cuánto** de la diferencia entre hombres
+> y mujeres se nos sigue colando por ahí.
+:::
+
+**Objetivo y método.** «$V$ es un proxy de $S$» significa, exactamente, «$V$ y $S$ no son
+independientes». Es una hipótesis contrastable en una **tabla de contingencia**
+([Unidad 2.2](../caso2_conteos.qmd#sec-u22-proxy)): para cada covariable permitida
+contrastamos la **independencia condicional** con `sexo` dado el siniestro. Después
+medimos la fuga comparando el efecto **marginal** de `sexo` con el **ajustado** por el
+proxy.
+
+```{r}
+#| label: q18-independencia-condicional
+candidatas <- c("tipo_vehiculo", "zona_circulacion", "uso", "combustible",
+                "estado_civil", "forma_pago", "nivel_estudios")
+
+proxy_test <- purrr::map_dfr(candidatas, function(v) {
+  tb <- cartera |>
+    mutate(sin = ifelse(tuvo_siniestro > 0, "si", "no")) |>
+    count(sexo, .data[[v]], sin, name = "n") |>
+    rename(V = 2)
+  m_ci  <- glm(n ~ sexo * sin + V * sin,          family = poisson, data = tb)  # sexo _||_ V | sin
+  m_hom <- glm(n ~ sexo * sin + V * sin + sexo:V, family = poisson, data = tb)
+  a <- anova(m_ci, m_hom, test = "LRT")
+  tibble::tibble(variable = v, gl = a$Df[2], LRT = round(a$Deviance[2], 2),
+                 p = a$`Pr(>Chi)`[2])
+}) |>
+  mutate(p_ajustado = p.adjust(p, method = "holm"),      # 7 contrastes: corregimos
+         veredicto  = ifelse(p_ajustado < 0.05, "PROXY", "sin evidencia")) |>
+  arrange(p)
+proxy_test
+```
+
+```{r}
+#| label: q18-tamano
+# El contraste dice SI; el tamaño dice CUÁNTO. Tabla sexo x tipo de vehículo.
+tb_st <- table(sexo = cartera$sexo, tipo = cartera$tipo_vehiculo)
+addmargins(tb_st)
+round(prop.table(tb_st, margin = 1), 3)     # composición por sexo
+```
+
+```{r}
+#| label: q18-fuga
+# Lo que el proxy transporta: efecto de sexo antes y después de controlar por él.
+irr_s <- function(fml) exp(coef(glm(fml, family = poisson, data = cartera))[["sexoM"]])
+fuga <- c(
+  marginal  = irr_s(n_siniestros ~ sexo + offset(log(exposicion))),
+  ajustado  = irr_s(n_siniestros ~ sexo + tipo_vehiculo + offset(log(exposicion))))
+c(round(1 / fuga, 3),                                  # en dirección H vs M
+  fuga_relativa = round(fuga[["ajustado"]] / fuga[["marginal"]], 3))
+```
+
+```{r}
+#| label: q18-cifras
+#| include: false
+q18 <- list(
+  tab      = proxy_test,
+  detectados = proxy_test$variable[proxy_test$veredicto == "PROXY"],
+  n_negativos = sum(proxy_test$veredicto == "sin evidencia"),
+  p_moto_H = mean(cartera$tipo_vehiculo[cartera$sexo == "H"] == "moto") * 100,
+  p_moto_M = mean(cartera$tipo_vehiculo[cartera$sexo == "M"] == "moto") * 100,
+  marg     = 1 / fuga[["marginal"]], ajus = 1 / fuga[["ajustado"]])
+q18$pct_fuga <- (q18$marg / q18$ajus - 1) * 100
+```
+
+::: {.callout-tip}
+## Respuesta a la dirección (Q18)
+**Sí, hay un proxy, y es el tipo de vehículo.** De las `r nrow(q18$tab)` variables
+permitidas que hemos auditado, `r length(q18$detectados)` sale asociada al sexo tras
+corregir por el número de contrastes: **`r paste(q18$detectados, collapse = ", ")`**.
+Las otras `r q18$n_negativos` no muestran evidencia, y ese contraste es tan importante
+como el positivo: significa que el hallazgo es específico, no un artefacto de mirar
+muchas variables.
+
+**El mecanismo, en una línea:** las motos son el **`r f(q18$p_moto_H)` %** de la cartera
+de hombres y solo el **`r f(q18$p_moto_M)` %** de la de mujeres. Como la moto es además
+más siniestrosa, tarificar por tipo de vehículo aplica, de rebote, parte de la
+diferencia por sexo.
+
+**Cuánto se cuela:** el efecto de ser hombre sobre la tasa de siniestros es
+**`r f(q18$marg, 3)`** sin controlar por el tipo de vehículo y **`r f(q18$ajus, 3)`**
+controlando por él. Esa brecha —en torno al **`r f(q18$pct_fuga)` %**— es la parte de la
+diferencia entre hombres y mujeres que sigue entrando en la tarifa **aunque `sexo` no
+esté en el modelo**.
+
+::: {.callout-important}
+## Qué hacer con esto: la decisión no es estadística
+El análisis dice **cuál** y **cuánto**. No dice qué hacer, y conviene ser explícito
+sobre por qué:
+
+- **Eliminar `tipo_vehiculo`** cierra esa vía, pero sacrifica poder predictivo
+  **legítimo**: la moto es objetivamente más siniestrosa, por razones físicas que nada
+  tienen que ver con quién la conduce.
+- **Conservarlo** mantiene la calidad técnica de la tarifa y acepta una fuga
+  cuantificada.
+
+Nuestra recomendación es **conservarlo y documentar la fuga**, porque el efecto causal
+propio del tipo de vehículo es real y la fuga resulta
+`r if (abs(q18$pct_fuga) < 3) "pequeña en la escala de la frecuencia" else if (abs(q18$pct_fuga) < 10) "moderada" else "sustancial, lo que debería inclinar la balanza hacia revisarlo"`.
+Pero es una decisión de
+**política de empresa** —con implicaciones legales— que corresponde tomar a la dirección,
+no al equipo analítico. Lo que sí es responsabilidad nuestra es que la decisión se tome
+**con la cifra delante** y no por descuido.
+
+Y un aviso para el Caso 3: esta fuga se ha medido sobre la **frecuencia**. Si el tipo de
+vehículo también afecta al **coste** por siniestro, la fuga sobre la **prima pura** será
+mayor que la calculada aquí.
+:::
+:::
+
+## Q19 · ¿Cómo comprobáis que no os habéis equivocado? {#sec-q19}
+
+::: {.callout-note}
+## Lo que pregunta la dirección (Q19)
+> Estos números los vamos a usar para fijar precios. ¿Cómo comprobáis vosotros mismos
+> que no os habéis equivocado? Si el mismo dato se puede analizar de dos maneras
+> distintas, ¿os dan lo mismo?
+:::
+
+**Objetivo y método.** Es una pregunta legítima y tiene respuesta técnica. La asociación
+entre un factor y el siniestro puede estimarse por **dos caminos formalmente
+equivalentes**: el log-lineal **saturado** sobre las frecuencias de celda y la
+**logística** del siniestro sobre ese factor. Deben dar **exactamente** los mismos odds
+ratios; si no coinciden, hay un error en alguna parte.
+
+```{r}
+#| label: q19-equivalencia
+tb_zs <- cartera |>
+  mutate(sin = ifelse(tuvo_siniestro > 0, "si", "no")) |>
+  count(zona_circulacion, sin, name = "n")
+
+# Camino 1: log-lineal saturado sobre los recuentos de celda
+m_ll <- glm(n ~ zona_circulacion * sin, family = poisson, data = tb_zs)
+or_ll <- coef(m_ll)[grepl(":", names(coef(m_ll)))]
+
+# Camino 2: logística del siniestro sobre la zona
+m_lg <- glm(I(sin == "si") ~ zona_circulacion, family = binomial, weights = n, data = tb_zs)
+or_lg <- coef(m_lg)[-1]
+
+comparacion <- rbind(loglineal = or_ll, logistica = or_lg)
+round(comparacion, 8)
+c(discrepancia_maxima = max(abs(or_ll - or_lg)))
+```
+
+```{r}
+#| label: q19-cifras
+#| include: false
+q19 <- list(dif = max(abs(or_ll - or_lg)))
+```
+
+::: {.callout-tip}
+## Respuesta a la dirección (Q19)
+**Sí, coinciden.** Las dos vías dan los mismos coeficientes de asociación: la
+discrepancia máxima es de `r format(q19$dif, digits = 2, scientific = TRUE)`, es decir,
+**error de redondeo del ordenador**, no diferencia real.
+
+Y no es una casualidad afortunada: **deben** coincidir. El log-lineal saturado y la
+logística son el mismo modelo escrito de dos maneras; lo único que cambia es qué se
+considera fijo —la logística da por dados los totales de cada zona y modela la
+probabilidad dentro de ella; el log-lineal los modela con un término propio—. Como ese
+término es justo el que el diseño del muestreo fija, las conclusiones sobre la
+asociación son idénticas.
+
+Por eso es una comprobación útil: **si un día no coincidieran**, no sería un hallazgo
+interesante, sería la señal de que hay un error —una tabla mal construida, una
+categoría de referencia distinta o unos pesos mal aplicados— y habría que buscarlo antes
+de usar el número para nada.
+
+Este es solo un ejemplo del control de calidad que aplicamos de forma sistemática; el
+más importante es el de la sección siguiente, donde contrastamos **todas** las
+estimaciones contra los parámetros con los que se generaron los datos.
 :::
 
 # Validación contra la verdad del DGP {#sec-validacion}
@@ -1242,7 +1721,7 @@ coef(m_sin)
 ```
 
 ::: {.callout-note}
-## Control de calidad (Bloque 2.1)
+## Control de calidad (Bloques 2.1–2.2)
 El ajuste **a ciegas recupera bien la verdad del DGP**. Todos los **signos** coinciden
 con los betas generadores (`verdad$betas$claim`, ya escalados por 0.9): edad negativa
 y fuerte; km y densidad positivas y grandes; moto, furgoneta y diésel positivas. Las
@@ -1264,7 +1743,7 @@ trata en [Q17](#sec-q17).
 
 ```{r}
 #| label: validacion-b22
-# Bloque 2.2-2.3: fragilidad y ceros estructurales
+# Bloques 2.3-2.4: fragilidad y ceros estructurales
 c(theta_frail_verdad = verdad$theta_frail,
   var_frailty_verdad = 1 / verdad$theta_frail,   # varianza de la fragilidad Gamma
   var_gamma_NB_estim = 1 / m_nb$theta)
@@ -1275,7 +1754,7 @@ coef(m_zip, model = "zero")
 ```
 
 ::: {.callout-note}
-## Control de calidad (Bloque 2.2–2.3)
+## Control de calidad (Bloques 2.3–2.4)
 **Fragilidad recuperada.** La verdad es `theta_frail = 0.8` → varianza de fragilidad
 **1.25**. La estimamos en **1.07** (NB) y **1.13** (OLRE): ligera **atenuación**
 (los predictores fijos absorben parte de la heterogeneidad), pero el orden de
@@ -1291,7 +1770,7 @@ ceros del fraude.
 
 ```{r}
 #| label: validacion-b24
-# Bloque 2.4: desviaciones típicas de agencia y región vs la verdad
+# Bloque 2.5: desviaciones típicas de agencia y región vs la verdad
 c(sd_agencia_verdad = verdad$sigma_ag, sd_agencia_estim = sqrt(var_ag),
   sd_region_verdad  = verdad$sigma_reg, sd_region_estim  = sqrt(var_reg))
 
@@ -1301,7 +1780,7 @@ c(cor_blup_uag = cor(blup_ord, verdad$u_ag))
 ```
 
 ::: {.callout-note}
-## Control de calidad (Bloque 2.4)
+## Control de calidad (Bloque 2.5)
 **Componentes de varianza recuperadas.** La verdad es σ_agencia = **0.45** y
 σ_región = **0.35**; estimamos **0.354** y **0.285** —una atenuación de ~20 %,
 esperable en Poisson-lognormal con 30 agencias y 6 regiones, pero con la **jerarquía
@@ -1313,14 +1792,14 @@ desvía, aunque el tamaño absoluto del efecto quede algo comprimido—.
 
 ```{r}
 #| label: validacion-b25
-# Bloque 2.5: forma y nivel del hazard base del primer siniestro
+# Bloque 2.6: forma y nivel del hazard base del primer siniestro
 c(weib_shape_verdad = verdad$weib_shape,   # >1 => hazard creciente con la antigüedad
   lambda0_verdad    = verdad$lambda0)      # nivel base del hazard de siniestros
 hazard_base                                 # estimado por tramo (de Q13)
 ```
 
 ::: {.callout-note}
-## Control de calidad (Bloque 2.5)
+## Control de calidad (Bloque 2.6)
 La verdad fija un hazard individual **Weibull con forma 1.05** (ligeramente
 **creciente**) y nivel base `lambda0 = 0.12`. El hazard **estimado a nivel de población**
 **decrece** (0.08 → 0.03). **No es contradicción**: con una fragilidad fuerte
@@ -1332,23 +1811,56 @@ covariables y neto de fragilidad). El mecanismo temporal se recupera correctamen
 
 ```{r}
 #| label: validacion-b26
-# Bloque 2.6: señal verdadera de sexo y variables de ruido (efecto nulo por diseño)
+# Bloque 2.7: señal verdadera de sexo y variables de ruido (efecto nulo por diseño)
 verdad$betas$claim["sexo_h"]      # efecto real del sexo (excluido por ley)
 # Variables con señal real en la intensidad de siniestros (para contrastar la selección):
 names(verdad$betas$claim)
 ```
 
+```{r}
+#| label: validacion-proxy
+# ¿Existía el proxy que detectamos en Q18? El DGP lo declara explícitamente.
+px <- verdad$proxy
+str(px, max.level = 1)
+
+# Diseño frente a lo observado en NUESTRA cartera
+p_obs <- prop.table(table(cartera$sexo, cartera$tipo_vehiculo == "moto"), margin = 1)[, "TRUE"]
+or_obs <- (p_obs[["H"]] / (1 - p_obs[["H"]])) / (p_obs[["M"]] / (1 - p_obs[["M"]]))
+c(OR_disenado = round(px$or_moto_HvsM, 2), OR_observado = round(or_obs, 2))
+
+# ¿Y las que dimos por NO proxies? El DGP las declara controles negativos.
+px$controles_negativos
+
+# Fuga teórica por este canal, según los betas verdaderos
+d_p <- diff(px$p_moto_sexo)
+c(frecuencia = exp(verdad$betas$claim[["tipo_moto"]] * d_p),
+  severidad  = exp(verdad$betas$sev[["tipo_moto"]]   * d_p),
+  prima_pura = exp((verdad$betas$claim[["tipo_moto"]] +
+                      verdad$betas$sev[["tipo_moto"]]) * d_p)) |> round(4)
+```
+
 ::: {.callout-note}
-## Control de calidad (Bloque 2.6)
-La selección **acierta con la verdad del DGP**. Las variables con **señal real** en la
-intensidad de siniestros son edad, carnet (débil), potencia, antig. vehículo (débil),
-km, densidad, uso, tipo y combustible; la selección retiene el **núcleo fuerte** (edad,
-km, densidad, y tipo/combustible en AIC) y **descarta todo el ruido** (color, estado
-civil, forma de pago, estudios, medio de contacto, valor, cilindrada, financiado). El
-único desliz es que el paso a paso conserva `n_conductores` —ruido por diseño—, que el
-**lasso sí elimina**: ilustra por qué la **regularización** es más robusta frente a
-falsos positivos. Y `sexo_h` = **0.09** (señal real) queda **excluido**, con la
-auditoría de proxies confirmando que no reingresa (AUC 0.53).
+## Control de calidad (Bloque 2.7)
+La selección **acierta con la verdad del DGP**: retiene el núcleo de variables con señal
+real y descarta el ruido, con el **lasso** eliminando algún falso positivo que el paso a
+paso conserva —ilustra por qué la regularización es más robusta—. Y `sexo_h`, que tiene
+señal real, queda **excluido** del modelo de tarificación.
+
+**Y el proxy existía.** Esta es la comprobación que da sentido a [Q18](#sec-q18): el DGP
+declara en `attr(cartera, "verdad")$proxy` que `tipo_vehiculo` fue construido
+**deliberadamente** asociado al sexo, con un odds ratio de diseño que recuperamos casi
+exactamente en la cartera. Además:
+
+- Las variables que dimos por **no proxies** figuran en el DGP como **controles
+  negativos**: acertamos también en los negativos, que es la mitad difícil del problema.
+- La **fuga teórica** calculada desde los betas verdaderos confirma el orden de magnitud
+  del que estimamos, y añade el aviso que anticipábamos: por **severidad** fuga más que
+  por frecuencia, de modo que sobre la **prima pura** el efecto es mayor que el medido
+  sobre la siniestralidad. Es material para el Caso 3.
+
+Que la auditoría de Q17–Q18 detecte un proxy **que sabemos que está** —y solo ese— es la
+mejor evidencia de que el procedimiento funciona. Con datos reales no tendríamos esta
+red de seguridad, y esa es precisamente la razón de haberlo ensayado aquí.
 :::
 
 # Referencias {.unnumbered}

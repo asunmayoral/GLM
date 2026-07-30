@@ -1,0 +1,82 @@
+# Cabeceras descriptivas escritas a mano de los scripts del Caso 3,
+# conservadas antes de regenerarlos con _scripts/generar_scripts_unidades.R.
+# Si algún texto merece la pena, su sitio natural es el .qmd de la unidad.
+# ==========================================================================
+
+### unidad_3_1.R ----------------------------------------------------------
+# =============================================================================
+#  Unidad 3.1 · GLM Gamma para el coste de una avería
+# -----------------------------------------------------------------------------
+#  Ajuste, interpretación, inferencia y diagnóstico de un GLM Gamma (enlace log)
+#  sobre el coste de reparación de una avería (banco$averias).
+#
+#  Script AUTOCONTENIDO: carga los datos y reproduce, en orden, los chunks de
+#  código de la unidad homónima (caso3/_unidad_3_1.qmd), identificados por
+#  sección y subsección. Generado a partir del .qmd; la fuente de verdad sigue
+#  siendo el cuaderno Quarto.
+#
+#  Uso:  Rscript caso3/scripts/unidad_3_1.R      (o `source()` desde RStudio).
+#        Funciona desde cualquier carpeta DENTRO del proyecto GLM.
+# =============================================================================
+
+# ---- Paquetes ---------------------------------------------------------------
+
+
+### unidad_3_2.R ----------------------------------------------------------
+# =============================================================================
+#  Unidad 3.2 · Elegir familia y escala
+# -----------------------------------------------------------------------------
+#  Gamma vs. inversa gaussiana vs. lognormal/log-OLS; modelar la dispersión;
+#  comparación por AIC y retransformación (Duan). Sobre el coste de una avería.
+#
+#  Script AUTOCONTENIDO: carga los datos y reproduce, en orden, los chunks de
+#  código de la unidad homónima (caso3/_unidad_3_2.qmd), identificados por
+#  sección y subsección. Generado a partir del .qmd; la fuente de verdad sigue
+#  siendo el cuaderno Quarto.
+#
+#  Uso:  Rscript caso3/scripts/unidad_3_2.R      (o `source()` desde RStudio).
+#        Funciona desde cualquier carpeta DENTRO del proyecto GLM.
+# =============================================================================
+
+# ---- Paquetes ---------------------------------------------------------------
+
+
+### unidad_3_3.R ----------------------------------------------------------
+# =============================================================================
+#  Unidad 3.3 · GLMM Gamma (continuas positivas agrupadas)
+# -----------------------------------------------------------------------------
+#  Modelo mixto Gamma con intercepto y pendiente aleatorios por máquina;
+#  componentes de varianza, ICC, diagnóstico y predicción marginal/condicional.
+#
+#  Script AUTOCONTENIDO: carga los datos y reproduce, en orden, los chunks de
+#  código de la unidad homónima (caso3/_unidad_3_3.qmd), identificados por
+#  sección y subsección. Generado a partir del .qmd; la fuente de verdad sigue
+#  siendo el cuaderno Quarto.
+#
+#  Uso:  Rscript caso3/scripts/unidad_3_3.R      (o `source()` desde RStudio).
+#        Funciona desde cualquier carpeta DENTRO del proyecto GLM.
+# =============================================================================
+
+# ---- Paquetes ---------------------------------------------------------------
+
+
+### unidad_3_5.R ----------------------------------------------------------
+# =============================================================================
+#  Unidad 3.5 · Cox como frontera del marco (supervivencia en tiempo continuo)
+# -----------------------------------------------------------------------------
+#  Modelo de riesgos proporcionales de Cox sobre el TIEMPO ENTRE FALLOS del banco
+#  de averias: verosimilitud parcial (por que no es un GLM), interpretacion (HR y
+#  equivalencia con el AFT), inferencia y bondad de ajuste, fragilidad / errores
+#  robustos, diagnostico de proporcionalidad (Schoenfeld) y Cox extendido con
+#  covariable dependiente del tiempo (formato start-stop).
+#
+#  Script AUTOCONTENIDO: carga los datos y reproduce, en orden, los chunks de la
+#  unidad homonima (caso3/_unidad_3_5.qmd), identificados por seccion. Generado a
+#  partir del .qmd; la fuente de verdad sigue siendo el cuaderno Quarto.
+#
+#  Uso:  Rscript caso3/scripts/unidad_3_5.R      (o source() desde RStudio).
+#        Funciona desde cualquier carpeta DENTRO del proyecto GLM.
+# =============================================================================
+
+# ---- Paquetes ---------------------------------------------------------------
+

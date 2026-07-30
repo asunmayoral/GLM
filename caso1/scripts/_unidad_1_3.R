@@ -4,41 +4,55 @@
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_3.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta del proyecto GLM (localiza la raíz
-# por _quarto.yml). Cada unidad carga además en sus chunks sus librerías propias.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías base (setup del documento del caso) ---------------------------
-library(broom); library(aplore3); library(patchwork); library(see)
-library(DHARMa); library(arm); library(performance); library(tidyverse)
-library(MuMIn); library(readr); library(GGally)
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo de software (cada unidad carga además lo suyo: lme4, nnet, ordinal,
+# pROC, performance, DHARMa, marginaleffects, car, survival...).
+
+library(broom)
+library(aplore3)
+library(patchwork)
+library(see)
+library(DHARMa)
+library(arm)
+library(performance)
+library(tidyverse)
+library(MuMIn)
+library(readr)
+library(GGally)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Raíz del proyecto (robusto al directorio de trabajo) --------------------
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-
-# --- Dato real GLOW ----------------------------------------------------------
 data(glow500)
 glow <- glow500 |>
   as_tibble() |>
   mutate(fractura01 = as.integer(fracture) - 1L)   # No -> 0, Yes -> 1
 
-# --- Cohorte simulada con CACHÉ (misma que el documento del caso) ------------
-source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))  # simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
-cohorte <- cargar_cohorte()          # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 
-
-# --- Dependencia: reutiliza objetos de la Unidad 1.2 (beta, p, pred, y).
-#     Si no están en el entorno, se construyen ejecutando su script.
-if (!all(sapply(c("beta", "p", "pred", "y"), exists))) source(file.path(.raiz, "caso1", "scripts", "_unidad_1_2.R"))
+library(readr)
+source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))                        # define simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
+cohorte <- cargar_cohorte()                      # lee datos/cohorte_*.rds si existe; si no (o si cambió el DGP), simula y guarda
+# y guardamos las simulaciones
+#write_csv(cohorte, "cohorte.csv")        # nivel individuo
+# resumen
+glimpse(cohorte)
+head(cohorte)
 
 # -----------------------------------------------------------------------------
-# [u13-agrupar]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-agrupar]  ·  🔧 En R. El glm() con datos binomiales
 # -----------------------------------------------------------------------------
 glow_agg <- glow |>
   count(priorfrac, momfrac, raterisk, fracture) |>
@@ -47,7 +61,7 @@ glow_agg <- glow |>
 glow_agg
 
 # -----------------------------------------------------------------------------
-# [fig-u13-barras]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [fig-u13-barras]  ·  🔧 En R. El glm() con datos binomiales
 # -----------------------------------------------------------------------------
 glow_agg |>
   mutate(prop = Yes / total) |>
@@ -61,7 +75,7 @@ glow_agg |>
   ylim(0, NA)
 
 # -----------------------------------------------------------------------------
-# [u13-binomial-fit]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-binomial-fit]  ·  🔧 En R. El glm() con datos binomiales
 # -----------------------------------------------------------------------------
 fit_bin <- glm(cbind(Yes, No) ~ priorfrac + momfrac + raterisk,
                family = binomial, data = glow_agg)
@@ -71,7 +85,7 @@ fit_ind <- glm(fracture ~ priorfrac + momfrac + raterisk,
 cbind(agrupado = coef(fit_bin), individual = coef(fit_ind))   # idénticos
 
 # -----------------------------------------------------------------------------
-# [fig-u13-residuos]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [fig-u13-residuos]  ·  La matriz sombrero en un GLM
 # -----------------------------------------------------------------------------
 #library(patchwork)
 
@@ -97,7 +111,7 @@ p_cook <- ggplot(diag_bin, aes(cell, cook, size = total)) +
 p_res + p_cook + plot_layout(guides = "collect")
 
 # -----------------------------------------------------------------------------
-# [u13-gof]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-gof]  ·  🔧 En R. Residuos e influencia > Bondad de ajuste
 # -----------------------------------------------------------------------------
 gl <- df.residual(fit_bin)                       # n - p = nº de celdas - nº de parámetros
 c(deviance = deviance(fit_bin),
@@ -109,7 +123,7 @@ c(p_deviance = pchisq(deviance(fit_bin), gl, lower.tail = FALSE),
   p_pearson  = pchisq(sum(residuals(fit_bin, "pearson")^2), gl, lower.tail = FALSE))
 
 # -----------------------------------------------------------------------------
-# [fig-u13-calibracion]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [fig-u13-calibracion]  ·  🔧 En R. El contraste χ² de bondad de ajuste (deviance y Pearson) > Calibración
 # -----------------------------------------------------------------------------
 # Calibración DIRECTA: cada celda = (probabilidad predicha, proporción observada)
 calib_bin <- glow_agg |>
@@ -122,13 +136,13 @@ ggplot(calib_bin, aes(pred, obs, size = total)) +
        size = "n por celda")
 
 # -----------------------------------------------------------------------------
-# [u13-sobredisp]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-sobredisp]  ·  🔧 En R. El data frame de observados vs predichos para la calibración > Sobredispersión
 # -----------------------------------------------------------------------------
 # Índice de sobredispersión (cociente de Pearson)
 sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
 
 # -----------------------------------------------------------------------------
-# [u13-nominal]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-nominal]  ·  🔧 En R. Ajustar e inspeccionar el multinomial nominal
 # -----------------------------------------------------------------------------
 library(nnet)
 m_nom <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac,
@@ -138,13 +152,13 @@ tidy(m_nom) # visualización ordenada
 exp(coef(m_nom))      # odds ratios relativos
 
 # -----------------------------------------------------------------------------
-# [fig-u13-pred-nominal]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [fig-u13-pred-nominal]  ·  🔧 En R. Ajustar e inspeccionar el multinomial nominal
 # -----------------------------------------------------------------------------
 library(ggeffects)
 plot(ggpredict(m_nom, terms = "age [all]"))
 
 # -----------------------------------------------------------------------------
-# [u13-ordinal]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-ordinal]  ·  3.4 Categorías ordenadas: el modelo de odds proporcionales
 # -----------------------------------------------------------------------------
 glow_ord <- glow |>
   mutate(raterisk = ordered(raterisk, levels = c("Less", "Same", "Greater")))
@@ -153,13 +167,13 @@ tidy(m_ord)        # dos umbrales (theta) y los efectos (beta), comunes a ambos 
 exp(coef(m_ord))      # odds ratios acumulados
 
 # -----------------------------------------------------------------------------
-# [fig-u13-pred-ordinal]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [fig-u13-pred-ordinal]  ·  🔧 En R. Ajustar e inspeccionar el ordinal (odds proporcionales)
 # -----------------------------------------------------------------------------
 library(ggeffects)
 plot(ggpredict(m_ord, terms = "age [all]"))
 
 # -----------------------------------------------------------------------------
-# [u13-comparacion-nom-ord]  ·  3.1 Del dato individual al agrupado: respuesta binomial
+# [u13-comparacion-nom-ord]  ·  🔧 En R. Ajustar e inspeccionar el ordinal (odds proporcionales)
 # -----------------------------------------------------------------------------
 # Ajuste y parsimonia (el ordinal usa menos parámetros)
 ajuste <- tibble::tibble(
@@ -182,3 +196,4 @@ discrepancias <- tibble::tibble(
 
 ajuste
 discrepancias
+

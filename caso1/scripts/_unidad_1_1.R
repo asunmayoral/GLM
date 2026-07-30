@@ -4,34 +4,52 @@
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_1.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta del proyecto GLM (localiza la raíz
-# por _quarto.yml). Cada unidad carga además en sus chunks sus librerías propias.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías base (setup del documento del caso) ---------------------------
-library(broom); library(aplore3); library(patchwork); library(see)
-library(DHARMa); library(arm); library(performance); library(tidyverse)
-library(MuMIn); library(readr); library(GGally)
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo de software (cada unidad carga además lo suyo: lme4, nnet, ordinal,
+# pROC, performance, DHARMa, marginaleffects, car, survival...).
+
+library(broom)
+library(aplore3)
+library(patchwork)
+library(see)
+library(DHARMa)
+library(arm)
+library(performance)
+library(tidyverse)
+library(MuMIn)
+library(readr)
+library(GGally)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Raíz del proyecto (robusto al directorio de trabajo) --------------------
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-
-# --- Dato real GLOW ----------------------------------------------------------
 data(glow500)
 glow <- glow500 |>
   as_tibble() |>
   mutate(fractura01 = as.integer(fracture) - 1L)   # No -> 0, Yes -> 1
 
-# --- Cohorte simulada con CACHÉ (misma que el documento del caso) ------------
-source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))  # simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
-cohorte <- cargar_cohorte()          # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 
+library(readr)
+source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))                        # define simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
+cohorte <- cargar_cohorte()                      # lee datos/cohorte_*.rds si existe; si no (o si cambió el DGP), simula y guarda
+# y guardamos las simulaciones
+#write_csv(cohorte, "cohorte.csv")        # nivel individuo
+# resumen
+glimpse(cohorte)
+head(cohorte)
 
 # -----------------------------------------------------------------------------
 # [fig-glow-eda-box]  ·  1.1 El modelo lineal en GLOW
@@ -125,14 +143,14 @@ g2 <- tibble(eta = seq(-6, 6, by = 0.05)) |>
 g1 + g2
 
 # -----------------------------------------------------------------------------
-# [u11-primer-glm]  ·  1.4 GLM en datos binarios
+# [u11-primer-glm]  ·  🔧 En R. El glm() con datos binarios
 # -----------------------------------------------------------------------------
 fit_glm <- glm(fracture ~ age + priorfrac, family = binomial, data = glow)
 # Resultado del ajuste
 summary(fit_glm)
 
 # -----------------------------------------------------------------------------
-# [u11-broom]  ·  1.4 GLM en datos binarios
+# [u11-broom]  ·  🔧 En R. El glm() con datos binarios
 # -----------------------------------------------------------------------------
 tidy(fit_glm)                                     # coeficientes (escala log-odds)
 glance(fit_glm)                                   # deviance, AIC, BIC, gl...
@@ -141,7 +159,7 @@ augment(fit_glm, type.predict = "response") |>    # ajustes en escala probabilid
   slice_head(n = 5)
 
 # -----------------------------------------------------------------------------
-# [fig-u11-ols-vs-logistica]  ·  1.4 GLM en datos binarios
+# [fig-u11-ols-vs-logistica]  ·  🔧 En R. El glm() con datos binarios
 # -----------------------------------------------------------------------------
 # Rejilla de predicción de los modelos 
 grid <- expand_grid(
@@ -173,7 +191,7 @@ ggplot() +
        color = "Fractura previa", size = "n")
 
 # -----------------------------------------------------------------------------
-# [fig-u11-residuos-ols-glm]  ·  1.4 GLM en datos binarios
+# [fig-u11-residuos-ols-glm]  ·  🔧 En R. El glm() con datos binarios
 # -----------------------------------------------------------------------------
 p_ols <- plot(performance::binned_residuals(fit_ols)) +
   labs(title = "OLS (modelo lineal de probabilidad)")
@@ -181,3 +199,4 @@ p_glm <- plot(performance::binned_residuals(fit_glm)) +
   labs(title = "GLM logístico")
 patchwork::wrap_plots( p_ols, p_glm, nrow = 2) +
   patchwork::plot_annotation(title = "Residuos medios por tramos: OLS vs GLM")
+

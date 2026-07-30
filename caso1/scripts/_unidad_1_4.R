@@ -1,48 +1,58 @@
 # =============================================================================
-# Caso 1 · Unidad 1.4 — 4 · Efectos aleatorios
+# Caso 1 · Unidad 1.4 — 4 · Efectos Aleatorios y Modelos Mixtos
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_4.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta del proyecto GLM (localiza la raíz
-# por _quarto.yml). Cada unidad carga además en sus chunks sus librerías propias.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías base (setup del documento del caso) ---------------------------
-library(broom); library(aplore3); library(patchwork); library(see)
-library(DHARMa); library(arm); library(performance); library(tidyverse)
-library(MuMIn); library(readr); library(GGally)
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo de software (cada unidad carga además lo suyo: lme4, nnet, ordinal,
+# pROC, performance, DHARMa, marginaleffects, car, survival...).
+
+library(broom)
+library(aplore3)
+library(patchwork)
+library(see)
+library(DHARMa)
+library(arm)
+library(performance)
+library(tidyverse)
+library(MuMIn)
+library(readr)
+library(GGally)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Raíz del proyecto (robusto al directorio de trabajo) --------------------
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-
-# --- Dato real GLOW ----------------------------------------------------------
 data(glow500)
 glow <- glow500 |>
   as_tibble() |>
   mutate(fractura01 = as.integer(fracture) - 1L)   # No -> 0, Yes -> 1
 
-# --- Cohorte simulada con CACHÉ (misma que el documento del caso) ------------
-source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))  # simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
-cohorte <- cargar_cohorte()          # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 
-
-# --- Dependencia: reutiliza objetos de la Unidad 1.2 (X, beta, p, y, z).
-#     Si no están en el entorno, se construyen ejecutando su script.
-if (!all(sapply(c("X", "beta", "p", "y", "z"), exists))) source(file.path(.raiz, "caso1", "scripts", "_unidad_1_2.R"))
-
-# --- Dependencia: reutiliza objetos de la Unidad 1.3 (ajuste).
-#     Si no están en el entorno, se construyen ejecutando su script.
-if (!all(sapply(c("ajuste"), exists))) source(file.path(.raiz, "caso1", "scripts", "_unidad_1_3.R"))
+library(readr)
+source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))                        # define simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
+cohorte <- cargar_cohorte()                      # lee datos/cohorte_*.rds si existe; si no (o si cambió el DGP), simula y guarda
+# y guardamos las simulaciones
+#write_csv(cohorte, "cohorte.csv")        # nivel individuo
+# resumen
+glimpse(cohorte)
+head(cohorte)
 
 # -----------------------------------------------------------------------------
-# [fig-u14-prop-centro]  ·  (introducción)
+# [fig-u14-prop-centro]  ·  
 # -----------------------------------------------------------------------------
 library(patchwork)
 lims     <- c(0, 0.62)
@@ -71,7 +81,7 @@ p_glow <- ggplot(prop_glow, aes(reorder(factor(site_id), prop), prop)) +
 p_coh + p_glow
 
 # -----------------------------------------------------------------------------
-# [fig-cohorte-eda-box]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-cohorte-eda-box]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en cohorte
 # -----------------------------------------------------------------------------
 cohorte |>
   mutate(Desenlace   = factor(evento, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
@@ -81,7 +91,7 @@ cohorte |>
   labs(x = "Fragilidad ósea (x1, en z)", y = "Desenlace", fill = "Tratamiento")
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-pool-int]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-pool-int]  ·  🔧 En R. Ajustar un GLMM de intercepto aleatorio
 # -----------------------------------------------------------------------------
 library(lme4)
 m_pool <- glm  (ever ~ x1 + x2,                family = binomial, data = cohorte)  # complete pooling
@@ -90,12 +100,12 @@ m_int  <- glmer(ever ~ x1 + x2 + (1 | centro),  family = binomial, data = cohort
 summary(m_pool)
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-int]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-int]  ·  🔧 En R. Ajustar un GLMM de intercepto aleatorio
 # -----------------------------------------------------------------------------
 summary(m_int)
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-varcov]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-varcov]  ·  🔧 En R. Calcular el ICC de un GLMM
 # -----------------------------------------------------------------------------
 # matriz de varianzas-covarianzas de los efectos aleatorios
 vc <- as.data.frame(VarCorr(m_int))
@@ -108,7 +118,7 @@ vc$vcov[1] / (vc$vcov[1] + pi^2/3)
 attr(cohorte, "verdad")$binaria[c("sigma_u", "icc_latente")]
 
 # -----------------------------------------------------------------------------
-# [fig-u14-glmm-coef]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-glmm-coef]  ·  🔧 En R. Calcular el ICC de un GLMM > 2. Condicional vs marginal
 # -----------------------------------------------------------------------------
 # verdad
 attr(cohorte,"verdad")$binaria[c("beta")]
@@ -131,7 +141,7 @@ ggplot(coefs, aes(estimate, term, color = modelo)) +
   labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u14-cond-marg]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-cond-marg]  ·  🔧 En R. Calcular el ICC de un GLMM > 2. Condicional vs marginal
 # -----------------------------------------------------------------------------
 b0 <- 0; b1 <- 1.5; sigma_u <- 2          # sigma_u exagerado para que el aplanamiento se vea
 x  <- seq(-6, 6, length.out = 200)
@@ -159,7 +169,7 @@ ggplot() +
   theme(legend.position = "top")
 
 # -----------------------------------------------------------------------------
-# [fig-u14-cohorte-caterpillar]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-cohorte-caterpillar]  ·  🔧 En R. Obtener los efectos aleatorios estimados (ranef)
 # -----------------------------------------------------------------------------
 re_coh <- as.data.frame(ranef(m_int, condVar = TRUE))   # columnas: grp, condval, condsd
 ggplot(re_coh, aes(reorder(grp, condval), condval)) +
@@ -170,7 +180,7 @@ ggplot(re_coh, aes(reorder(grp, condval), condval)) +
   labs(x = "Centro", y = "Intercepto aleatorio (log-odds)")
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-pool-int-compare]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-pool-int-compare]  ·  🔧 En R. Obtener los efectos aleatorios estimados (ranef)
 # -----------------------------------------------------------------------------
 # 1) Varianza entre centros: sigma_u^2 (y sigma_u)
 vc   <- as.data.frame(VarCorr(m_int))
@@ -188,7 +198,7 @@ c(var_residual = resid_var, ICC = icc)
 AIC(m_pool, m_int)          # data.frame con df y AIC de cada uno
 
 # -----------------------------------------------------------------------------
-# [fig-u14-x1-centro]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-x1-centro]  ·  4.3 Pendiente aleatoria: cuando el efecto varía por grupo
 # -----------------------------------------------------------------------------
 library(tidyverse)
 n_bins <- 4
@@ -207,45 +217,45 @@ cohorte |>
   guides(color = "none")                                        # sin leyenda de centros
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-slope]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-slope]  ·  🔧 En R. Añadir una pendiente aleatoria
 # -----------------------------------------------------------------------------
 m_slope  <- glmer(ever ~ x1 + x2 + (1 + x1 | centro), family = binomial, data = cohorte)  # intercepto + pendiente
 
 VarCorr(m_slope)        # sigma_u0, sigma_u1 y su correlacion
 
 # -----------------------------------------------------------------------------
-# [u14-glmm-comparacion]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glmm-comparacion]  ·  🔧 En R. Comparar y elegir
 # -----------------------------------------------------------------------------
 AIC(m_pool, m_int, m_slope)   # pooled  <  intercepto  <  intercepto + pendiente
 anova(m_int, m_slope)          # LRT de la pendiente
 
 # -----------------------------------------------------------------------------
-# [fig-u14-dharma]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-dharma]  ·  🔧 En R. Residuos simulados (DHARMa) en modelos mixtos
 # -----------------------------------------------------------------------------
 library(DHARMa)
 sim <- simulateResiduals(m_int)
 plot(sim)
 
 # -----------------------------------------------------------------------------
-# [u14-dharma-tests]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-dharma-tests]  ·  🔧 En R. Residuos simulados (DHARMa) en modelos mixtos
 # -----------------------------------------------------------------------------
 testDispersion(sim)                          # sobre/infradispersión
 plotResiduals(sim, form = cohorte$centro)    # residuos agregados por centro
 
 # -----------------------------------------------------------------------------
-# [u14-r2]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-r2]  ·  🔧 En R. Residuos simulados (DHARMa) en modelos mixtos
 # -----------------------------------------------------------------------------
 performance::r2(m_int)     # R2 marginal (fijos) y condicional (fijos + aleatorios)
 performance::icc(m_int)    # icc no ajustado = R2(cond)-R2(marg)
 
 # -----------------------------------------------------------------------------
-# [u14-singular]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-singular]  ·  🔧 En R. Residuos simulados (DHARMa) en modelos mixtos
 # -----------------------------------------------------------------------------
 isSingular(m_int)                    # TRUE = ajuste singular (estructura aleatoria no sostenida)
 performance::check_singularity(m_int)
 
 # -----------------------------------------------------------------------------
-# [u14-glow-mixto]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [u14-glow-mixto]  ·  4.6 El modelo mixto sobre datos reales: GLOW por centro
 # -----------------------------------------------------------------------------
 library(lme4)
 glow_m <- glow |> mutate(site_id = factor(site_id))
@@ -263,7 +273,7 @@ c(sigma_u = sqrt(vc$vcov[1]), ICC = vc$vcov[1] / (vc$vcov[1] + pi^2 / 3))
 cbind(pooled = coef(m_glow_pool), mixto = fixef(m_glow_mix))
 
 # -----------------------------------------------------------------------------
-# [fig-u14-glow-caterpillar]  ·  4.2 Intercepto aleatorio > Intercepto aleatorio en `cohorte`
+# [fig-u14-glow-caterpillar]  ·  4.6 El modelo mixto sobre datos reales: GLOW por centro
 # -----------------------------------------------------------------------------
 re_glow <- as.data.frame(ranef(m_glow_mix, condVar = TRUE))   # grp, condval, condsd
 ggplot(re_glow, aes(reorder(grp, condval), condval)) +
@@ -272,3 +282,4 @@ ggplot(re_glow, aes(reorder(grp, condval), condval)) +
                       ymax = condval + 1.96 * condsd)) +
   coord_flip() +
   labs(x = "Centro (site_id)", y = "Intercepto aleatorio (log-odds)")
+

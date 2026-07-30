@@ -165,7 +165,7 @@ Conviene ser honestos con este gráfico: coloreando por criticidad se ven **band
 separa las nubes—, pero las **pendientes marginales son suaves**, y la de la carga casi plana. Cuidado
 con concluir de ahí que no importan: es la vista *marginal*, que mezcla máquinas de toda criticidad y
 puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al ajustar el modelo
-(@sec-u31-inferencia)—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
+([Sección 1.4](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
 otra mitad del caso, que modelaremos en la [Unidad 3.4](#sec-u34).
@@ -225,8 +225,8 @@ El enlace **canónico** de la Gamma no es el log sino el **inverso**, $\eta=1/\m
 **log**, que da la lectura multiplicativa que necesitamos ($e^{\beta}$ es un factor) y evita
 predicciones inadmisibles (el inverso **no** garantiza $\mu>0$ para todo $\eta$).
 
-::: {.callout-note}
-## En R: ajustar una Gamma con `glm()`
+::: {.callout-tip}
+## 🔧 En R. Ajustar una Gamma con `glm()`
 El ajuste es el mismo `glm()` de siempre; solo cambia la **familia**:
 
 ```r
@@ -287,7 +287,7 @@ c(phi_pearson  = summary(m_gamma)$dispersion,
 El `cv_implicado` es la lectura útil: dice que, alrededor del coste medio que predice el modelo, una
 reparación cualquiera se desvía en ese porcentaje **con independencia de si es cara o barata** —la firma
 Gamma de CV constante que motivó la familia—. Conviene retener esta cifra: al validar contra el DGP
-(@sec-u31-diagnostico) comprobaremos que sale **más alta** que la dispersión «pura» con la que se
+([Sección 1.5](#sec-u31-diagnostico)) comprobaremos que sale **más alta** que la dispersión «pura» con la que se
 simularon los datos, y esa brecha no es ruido, sino la pista de que al modelo le falta algo —lo que
 comentamos a continuación—.
 
@@ -297,7 +297,7 @@ Cada máquina aporta **varias averías**, y las de una misma máquina se parecen
 independientes. Aquí las tratamos como si lo fueran —un modelo de efectos fijos sobre todas las
 averías—. Esa simplificación tiene un precio visible: el $\hat\phi$ que acabamos de estimar sale
 **inflado** respecto de la dispersión «pura» de la Gamma, porque absorbe la variabilidad **entre
-máquinas** que el modelo no incluye. Lo confirmaremos al validar contra el DGP (@sec-u31-diagnostico) y
+máquinas** que el modelo no incluye. Lo confirmaremos al validar contra el DGP ([Sección 1.5](#sec-u31-diagnostico)) y
 lo resolveremos con el **efecto aleatorio de máquina** de la [Unidad 3.3](#sec-u33).
 :::
 
@@ -378,7 +378,7 @@ marginaleffects::plot_predictions(m_gamma,
 ```
 
 ::: {.callout-tip}
-## En R: tres herramientas para leer el modelo
+## 🔧 En R. Tres herramientas para leer el modelo
 Hemos usado tres piezas del ecosistema, cada una para una tarea distinta de interpretación:
 
 - **`broom::tidy(m_gamma, exponentiate = TRUE)`** ordena los coeficientes en un *data frame* limpio (una
@@ -467,6 +467,20 @@ de coeficientes trae `t value`/`Pr(>|t|)` y en los contrastes de modelos pasamos
 `test = "Chisq"` produciría valores $p$ demasiado pequeños.
 :::
 
+::: {.callout-tip}
+## 🔧 En R. Contrastar términos y comparar modelos
+Tres piezas, según lo que se pregunte:
+
+- **Un término dentro del modelo** — `anova(m_gamma, test = "F")` da la tabla de deviances término a
+  término. En la Gamma se pasa **`test = "F"`** (porque $\phi$ se estima); `test = "Chisq"` daría $p$
+  demasiado pequeños. `drop1(m, test = "F")` hace lo análogo quitando un término cada vez.
+- **Dos modelos anidados** (¿aporta la interacción?, ¿sobra `fabricante`?) — se ajusta el vecino y se
+  enfrentan con `anova(m_reducido, m_completo, test = "F")`. **`update(m, . ~ . + fabricante)`** construye
+  ese modelo vecino sin reescribir la fórmula entera.
+- **Modelos no anidados, misma respuesta y familia** — **`AIC(m1, m2, m3)`**; gana el menor. (Para comparar
+  entre respuestas en escalas distintas, cuidado con el jacobiano: [Unidad 3.2](#sec-u32).)
+:::
+
 **Segundo nivel: términos y modelos.** Pasamos de los coeficientes uno a uno a los bloques. La tabla de
 análisis de la deviance término a término:
 
@@ -509,7 +523,7 @@ respalda y el AIC baja al incluirla). Y `fabricante`, contra lo que cabría espe
 de catálogo, **también baja el AIC** y sale significativo; siguiendo la evidencia, lo **incluimos
 provisionalmente**, de modo que el modelo con el que seguimos es `m_fab`. Es una decisión que dejamos
 **en cuarentena**: un único nivel significativo y un efecto pequeño invitan a la cautela, y en la
-validación contra el DGP (@sec-u31-diagnostico) veremos si ese efecto es real o un espejismo. Sobre
+validación contra el DGP ([Sección 1.5](#sec-u31-diagnostico)) veremos si ese efecto es real o un espejismo. Sobre
 `m_fab` hacemos el diagnóstico.
 
 ```
@@ -575,6 +589,27 @@ correcto se distribuyen **uniformemente**, sea cual sea la familia.
 #| fig-cap: "Diagnóstico con residuos cuantil simulados (DHARMa). Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste. Derecha: residuos frente a valores ajustados; buscamos una nube sin estructura."
 DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
 ```
+
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico con residuos cuantil (DHARMa)
+Los residuos crudos y los de deviance engañan en un GLM Gamma; los **residuos cuantil aleatorizados**
+[@dunnsmyth1996] son **uniformes** si el modelo es correcto, sea cual sea la familia. **`DHARMa`** los
+obtiene por simulación:
+
+```r
+DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
+```
+
+- **`simulateResiduals()`** genera `n` réplicas de la respuesta bajo el modelo y sitúa cada residuo como su
+  **cuantil** dentro de esa réplica simulada. Con `plot = TRUE` dibuja los dos paneles.
+- **Panel izquierdo (QQ uniforme):** los puntos deben seguir la diagonal, y los contrastes que superpone
+  —uniformidad (KS), dispersión y atípicos— salir **no significativos**.
+- **Panel derecho:** residuos frente a valor predicho; buscamos una nube **sin estructura** (ni abanico ni
+  curvatura).
+
+Volveremos a DHARMa en la [Unidad 3.3](#sec-u33), donde `simulateResiduals` sabe además respetar el
+**agrupamiento por máquina** del modelo mixto.
+:::
 
 ### ¿Es correcta la función de varianza?
 

@@ -4,42 +4,52 @@
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_5.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta del proyecto GLM (localiza la raíz
-# por _quarto.yml). Cada unidad carga además en sus chunks sus librerías propias.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías base (setup del documento del caso) ---------------------------
-library(broom); library(aplore3); library(patchwork); library(see)
-library(DHARMa); library(arm); library(performance); library(tidyverse)
-library(MuMIn); library(readr); library(GGally)
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo de software (cada unidad carga además lo suyo: lme4, nnet, ordinal,
+# pROC, performance, DHARMa, marginaleffects, car, survival...).
+
+library(broom)
+library(aplore3)
+library(patchwork)
+library(see)
+library(DHARMa)
+library(arm)
+library(performance)
+library(tidyverse)
+library(MuMIn)
+library(readr)
+library(GGally)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Raíz del proyecto (robusto al directorio de trabajo) --------------------
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-
-# --- Dato real GLOW ----------------------------------------------------------
 data(glow500)
 glow <- glow500 |>
   as_tibble() |>
   mutate(fractura01 = as.integer(fracture) - 1L)   # No -> 0, Yes -> 1
 
-# --- Cohorte simulada con CACHÉ (misma que el documento del caso) ------------
-source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))  # simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
-cohorte <- cargar_cohorte()          # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 
-
-# --- Dependencia: reutiliza objetos de la Unidad 1.2 (escala, eta, p, y).
-#     Si no están en el entorno, se construyen ejecutando su script.
-if (!all(sapply(c("escala", "eta", "p", "y"), exists))) source(file.path(.raiz, "caso1", "scripts", "_unidad_1_2.R"))
-
-# --- Dependencia: reutiliza objetos de la Unidad 1.4 (x).
-#     Si no están en el entorno, se construyen ejecutando su script.
-if (!all(sapply(c("x"), exists))) source(file.path(.raiz, "caso1", "scripts", "_unidad_1_4.R"))
+library(readr)
+source(file.path(.raiz, "caso1", "R", "dgp_cohorte.R"))                        # define simular_cohorte(), cargar_cohorte(), expandir_persona_periodo()
+cohorte <- cargar_cohorte()                      # lee datos/cohorte_*.rds si existe; si no (o si cambió el DGP), simula y guarda
+# y guardamos las simulaciones
+#write_csv(cohorte, "cohorte.csv")        # nivel individuo
+# resumen
+glimpse(cohorte)
+head(cohorte)
 
 # -----------------------------------------------------------------------------
 # [u15-cohorte-head]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Kaplan–Meier: dejar hablar a los datos
@@ -85,20 +95,20 @@ base |>
   theme(legend.position = "top")
 
 # -----------------------------------------------------------------------------
-# [fig-u15-km-loglog]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [fig-u15-km-loglog]  ·  Cuándo falla la proporcionalidad
 # -----------------------------------------------------------------------------
 ggsurvplot(km, data = cohorte, fun = "cloglog",
            legend.title = "Tratamiento", legend.labs = c("No", "Sí"),
            xlab = "log(periodo)", ylab = "log(-log S(t))")
 
 # -----------------------------------------------------------------------------
-# [u15-pp]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [u15-pp]  ·  5.3 La modelización GLM del problema de supervivencia > De los datos al modelo: qué es $T$ y qué asumimos
 # -----------------------------------------------------------------------------
 pp <- expandir_persona_periodo(cohorte)   # de 1 fila por mujer a 1 fila por mujer y periodo en riesgo
 head(pp, 8)
 
 # -----------------------------------------------------------------------------
-# [fig-u15-enlaces]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [fig-u15-enlaces]  ·  5.3 La modelización GLM del problema de supervivencia > El enlace complementary log-log y por qué es el natural
 # -----------------------------------------------------------------------------
 tibble(eta = seq(-4, 4, by = 0.02)) |>
   mutate(logit   = plogis(eta),
@@ -109,7 +119,7 @@ tibble(eta = seq(-4, 4, by = 0.02)) |>
   labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
 
 # -----------------------------------------------------------------------------
-# [u15-ajuste]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [u15-ajuste]  ·  5.3 La modelización GLM del problema de supervivencia > Ajuste en tiempo discreto e interpretación
 # -----------------------------------------------------------------------------
 m_pp <- glm(y ~ periodo + x1 + x2, family = binomial("cloglog"), data = pp)
 summary(m_pp)
@@ -118,7 +128,7 @@ exp(coef(m_pp)[c("x1", "x2")])               # hazard ratios estimados
 exp(attr(cohorte, "verdad")$binaria$beta)    # HR verdaderos: e^0.85, e^-0.65
 
 # -----------------------------------------------------------------------------
-# [fig-u15-hazard-base]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [fig-u15-hazard-base]  ·  5.3 La modelización GLM del problema de supervivencia > Ajuste en tiempo discreto e interpretación
 # -----------------------------------------------------------------------------
 base <- tibble(periodo = factor(levels(pp$periodo), levels = levels(pp$periodo)),
                x1 = 0, x2 = 0)
@@ -136,7 +146,7 @@ pS <- ggplot(base, aes(t, S)) +
 pH + pS
 
 # -----------------------------------------------------------------------------
-# [u15-fragilidad]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [u15-fragilidad]  ·  5.3 La modelización GLM del problema de supervivencia > Ajuste en tiempo discreto e interpretación
 # -----------------------------------------------------------------------------
 library(lme4)
 m_frail <- glmer(y ~ periodo + x1 + x2 + (1 | centro),
@@ -145,7 +155,7 @@ VarCorr(m_frail)               # sigma de la fragilidad (verdad del DGP: 0.70)
 fixef(m_frail)[c("x1", "x2")]  # efectos fijos, ahora condicionales al centro
 
 # -----------------------------------------------------------------------------
-# [u15-logit]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [u15-logit]  ·  🔧 En R. El GLM de supervivencia en persona-periodo > Cloglog frente a logit: ¿cuánto importa el enlace?
 # -----------------------------------------------------------------------------
 m_pp_logit <- glm(y ~ periodo + x1 + x2, family = binomial("logit"), data = pp)
 
@@ -155,7 +165,7 @@ cbind(cloglog_HR = exp(coef(m_pp)[c("x1", "x2")]),
 c(AIC_cloglog = AIC(m_pp), AIC_logit = AIC(m_pp_logit))
 
 # -----------------------------------------------------------------------------
-# [fig-u15-logit-cmp]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [fig-u15-logit-cmp]  ·  🔧 En R. El GLM de supervivencia en persona-periodo > Cloglog frente a logit: ¿cuánto importa el enlace?
 # -----------------------------------------------------------------------------
 base2 <- tibble(periodo = factor(levels(pp$periodo), levels(pp$periodo)), x1 = 0, x2 = 0)
 pred2 <- base2 |>
@@ -174,7 +184,7 @@ ggplot(pred2, aes(t, S, color = enlace)) +
   labs(x = "Periodo", y = "Supervivencia base S(t)", color = "Enlace")
 
 # -----------------------------------------------------------------------------
-# [fig-u15-clinica]  ·  5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox > Riesgos proporcionales, en tiempo discreto
+# [fig-u15-clinica]  ·  🔧 En R. El GLM de supervivencia en persona-periodo > Conclusiones para la práctica clínica
 # -----------------------------------------------------------------------------
 arquetipos <- tibble(
   arquetipo = factor(c("Alta fragilidad, sin tratamiento",
@@ -202,3 +212,4 @@ ggplot(grid, aes(t, riesgo_acum, color = arquetipo)) +
   labs(x = "Periodo de revisión", y = "Riesgo acumulado de fractura (1 - S)",
        color = NULL) +
   theme(legend.position = "top")
+

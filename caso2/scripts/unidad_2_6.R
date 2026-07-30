@@ -1,201 +1,315 @@
 # =============================================================================
-# Caso 2 · Unidad 2.6 — 6 · Selección, validación cruzada y regularización
+# Caso 2 · Unidad 2.6 — 6 · Del conteo al reloj. Supervivencia
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_6.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM; localiza
-# la raíz por _quarto.yml y resuelve solo las rutas del DGP y de la caché.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías (idénticas al setup del documento del caso) -------------------
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo.
 library(broom)
 library(tidyverse)
-library(MASS)          # glm.nb
+library(MASS)          # glm.nb (base-recommended)
 library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos
-library(MuMIn); library(glmnet)
-library(vcdExtra)      # zero-inflated
+library(survival)      # riesgos a trozos (base-recommended)
+library(MuMIn); library(glmnet)   # selección / regularización 
+library(vcd)           # mosaicos para tablas de contingencia (2.2)
+library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Datos: cartera de auto (misma llamada que el documento del caso) --------
-# Localiza la raíz del proyecto (donde está _quarto.yml), sea cual sea el wd:
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))  # simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
-cartera <- cargar_cartera("auto")    # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u26-datos]  ·  (introducción)
+# [u26-datos]  ·  6.1 El hazard como una tasa: el problema del tiempo a evento > Los datos y la pregunta
 # -----------------------------------------------------------------------------
-# Predictores del riesgo (activos en el DGP) + bloque de ruido (relación nula por diseño).
-activos <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo",
-             "zona_circulacion", "uso", "tipo_vehiculo")
-ruido   <- c("sexo", "estado_civil", "color_vehiculo", "tiene_garaje", "forma_pago",
-             "financiado", "km_declarados", "valor_vehiculo", "n_conductores", "antiguedad_cliente")
-predictores <- c(activos, ruido)
-
-cartera |> dplyr::select(n_asistencia, exposicion, dplyr::all_of(predictores)) |> dplyr::glimpse()
+cartera |>
+  dplyr::select(id_poliza, tiempo_primer_sin, evento, exposicion,
+                zona_circulacion, tipo_vehiculo, sexo) |>
+  head(8)
 
 # -----------------------------------------------------------------------------
-# [u26-optimismo]  ·  6.1 De la selección clásica a la validación cruzada > Ajustar bien no es predecir bien
+# [fig-u26-km]  ·  Cómo leer una fila: (exposicion,tiempo_primer_sin, evento) > Una primera mirada: la curva de supervivencia
 # -----------------------------------------------------------------------------
-f_activos <- reformulate(c(activos, "offset(log(exposicion))"), response = "n_asistencia")
-f_todo    <- reformulate(c(predictores, "offset(log(exposicion))"), response = "n_asistencia")
-
-m_activos <- glm(f_activos, family = poisson, data = cartera)
-m_todo    <- glm(f_todo,    family = poisson, data = cartera)
-
-c(dev_activos = deviance(m_activos), dev_todo = deviance(m_todo),
-  gl_activos = m_activos$df.residual, gl_todo = m_todo$df.residual)
+km <- survfit(Surv(tiempo_primer_sin, evento) ~ zona_circulacion, data = cartera)
+broom::tidy(km) |>
+  ggplot(aes(time, estimate, colour = strata)) +
+  geom_step(linewidth = 0.8) +
+  labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = "zona")
 
 # -----------------------------------------------------------------------------
-# [u26-lrt]  ·  6.1 De la selección clásica a la validación cruzada > Ajustar bien no es predecir bien
+# [u26-pp]  ·  Cómo leer una fila: (exposicion,tiempo_primer_sin, evento) > La transformación a persona-periodo (y por qué)
 # -----------------------------------------------------------------------------
-anova(m_activos, m_todo, test = "LRT")
+pp <- expandir_poliza_tramo(cartera, "tiempo_primer_sin", "evento", col_id = "id_poliza")
+# la primera póliza, desplegada en sus tramos en riesgo:
+head(pp[pp$id == pp$id[1], c("id", "tramo", "y", "zona_circulacion", "uso")], 8)
 
 # -----------------------------------------------------------------------------
-# [u26-aic-bic]  ·  6.1 De la selección clásica a la validación cruzada > El apaño analítico: AIC y BIC
+# [u26-haz-emp]  ·  6.2 El modelo de riesgos a trozos como GLM de Poisson > Qué dicen los datos antes de modelar
 # -----------------------------------------------------------------------------
+pp |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(en_riesgo = dplyr::n(), eventos = sum(y),
+                   hazard = round(mean(y), 4), .groups = "drop")
+
+# -----------------------------------------------------------------------------
+# [fig-u26-haz-emp]  ·  6.2 El modelo de riesgos a trozos como GLM de Poisson > Qué dicen los datos antes de modelar
+# -----------------------------------------------------------------------------
+pp |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(hazard = mean(y), .groups = "drop") |>
+  ggplot(aes(as.integer(tramo), hazard)) +
+  geom_line(linewidth = 0.8, colour = "steelblue") +
+  geom_point(size = 2.5, colour = "steelblue") +
+  labs(x = "tramo de antigüedad", y = "hazard empírico (eventos / en riesgo)")
+
+# -----------------------------------------------------------------------------
+# [u26-eda-prep]  ·  🔧 En R. Calcular supervivencia y hazard
+# -----------------------------------------------------------------------------
+vars_cont <- c("edad_conductor", "antiguedad_carnet")
+vars_cate <- c("sexo", "tipo_vehiculo", "zona_circulacion")
+
+cartera_eda <- cartera |>
+  dplyr::mutate(dplyr::across(dplyr::all_of(vars_cont),
+                              \(x) factor(dplyr::ntile(x, 5)),
+                              .names = "{.col}_q"))
+vars_eda <- c(paste0(vars_cont, "_q"), vars_cate)
+
+pp_eda <- pp |>
+  dplyr::left_join(
+    dplyr::select(cartera_eda, id_poliza, dplyr::all_of(paste0(vars_cont, "_q"))),
+    by = "id_poliza"
+  )
+
+km_all <- purrr::map_dfr(vars_eda, \(v) {
+  f <- stats::as.formula(paste("Surv(tiempo_primer_sin, evento) ~", v))
+  broom::tidy(survfit(f, data = cartera_eda)) |>
+    dplyr::mutate(predictor = v, nivel = sub("^[^=]+=", "", strata))
+})
+
+# -----------------------------------------------------------------------------
+# [fig-u26-eda-km]  ·  🔧 En R. Calcular supervivencia y hazard
+# -----------------------------------------------------------------------------
+patchwork::wrap_plots(
+  purrr::map(vars_eda, \(v) {
+    km_all |>
+      dplyr::filter(predictor == v) |>
+      ggplot(aes(time, estimate, colour = nivel)) +
+      geom_step(linewidth = 0.7) +
+      labs(title = v, x = "tramo", y = "S(t)", colour = NULL) +
+      theme(plot.title = element_text(size = 10),
+            legend.key.size = unit(0.35, "cm"),
+            legend.text = element_text(size = 8))
+  }),
+  ncol = 3
+)
+
+# -----------------------------------------------------------------------------
+# [fig-u26-eda-haz]  ·  🔧 En R. Calcular supervivencia y hazard
+# -----------------------------------------------------------------------------
+purrr::map_dfr(vars_eda, \(v) pp_eda |>
+  dplyr::group_by(nivel = as.character(.data[[v]])) |>
+  dplyr::summarise(hazard = mean(y), .groups = "drop") |>
+  dplyr::mutate(predictor = v)) |>
+  ggplot(aes(nivel, hazard)) +
+  geom_hline(yintercept = mean(pp$y), linetype = 2, colour = "grey50") +
+  geom_point(size = 2.5, colour = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  labs(x = NULL, y = "hazard empírico (media de y)")
+
+# -----------------------------------------------------------------------------
+# [fig-u26-eda-loglog]  ·  🔧 En R. Calcular supervivencia y hazard
+# -----------------------------------------------------------------------------
+patchwork::wrap_plots(
+  purrr::map(vars_eda, \(v) {
+    km_all |>
+      dplyr::filter(predictor == v, estimate > 0, estimate < 1) |>
+      ggplot(aes(time, log(-log(estimate)), colour = nivel)) +
+      geom_step(linewidth = 0.7) +
+      labs(title = v, x = "tramo", y = "log(-log S)", colour = NULL) +
+      theme(plot.title = element_text(size = 10),
+            legend.key.size = unit(0.35, "cm"),
+            legend.text = element_text(size = 8))
+  }),
+  ncol = 3
+)
+
+# -----------------------------------------------------------------------------
+# [u26-pw]  ·  🔧 En R. Calcular supervivencia y hazard > Ajuste e interpretación
+# -----------------------------------------------------------------------------
+m_pw <- glm(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
+  family = poisson, data = pp
+)
+broom::tidy(m_pw, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(!grepl("^tramo", term))
+
+# -----------------------------------------------------------------------------
+# [u26-ph-check]  ·  🔧 En R. El modelo de riesgos a trozos como glm(poisson) > Bondad de ajuste, diagnóstico y predicción
+# -----------------------------------------------------------------------------
+m_int <- update(m_pw, . ~ . + tramo:zona_circulacion)
+anova(m_pw, m_int, test = "Chisq")
+
+# -----------------------------------------------------------------------------
+# [fig-u26-pw-surv]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos)
+# -----------------------------------------------------------------------------
+perfil <- pp[rep(1, nlevels(pp$tramo)), ]
+perfil$tramo <- factor(levels(pp$tramo), levels = levels(pp$tramo))
+
+h_hat <- predict(m_pw, newdata = perfil, type = "response")   # hazard por tramo (t = 1)
+curva <- tibble::tibble(
+  tramo  = seq_along(h_hat),
+  hazard = as.numeric(h_hat),
+  S      = exp(-cumsum(h_hat))
+)
+
+curva |>
+  tidyr::pivot_longer(c(hazard, S), names_to = "curva", values_to = "valor") |>
+  dplyr::mutate(curva = factor(curva, c("hazard", "S"),
+                               c("hazard estimado por tramo", "supervivencia S(t)"))) |>
+  ggplot(aes(tramo, valor)) +
+  geom_step(direction = "hv", linewidth = 0.8, colour = "steelblue") +
+  geom_point(size = 2, colour = "steelblue") +
+  facet_wrap(~ curva, scales = "free_y") +
+  labs(x = "tramo de antigüedad", y = NULL)
+
+# -----------------------------------------------------------------------------
+# [u26-pw-valida]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos) > Validación contra el DGP
+# -----------------------------------------------------------------------------
+verdad    <- attr(cartera, "verdad")
+razon_dgp <- verdad$h0_tramo / verdad$h0_tramo[1]
+razon_est <- c(1, exp(coef(m_pw)[grep("^tramo", names(coef(m_pw)))]))
+
 tibble::tibble(
-  modelo = c("solo activos", "activos + ruido"),
-  gl     = c(length(coef(m_activos)), length(coef(m_todo))),
-  AIC    = c(AIC(m_activos), AIC(m_todo)),
-  BIC    = c(BIC(m_activos), BIC(m_todo)))
+  tramo     = seq_along(razon_dgp),
+  estimada  = round(as.numeric(razon_est), 2),
+  verdadera = round(razon_dgp, 2)
+)
 
 # -----------------------------------------------------------------------------
-# [u26-cv-funcion]  ·  6.1 De la selección clásica a la validación cruzada > La validación cruzada: medir el error donde importa
+# [u26-pw-valida-beta]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos) > Validación contra el DGP
 # -----------------------------------------------------------------------------
-# Deviance de Poisson OUT-OF-SAMPLE = deviance de la familia aplicada a (y de test, mu predicha).
-# poisson()$dev.resids(y, mu, w) da las contribuciones a la deviance que R suma en deviance(fit);
-# aquí las sumamos sobre las filas que el modelo NO vio. No hay que rehacer la fórmula a mano.
-dev_poisson <- function(y, mu) sum(poisson()$dev.resids(y, mu, wt = 1))
+b <- setNames(verdad$betas$evento, verdad$nombres_beta)
 
-# Validación cruzada de k = 10 bloques para un glm de Poisson con offset. Devuelve la deviance
-# de predicción (out-of-sample) por observación.
-cv_deviance <- function(formula, datos, k = 10, semilla = SEMILLA_CURSO) {
-  set.seed(semilla)
-  bloque <- sample(rep(seq_len(k), length.out = nrow(datos)))  # partición aleatoria en k bloques
-  dev_test <- 0
-  for (b in seq_len(k)) {
-    ent <- datos[bloque != b, ]; test <- datos[bloque == b, ]  # entrena con k-1 bloques, evalúa en el b
-    fit <- glm(formula, family = poisson, data = ent)
-    mu  <- predict(fit, newdata = test, type = "response")     # incluye el offset
-    dev_test <- dev_test + dev_poisson(test$n_asistencia, mu)
-  }
-  dev_test / nrow(datos)      # deviance de predicción por observación
-}
+# Continuas: el DGP las estandarizó -> llevamos nuestro coeficiente a esa escala
+cont <- c(edad_conductor = "z_edad", antiguedad_carnet = "z_exp")
+sd_v <- vapply(names(cont), \(v) sd(cartera[[v]]), numeric(1))
 
-# -----------------------------------------------------------------------------
-# [u26-cv-comparar]  ·  6.1 De la selección clásica a la validación cruzada > La validación cruzada: medir el error donde importa
-# -----------------------------------------------------------------------------
-f_nulo <- n_asistencia ~ offset(log(exposicion))
-tibble::tibble(
-  modelo       = c("nulo", "solo activos", "activos + ruido"),
-  cv_deviance  = c(cv_deviance(f_nulo, cartera),
-                   cv_deviance(f_activos, cartera),
-                   cv_deviance(f_todo, cartera)))
+# Categóricas; 'sexo' no interviene en el DGP del evento, así que su valor verdadero es 0
+cate <- c(grep("^sexo", names(coef(m_pw)), value = TRUE),
+          "tipo_vehiculomoto", "tipo_vehiculofurgoneta",
+          "zona_circulacionmixta", "zona_circulacionrural")
+
+dplyr::bind_rows(
+  tibble::tibble(
+    termino   = names(cont),
+    estimado  = as.numeric(coef(m_pw)[names(cont)] * sd_v),
+    verdadero = as.numeric(b[cont])
+  ),
+  tibble::tibble(
+    termino   = cate,
+    estimado  = as.numeric(coef(m_pw)[cate]),
+    # el DGP mide la zona frente a 'rural'; R, frente a 'urbana'
+    verdadero = as.numeric(c(0, b["moto"], b["furgoneta"],
+                             b["mixta"] - b["urbana"], -b["urbana"]))
+  )
+) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 # -----------------------------------------------------------------------------
-# [u26-glmnet-matriz]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > `glmnet` sobre la Poisson
+# [u26-cloglog]  ·  6.3 Dos lentes del mismo hazard: Poisson y cloglog > Ajuste y comparación
 # -----------------------------------------------------------------------------
-library(glmnet)
-x  <- model.matrix(reformulate(predictores), data = cartera)[, -1]  # quita el intercepto
-y  <- cartera$n_asistencia
-os <- log(cartera$exposicion)                                       # offset de la exposición
-dim(x)
+m_cll <- glm(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
+  family = binomial(link = "cloglog"), data = pp
+)
+
+comp <- dplyr::inner_join(
+  broom::tidy(m_pw)  |> dplyr::select(term, poisson = estimate),
+  broom::tidy(m_cll) |> dplyr::select(term, cloglog = estimate),
+  by = "term"
+) |>
+  dplyr::mutate(diferencia = cloglog - poisson,
+                dplyr::across(where(is.numeric), \(x) round(x, 3)))
+comp
 
 # -----------------------------------------------------------------------------
-# [fig-u26-ruta-lasso]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > `glmnet` sobre la Poisson
+# [u26-cox]  ·  6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier > Cox: el mismo efecto, otro trato del hazard base
 # -----------------------------------------------------------------------------
-fit_lasso <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)
-plot(fit_lasso, xvar = "lambda", label = TRUE)
+m_cox <- coxph(
+  Surv(tiempo_primer_sin, evento) ~ edad_conductor + antiguedad_carnet + sexo +
+    tipo_vehiculo + zona_circulacion,
+  data = cartera, ties = "breslow"
+)
+
+comp_cox <- dplyr::inner_join(
+  broom::tidy(m_pw) |> dplyr::select(term, poisson = estimate),
+  broom::tidy(m_cox) |> dplyr::select(term, cox = estimate),
+  by = "term"
+) |>
+  dplyr::mutate(diferencia = cox - poisson,
+                dplyr::across(where(is.numeric), \(x) round(x, 3)))
+comp_cox
 
 # -----------------------------------------------------------------------------
-# [fig-u26-cvglmnet]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > Elegir $\lambda$: `cv.glmnet`
+# [u26-zph]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox
 # -----------------------------------------------------------------------------
-set.seed(SEMILLA_CURSO)
-cv_lasso <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
-                      type.measure = "deviance", nfolds = 10)
-plot(cv_lasso)
-c(lambda_min = cv_lasso$lambda.min, lambda_1se = cv_lasso$lambda.1se)
+cox.zph(m_cox)
 
 # -----------------------------------------------------------------------------
-# [u26-lasso-coef]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > El *lasso* como selección: ¿acierta con la verdad?
+# [fig-u26-zph]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox
 # -----------------------------------------------------------------------------
-coef_1se <- coef(cv_lasso, s = "lambda.1se")
-coef_min <- coef(cv_lasso, s = "lambda.min")
-
-retenidas <- function(coefs) {
-  m <- as.matrix(coefs); nz <- rownames(m)[m[, 1] != 0]
-  setdiff(nz, "(Intercept)")
-}
-
-# Imprime, para cada lambda, la lista de variables retenidas (con su número).
-lista_retenidas <- function(nombre, vars) {
-  cat("**`", nombre, "`** — ", length(vars), " variables retenidas:\n\n", sep = "")
-  cat(paste0("- `", vars, "`"), sep = "\n")
-  cat("\n\n")
-}
-lista_retenidas("lambda.1se", retenidas(coef_1se))
-lista_retenidas("lambda.min", retenidas(coef_min))
+par(mfrow = c(2, 3))
+plot(cox.zph(m_cox))
+par(mfrow = c(1, 1))
 
 # -----------------------------------------------------------------------------
-# [u26-lasso-irr]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > El *lasso* como selección: ¿acierta con la verdad?
+# [fig-u26-km-vs-pw]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox > Kaplan–Meier: la curva sin modelo frente a la del modelo
 # -----------------------------------------------------------------------------
-# Coeficientes no nulos del modelo 1se, en escala IRR (exp del coeficiente).
-m1 <- as.matrix(coef_1se)
-tibble::tibble(termino = rownames(m1), coef = m1[, 1]) |>
-  dplyr::filter(coef != 0, termino != "(Intercept)") |>
-  dplyr::mutate(IRR = exp(coef)) |>
-  dplyr::arrange(dplyr::desc(abs(coef)))
+m_base <- glm(y ~ 0 + tramo, family = poisson, data = pp)   # solo el hazard base
+S_pw   <- exp(-cumsum(exp(coef(m_base))))
+
+km0 <- survfit(Surv(tiempo_primer_sin, evento) ~ 1, data = cartera)
+
+dplyr::bind_rows(
+  broom::tidy(km0) |> dplyr::transmute(tramo = time, S = estimate, metodo = "Kaplan–Meier"),
+  tibble::tibble(tramo = seq_along(S_pw), S = as.numeric(S_pw), metodo = "Poisson a trozos")
+) |>
+  ggplot(aes(tramo, S, colour = metodo)) +
+  geom_step(direction = "hv", linewidth = 0.8) +
+  geom_point(size = 2) +
+  labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [u26-verdad]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > El *lasso* como selección: ¿acierta con la verdad?
+# [u26-frailty]  ·  6.5 Fragilidad ≡ GLMM de Poisson
 # -----------------------------------------------------------------------------
-verdad <- attr(cartera, "verdad")
-tibble::tibble(termino = verdad$nombres_beta, beta = verdad$betas$limpio) |>
-  dplyr::mutate(IRR = exp(beta))
+m_frag <- glmer(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion +
+    (1 | agencia),
+  family = poisson, data = pp
+)
+sd_frag <- as.data.frame(VarCorr(m_frag))$sdcor[1]
+c(sigma_agencia = sd_frag)
 
 # -----------------------------------------------------------------------------
-# [u26-tres-penalizaciones]  ·  6.2 Regularización: *ridge*, *lasso* y *elastic-net* > *Ridge*, *lasso* y *elastic-net*, comparados
+# [u26-bookend]  ·  6.6 Conteos y supervivencia: dos caras de la tasa
 # -----------------------------------------------------------------------------
-set.seed(SEMILLA_CURSO)
-cv_ridge <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0,   type.measure = "deviance", nfolds = 10)
-cv_enet  <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0.5, type.measure = "deviance", nfolds = 10)
+c(poisson_en_cero = dpois(0, 0.3), exp_supervivencia = exp(-0.3))
 
-n_no_nulos <- function(cvfit) sum(as.matrix(coef(cvfit, s = "lambda.1se"))[, 1] != 0) - 1
-tibble::tibble(
-  metodo          = c("ridge (a=0)", "elastic-net (a=0.5)", "lasso (a=1)"),
-  dev_cv_1se      = c(cv_ridge$cvm[cv_ridge$index["1se", ]],
-                      cv_enet$cvm[cv_enet$index["1se", ]],
-                      cv_lasso$cvm[cv_lasso$index["1se", ]]),
-  variables_vivas = c(n_no_nulos(cv_ridge), n_no_nulos(cv_enet), n_no_nulos(cv_lasso)))
-
-# -----------------------------------------------------------------------------
-# [u26-binomial]  ·  6.3 La misma máquina en la binaria
-# -----------------------------------------------------------------------------
-set.seed(SEMILLA_CURSO)
-cv_bin <- cv.glmnet(x, cartera$evento, family = "binomial",
-                    type.measure = "deviance", alpha = 1, nfolds = 10)
-
-# Nº de predictores retenidos en cada criterio (la señal binaria de 'evento' es débil).
-n_sel <- function(s) sum(as.matrix(coef(cv_bin, s = s))[, 1] != 0) - 1L
-c(no_nulos_1se = n_sel("lambda.1se"), no_nulos_min = n_sel("lambda.min"))
-
-# -----------------------------------------------------------------------------
-# [u26-binomial-min]  ·  6.3 La misma máquina en la binaria
-# -----------------------------------------------------------------------------
-# Coeficientes que sobreviven a lambda.min, en escala ODDS RATIO (exp del coeficiente).
-m_bin <- as.matrix(coef(cv_bin, s = "lambda.min"))
-tibble::tibble(termino = rownames(m_bin), coef = m_bin[, 1]) |>
-  dplyr::filter(coef != 0, termino != "(Intercept)") |>
-  dplyr::mutate(odds_ratio = exp(coef)) |>          # en binomial, exp(coef) es un ODDS RATIO
-  dplyr::arrange(dplyr::desc(abs(coef)))

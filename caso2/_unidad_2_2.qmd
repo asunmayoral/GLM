@@ -1,866 +1,869 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_2.qmd >}}. Sin YAML. Chunks u22-.
-     Tratamiento exhaustivo: la sobredispersión es EL problema central del conteo. -->
+<!-- Partial · Incluir con {{< include _unidad_2_2.qmd >}}. Sin YAML. Chunks u22-.
+     AMPLIACIÓN de la Unidad 2.1: modelos log-lineales para tablas. NO consume horas de
+     teoría del cronograma (sem. 6): es material de laboratorio y de apoyo autónomo a las
+     preguntas Q4, Q5, Q18 y Q19 del estudio de caso (Unidad 2.8). El enganche con esas
+     preguntas se declara SOLO en la "Tarea del estudiante" del final, no en la entradilla.
+     Estructura espejo de las demás unidades: Contexto · Modelización · Interpretación ·
+     Inferencia y selección · Diagnóstico.
+     Datos: `cartera` de teoría (R/dgp_conteos.R, contexto "auto"), la misma de 2.1 y 2.3-2.7.
+     Capítulos de Agresti (2013, 3.ª ed.) VERIFICADOS contra el apéndice de software del
+     propio autor (alanagresti.com/cda/R_web.pdf, organizado por capítulo de esa edición):
+       caps. 2-3 tablas de dos vías · cap. 4 GLM · caps. 5-7 logística · cap. 8 multinomial ·
+       caps. 9-10 MODELOS LOG-LINEALES · cap. 11 MODELS FOR MATCHED PAIRS (tablas cuadradas) ·
+       cap. 12 marginales · caps. 13-14 efectos aleatorios · cap. 15 clasificación.
+     OJO: en Christensen (2025) la simetría y la cuasi-simetría están en los EJERCICIOS del
+     cap. 2 (pp. 80-81), no en el texto principal: no citarlo como fuente de esa exposición. -->
 
-# 2 · Sobredispersión {#sec-u22}
+# 2 · Modelos log-lineales para tablas {#sec-u22}
 
-La Poisson de la [Unidad 2.1](#sec-u21) trae una condición de fábrica —**media = varianza**— que en la
-práctica casi nunca se cumple: los conteos reales suelen variar **más** de lo que la Poisson permite.
-Lo detectamos al final de 2.1 con el índice de dispersión de `n_danos`. Esta unidad se ocupa de ello
-en serio, porque es la patología más frecuente del conteo y la puerta de entrada a los ceros
-([Unidad 2.3](#sec-u23)) y al agrupamiento ([Unidad 2.4](#sec-u24)).
+En la [Unidad 2.1](#sec-u21) el dato era la **póliza**: una fila por sujeto, un conteo por fila. Ahora
+el dato es la **celda**: hemos cruzado dos o más variables categóricas y lo único que queda es
+*cuántos casos caen en cada combinación*. Cambia el objeto, cambia la lógica inferencial —modelos
+anidados y grados de libertad— y cambia la escala de lectura —**odds ratios**, no IRR—. Lo que **no**
+cambia es la maquinaria: sigue siendo `glm(family = poisson)`.
 
-Seguimos el mismo recorrido de la Unidad 2.1 —contexto, modelización, interpretación, selección y
-bondad de ajuste—, pero con un giro: como ahora hay **varios modelos candidatos** para un mismo
-problema, no repetimos el recorrido en cada uno. Lo aplicamos al **problema** (identificarlo) y a la
-**familia** (compararla): primero **qué es y cómo se identifica** (§2.1), luego un **bloque breve por
-modelo** (§2.2–2.3), y al final la **comparación y selección** (§2.4).
+Esta unidad desarrolla lo que la 2.1 solo dejó apuntado.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **Conteos y tasas** — diagnosticar la **sobredispersión**, tratarla (quasi-Poisson,
-binomial negativa) y saber elegir.
+**Ampliación** de la Unidad 2.1 (RA2). No introduce familia nueva: reinterpreta el Poisson cuando la
+respuesta son **frecuencias de celda**. Cubre los esquemas de muestreo, la **jerarquía** de modelos en
+tablas de tres o más vías, la paradoja de **Simpson**, el diagnóstico de tablas y los modelos de
+**tablas cuadradas** (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal), y termina
+aplicándolos a la detección de variables ***proxy***.
+
+No consume sesión de teoría propia: se trabaja en **laboratorio** y de forma autónoma.
+
+Fuentes: @agresti2015 (cap. 7, el texto de referencia del caso para conteos) y @mccullagh1989 (cap. 6)
+para el marco; @dunnsmyth2018 (§10.4, pp. 378–397) para el desarrollo con R; @christensen2025
+(caps. 1–3 y 5) para los esquemas de muestreo y la colapsabilidad; y @agresti2013 (caps. 9–10 para
+tablas de contingencia, cap. 11 para tablas cuadradas) como tratamiento profundo.
 :::
 
-## 2.1 Qué es, de dónde viene y cómo se identifica {#sec-u22-causas}
+## 2.1 Contexto: cuando el dato es la celda {#sec-u22-contexto}
 
-La Poisson tiene **un solo parámetro**, $\mu$, que gobierna a la vez el centro y la dispersión:
-$\mathrm{E}[Y]=\mathrm{Var}[Y]=\mu$. Es la **equidispersión**, y es una restricción rígida. Cuando la
-varianza observada supera a la media hablamos de **sobredispersión** (el caso habitual); si se queda
-por debajo, de subdispersión (mucho más raro). El síntoma no es que el modelo prediga mal la media
-—los coeficientes siguen siendo razonables—, sino que **miente sobre su propia precisión**.
+### De la ficha a la tabla
 
-### La huella: media frente a varianza
-
-Fijémonos en una respuesta concreta: **`n_danos`**, el número de partes por daños propios que registra
-cada póliza a lo largo del periodo. Queremos explicarlo en función de las variables de riesgo (edad del
-conductor, potencia, zona de circulación, uso, tipo de vehículo). Como el tiempo de cobertura varía de
-una póliza a otra, ajustamos una **Poisson con el *offset* de la exposición** —modelamos la tasa de
-partes por unidad de tiempo, como en la [Unidad 2.1](#sec-u21)—. Ese es el modelo `m_pois`, que
-usaremos como referencia en toda la unidad.
-
-Un vistazo exploratorio justifica esos predictores: la **tasa** de partes por daños (partes por unidad de
-exposición) no es plana frente a ninguno de ellos:
+Partimos siempre del mismo fichero —una fila por póliza—, pero podemos mirarlo de dos maneras. Con
+`n_danos` como respuesta y la zona como predictor, cada póliza aporta una fila. Si en cambio solo nos
+interesa **si** hubo daños y **en qué zona**, toda la información relevante cabe en una tabla de
+$3\times 2$ frecuencias:
 
 ```{r}
-#| label: fig-u22-eda-modelo
-#| fig-cap: "Tasa de `n_danos` (partes por unidad de exposición) según cada predictor del modelo. Sube con la potencia, es mayor en zona urbana y para uso comercial y moto, y baja levemente con la edad: relaciones que justifican los términos que se ajustan."
-#| fig-width: 9
+#| label: u22-de-ficha-a-tabla
+# Trabajamos sobre una copia con el indicador de daños; no modificamos `cartera`, que las
+# unidades siguientes siguen usando tal cual. El nivel "con" va segundo: será el "éxito".
+cart_tab <- cartera |> dplyr::mutate(danos = factor(ifelse(n_danos > 0, "con", "sin"),
+                                                    levels = c("sin", "con")))
+tab2 <- xtabs(~ zona_circulacion + danos, data = cart_tab)
+addmargins(tab2)
+```
+
+De unas 3.000 filas hemos pasado a **6 números**. No es una pérdida: si lo único que preguntamos es sobre
+la relación entre esas dos variables, la tabla es un **estadístico suficiente**. Y como sus entradas
+son conteos, el modelo natural vuelve a ser la Poisson —solo que ahora la unidad de observación es la
+celda—.
+
+### Los tres esquemas de muestreo (y por qué da igual)
+
+Aquí aparece la primera objeción de fondo, y conviene resolverla antes de ajustar nada. ¿De verdad son
+Poisson esas seis frecuencias? Depende de cómo se recogieron los datos, y hay **tres** situaciones
+distintas [@christensen2025, cap. 1, §§1.4–1.5; @dunnsmyth2018, §10.4.3]:
+
+| Esquema | Cómo se recoge | Qué queda fijo | Distribución de la tabla |
+|:--|:--|:--|:--|
+| **Poisson** | se observa una ventana de tiempo y se cuenta lo que llega | nada; $n$ es aleatorio | celdas Poisson independientes |
+| **Multinomial** | se fija el total $n$ y se clasifica a cada individuo | el **gran total** | multinomial sobre las celdas |
+| **Multinomial-producto** | se fija el tamaño de cada grupo y se clasifica dentro | los **marginales de un factor** | multinomiales independientes por fila |
+
+Nuestra cartera es del segundo tipo: tenemos las pólizas que tenemos y las clasificamos. Un estudio que
+hubiera reclutado *a propósito* 1.000 pólizas de cada zona sería del tercero.
+
+El resultado que hace viable todo el capítulo es que **los tres conducen a las mismas estimaciones y a
+los mismos contrastes**, siempre que el modelo log-lineal incluya los términos que fijan los marginales
+del diseño. Ajustar como si fueran Poisson independientes —el llamado *Poisson subrogado*— da los
+mismos $\hat\beta$ de interés, los mismos valores ajustados y las mismas deviances que la multinomial
+correcta [@christensen2025, §3.5; @dunnsmyth2018, §10.4.3].
+
+::: {.callout-important}
+## La regla práctica: fija en el modelo lo que estaba fijo en el diseño
+Si el diseño fijó el total, el modelo debe llevar **intercepto**. Si fijó los marginales de un factor,
+el modelo debe llevar el **efecto principal** de ese factor. Si fijó los marginales de una
+clasificación cruzada, debe llevar su **interacción**.
+
+Esos términos **no se contrastan**: no son hipótesis sobre el fenómeno, son propiedades del muestreo.
+Un modelo sin ellos ajustaría marginales que el investigador ya había decidido, y su deviance no
+mediría nada interpretable. Por eso todos los modelos que compararemos incluyen, como mínimo, los
+efectos principales de todos los factores.
+:::
+
+Esta es también la razón por la que un modelo log-lineal **nunca** aparece sin efectos principales, y
+por la que el modelo más simple que tiene sentido comparar es el de **independencia**, no el modelo
+nulo.
+
+### Grados de libertad: contar celdas y contar parámetros
+
+En una tabla, los grados de libertad residuales son **celdas menos parámetros**, y saber contarlos es
+la mitad del trabajo. Para un factor de $I$ niveles, su efecto principal aporta $I-1$ parámetros; una
+interacción de dos factores, $(I-1)(J-1)$; una de tres, $(I-1)(J-1)(K-1)$.
+
+```{r}
+#| label: u22-gl
+d2 <- as.data.frame(tab2)                                   # una fila por celda; columna Freq
+m_ind <- glm(Freq ~ zona_circulacion + danos, family = poisson, data = d2)
+c(celdas = nrow(d2), parametros = length(coef(m_ind)), gl_residuales = df.residual(m_ind))
+```
+
+Seis celdas, cuatro parámetros ($1 + 2 + 1$), **2 gl** residuales: exactamente $(3-1)(2-1)=2$, los
+grados de libertad del clásico $\chi^2$ de independencia. El log-lineal no es una alternativa a ese
+contraste: es el marco que lo contiene.
+
+## 2.2 Dos vías: independencia, asociación y el puente con la logística {#sec-u22-dosvias}
+
+### El modelo y su lectura
+
+Con dos factores $A$ (zona) y $B$ (daños), el modelo saturado es
+
+$$\log \mu_{ij} = \lambda + \lambda^A_i + \lambda^B_j + \lambda^{AB}_{ij},$$
+
+y toda la asociación vive en $\lambda^{AB}_{ij}$. Anularlo da el modelo de **independencia**: las
+frecuencias esperadas se reconstruyen a partir de los marginales, $\hat\mu_{ij}=n_{i\cdot}n_{\cdot j}/n$.
+
+```{r}
+#| label: u22-dosvias-fit
+m_sat <- glm(Freq ~ zona_circulacion * danos, family = poisson, data = d2)
+anova(m_ind, m_sat, test = "LRT")     # H0: independencia
+```
+
+La interacción se lee como un **odds ratio**. Para una tabla $2\times 2$ el coeficiente de interacción
+*es* el log-odds ratio; con más niveles, cada coeficiente compara una celda con las de referencia:
+
+```{r}
+#| label: u22-dosvias-or
+broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl(":", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high)
+```
+
+### El puente con la logística
+
+Cuando uno de los factores es claramente la **respuesta** —aquí, tener o no daños— el log-lineal
+saturado y la **logística** de ese factor sobre el otro son el **mismo modelo** reparametrizado
+[@dunnsmyth2018, §10.4.6; @christensen2025, §2.5]. Los coeficientes de asociación coinciden:
+
+```{r}
+#| label: u22-puente-logit
+m_logit <- glm(danos ~ zona_circulacion, family = binomial, data = cart_tab)
+rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
+      logistica = coef(m_logit)[-1]) |> round(4)
+```
+
+Idénticos hasta el redondeo. La diferencia está en **qué se considera fijo**: la logística condiciona a
+los marginales de la zona (los da por dados y modela la probabilidad de daños dentro de cada una),
+mientras el log-lineal los modela con su efecto principal. Como ese efecto principal es justo el
+término que el diseño fija, las conclusiones sobre la asociación son las mismas.
+
+Esto tiene una consecuencia práctica: **si hay una respuesta clara, usa la logística** —es más directa
+de interpretar y no gasta parámetros en marginales que no te interesan—. El log-lineal gana cuando
+**no hay una respuesta**, sino varias variables cuya estructura de asociación mutua es el objeto del
+estudio. Es exactamente la situación de Q4.
+
+::: {.callout-tip}
+## 🔧 En R. Construir y ajustar una tabla
+- **`xtabs(~ a + b + c, data = d)`** construye la tabla de contingencia; **`as.data.frame(tab)`** la
+  pasa a formato largo con una fila por celda y la columna de frecuencias llamada **`Freq`** (es el
+  formato que necesita `glm`). `count(a, b, c)` de dplyr hace lo mismo, pero **omite las celdas con
+  cero**: usa `xtabs` si quieres conservarlas (ver [2.4](#sec-u22-diagnostico)).
+- **`addmargins(tab)`** añade los totales; **`prop.table(tab, margin = 1)`** da porcentajes por fila.
+- **`glm(Freq ~ ..., family = poisson, data = ...)`** ajusta el log-lineal. **Sin `offset`**: aquí no
+  hay exposición, las celdas no son tasas.
+- **`MASS::loglm(~ a * b, data = tab)`** ajusta directamente sobre el objeto tabla, con una sintaxis
+  más próxima a la notación de modelos jerárquicos y un `summary` que da a la vez la deviance y el
+  $\chi^2$ de Pearson. Por debajo es el mismo ajuste.
+- **`anova(m_reducido, m_completo, test = "LRT")`** contrasta modelos anidados; en la Poisson
+  $\phi = 1$, así que el contraste es $\chi^2$ y no $F$.
+:::
+
+## 2.3 Tres vías: la jerarquía de modelos {#sec-u22-tresvias}
+
+Con dos factores solo hay dos posibilidades —independencia o asociación—. Con tres hay una **jerarquía**,
+y ahí está el interés: la pregunta deja de ser *«¿están asociados?»* y pasa a ser *«¿quién con quién, y
+condicionado a qué?»*.
+
+Cruzamos zona, tipo de vehículo y daños:
+
+```{r}
+#| label: u22-tab3
+tab3 <- xtabs(~ zona_circulacion + tipo_vehiculo + danos, data = cart_tab)
+d3   <- as.data.frame(tab3)
+ftable(tab3)
+```
+
+### Los cinco modelos
+
+Notación abreviada: $[AB]$ significa «incluye la interacción de $A$ y $B$ (y sus efectos
+principales)». Con $A$ = zona ($I=3$), $B$ = tipo ($J=3$), $C$ = daños ($K=2$) tenemos $18$ celdas.
+
+| Modelo | Fórmula en R | Notación | Qué afirma | gl |
+|:--|:--|:--|:--|--:|
+| Independencia mutua | `A + B + C` | $[A][B][C]$ | los tres, independientes entre sí | 12 |
+| Independencia conjunta | `A*B + C` | $[AB][C]$ | $C$ es independiente del par $(A,B)$ | 8 |
+| Independencia condicional | `A*C + B*C` | $[AC][BC]$ | $A \perp B$ **dado** $C$ | 8 |
+| Asociación homogénea | `(A+B+C)^2` | $[AB][AC][BC]$ | las tres asociaciones existen, pero cada una **no depende** del nivel del tercero | 4 |
+| Saturado | `A*B*C` | $[ABC]$ | la asociación entre dos varía con el tercero | 0 |
+
+```{r}
+#| label: u22-jerarquia
+f <- function(fml) glm(fml, family = poisson, data = d3)
+mods <- list(
+  mutua       = f(Freq ~ zona_circulacion + tipo_vehiculo + danos),
+  conjunta    = f(Freq ~ zona_circulacion * tipo_vehiculo + danos),
+  condicional = f(Freq ~ zona_circulacion * danos + tipo_vehiculo * danos),
+  homogenea   = f(Freq ~ (zona_circulacion + tipo_vehiculo + danos)^2),
+  saturado    = f(Freq ~ zona_circulacion * tipo_vehiculo * danos))
+
+purrr::map_dfr(names(mods), ~ {
+  m <- mods[[.x]]; gl <- df.residual(m)
+  tibble::tibble(
+    modelo   = .x,
+    gl       = gl,
+    deviance = round(deviance(m), 2),
+    # el saturado no tiene gl residuales: no hay contraste de ajuste que hacerle
+    p_ajuste = if (gl > 0) round(pchisq(deviance(m), gl, lower.tail = FALSE), 4) else NA_real_,
+    AIC      = round(AIC(m), 1))})
+```
+
+La columna `p_ajuste` contrasta cada modelo **contra el saturado**: un $p$ grande significa que el
+modelo reproduce la tabla razonablemente bien y no hace falta complicarlo. Aquí el modelo de
+**independencia condicional** $[AC][BC]$ ajusta: zona y tipo están asociados con los daños, pero **no
+entre sí** una vez fijados los daños. Es exactamente lo que dice el DGP —los predictores categóricos se
+sortean de forma independiente y cada uno influye en el riesgo—, así que el modelo correcto es el que
+el diseño puso ahí.
+
+::: {.callout-note}
+## Ajuste absoluto: aquí sí, y por qué
+En la [Unidad 2.1](#sec-u21-diagnostico) advertimos que contrastar la deviance contra una $\chi^2$
+**falla** con conteos individuales y muchos ceros. En tablas la situación es la contraria: las
+frecuencias de celda son **grandes** (aquí, decenas o centenares), que es precisamente la condición
+que la aproximación necesita. Es una de las pocas veces en el curso en que la bondad de ajuste
+**absoluta** de un GLM es directamente utilizable.
+
+El límite está en las celdas escasas: con esperadas por debajo de ~5 la aproximación se degrada. Lo
+tratamos en [2.4](#sec-u22-diagnostico).
+:::
+
+### La selección, término a término
+
+Comparar modelos anidados de la jerarquía es un LRT ordinario. Las dos comparaciones que suelen
+importar:
+
+```{r}
+#| label: u22-lrt-jerarquia
+anova(mods$homogenea, mods$saturado, test = "LRT")        # ¿hay interacción de 3 vías?
+anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dados los daños?
+```
+
+El primero pregunta si la asociación entre dos factores **cambia** con el nivel del tercero (el término
+de tres vías). El segundo, si sobra el término $[AB]$. Rechazar el primero es raro y difícil de
+interpretar; no rechazarlo es lo habitual y justifica quedarse en la asociación homogénea o por debajo.
+
+### Simpson: la asociación marginal puede mentir
+
+La razón de fondo para trabajar con tres vías y no con pares es que **colapsar una tabla puede invertir
+la conclusión**. Es la paradoja de Simpson [@christensen2025, §3.1; @dunnsmyth2018, §10.4.5]. El
+mecanismo se ve mejor en un ejemplo mínimo con proceso generador explícito:
+
+```{r}
+#| label: u22-simpson
+# DGP explícito: Z está asociado a la vez con X y con Y. En z1 son raros tanto X=sí como
+# Y=sí; en z2 son frecuentes los dos. Dentro de CADA estrato X protege levemente (OR < 1),
+# pero al colapsar sobre Z la mezcla desigual invierte el signo.
+toy <- expand.grid(Z = c("z1", "z2"), X = c("no", "si"), Y = c("no", "si"))
+toy$Freq <- c(900,  50,  150, 300,      # Y = no
+              225, 200,   15, 480)      # Y = sí
+tt <- xtabs(Freq ~ X + Y + Z, data = toy)
+
+or <- function(m) (m[1,1] * m[2,2]) / (m[1,2] * m[2,1])
+round(c(condicional_z1 = or(tt[, , "z1"]),
+        condicional_z2 = or(tt[, , "z2"]),
+        marginal       = or(margin.table(tt, c(1, 2)))), 3)
+```
+
+Dentro de cada estrato la asociación es **protectora** —y la misma en los dos, $\text{OR}=0{,}40$—, y al
+colapsar sobre $Z$ se vuelve **de riesgo**, $\text{OR}=2{,}46$. No es que el efecto se atenúe: **cambia
+de signo**, y por un factor de seis. Cualquier conclusión sacada de la tabla marginal habría sido la
+contraria de la verdadera.
+
+Con el modelo log-lineal el diagnóstico es inmediato —la asociación condicional existe y se detecta sin
+ambigüedad—:
+
+```{r}
+#| label: u22-simpson-modelos
+anova(glm(Freq ~ X*Z + Y*Z, family = poisson, data = toy),    # X _||_ Y | Z
+      glm(Freq ~ (X + Y + Z)^2, family = poisson, data = toy), test = "LRT")
+```
+
+::: {.callout-important}
+## Cuándo se puede colapsar una tabla
+No es cuestión de tamaño de muestra, sino de estructura. Se puede colapsar sobre un factor $C$ sin
+distorsionar la asociación $A$–$B$ cuando **$C$ es independiente de $A$, o bien $C$ es independiente de
+$B$** (condicionalmente al resto) [@christensen2025, §5.3]. En términos del modelo: si el término
+$[AC]$ o el $[BC]$ es prescindible, colapsar es inocuo; si **ambos** hacen falta —$C$ está asociado a
+los dos—, colapsar sesga y puede invertir el signo.
+
+En nuestra cartera zona y tipo son independientes entre sí, así que la tabla `zona × daños` de la
+[Unidad 2.1](#sec-u21) era legítima. No hay que dar eso por supuesto: hay que **comprobarlo**.
+:::
+
+Esta es la misma distinción condicional/marginal que reaparece en los mixtos
+([Unidad 2.5](#sec-u25)) y la que sostiene la detección de *proxies* de
+[2.6](#sec-u22-proxy).
+
+### Cuatro factores o más: trabajar por orden de interacción {#sec-u22-orden-superior}
+
+Con tres factores pudimos enumerar los cinco modelos y elegir. Con cuatro eso deja de ser viable: el
+número de modelos jerárquicos se dispara, muchos no se anidan entre sí, y ninguna tabla los recoge
+todos. Hace falta otra estrategia [@dunnsmyth2018, §10.4.7; @christensen2025, §3.7].
+
+La que funciona es **no** empezar eligiendo qué términos, sino **hasta qué orden**: se ajusta el modelo
+con todos los efectos principales, luego con todas las interacciones dobles, luego con todas las
+triples… y se mira a partir de qué orden dejar de subir no aporta [@christensen2025, §6.2.1]. R lo
+escribe con el operador `^`, que ya usamos: `(A+B+C+D)^2` son todas las dobles, `^3` todas las triples.
+
+Lo hacemos sobre la tabla de cuatro vías `zona × tipo × uso × daños`:
+
+```{r}
+#| label: u22-cuatro-vias
+tab4 <- xtabs(~ zona_circulacion + tipo_vehiculo + uso + danos, data = cart_tab)
+d4   <- as.data.frame(tab4)
+
+ordenes <- list(
+  "1 · solo principales"  = Freq ~ zona_circulacion + tipo_vehiculo + uso + danos,
+  "2 · todas las dobles"  = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^2,
+  "3 · todas las triples" = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^3,
+  "4 · saturado"          = Freq ~ zona_circulacion * tipo_vehiculo * uso * danos)
+
+purrr::map_dfr(names(ordenes), ~ {
+  m <- glm(ordenes[[.x]], family = poisson, data = d4); gl <- df.residual(m)
+  tibble::tibble(orden = .x, parametros = length(coef(m)), gl = gl,
+                 deviance = round(deviance(m), 2),
+                 p_ajuste = if (gl > 0) round(pchisq(deviance(m), gl, lower.tail = FALSE), 4)
+                            else NA_real_)})
+```
+
+El resultado merece una mirada atenta, porque es **inquietante**: el modelo de orden 1 —independencia
+mutua de los cuatro factores— **no se rechaza** ($p=0{,}082$). Pero con tres factores la independencia
+mutua sí se rechazaba, y con claridad ($p=0{,}0014$). ¿Ha desaparecido la asociación entre zona, tipo y
+daños al añadir `uso`?
+
+No: sigue ahí, entera. Lo que ha ocurrido es que la deviance ha subido poco (31,9 → 40,1) y los grados
+de libertad **mucho** (12 → 29). La misma señal repartida entre más del doble de celdas produce un
+contraste que ya no la detecta. Añadir un factor irrelevante no ha cambiado los datos: ha **diluido la
+potencia** del contraste.
+
+La moraleja es directa y va contra el instinto: en tablas, **incluir factores «por si acaso» tiene un
+coste**, y el coste es dejar de ver lo que sí estaba. Si `uso` no aporta a la pregunta, sobra.
+
+La cuenta de parámetros conviene saber reproducirla a mano, porque es la que revela cuánto cuesta cada
+orden. Con $A$ = zona (3), $B$ = tipo (3), $C$ = uso (2), $D$ = daños (2) hay $3\cdot3\cdot2\cdot2=36$
+celdas:
+
+| Orden | Términos que añade | Parámetros nuevos | Acumulados | gl |
+|:--|:--|--:|--:|--:|
+| 0 | intercepto | 1 | 1 | 35 |
+| 1 | $A,B,C,D$ | $2+2+1+1=6$ | 7 | 29 |
+| 2 | las seis dobles | $4+2+2+2+2+1=13$ | 20 | 16 |
+| 3 | las cuatro triples | $4+4+2+2=12$ | 32 | 4 |
+| 4 | la cuádruple | 4 | 36 | 0 |
+
+Fijado el orden máximo que hace falta, se **poda dentro de él**: se quitan uno a uno los términos de ese
+orden y se conserva solo lo que aporte. Y el modelo final se lee **traduciéndolo a enunciados de
+independencia condicional**, que es lo que el cliente entiende [@christensen2025, §5.1]. Por ejemplo, si
+sobreviven $[AD][BD][CD]$, el modelo dice: *zona, tipo y uso son independientes entre sí, y cada uno se
+asocia con el siniestro* —exactamente lo que encontramos con tres factores, ahora con cuatro—.
+
+::: {.callout-warning}
+## El coste de añadir factores
+Cada factor nuevo multiplica las celdas sin añadir un solo dato. Al pasar de tres a cuatro vías hemos
+duplicado las celdas (18 → 36) repartiendo las mismas ~3.000 pólizas, y los términos de orden alto se
+estiman sobre recuentos cada vez más pequeños. El resultado típico es que el contraste de la interacción
+de orden superior **no tiene potencia**: no rechazarla no significa que no exista.
+
+Esto no es un detalle técnico, es lo que decide si el análisis vale: antes de interpretar cualquier
+$p$-valor de orden alto hay que mirar la **ocupación de las celdas**, que es justo lo que hacemos a
+continuación.
+:::
+
+::: {.callout-tip}
+## 🔧 En R. Recorrer la jerarquía
+- **`ftable(tab)`** imprime tablas de tres o más vías de forma legible; `margin.table(tab, c(1,2))`
+  colapsa sobre el resto.
+- **`(A + B + C)^2`** en la fórmula genera todos los efectos principales y todas las interacciones
+  **de dos** factores: es la asociación homogénea, sin escribirla término a término. `A*B*C` da el
+  saturado. Con cuatro o más factores, **`^2`, `^3`, `^4`** recorren la jerarquía **por orden de
+  interacción** —la única vía practicable cuando enumerar modelos deja de serlo—.
+- **`anova(m1, m2, test = "LRT")`** para cada paso de la jerarquía; **`AIC()`** si comparas modelos
+  no anidados (p. ej. `[AB][C]` frente a `[AC][BC]`, que tienen los mismos gl pero no se anidan).
+- **`pchisq(deviance(m), df.residual(m), lower.tail = FALSE)`** es el contraste de ajuste **absoluto**
+  contra el saturado, utilizable aquí porque las esperadas son grandes.
+- **Cuidado con `drop1`** en tablas: al quitar un efecto principal produce modelos que violan el
+  esquema de muestreo. Recorre la jerarquía a mano.
+:::
+
+## 2.4 Diagnóstico: dónde falla el modelo {#sec-u22-diagnostico}
+
+Un modelo de tabla puede ajustar mal en unas pocas celdas y bien en el resto. La deviance global no lo
+dice; los residuos, sí.
+
+### Residuos ajustados
+
+El residuo de Pearson de una celda, $e_{ij} = (n_{ij}-\hat\mu_{ij})/\sqrt{\hat\mu_{ij}}$, tiene un
+problema: su varianza es **menor que 1**, y en distinto grado según la celda, porque el modelo ha usado
+los datos para estimar los marginales. Dividirlo por su error estándar da el **residuo ajustado**
+(estandarizado), que sí se compara con una normal estándar: por encima de $|2|$ la celda merece
+atención, y por encima de $|3|$ es una discrepancia clara [@christensen2025, §6.7].
+
+```{r}
+#| label: u22-residuos
+d3$r_aj <- rstandard(mods$condicional, type = "pearson")   # residuos AJUSTADOS
+d3 |>
+  dplyr::mutate(esperado = round(fitted(mods$condicional), 1), r_aj = round(r_aj, 2)) |>
+  dplyr::arrange(dplyr::desc(abs(r_aj))) |>
+  head(6)
+```
+
+Los dos residuos mayores rozan el $|2|$ —turismos de zona mixta sin daños por encima de lo esperado,
+motos de zona mixta por debajo—, y ninguno llega a $|3|$. Con **18 celdas**, esperar algún residuo por
+encima de 2 es lo normal: al 5 % tocaría casi uno por puro azar. Es la misma cautela de siempre con las
+comparaciones múltiples, y la razón de no leer el máximo de una lista como si fuera un contraste. La
+lectura correcta es la conjunta: la deviance global ajusta ($p=0{,}24$) y ningún residuo destaca de
+verdad, así que el modelo de independencia condicional describe bien la tabla.
+
+Cuando un modelo **sí** falla, este listado señala **exactamente qué combinación** lo rompe, y eso
+suele ser el hallazgo que se comunica al cliente —más útil que el $p$-valor global—.
+
+### El mosaico
+
+La versión gráfica de lo anterior. En un mosaico el área de cada baldosa es proporcional a la frecuencia
+observada y el color codifica el residuo de Pearson **respecto a un modelo concreto**: azul donde hay más
+casos de los que ese modelo espera, rojo donde hay menos, gris donde cuadra.
+
+Ese «respecto a un modelo concreto» es la clave, y el descuido más habitual: si no se especifica nada,
+`vcd::mosaic()` **no** contrasta el modelo que acabas de elegir, sino la **independencia mutua**. Aquí
+tenemos las dos vistas, y comparadas cuentan la historia de la jerarquía mejor que la tabla de
+deviances.
+
+```{r}
+#| label: fig-u22-mosaico-mutua
+#| fig-cap: "Mosaico bajo INDEPENDENCIA MUTUA (el modelo por defecto de `vcd::mosaic`). Los turismos de zona mixta sin daños aparecen en azul (muchos más de los esperados) y los de zona urbana sin daños en rojo: el modelo no reproduce la tabla, y el propio gráfico da su p-valor."
+#| fig-width: 7.5
 #| fig-height: 5
-dplyr::bind_rows(
-  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
-                     y = n_danos, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
-  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
-                     y = n_danos, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
-  ggplot(aes(nivel, tasa)) +
-  geom_col(fill = "steelblue") +
-  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,   # por defecto: ~ zona + tipo + danos
+            main = "Independencia mutua",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 ```
-
-La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
-baja algo con la **edad**: hay señal en todos, lo que justifica el modelo. Ahora bien, ese modelo
-describe bien la **media**; el problema —lo veremos— está en la **varianza**. La forma más directa de
-*ver* si sostiene su hipótesis de equidispersión es enfrentar, por grupos de pólizas de riesgo parecido,
-la **media** y la **varianza** observadas. Construimos la @fig-u22-media-varianza en cuatro pasos:
-
-1. Con `m_pois` obtenemos, para cada póliza, su número **esperado** de partes $\hat\mu_i$ =
-   `fitted(m_pois)` —su riesgo según el modelo—.
-2. Ordenamos las pólizas por ese $\hat\mu_i$ y las repartimos en **12 grupos** de igual tamaño
-   (`ntile(mu, 12)`): dentro de cada grupo, las pólizas tienen un riesgo esperado parecido.
-3. En cada grupo calculamos la **media** y la **varianza** observadas de `n_danos`.
-4. Representamos varianza frente a media y superponemos tres **formas de referencia** —la Poisson y dos alternativas que trabajamos en esta unidad para mejorar el ajuste—: la recta
-   $\mathrm{Var}=\mathrm{media}$ (Poisson), la recta $\mathrm{Var}=\hat\phi\,\mathrm{media}$ (dispersión
-   **lineal**) y la curva
-   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Las dos últimas anticipan modelos de las secciones 2.2–2.3; aquí solo nos interesa **qué forma
-   siguen los puntos**.
 
 ```{r}
-#| label: fig-u22-media-varianza
-#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan muy por encima de la recta Var = media (sobredispersión) y, entre las dos formas de dispersión, siguen la curva cuadrática (NB2), no la recta lineal (quasi/NB1): la varianza crece con el cuadrado de la media."
-#| fig-width: 8
-#| fig-height: 4
-m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                offset(log(exposicion)), family = poisson, data = cartera)
-
-mu_i  <- fitted(m_pois); y <- cartera$n_danos
-phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
-alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
-
-pts <- tibble::tibble(mu = mu_i, y = y) |>
-  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
-
-rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
-curvas <- tibble::tibble(
-  media = rango,
-  `Poisson: Var = media`               = rango,
-  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
-  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
-  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
-
-ggplot() +
-  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
-  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
-  scale_colour_manual(values = c(
-    "Poisson: Var = media"             = "grey55",
-    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
-    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
-  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+#| label: fig-u22-mosaico-condicional
+#| fig-cap: "Mosaico bajo INDEPENDENCIA CONDICIONAL (zona ⊥ tipo | daños), el modelo seleccionado. Todas las baldosas quedan en gris: el modelo reproduce la tabla, y las discrepancias de la figura anterior eran precisamente la asociación de zona y tipo con los daños, que este modelo ya incorpora."
+#| fig-width: 7.5
+#| fig-height: 5
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
+            expected = ~ zona_circulacion * danos + tipo_vehiculo * danos,
+            main = "Independencia condicional",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 ```
 
-- **Qué esperamos.** Si la Poisson describiera bien los datos, en cada grupo la varianza igualaría a la
-media y los doce puntos caerían sobre la recta $\mathrm{Var}=\mathrm{media}$. 
-- **Qué vemos.** Todos los puntos quedan muy por encima de esa recta —hay sobredispersión— y, además, **no siguen la recta lineal**
-($\hat\phi\,\mathrm{media}$) sino que se **curvan hacia arriba**, pegándose a la curva cuadrática: la
-varianza crece con el **cuadrado** de la media. No es un fallo al predecir el promedio —`m_pois` acierta
-con el nivel—, sino en la dispersión. Esa forma cuadrática anticipa un ajuste mejorado que conseguiremos en la [Sección 2.3](#sec-u22-nb) con un modelo binomial-negativo, alternativo al Poisson para asumir la sobredispersión observada.
-
-### De dónde viene
-
-La sobredispersión rara vez es un accidente: casi siempre señala **estructura no modelada**. Las
-causas típicas:
-
-- **Heterogeneidad no observada.** Es la más común: dos pólizas con el mismo perfil observado no tienen
-  el mismo riesgo real (conducción, cuidado del vehículo, azar individual). El modelo ve una media
-  común donde hay un abanico de medias, y ese abanico añade varianza.
-- **Agrupamiento.** Si las pólizas se agrupan (por agencia, por región) y comparten factores no
-  medidos, los conteos dentro de un grupo se parecen entre sí: correlación positiva que infla la
-  varianza (lo trataremos como efecto aleatorio en la [Unidad 2.4](#sec-u24)).
-- **Exceso de ceros.** A veces el problema no es la cola, sino un montón de ceros «de más» respecto a
-  los que la Poisson espera (pólizas que sencillamente nunca reclaman). La [Unidad 2.3](#sec-u23) lo
-  separa; a menudo se confunde con sobredispersión.
-- **Predictores omitidos o mal especificados.** Una covariable relevante que falta, o una relación no
-  lineal ignorada, reaparece como varianza extra.
-- **Dependencia entre eventos.** Si un evento hace más probable el siguiente (contagio, reincidencia),
-  los recuentos se agolpan y dejan de ser Poisson.
-
-El mecanismo de la primera —**mezcla** de Poissons con medias distintas— se ve simulando dos escenarios
-con la **misma media**: una población homogénea (una sola Poisson) y otra heterogénea (cada individuo
-con su propia media, repartida al azar):
-
-```{r}
-#| label: fig-u22-heterogeneidad
-#| fig-cap: "Dos poblaciones con la misma media (2 eventos). En azul, una Poisson homogénea; en naranja, una mezcla en la que cada individuo tiene su propia media (heterogeneidad no observada). La mezcla acumula más ceros y una cola más larga: misma media, más varianza. Así nace la sobredispersión."
-#| fig-width: 6
-#| fig-height: 3.4
-set.seed(2026)
-n <- 5000; media <- 2
-dplyr::bind_rows(
-  tibble::tibble(poblacion = "Poisson homogénea",  y = rpois(n, media)),
-  tibble::tibble(poblacion = "Mezcla heterogénea", y = rpois(n, media * rgamma(n, 1, 1)))) |>
-  dplyr::filter(y <= 8) |>
-  dplyr::count(poblacion, y) |>
-  ggplot(aes(y, n, fill = poblacion)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Poisson homogénea" = "steelblue",
-                               "Mezcla heterogénea" = "darkorange")) +
-  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
-```
-
-### Por qué importa
-
-Ignorar la sobredispersión **no** sesga mucho los coeficientes, pero **subestima sus errores
-estándar** (aproximadamente en un factor $\sqrt{\phi}$, con $\phi$ el índice de dispersión). La
-consecuencia es una inferencia **demasiado optimista**: estadísticos de Wald inflados, intervalos de
-confianza demasiado estrechos y contrastes (LRT incluido) que declaran significativo lo que no lo es.
-Por eso conviene diagnosticarla —la [medimos y contrastamos](#sec-u22-diagnostico) más abajo— antes de
-fiarse de ningún $p$-valor.
-
-### Dónde aparece
-
-Es la regla, más que la excepción, en casi todo conteo real: **siniestros por póliza** en seguros (unos
-pocos asegurados concentran la mayoría), **uso de recursos sanitarios** por paciente (crónicos que
-acumulan visitas e ingresos), **individuos por parcela** en ecología (hábitat en manchas), **defectos
-por lote** en fiabilidad, **casos por región** en epidemiología o **accidentes por conductor**. En
-todos, unas pocas unidades acumulan mucho y la mayoría casi nada.
-
-Reconocido el fenómeno, toca **identificarlo con números**. Ver la nube de puntos por encima de la recta
-es sugerente, pero conviene **medir** y **contrastar** la sobredispersión antes de cambiar de modelo.
-
-### El índice de dispersión {#sec-u22-diagnostico}
-
-La medida de referencia es el **índice de dispersión** $\hat\phi$: la suma de los residuos de Pearson
-al cuadrado dividida por los grados de libertad. Se puede calcular también con la deviance, pero la
-versión de Pearson es más fiable:
-
-```{r}
-#| label: u22-indice
-phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
-phi_dev     <- deviance(m_pois) / df.residual(m_pois)
-c(pearson = phi_pearson, deviance = phi_dev)
-```
-
-En `n_danos`, $\hat\phi$ sale **muy por encima de 1** (en torno a **2.4** por Pearson, 2.1 por
-deviance): cada póliza varía bastante más de lo que la Poisson tolera. Un matiz sobre las dos versiones. La basada en la **deviance** (`deviance/gl`) es
-popular pero **traicionera** con conteos escasos: cuando las medias son bajas o hay muchos patrones de
-covariables, la deviance no sigue una $\chi^2$ y el cociente puede rondar 1 **aunque haya
-sobredispersión real**. Por eso nos quedamos con el de **Pearson** como indicador rápido y no nos
-fiamos de un número suelto sin un contraste que lo respalde.
-
-El cociente cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** es la
-varianza. Lo primero se ve mejor que se cuenta; lo segundo se contrasta. Empecemos por mirar.
-
-### El rootograma: ver dónde falla el ajuste
-
-Un **rootograma** enseña la sobredispersión **conteo a conteo**. Es una herramienta gráfica de bondad
-de ajuste para modelos de recuento: sobre las frecuencias **observadas** de cada valor $0,1,2,\dots$
-superpone las que **predice** el modelo ajustado. Se obtiene así: para cada conteo $k$, la frecuencia
-esperada es la suma, sobre todas las pólizas, de la probabilidad $\Pr(Y_i=k)$ que asigna el modelo
-—aquí $\sum_i \mathrm{dpois}(k,\hat\mu_i)$—, y se compara con el número de pólizas que realmente tienen
-$k$ partes. En su forma clásica (`countreg::rootogram`) las barras «cuelgan» de la curva esperada y las
-frecuencias van en escala raíz —de ahí el nombre—, para que los conteos raros no se pierdan; aquí
-usamos una versión lado a lado, más directa de leer. Su valor está en que muestra **dónde** falla el
-modelo, no solo cuánto:
-
-```{r}
-#| label: fig-u22-rootograma
-#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson ajustada. La Poisson se queda corta en los ceros y en la cola alta, y sobra en los valores intermedios: el patrón típico de la sobredispersión."
-#| fig-width: 6.5
-#| fig-height: 3.6
-mu <- fitted(m_pois); K <- 0:8
-esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
-  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
-```
-
-El patrón es el típico de la sobredispersión: la Poisson **subestima los ceros** y **la cola** (las
-pocas pólizas que acumulan muchos partes) y **sobreestima los valores intermedios**. No acierta con la
-forma de la distribución, solo con su promedio. En la [Sección 2.3](#sec-u22-nb) repetiremos este
-rootograma con la binomial negativa, que endereza los dos extremos.
-
-### Los contrastes: ¿hay sobredispersión y de qué tipo?
-
-El rootograma deja claro que la Poisson se queda corta; para tratarlo hay tres modelos habituales, y se
-distinguen justamente por la **forma que le dan a la varianza**:
-
-- **quasi-Poisson** ([Sección 2.2](#sec-u22-quasi)): $\mathrm{Var}=\phi\,\mu$. Infla la varianza por un
-  factor **constante** —crece de forma **lineal** con $\mu$— y solo corrige los errores estándar, sin
-  cambiar de distribución.
-- **binomial negativa NB1**: $\mathrm{Var}=\mu\,(1+\alpha)=\mu+\alpha\,\mu$. También **lineal**, pero
-  con una distribución propia (permite predecir probabilidades).
-- **binomial negativa NB2** ([Sección 2.3](#sec-u22-nb)): $\mathrm{Var}=\mu+\alpha\,\mu^{2}$.
-  **Cuadrática**: la varianza se dispara más deprisa en las pólizas de mayor riesgo esperado.
-
-**La elección no es cosmética.** Si la varianza real crece de forma cuadrática y aplicamos una corrección
-lineal (quasi-Poisson o NB1), nos quedaremos cortos justo en la **cola** —donde están las pólizas más
-costosas—; y a la inversa, sobre-corregiríamos. De modo que conviene **contrastar qué estructura**
-describe mejor los datos. Tres herramientas complementarias, todas sobre `m_pois`, deciden **si** el
-exceso es significativo y **de qué forma** es.
-
-**¿Hay sobredispersión?** 
-
-El contraste de referencia es el de **Cameron–Trivedi** (`AER::dispersiontest`):
-enfrenta $H_0:\mathrm{Var}=\mu$ a la alternativa $\mathrm{Var}=\mu+\alpha\,g(\mu)$ y decide si
-$\alpha>0$. `performance::check_overdispersion` da la versión analítica (el índice de Pearson y su $\chi^2$), y `DHARMa`, una por **simulación**, más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea:
-
-```{r}
-#| label: u22-tests
-# Tests de sobredispersión
-print(performance::check_overdispersion(m_pois))
-print(AER::dispersiontest(m_pois))
-print(DHARMa::testDispersion(m_pois, plot = FALSE))
-```
-
-Como vemos, los tres tests concluyen a favor de sobredispersión (rechazando la hipótesis nula de conformidad con la Poisson). Ahora viene el punto de descubrir qué estructura tiene la varianza, con el fin de optar por el modelo más apropiado para capturarla.
-
-**¿De qué tipo es la sobredispersión?** 
-
-El mismo contraste elige la **forma** de la varianza mediante el argumento `trafo`, que
-fija $g$: con $g(\mu)=\mu$ prueba la alternativa **lineal** (quasi-Poisson / NB1) y con $g(\mu)=\mu^2$,
-la **cuadrática** (NB2):
-
-```{r}
-#| label: u22-trafo
-print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
-print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
-```
-
-Concluimos pues, que $\alpha>1$ de modo significativo, tanto en la estructura lineal ($Var = \mu + \alpha·\mu$), como en la cuadrática, ($Var = \mu + \alpha·\mu^2$), de forma que probablemente sea preciso usar un modelo con varianza cuadrática para capturar eficazmente la variabilidad.
-
-**La versión transparente: regresión sobre el residuo** 
-
-La misma idea se puede reproducir a mano —y así se ve el resultado aunque falte
-`AER`—. Cameron–Trivedi parte de que, bajo la Poisson, el residuo estandarizado,
-$r_i=\dfrac{(y_i-\hat\mu_i)^2-y_i}{\hat\mu_i}$, tiene media cero; bajo la alternativa, su media es
-$\alpha\,g(\hat\mu_i)/\hat\mu_i$. Basta una **regresión auxiliar** de $r$ para estimar $\alpha$: sobre
-una **constante** para la forma lineal (NB1) y sobre la media estimada $\hat\mu$ para la **cuadrática** (NB2):
-
-```{r}
-#| label: u22-trafo-manual
-mu <- fitted(m_pois); y <- cartera$n_danos
-r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
-test_var <- function(formula, etiqueta) {
-  s <- coef(summary(lm(formula)))[1, ]        # coeficiente = alpha estimado
-  data.frame(estructura = etiqueta, alpha = round(s[1], 3),
-             t = round(s[3], 1), p_valor = signif(s[4], 3), row.names = NULL)
-}
-rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = media de r
-      test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
-```
-
-En la cartera, todas las vías coinciden en lo esencial: el índice da $\hat\phi\approx 2.4$ (más del
-doble de lo admisible) y los contrastes rechazan la equidispersión de forma abrumadora ($z\approx 12$
-en Cameron–Trivedi; $p<2\times10^{-16}$ también por simulación con `DHARMa`). Sobre la **forma** de la
-varianza conviene ser prudentes: los dos contrastes —lineal y cuadrático— salen fuertemente
-significativos porque $\mu$ y $\mu^2$ están muy correlacionadas y ambos «ven» el mismo exceso, de modo
-que **comparar sus estadísticos no decide** cuál es la estructura correcta. Esa decisión se toma
-**ajustando** los dos modelos y comparándolos por AIC y re-diagnóstico (NB2 frente a NB1): los ajustamos
-en la [Sección 2.3](#sec-u22-nb) y los comparamos formalmente en la [Sección 2.4](#sec-u22-elegir).
-
-Lo que sí podemos hacer aquí, por ser datos **simulados**, es un **control de calidad**: la alternativa
-cuadrática estima $\hat\alpha\approx 1.03$, que coincide con el $1/\theta$ del DGP ($\theta=1$). Pero ojo: ese «1» solo lo conocemos porque generamos los datos; en un caso real, $\alpha$ **no tiene ningún valor de referencia**.
-
-::: {.callout-tip}
-En suma: el índice **mide** el exceso, el rootograma **enseña dónde** está, los contrastes
-**confirman** que la Poisson se queda corta, y la **forma** de la varianza se zanja **comparando
-modelos**, no sólo con estos tests.
-:::
+Las baldosas coloreadas de la primera figura **desaparecen** en la segunda. No es que los datos hayan
+cambiado: es que el modelo condicional ya explica lo que la independencia mutua dejaba sin explicar —la
+asociación de zona y de tipo con los daños—. Un mosaico no dice si una tabla «tiene estructura»: dice
+qué estructura le **falta al modelo que le pases**. Sin declarar el modelo, la figura no significa nada
+concreto.
 
 ::: {.callout-note}
-## Panorama de modelos para la sobredispersión
-
-Las **tres herramientas** que desarrollaremos en esta unidad, ordenadas por la forma de su varianza:
-
-| Modelo | Varianza | En una frase | Se desarrolla en |
-|---|---|---|---|
-| **quasi-Poisson** | $\phi\,\mu$ (lineal) | corrige los errores estándar, sin distribución propia | [§2.2](#sec-u22-quasi) |
-| **NB1** | $\mu(1+\alpha)$ (lineal) | la gemela de la quasi, pero con verosimilitud | [§2.3](#sec-u22-nb) |
-| **NB2** | $\mu+\mu^2/\theta$ (cuadrática) | mezcla Poisson–Gamma; la opción por defecto | [§2.3](#sec-u22-nb) |
-
-Cubren la mayoría de los casos, pero **no son las únicas** herramientas en R:
-
-- **Conway–Maxwell–Poisson** (COM-Poisson): un parámetro extra de dispersión que captura tanto
-  **sobre-** como **subdispersión** —`glmmTMB(family = compois)` o el paquete `COMPoissonReg`—.
-- **Poisson generalizada**: alternativa flexible en ambos sentidos —`VGAM::genpoisson` o
-  `glmmTMB(family = genpois)`—.
-- **Colas aún más pesadas que la NB**: la **Poisson-inversa gaussiana** (PIG) y las familias Delaporte
-  o Sichel, disponibles en `gamlss`, para conteos con colas muy largas.
-
-Hay una vía más, el **efecto aleatorio a nivel de observación** (OLRE, o Poisson-lognormal): cada
-observación recibe su propio impulso $N(0,\sigma^2)$ sobre el logaritmo de la tasa, lo que infla la varianza y
-modela la sobredispersión como una mezcla Poisson-lognormal. Es en realidad un **modelo mixto** —un
-intercepto aleatorio por observación—, así que lo tratamos y ejemplificamos en la
-[Unidad 2.4](#sec-u24-olre). Y un recordatorio: si el exceso proviene de **demasiados ceros** o de
-**agrupamiento**, la solución no es otra distribución de cola, sino un modelo de ceros
-([Unidad 2.3](#sec-u23)) o un modelo mixto ([Unidad 2.4](#sec-u24)).
+## Pearson frente a ajustados
+El sombreado de `vcd` usa residuos de **Pearson**; el listado anterior usaba los **ajustados**
+(`rstandard`). Los ajustados son los correctos para juzgar celda a celda, porque los de Pearson tienen
+varianza menor que 1 y hacen parecer menores las discrepancias. Para localizar visualmente el problema
+el mosaico basta; para cuantificarlo, usa los ajustados.
 :::
 
-## 2.2 Quasi-Poisson {#sec-u22-quasi}
+### Tablas escasas y ceros
 
-La respuesta más económica a la sobredispersión es no cambiar de distribución, sino **relajar la
-restricción de la varianza**.
-
-### El modelo y su estimación
-
-La quasi-Poisson mantiene la media $\mu=\exp(\eta)$ pero admite
-
-$$\mathrm{Var}[Y]=\phi\,\mu,$$
-
-con un **parámetro de dispersión** $\phi$ que se estima de los datos. Si $\phi=1$ recuperamos la
-Poisson; si $\phi>1$, sobredispersión.
-
-El fundamento es la **cuasi-verosimilitud** [@mccullagh1989]: en lugar de postular una distribución
-completa, se especifican solo la **media** y la **varianza**, $\mathrm{E}[Y_i]=\mu_i$ y
-$\mathrm{Var}[Y_i]=\phi\,V(\mu_i)$ con función de varianza $V(\mu)=\mu$. La cuasi-log-verosimilitud $Q$
-se define por su derivada,
-
-$$\frac{\partial Q(\mu_i;y_i)}{\partial\mu_i}=\frac{y_i-\mu_i}{\phi\,V(\mu_i)}=\frac{y_i-\mu_i}{\phi\,\mu_i},$$
-
-que es cuanto hace falta para estimar. Las **ecuaciones de estimación** resultantes,
-
-$$\sum_{i=1}^{n}\frac{y_i-\mu_i}{\phi\,\mu_i}\,\frac{\partial\mu_i}{\partial\boldsymbol\beta}=\mathbf{0}\ \Longleftrightarrow\ \sum_{i=1}^{n}(y_i-\mu_i)\,\mathbf{x}_i=\mathbf{0},$$
-
-son **idénticas** a las de la Poisson (el factor $\phi$ se cancela): de ahí que $\hat{\boldsymbol\beta}$
-**no cambie**. La dispersión se estima aparte con el estadístico de Pearson,
-
-$$\hat\phi=\frac{1}{n-p}\sum_{i=1}^{n}\frac{(y_i-\hat\mu_i)^2}{\hat\mu_i},$$
-
-—justo el índice de la [Sección 2.1](#sec-u22-diagnostico)— y entra en la matriz de covarianzas de
-$\hat{\boldsymbol\beta}$, que queda **inflada** en un factor $\hat\phi$: por eso los **errores estándar
-se multiplican por $\sqrt{\hat\phi}$**, aunque las estimaciones puntuales sean las de la Poisson.
-
-### Ajuste e interpretación
-
-Ajustamos con `family = quasipoisson` y leemos el $\hat\phi$ estimado:
+Es la advertencia con la que cerrábamos [2.3](#sec-u22-orden-superior), ahora con números. Sobre la
+misma tabla de cuatro vías:
 
 ```{r}
-#| label: u22-quasi-fit
-m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                 offset(log(exposicion)), family = quasipoisson, data = cartera)
-summary(m_quasi)$dispersion   # phi estimado
+#| label: u22-escasez
+c(celdas = length(tab4), minimo = min(tab4),
+  menores_de_5 = sum(tab4 < 5), vacias = sum(tab4 == 0))
 ```
 
-Comparando los errores estándar de la Poisson y de la quasi-Poisson se ve el efecto —los coeficientes
-son idénticos; los errores, mayores—:
-
-```{r}
-#| label: u22-quasi-comp
-dplyr::left_join(
-  broom::tidy(m_pois)  |> dplyr::select(term, estimacion = estimate, se_poisson = std.error),
-  broom::tidy(m_quasi) |> dplyr::select(term, se_quasi = std.error),
-  by = "term")
-```
-
-Los `se_quasi` son aproximadamente `se_poisson` $\times\sqrt{\hat\phi}$. Al ensancharse los errores,
-algún efecto que la Poisson daba por significativo puede dejar de serlo: esa es, precisamente, la
-corrección que buscábamos.
-
-### Qué se puede (y qué no) contrastar
-
-La quasi-Poisson **no es una verosimilitud propia**, sino una **cuasi-verosimilitud**: solo especifica
-la media y la varianza, no una distribución completa. Por eso:
-
-- No hay `logLik` ni `AIC` (R los devuelve como `NA`); para comparar modelos anidados se usa el contraste
-  **F** —`anova(m1, m2, test = "F")`—, no el LRT, y para selección, el **QAIC** [@burnham2002], el AIC
-  penalizado por la sobredispersión.
-
-- Al no ser un modelo generativo, no produce probabilidades de cada conteo ni un rootograma propio: es
-  una **corrección de los errores estándar**, no una descripción de la forma de la distribución.
-
-El **QAIC** sustituye la log-verosimilitud por su versión escalada por el factor de sobredispersión
-$\hat c=\hat\phi$:
-
-$$\mathrm{QAIC} = -\,\frac{2\,\ell(\hat{\boldsymbol\beta})}{\hat c} + 2K,$$
-
-con $\ell$ la log-verosimilitud del modelo base (aquí la Poisson), $K$ el número de parámetros —incluido
-el de dispersión— y $\hat c$ **común** a todos los modelos comparados (si $\hat c = 1$, se recupera el
-AIC ordinario).
-
-### Bondad de ajuste y diagnóstico
-
-Que la quasi-Poisson no tenga verosimilitud no nos deja sin diagnóstico. Conviene primero tener claro
-**qué queremos verificar**, que son dos cosas distintas:
-
-1. **La estructura de la media**, esto es, que $\log\mu=\eta$ esté bien especificada, con los predictores correctos y forma funcional adecuada, y sin indicios de no-linealidad ignorada.
-2. **La estructura de la varianza**: que se cumpla el supuesto $\mathrm{Var}=\phi\,\mu$, es decir, que la dispersión crezca proporcional a la media, y no más deprisa.
-
-Para lo **primero**, el análisis de residuos sigue en pie. Con conteos, el estándar son los **residuos
-cuantil aleatorizados** [@dunnsmyth1996] —que bajo un modelo correcto se distribuyen como una normal—,
-pero `DHARMa` [@hartig2022] los obtiene **simulando** del modelo ajustado, y la quasi-Poisson **no es
-generativa** (no define una distribución de la que simular). Hay dos salidas: (a) mirar los **residuos
-de Pearson (o de deviance) frente al valor ajustado**, que deben formar una **banda sin tendencia ni
-embudo** en torno a 0 —una curva delataría no linealidad, y un abanico, una media mal especificada—; y
-(b) como la quasi-Poisson comparte los mismos $\hat\mu$ que la Poisson, **aprovechar los residuos
-simulados de la Poisson equivalente** (`m_pois`) —con una cautela: esos residuos recogen **también** la
-sobredispersión, de modo que la **media** se juzga por la ausencia de **tendencias** frente al predicho,
-no por el test global de dispersión (que saldrá significativo por la propia sobredispersión)—. Usamos
-aquí la vía directa, esto es, residuos de Pearson frente a valores ajustados:
-
-```{r}
-#| label: fig-u22-quasi-resid
-#| fig-cap: "Residuos de Pearson de la quasi-Poisson frente al valor ajustado. Buscamos una nube sin tendencia ni embudo, con la línea suavizada plana en torno a 0: eso indica que la media está bien especificada. (La hipótesis sobre la varianza se contrasta aparte.)"
-#| fig-width: 6
-#| fig-height: 3.4
-tibble::tibble(ajustado = fitted(m_quasi),
-               residuo  = residuals(m_quasi, type = "pearson")) |>
-  ggplot(aes(ajustado, residuo)) +
-  geom_point(alpha = 0.2, colour = "steelblue") +
-  geom_hline(yintercept = 0, linetype = 2) +
-  geom_smooth(se = FALSE, colour = "darkorange") +
-  labs(x = "valor ajustado", y = "residuo de Pearson")
-```
-
-Para lo **segundo** —el supuesto sobre la varianza— hay dos miradas complementarias. La primera es
-**visual**: en la relación media–varianza (@fig-u22-media-varianza) se aprecia la **forma**. Si los
-puntos siguen una **recta** ($\mathrm{Var}=\phi\,\mu$), la dispersión es lineal y la quasi-Poisson es
-adecuada; si se **curvan hacia arriba** ($\mathrm{Var}=\mu+\mu^2/\theta$), crece de forma cuadrática y un
-$\hat\phi$ único se queda corto. Eso es justo lo que significa que «la varianza crece más deprisa»: la
-nube se despega de la recta. La segunda mirada es **decisiva**: como ese gráfico es ruidoso (pocos
-grupos, y estimar una varianza es inestable), la elección firme entre la varianza lineal
-(quasi-Poisson / NB1) y la cuadrática (NB2) se toma **ajustando ambos modelos y comparándolos por AIC**
-([Sección 2.3](#sec-u22-nb)). El gráfico **sugiere** la forma; el AIC la **confirma**.
-
-**Bondad de ajuste.** Al no ser generativa, la quasi-Poisson no admite rootograma ni residuos simulados;
-su ajuste se juzga por los **residuos de Pearson** (media bien especificada, sin patrón) y por que la
-varianza sea realmente **lineal**. Aquí lo primero se cumple, pero lo segundo **no** —la varianza es
-cuadrática—, así que la quasi-Poisson corrige los errores pero no es el mejor modelo para estos datos.
-
-En resumen, la quasi-Poisson es la opción adecuada cuando la varianza crece de forma **aproximadamente
-lineal** con la media y solo buscamos una inferencia honesta con una variación mínima de los
-supuestos; cuando crece más deprisa, o cuando necesitamos un modelo generativo (probabilidades,
-predicción de conteos), damos el paso a la binomial negativa.
-
-## 2.3 Binomial negativa {#sec-u22-nb}
-
-La quasi-Poisson corrige los errores estándar, pero no da una distribución. La **binomial negativa**
-(NB) sí: es un modelo generativo completo que nace, precisamente, del mecanismo que simulamos en la
-[Sección 2.1](#sec-u22-causas) —la **mezcla Poisson–Gamma**—.
-
-### El modelo: una mezcla Poisson–Gamma
-
-Las dos binomiales negativas más habituales son la NB1 y NB2, y cada una captura una estructura específica para la varianza. Ambas se pueden obtener como una mixtura de una distribución de Poisson $Y|V \sim Po(\mu \cdot V)$ y una Gamma para la variable de confusión $V$, que debe tener una media de 1, $E(V)=1$:
-
-- **NB1** (varianza **lineal**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu=\mu(1+\alpha)$. Es la misma forma que
-  la quasi-Poisson (con $\phi=1+\alpha$), pero con distribución propia. Se ajusta con
-  `glmmTMB(family = nbinom1)`. Aquí $V \sim Ga(shape=\mu/\phi,rate=\mu/\phi)$, con $Var(V)=\phi/\mu$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2(\phi/\mu)=\mu+\phi\mu$.
-- **NB2** (varianza **cuadrática**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu^2$. Es la de `MASS::glm.nb` y `glmmTMB(family = nbinom2)`, que  la reparametriza con $\theta=1/\alpha$: $\mathrm{Var}[Y]=\mu+\mu^2/\theta$. Un $\theta$ **grande**
-  ($\alpha$ pequeño) acerca a la Poisson, y $\theta\to\infty$ la recupera. Aquí $V \sim Ga(shape=\phi,rate=\phi)$, con $Var(V)=1/\phi$, de modo que $Var(Y)=\mu + \mu^2Var(V)=\mu+\mu^2/\phi$.
-
-
-La NB2 es el **caballo de batalla** —la opción por defecto— y la que encaja con la huella cuadrática que
-vimos en la cartera de seguros; la NB1 nos servirá para contrastarla con la quasi-Poisson.
-
-### Estimación
-
-Ambas son verosimilitudes propias. Lo más limpio es ver **cómo contribuye cada observación** a la
-log-verosimilitud, $\ell=\sum_i \ell_i$, con $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ (más el
-*offset*):
-
-- **NB2** (tamaño $\theta$ **constante**):
-$$\ell_i(\boldsymbol\beta,\theta)=\log\frac{\Gamma(y_i+\theta)}{\Gamma(\theta)\,y_i!}+\theta\log\frac{\theta}{\theta+\mu_i}+y_i\log\frac{\mu_i}{\theta+\mu_i}.$$
-- **NB1** (misma forma, pero con tamaño $r_i=\mu_i/\alpha$ que **varía** con la póliza y probabilidad
-  constante $p=\tfrac{1}{1+\alpha}$):
-$$\ell_i(\boldsymbol\beta,\alpha)=\log\frac{\Gamma(y_i+r_i)}{\Gamma(r_i)\,y_i!}+r_i\log p+y_i\log(1-p),\qquad r_i=\frac{\mu_i}{\alpha}.$$
-
-La clave está en el **tamaño**: constante en la NB2 (de ahí la varianza cuadrática) y proporcional a
-$\mu_i$ en la NB1 (de ahí la lineal). Ambas se maximizan por **máxima verosimilitud**: `MASS::glm.nb`
-estima la NB2 de forma **alternada** (fijado $\theta$, un GLM por IWLS —como en la
-[Sección 1.2](#sec-u21-modelizacion)—; luego actualiza $\theta$; itera), y `glmmTMB` estima la NB1 (y
-también la NB2) por ML numérica directa.
-
-### Ajuste e interpretación
-
-**NB2**, con `MASS::glm.nb`:
-
-```{r}
-#| label: u22-nb-fit
-m_nb <- MASS::glm.nb(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-                       offset(log(exposicion)), data = cartera)
-c(theta = m_nb$theta, se_theta = m_nb$SE.theta)   # dispersion estimada
-```
-
-El $\hat\theta\approx 0.97$ implica una heterogeneidad $\hat\alpha=1/\hat\theta\approx 1.03$: notable
-(recordemos que $\theta\to\infty$ sería la Poisson). Los coeficientes se leen en IRR igual que en la
-Poisson (`broom::tidy(m_nb, exponentiate = TRUE)`).
-
-**NB1**, con `glmmTMB`:
-
-```{r}
-#| label: u22-nb1
-m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
-                            tipo_vehiculo + offset(log(exposicion)),
-                          family = glmmTMB::nbinom1, data = cartera)
-sigma(m_nb1)   # dispersion alpha de la NB1
-```
-
-Su dispersión sale $\hat\alpha\approx 1.47$, de modo que $1+\hat\alpha\approx 2.5$ reproduce —salvo el
-método de estimación— el $\hat\phi\approx 2.39$ de la quasi-Poisson: primera señal de que NB1 y quasi
-son la misma cosa vista de dos maneras. Se confirma comparando los errores estándar término a término,
-que salen **del mismo orden**:
-
-```{r}
-#| label: u22-nb1-quasi
-se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
-se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
-data.frame(term = names(se_q), se_quasi = round(se_q, 4),
-           se_nb1 = round(se_nb1[names(se_q)], 4))
-```
-
-(la NB1 los da algo más ajustados, por estimarlos con verosimilitud en vez de por momentos). La
-diferencia de fondo es **conceptual**: la quasi-Poisson corrige los errores estándar por momentos
-(estima $\phi$ con Pearson, sin verosimilitud), mientras que la NB1 es un **modelo generativo con
-verosimilitud propia** —tiene `logLik`/`AIC` y predice probabilidades—. La NB1 le da a la quasi el
-estatus de distribución que le faltaba. (La comparación formal por AIC de **todos** los modelos
-va en la [Sección 2.4](#sec-u22-elegir).)
-
-### Bondad de ajuste y diagnóstico
-
-Ajustadas las dos NB, ¿han **absorbido** de verdad la sobredispersión? Verificamos tres cosas, en ambos
-modelos: que la varianza ya cuadre (índice de dispersión $\approx 1$), que los residuos no muestren
-patrón, y que la **forma** de la distribución predicha reproduzca la observada (rootograma).
-
-Primero, el **índice de dispersión** recalculado sobre cada NB debe quedar **cerca de 1** (en la Poisson
-rondaba 2.4): si lo hace, el modelo ha recogido el exceso.
-
-```{r}
-#| label: u22-nb-disp
-disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
-round(c(NB2 = disp(m_nb), NB1 = disp(m_nb1)), 3)
-```
-
-Segundo, los **residuos cuantil aleatorizados** de `DHARMa`: su QQ-plot debe seguir la diagonal y el
-test de dispersión no debe rechazar. Para la NB2 (el modelo elegido):
-
-```{r}
-#| label: fig-u22-nb2-dharma
-#| fig-cap: "Residuos simulados (DHARMa) de la NB2: QQ-plot frente a la uniforme (izquierda) y residuos frente al predicho (derecha). Si los puntos siguen la diagonal y las líneas de cuantil salen planas, el ajuste es adecuado."
-#| fig-width: 8
-#| fig-height: 5.5
-DHARMa::simulateResiduals(m_nb, plot = TRUE)
-```
-
-Y, para comparar, la NB1:
-
-```{r}
-#| label: fig-u22-nb1-dharma
-#| fig-cap: "Residuos simulados (DHARMa) de la NB1. Al imponer una varianza lineal, puede quedarse algo corta en la cola frente a la NB2, cuya varianza cuadrática se ajusta mejor a estos datos."
-#| fig-width: 8
-#| fig-height: 5.5
-DHARMa::simulateResiduals(m_nb1, plot = TRUE)
-```
-
-Tercero, el **rootograma**. Recordemos ([Sección 2.1](#sec-u22-diagnostico)) que enfrenta, conteo a
-conteo, las frecuencias **observadas** con las **esperadas** por el modelo ($\sum_i\Pr(Y_i=k)$): muestra
-**dónde** ajusta. Aquí lo leemos comprobando que la NB «se pega» a los observados en el 0 y en la cola,
-justo donde la Poisson fallaba:
-
-```{r}
-#| label: fig-u22-nb-rootograma
-#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson y por la NB2. La NB sigue de cerca los ceros y la cola; la Poisson se queda corta en ambos extremos."
-#| fig-width: 6.5
-#| fig-height: 3.8
-mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
-esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
-esp_nb   <- sapply(K, function(k) if (k < 8) sum(dnbinom(k, size = th, mu = mu_n)) else sum(1 - pnbinom(7, size = th, mu = mu_n)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb) |>
-  tidyr::pivot_longer(c(Observado, Poisson, `NB2`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, colour = fuente, group = fuente)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 2) +
-  scale_colour_manual(values = c("Observado" = "grey30", "Poisson" = "darkorange", "NB2" = "steelblue")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
-```
-
-**Conclusión de bondad de ajuste.** La **NB2** pasa las tres pruebas —índice de dispersión $\approx 1$,
-residuos de `DHARMa` sin desviaciones marcadas y rootograma que sigue de cerca ceros y cola—: describe
-bien estos conteos. La **NB1** cumple casi igual (su dispersión también baja a $\approx 1$), pero, al
-imponer una varianza lineal, se queda algo corta en la cola; el AIC ratificará la ventaja de la NB2
-([Sección 2.4](#sec-u22-elegir)). Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
-ceros que la NB no explica—, el paso siguiente serían los modelos de la [Unidad 2.3](#sec-u23). La
-comparación integral de los cuatro modelos y la validación contra el DGP van en la
-[Sección 2.4](#sec-u22-elegir).
-
-## 2.4 Elegir, comparar y conectar {#sec-u22-elegir}
-
-Hemos ajustado cuatro modelos para el mismo problema —**Poisson**, **quasi-Poisson**, **NB1** y
-**NB2**—. Toca ponerlos frente a frente: comparar coeficientes y errores, decidir formalmente por
-información, ver qué cambia en la predicción, y **validar** el resultado contra el DGP.
-
-### Los cuatro modelos, lado a lado
-
-El modelo de la media es el mismo en los cuatro, de modo que los **coeficientes** (y las IRR) son casi
-idénticos; lo que cambia son los **errores estándar**. Se ve mejor en un gráfico que en una tabla,
-poniendo cada término en su propia escala (van de $\sim 0.007$ a $\sim -0.34$):
-
-```{r}
-#| label: fig-u22-comp-modelos
-#| fig-cap: "Estimaciones (punto) y ±1 error estándar (barra) de tres coeficientes en los cuatro modelos, cada término en su propia escala. Los puntos apenas se mueven entre modelos —la media es la misma—; lo que cambia es la longitud de la barra: la Poisson da el EE más pequeño, y la quasi-Poisson y la NB1 lo agrandan de forma parecida (misma varianza lineal)."
-#| fig-width: 8.5
-#| fig-height: 3.4
-ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
-  s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
-  data.frame(term = rownames(s), estimate = s[, 1], std.error = s[, 2])
-}
-mods <- list(Poisson = m_pois, `Quasi-Poisson` = m_quasi, NB1 = m_nb1, NB2 = m_nb)
-
-purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
-  dplyr::filter(term %in% c("potencia_cv", "zona_circulacionrural", "usocomercial")) |>
-  dplyr::mutate(modelo = factor(modelo, levels = names(mods))) |>
-  ggplot(aes(modelo, estimate, colour = modelo)) +
-  geom_hline(yintercept = 0, linetype = 3, colour = "grey60") +
-  geom_pointrange(aes(ymin = estimate - std.error, ymax = estimate + std.error)) +
-  facet_wrap(~ term, scales = "free_y") +
-  labs(x = NULL, y = "estimación (± 1 EE)", colour = NULL) +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-```
-
-Las estimaciones apenas se mueven (los puntos quedan casi a la misma altura en cada faceta); lo que
-cambia es la **longitud de la barra**: la Poisson da los errores más pequeños; la quasi-Poisson y la
-**NB1** los agrandan de forma parecida —del orden de $\sqrt{\hat\phi}\approx 1.5$ veces— (son la misma varianza
-lineal); y la **NB2** queda en una magnitud parecida, con su propia varianza cuadrática.
-
-### La decisión formal: AIC y LRT
-
-El **AIC** solo compara modelos con verosimilitud propia —Poisson, NB1 y NB2, **no** la quasi-Poisson—.
-No es una laguna: como la **NB1 es la gemela con verosimilitud de la quasi-Poisson** (misma varianza
-lineal), su AIC hace de sustituto del que la quasi no tiene.
-
-```{r}
-#| label: u22-aic-comp
-mods_lik <- list(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb)
-data.frame(modelo = names(mods_lik),
-           df  = sapply(mods_lik, function(m) attr(logLik(m), "df")),
-           AIC = round(sapply(mods_lik, AIC), 1)) |>
-  dplyr::arrange(AIC)
-```
-
-La **NB2** gana con holgura (AIC $\approx$ 9418, frente a 9488 de la NB1 y 10766 de la Poisson): su
-varianza **cuadrática** es la que piden estos datos, coherente con la huella del gráfico media–varianza
-y con que se generaron como mezcla Poisson–Gamma; y que la NB2 supere también a la NB1 confirma que la
-forma es cuadrática, no lineal. Como la Poisson está **anidada** en la NB2 (su límite $\theta\to\infty$),
-un LRT lo remacha —con la cautela de que $\theta\to\infty$ cae en el **borde** del espacio de
-parámetros, lo que reparte a la mitad el $p$-valor—:
-
-```{r}
-#| label: u22-lrt
-LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
-c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
-```
-
-### Una lectura estándar de bondad de ajuste
-
-`performance::compare_performance()` reúne de un vistazo las medidas habituales de bondad de ajuste
-—**AIC**, **BIC** y **RMSE**— de los modelos con verosimilitud (la quasi-Poisson queda fuera por carecer
-de ella). Omitimos el pseudo-$R^2$ porque la NB1 de `glmmTMB` no lo admite:
-
-```{r}
-#| label: u22-perf
-performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
-                                 metrics = c("AIC", "BIC", "RMSE"))
-```
-
-El **RMSE** sale casi igual en los tres (≈ 1.92): todos predicen la misma **media**. Lo que separa es el
-**AIC/BIC**, y ahí la **NB2** se lleva todo el peso de Akaike ($\approx 1$). Otra cara de lo mismo que ya
-sabíamos: el promedio no distingue los modelos; su **forma** (la distribución), sí.
+Con esperadas por debajo de 5 la aproximación $\chi^2$ deja de ser fiable justo donde más se la
+necesita —en los términos de orden alto—. Las salidas habituales, por orden de preferencia:
+
+1. **Colapsar niveles** con sentido sustantivo (moto y furgoneta → «no turismo»), comprobando antes que
+   colapsar es legítimo.
+2. **Renunciar al término de orden alto** y quedarse en la asociación homogénea, que gasta menos gl.
+3. **Contrastes exactos condicionales**, si el interés está precisamente en la celda escasa
+   [@christensen2025, cap. 14].
+
+Y hay que distinguir dos tipos de cero [@dunnsmyth2018, §10.4.8]:
+
+- **Cero muestral** (aleatorio): la combinación es posible, no ha salido. Se estima con normalidad,
+  aunque los EE de esa zona de la tabla serán grandes.
+- **Cero estructural** (fijo): la combinación **no puede existir** por el diseño del problema. No se
+  estima: se excluye la celda del ajuste (con `subset` o pesos 0) y se **descuenta un grado de
+  libertad** por cada una.
+
+Confundirlos es un error con consecuencias: tratar un cero estructural como muestral fuerza al modelo
+a explicar una imposibilidad, y contamina el ajuste del resto de la tabla.
 
 ::: {.callout-tip}
-## Compendio: bondad de ajuste en modelos de conteo
-
-No hay un único $R^2$ como en la regresión lineal. El repertorio estándar es:
-
-- **Índice de dispersión** (Pearson/gl): la cifra rápida; $\approx 1$ es buen ajuste, $\gg 1$ señala
-  estructura sin modelar.
-- **Contraste de deviance / Pearson $\chi^2$** frente a $\chi^2_{n-p}$: el «de libro», pero **solo
-  válido con medias altas o datos agrupados**; con conteos escasos (nuestro caso) **no es fiable**.
-- **AIC / BIC**: ajuste **relativo**, para **comparar** modelos, no absoluto.
-- **Pseudo-$R^2$** (McFadden y otros): análogo del $R^2$; `performance::r2()` (no todas las clases de
-  modelo lo admiten —p. ej. la NB1 de `glmmTMB`—).
-- **Rootograma** y **residuos simulados** (`DHARMa`): agnósticos a la distribución y fiables con
-  conteos escasos → los que más usamos.
-
-**Ojo con la quasi-Poisson:** al no tener verosimilitud, se queda **sin** AIC/BIC ni pseudo-$R^2$; su
-bondad se juzga solo por **dispersión + residuos**. La NB, ZIP/ZINB y hurdle sí admiten todo lo demás.
+## 🔧 En R. Diagnóstico de tablas
+- **`rstandard(m, type = "pearson")`** da los **residuos ajustados** (estandarizados). No uses
+  `residuals(m, type = "pearson")` a secas para juzgar celdas: su varianza no es 1.
+- **`vcd::mosaic(tab, shade = TRUE)`** dibuja el mosaico con sombreado por residuo; `vcd` viene con
+  `vcdExtra`, que ya cargamos en el caso. `vcdExtra::mosaic3d()` para tres vías en 3D si hace falta.
+- **`fitted(m)`** son las **frecuencias esperadas** de celda: compáralas con las observadas antes de
+  fiarte de cualquier $p$-valor.
+- **Ceros estructurales** — `glm(..., subset = !celda_imposible)` y resta un gl por celda excluida.
+  `MASS::loglm` permite pasar `start` y ceros fijos de forma más explícita.
 :::
 
-### Predicciones: misma media, distinto riesgo
+## 2.5 Tablas cuadradas: modelizar el cambio {#sec-u22-cuadradas}
 
-Un punto clave y a menudo malentendido: la **predicción de la media** es casi idéntica en los cuatro
-modelos, porque comparten $\mu=\exp(\eta)$. Lo que difiere es la **distribución** predicha —y con ella
-la probabilidad de valores extremos—. Para verlo tomamos la **póliza de mayor riesgo esperado**
-(`i`, la de mayor $\hat\mu$ según la NB, donde la diferencia se nota más) y calculamos, bajo la Poisson
-y la NB2, tres cantidades:
-
-- `media_pois`, `media_nb`: la **media predicha** de partes para esa póliza ($\hat\mu$, con
-  `predict(type = "response")`);
-- `P0_pois`, `P0_nb`: la probabilidad de que esa póliza tenga **cero** partes, $P(Y=0)$;
-- `Pge10_pois`, `Pge10_nb`: la probabilidad de que tenga **diez o más**, $P(Y\ge 10)=1-P(Y\le 9)$.
+Un caso especial y muy útil: la **misma** clasificación medida en dos momentos. El bonus-malus de la
+cartera se reevalúa cada año, y cruzar el nivel previo con el actual da una tabla $5\times 5$ cuya
+diagonal son las pólizas que no se mueven.
 
 ```{r}
-#| label: u22-pred-comp
-i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
-mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
-mu_n <- unname(predict(m_nb,   cartera[i, ], type = "response"))   # media predicha (NB2)
-round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguales
-        P0_pois    = dpois(0, mu_p),        P0_nb    = dnbinom(0, size = m_nb$theta, mu = mu_n),      # P(Y = 0)
-        Pge10_pois = 1 - ppois(9, mu_p),    Pge10_nb = 1 - pnbinom(9, size = m_nb$theta, mu = mu_n)), # P(Y >= 10)
-      3)
+#| label: u22-cuadrada
+cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera)) |>
+  dplyr::rename(prev = bonus_malus_prev, act = bonus_malus_act) |>
+  dplyr::mutate(i = as.integer(prev), j = as.integer(act),
+                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))
+xtabs(Freq ~ prev + act, data = cuad) |> addmargins()
 ```
 
-Para esa misma póliza (media $\approx 5$ partes), Poisson y NB predicen casi el **mismo promedio**, pero
-la NB lo reparte sobre una distribución mucho **más dispersa**: acumula bastante más probabilidad en el
-**0** (0.17 frente a 0.006) y en la **cola lejana** ($P(Y\ge 10)$ pasa de 0.04 a 0.17), a costa de
-vaciar el centro. Mismo promedio, mucha más varianza. Se ve en la distribución predicha:
+En una tabla así el modelo de independencia no interesa: por supuesto que el nivel de un año predice el
+del siguiente. Las preguntas útiles son otras: ¿el trasiego es **equilibrado**? ¿ha cambiado el
+**reparto global** de niveles? ¿tiene el movimiento alguna **estructura**? Es el terreno de los modelos
+para **pares emparejados** [@agresti2013, cap. 11].
+
+### Simetría
+
+**Simetría** afirma $\mu_{ij}=\mu_{ji}$: tantas pólizas pasan de $i$ a $j$ como de $j$ a $i$. Se ajusta
+con un único factor que empareja las celdas espejo:
 
 ```{r}
-#| label: fig-u22-pred-dist
-#| fig-cap: "Distribución de conteos predicha para una póliza de alto riesgo (media ≈ 5), con la misma media en todos los modelos. La NB2 (varianza cuadrática) acumula más probabilidad en el 0 y en la cola lejana; la NB1 (varianza lineal) queda entre la Poisson y la NB2; la Poisson concentra todo en el centro."
-#| fig-width: 6.5
-#| fig-height: 3.6
-K <- 0:16
-mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
-dist <- tibble::tibble(k = K,
-                       Poisson = dpois(K, mu_p),
-                       NB1 = dnbinom(K, size = mu_n1 / sigma(m_nb1), mu = mu_n1),   # NB1: Var = mu(1+alpha)
-                       NB2 = dnbinom(K, size = m_nb$theta, mu = mu_n))
-dist |>
-  tidyr::pivot_longer(-k, names_to = "modelo", values_to = "prob") |>
-  ggplot(aes(k, prob, colour = modelo, group = modelo)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 1.6) +
-  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue")) +
-  labs(x = "nº de partes", y = "probabilidad", colour = NULL)
+#| label: u22-simetria
+m_sim <- glm(Freq ~ par, family = poisson, data = cuad)
+c(deviance = round(deviance(m_sim), 2), gl = df.residual(m_sim),
+  p = signif(pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE), 3))
 ```
 
-La consecuencia es práctica: si lo que importa es el **promedio** (p. ej. la prima media), los cuatro
-modelos coinciden; si importa la **cola** (probabilidad de muchos siniestros, reservas, percentiles
-altos), la Poisson —y, en menor medida, la NB1— **infravaloran el riesgo extremo** frente a la NB2, que
-es la que mejor describe esa cola.
+Los gl salen de la cuenta: $I^2=25$ celdas, $I(I+1)/2=15$ parámetros, **10 gl**. Se rechaza con
+holgura: el intercambio **no** es simétrico.
 
-### quasi-Poisson, NB1 y NB2: cuándo cada una
+Cuidado con el paso siguiente, que es donde se equivoca casi todo el mundo: rechazar la simetría
+**no** demuestra que haya deriva. La simetría impone **dos** cosas a la vez —patrón de intercambio
+simétrico *y* marginales iguales—, así que su rechazo solo dice que falla al menos una. Para saber cuál,
+hace falta el modelo intermedio.
+
+### Cuasi-simetría y homogeneidad marginal
+
+La simetría es exigente porque impone dos cosas a la vez: que el **patrón** de intercambio sea
+simétrico y que los **marginales** coincidan. Separarlas es lo que hace útil el modelo intermedio.
+
+La **cuasi-simetría** añade a la simetría efectos principales libres para fila y columna: permite que
+el reparto global se desplace, manteniendo simétrico el patrón de intercambio. Sus gl son
+$(I-1)(I-2)/2 = 6$.
+
+```{r}
+#| label: u22-cuasisimetria
+m_qs <- glm(Freq ~ prev + act + par, family = poisson, data = cuad)
+c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs))
+```
+
+Y ahora el punto clave: la **homogeneidad marginal** —que la distribución de niveles sea la misma antes
+y después— se contrasta como **simetría dada la cuasi-simetría**, comparando los dos modelos
+[@agresti2013, cap. 11]:
+
+```{r}
+#| label: u22-homogeneidad-marginal
+anova(m_sim, m_qs, test = "LRT")   # H0: homogeneidad marginal (dada la cuasi-simetría)
+```
+
+Los $I-1=4$ gl de la diferencia son los de la comparación de marginales. Este contraste **no** se
+obtiene ajustando un modelo de «homogeneidad marginal» directamente: no es un modelo log-lineal, y de
+ahí el rodeo por la cuasi-simetría.
+
+La lectura conjunta de los tres resultados es lo que responde a la pregunta del cliente:
+
+| Simetría | Homogeneidad marginal | Interpretación |
+|:--|:--|:--|
+| se acepta | se acepta | el trasiego está equilibrado y el reparto no se mueve |
+| se rechaza | se acepta | hay intercambio asimétrico, pero se compensa: reparto estable |
+| se rechaza | se rechaza | hay **deriva**: el reparto global se desplaza |
+
+### Cuánta deriva, y en qué sentido
+
+Los contrastes dicen *si* hay deriva; su magnitud y sentido se leen en los marginales:
+
+```{r}
+#| label: u22-deriva
+niv <- as.integer(cartera$bonus_malus_prev); nva <- as.integer(cartera$bonus_malus_act)
+c(nivel_medio_previo = round(mean(niv), 3),
+  nivel_medio_actual = round(mean(nva), 3),
+  deriva             = round(mean(nva - niv), 3),
+  pct_empeora        = round(100 * mean(nva > niv), 1),
+  pct_mejora         = round(100 * mean(nva < niv), 1))
+```
+
+Una deriva positiva significa desplazamiento hacia el *malus* (peor tarifa); negativa, hacia el
+*bonus*. Es la cifra que va al informe —y aquí conviene detenerse—.
+
+::: {.callout-warning}
+## Significativo no es lo mismo que importante
+El contraste de homogeneidad marginal se rechaza de forma aplastante ($p\approx 2\times 10^{-11}$), y
+sin embargo el nivel medio pasa de **3,007 a 3,026**: una deriva de **0,020** en una escala de 1 a 5, y
+un 25,8 % de pólizas que empeoran frente a un 22,0 % que mejoran. Con $n\approx 3.000$ el contraste
+detecta desplazamientos que a efectos de negocio son **irrelevantes**.
+
+Si el informe dijera solo «se rechaza la homogeneidad marginal ($p<0{,}001$): hay deriva hacia el
+*malus*», sería literalmente cierto y **materialmente engañoso**: la dirección leería que su cartera se
+deteriora. La conclusión honesta es que hay un desplazamiento **estadísticamente detectable pero
+despreciable en magnitud**, y que el reparto de niveles es a efectos prácticos estable.
+
+Dar siempre el **tamaño** junto al $p$-valor no es un adorno metodológico: es lo que separa un informe
+útil de uno que induce a una decisión equivocada.
+:::
+
+### Asociación ordinal: aprovechar que los niveles están ordenados
+
+Los cinco niveles del bonus-malus **están ordenados**, y tratarlos como categorías nominales
+desperdicia esa información: la interacción del saturado gasta $(5-1)^2=16$ gl en estimar una
+estructura que probablemente es mucho más simple. El modelo de **asociación uniforme** (*linear-by-linear*)
+sustituye esos 16 gl por **uno**, usando puntuaciones numéricas de los niveles
+[@christensen2025, cap. 7; @agresti2013, caps. 9–10]:
+
+$$\log \mu_{ij} = \lambda + \lambda^{\text{prev}}_i + \lambda^{\text{act}}_j + \beta\, u_i v_j .$$
+
+```{r}
+#| label: u22-ordinal
+m_indep_c <- glm(Freq ~ prev + act,               family = poisson, data = cuad)
+m_unif    <- glm(Freq ~ prev + act + I(i * j),    family = poisson, data = cuad)
+anova(m_indep_c, m_unif, test = "LRT")
+c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
+  OR_local        = round(exp(coef(m_unif)["I(i * j)"]), 3))
+```
+
+El único $\beta$ resume toda la asociación: $e^{\beta}\approx 1{,}32$ es el **odds ratio local**, el
+mismo para cualquier par de niveles adyacentes. El término gana muchísima deviance sobre el modelo de
+independencia (más de 550 puntos con **1 solo** gl), así que la asociación ordinal existe y es fuerte.
+
+Pero ahora hay que hacer la pregunta que de verdad importa —**¿ajusta?**— y no confundirla con la
+anterior:
+
+```{r}
+#| label: u22-ordinal-ajuste
+c(deviance = round(deviance(m_unif), 1), gl = df.residual(m_unif))
+```
+
+**No ajusta.** Una deviance de ~1.024 sobre 15 gl es un desastre: el modelo mejora enormemente sobre la
+independencia y sigue siendo, en términos absolutos, malísimo. Son dos preguntas distintas y confundirlas
+es un error corriente: *«este término aporta»* no implica *«este modelo describe los datos»*.
+
+La razón se ve mirando la tabla: la **diagonal** concentra algo más de la mitad de las pólizas —las que
+no cambian de nivel—. Ninguna asociación suave, que reparte la masa de forma gradual al acercarse a la
+diagonal, puede reproducir un pico así. Hace falta un término que trate la **permanencia** como
+fenómeno propio:
+
+```{r}
+#| label: u22-movilidad
+cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
+m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
+anova(m_unif, m_mov, test = "LRT")
+c(deviance = round(deviance(m_mov), 1), gl = df.residual(m_mov))
+```
+
+El salto es brutal: la deviance cae de ~1.024 a ~39 gastando **un** grado de libertad. Con 14 gl el
+ajuste sigue sin ser perfecto, pero hemos pasado de un modelo inservible a uno razonable con un solo
+parámetro. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
+rasgo dominante de esta tabla no es la asociación ordinal, sino la inercia**. Lo que explica el
+bonus-malus es, sobre todo, que la mayoría de las pólizas **se quedan donde estaban**; el gradiente
+entre niveles vecinos es un efecto de segundo orden.
+
+Y así hay que contárselo a la dirección: no «los niveles contiguos están asociados», sino «algo más de
+la **mitad** de las pólizas no se mueve de nivel, y entre las que se mueven el salto tiende a ser
+corto». Es un mensaje distinto y conduce a decisiones distintas —por ejemplo, sobre cada cuánto merece
+la pena reevaluar—.
 
 ::: {.callout-note}
-## Cuándo cada una
-
-| Modelo | Varianza | ¿Distribución? | ¿AIC/LRT? | Cuándo |
-|---|---|---|---|---|
-| quasi-Poisson | $\phi\,\mu$ (lineal) | No (cuasi-verosim.) | No (QAIC) | Solo corregir EE, mínimos supuestos |
-| NB1 | $\mu(1+\alpha)$ (lineal) | Sí | Sí | Varianza lineal, con distribución |
-| NB2 | $\mu+\mu^2/\theta$ (cuadrática) | Sí | Sí | Varianza cuadrática (lo habitual) |
-
-Si el exceso es **exceso de ceros**, ve a la [Unidad 2.3](#sec-u23); si es **agrupamiento**, a la
-[Unidad 2.4](#sec-u24): a veces lo que parece sobredispersión es una de esas dos cosas.
+## Lo que este ejemplo enseña sobre el oficio
+Hemos recorrido tres modelos y la conclusión ha cambiado dos veces: primero parecía que había deriva
+(la había, pero despreciable), luego que la asociación ordinal resumía la tabla (ganaba mucha deviance,
+pero no ajustaba), y al final que la inercia era el fenómeno principal. En cada paso el error habría
+sido detenerse en el $p$-valor sin mirar **el ajuste absoluto** y **la magnitud**. Con tablas se puede
+hacer ese control —las frecuencias esperadas son grandes—, así que no hay excusa para no hacerlo.
 :::
 
-### Validación contra el DGP
+::: {.callout-tip}
+## 🔧 En R. Tablas cuadradas
+Todo con `glm`; lo único que cambia es cómo se construye el término:
 
-Como la cartera es **simulada**, podemos hacer lo que en un caso real no: contrastar el resultado con la
-**verdad**. El proceso generó `n_danos` como una mezcla Poisson–Gamma (una NB2) con dispersión
-$\theta=1$; nuestro análisis, a ciegas, ha elegido la **NB2** y ha estimado un $\hat\theta$ que debería
-rondar 1:
+- **Simetría** — factor que empareja $(i,j)$ con $(j,i)$:
+  `par = factor(paste(pmin(i,j), pmax(i,j), sep = "-"))`, y `Freq ~ par`. Gl: $I(I-1)/2$.
+- **Cuasi-simetría** — `Freq ~ prev + act + par`. Gl: $(I-1)(I-2)/2$.
+- **Homogeneidad marginal** — no es un modelo log-lineal: es el LRT
+  `anova(m_simetria, m_cuasisimetria, test = "LRT")`, con $I-1$ gl.
+- **Asociación uniforme** — `Freq ~ prev + act + I(i*j)` con `i`, `j` **numéricos**. 1 gl; $e^\beta$ es
+  el odds ratio local. Con puntuaciones no equiespaciadas, sustituye `i*j` por `u[i]*v[j]`.
+- **Inercia de la diagonal** — añade un indicador `i == j` (o un factor con un nivel por celda
+  diagonal, si crees que la inercia varía con el nivel).
+- Los modelos de movilidad más elaborados (RC de Goodman, con puntuaciones **estimadas** en vez de
+  fijadas) no son log-lineales: son multiplicativos y requieren `gnm`. Fuera del alcance del curso.
+:::
+
+## 2.6 Aplicación: detectar *proxies* del factor prohibido {#sec-u22-proxy}
+
+Cerramos con el uso que da a esta unidad su peso en el estudio de caso. La ley prohíbe tarificar con el
+**sexo** (primas unisex; TJUE C-236/09, *Test-Achats*). Excluir la variable del modelo parece
+suficiente, y no lo es: si una variable **permitida** está asociada al sexo, el modelo sigue usando esa
+información por la puerta de atrás. Esa variable es un ***proxy***.
+
+Y aquí está la conexión: **«$V$ es un proxy de $S$» es, exactamente, «$V$ y $S$ no son
+independientes»** — una hipótesis contrastable en una tabla de contingencia. Con la respuesta en la
+tabla, la pregunta se afina: *¿queda asociación entre $S$ y $V$ una vez tenido en cuenta el resultado?*
+
+En la cartera de teoría el sexo es ruido puro por construcción, así que sirve como **control negativo**:
+vemos qué aspecto tiene un «no proxy».
 
 ```{r}
-#| label: u22-validacion
-verdad <- attr(cartera, "verdad")
-c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))
+#| label: u22-proxy-control
+tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + danos, data = cart_tab))
+m_ci  <- glm(Freq ~ sexo * danos + tipo_vehiculo * danos, family = poisson, data = tp)
+m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + danos)^2,      family = poisson, data = tp)
+anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | danos  (no hay proxy)
 ```
 
-El $\hat\theta\approx 0.97$ recupera el $\theta=1$ del DGP casi al dedillo, y la **forma de modelo**
-elegida (NB2, cuadrática) coincide con el mecanismo generador. Los signos de las IRR también concuerdan
-con el diseño (mayor potencia, zona urbana, uso comercial o moto → más partes). Es decir: no solo hemos
-ajustado un modelo que encaja, sino **el modelo correcto**. Ese es el sentido del control de calidad que
-pediremos en el estudio de caso —ajustar a ciegas y validar al final contra `attr(., "verdad")`—.
+Y —esto es lo que de verdad hay que mirar— el **tamaño** de esa asociación, con su intervalo:
 
-### Una estrategia general
+```{r}
+#| label: u22-proxy-control-tamano
+broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl("^sexo.*:tipo", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
 
-::: {.callout-tip}
-## Receta para conteos sobredispersos
+Y aquí la realidad nos regala una lección mejor que cualquier ejemplo de manual: sale
+$p \approx 0{,}056$. Justo al borde, cuando sabemos con **certeza** que en esta cartera `sexo` es ruido
+sorteado de forma independiente. Con la regla mecánica del 0,05 nos habríamos salvado por tres
+milésimas; si hubiera salido 0,047, habríamos «descubierto» un proxy inexistente.
 
-1. **Ajusta la Poisson** (con `offset` si hay exposición) como punto de partida y lee las IRR.
-2. **Diagnostica**: índice de dispersión, rootograma y residuos simulados. Si $\hat\phi\approx 1$, la
-   Poisson basta y aquí acabas.
-3. Si $\hat\phi>1$, **identifica la causa** con el rootograma y los residuos: ¿exceso de ceros
-   ([2.3](#sec-u23)), agrupamiento ([2.4](#sec-u24)) o heterogeneidad general?
-4. Para la heterogeneidad, **contrasta la estructura** de la varianza (Cameron–Trivedi, `trafo`):
-   lineal → quasi-Poisson / NB1; cuadrática → NB2.
-5. **Ajusta la alternativa** y **re-diagnostica** (dispersión $\approx 1$, `DHARMa`); compara por AIC
-   (o QAIC con la quasi-Poisson).
-6. **Interpreta** en IRR (no cambian) con los EE corregidos, y **predice** con la distribución
-   adecuada, según necesites la media o la cola.
-7. **Valida**: contra el DGP (en el curso) y fuera de muestra en la práctica ([Unidad 2.6](#sec-u26)).
+Y aún hay más, mirando el tamaño en lugar del contraste global: el segundo odds ratio —
+`sexo × furgoneta`— tiene un intervalo de confianza que **no contiene el 1** (aproximadamente
+$[1{,}01;\ 1{,}59]$). Es decir: un término **individualmente «significativo»** en una asociación que por
+construcción **no existe**.
+
+::: {.callout-warning}
+## Este es un falso positivo, y lo sabemos con certeza
+Lo que enseña este resultado no es cómo está la cartera, sino cómo **no** hay que leer un contraste:
+
+- **La hipótesis nula es cierta y aun así hemos obtenido un $p$ casi significativo y un intervalo que
+  excluye el 1.** No es mala suerte excepcional: bajo $H_0$ el $p$-valor se distribuye **uniforme**, así
+  que un valor por debajo de 0,10 ocurre una vez de cada diez, y aquí además hay **dos** términos de
+  interacción, cada uno con su oportunidad de fallar.
+- **Con un umbral rígido, la conclusión depende del ruido**, no del fenómeno.
+- **Un intervalo que roza el 1 por su extremo inferior no es evidencia de nada.** $[1{,}01;\ 1{,}59]$ es
+  compatible con «ningún efecto» y con «efecto moderado»: lo que dice es que **no hay información
+  suficiente**, no que haya asociación.
+
+En el estudio de caso vas a contrastar **varias** covariables permitidas contra `sexo`. Con ocho
+covariables esperas casi una alerta falsa por puro tanteo. No llames proxy a nada sin mirar la
+**magnitud**, sin comprobar que el intervalo está claramente lejos del 1 y sin tener en cuenta cuántos
+contrastes has hecho. Aquí tienes la verdad del DGP para comprobarlo; con datos reales no la tendrás, y
+esa es exactamente la razón de ser prudente.
+:::
+
+Y así se ve un proxy de verdad, con proceso generador explícito:
+
+```{r}
+#| label: u22-proxy-simulado
+set.seed(SEMILLA_CURSO)
+n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
+# Niveles EXPLÍCITOS: "M" es la referencia, así el coeficiente se llama `sH` y se lee
+# "hombres frente a mujeres". Sin declararlos, R ordena alfabéticamente (H antes que M)
+# y el coeficiente saldría invertido.
+s <- factor(sample(c("M", "H"), n, TRUE), levels = c("M", "H"))        # factor prohibido
+v <- factor(ifelse(runif(n) < ifelse(s == "H", 0.30, 0.05), "moto", "otro"),
+            levels = c("otro", "moto"))                               # PERMITIDA, asociada a s
+y <- rbinom(n, 1, plogis(-0.8 + 1.20 * (v == "moto") + 0.20 * (s == "H")))
+sim <- as.data.frame(xtabs(~ s + v + y))
+
+anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
+      glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
+```
+
+Rechazo claro: la variable permitida **está** asociada al factor prohibido. Lo que el proxy transporta
+se mide comparando el efecto **marginal** del factor prohibido con el **ajustado** por la variable
+permitida —la brecha entre ambos es la fuga—:
+
+```{r}
+#| label: u22-proxy-fuga
+d_sim <- data.frame(y = y, s = s, v = v)
+or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
+c(OR_marginal    = round(or_s(y ~ s),     3),   # lo que se ve sin controlar el proxy
+  OR_ajustado    = round(or_s(y ~ s + v), 3),   # el efecto directo del factor prohibido
+  verdad_directa = round(exp(0.20),       3))   # el valor con el que se generaron los datos
+```
+
+El **ajustado** queda cerca de la verdad (a un 5 %, dentro del error de muestreo), mientras el
+**marginal** la exagera un **30 %**. Esa brecha es, literalmente, la información prohibida que `v`
+transporta: si tarificas con `v` y sin `s`, estás aplicando buena parte de la diferencia entre hombres y
+mujeres sin haberla escrito en ningún sitio —y sin que aparezca en el modelo—.
+
+::: {.callout-important}
+## Lo que este análisis sí dice y lo que no
+El contraste identifica **qué** variables transportan información prohibida y **cuánta**. No decide qué
+hacer con ellas: eliminar un proxy con efecto causal propio —la moto es objetivamente más siniestrosa—
+sacrifica poder predictivo legítimo, y la alternativa (conservarla y aceptar la fuga) es una decisión
+de política, no estadística.
+
+Lo que el análisis exige es que la decisión sea **explícita y cuantificada**, no un descuido. Eso es lo
+que se te pide en la reflexión individual del estudio de caso.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.2) — Preguntas 6 y 7 del caso
-Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.7](#sec-u27)):
+## Tarea del estudiante (2.2) — Preguntas 4, 5, 18 y 19 del caso
+Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
 
-- **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
-  la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
-  quasi-Poisson y binomial negativa, y **decide y justifica** cuál la captura mejor —AIC y re-diagnóstico—.
-  Explica qué cambia —y qué no— en los **errores estándar** y en la **tarifa**.
-- **P7 · ¿De dónde viene?** Razona esa variabilidad extra como **heterogeneidad no observada** (fragilidad):
-  pólizas intrínsecamente más siniestrosas que las variables no capturan. Deja el puente hacia los mixtos
-  ([2.4](#sec-u24)) y la supervivencia ([2.5](#sec-u25)).
+- **P4 · Asociación (jerarquía).** Tu tabla tiene **cuatro** factores —`tipo_vehiculo`,
+  `zona_circulacion` y `combustible` cruzados con *tener o no* siniestro—, así que no la abordes
+  enumerando modelos: recórrela **por orden de interacción** (`^2`, `^3`, saturado) como en
+  [2.3](#sec-u22-orden-superior), fija el orden máximo necesario y **poda dentro de él**. Justifica el
+  modelo elegido por LRT y AIC, con el **recuento de gl** hecho a mano, y **tradúcelo a enunciados de
+  independencia condicional** —eso es lo que responde a la pregunta de la dirección—. Compara además el
+  odds ratio **marginal** con el **condicional** de al menos un par de factores y razona si colapsar era
+  legítimo. **Valida** contra `attr(cartera, "verdad")`.
+- **P5 · Movilidad del bonus-malus.** Sobre la tabla cuadrada `bonus_malus_prev × bonus_malus_act`:
+  contrasta **simetría**, ajusta **cuasi-simetría** y obtén la **homogeneidad marginal** como la
+  diferencia entre ambas. Cuantifica la **deriva** y su sentido. Aprovecha que los niveles están
+  **ordenados**: ajusta la **asociación uniforme** y decide si añadir un término de **inercia** de la
+  diagonal; interpreta qué dice el modelo elegido sobre cómo se mueven las pólizas.
+- **P18 · Proxies (junto con P17).** Contrasta la **independencia condicional** entre `sexo` y cada
+  covariable permitida. Identifica los proxies, distingue los que lo son de los que no —habrá controles
+  negativos— y **mide la fuga** comparando el efecto marginal y el ajustado de `sexo`. Recuerda que vas a
+  hacer **varios** contrastes: algún $p$ pequeño saldrá por azar, así que no llames proxy a nada sin
+  mirar la magnitud. Lleva la conclusión a la reflexión individual: ¿qué haces con la variable, y a qué
+  coste?
+- **P19 · Control de calidad.** Reajusta al menos una de esas asociaciones como **logística** y comprueba
+  que recuperas los mismos odds ratios que el log-lineal saturado. Explica por qué **deben** coincidir,
+  qué cambia de una parametrización a otra, y qué habrías concluido si no hubieran coincidido.
 
-Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`attr(cartera, "verdad")$theta_frail`).
+Cuida el **diagnóstico**: residuos ajustados y mosaico —con el modelo declarado— antes de firmar
+cualquier conclusión, y comprueba la ocupación de las celdas antes de fiarte de un $p$-valor. Y da
+siempre el **tamaño** del efecto junto al $p$: significativo no es lo mismo que importante.
 :::

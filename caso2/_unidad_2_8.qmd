@@ -1,0 +1,240 @@
+<!-- Partial · Incluir con {{< include _unidad_2_8.qmd >}}. Sin YAML.
+     Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía.
+     Estudio de caso del Caso 2 sobre la CARTERA DE AUTO (dgp_auto.R). La misma cartera se
+     reutiliza como ESTUDIO DE CASO del Caso 3 (coste y duración) → síntesis "tres lentes".
+     Nota: la TEORÍA del Caso 3 usa un banco industrial distinto; la cartera de auto vuelve
+     solo en el proyecto del estudiante. -->
+
+# 8 · Estudio de caso, exposición y evaluación {#sec-u28}
+
+::: {.callout-note}
+## Sobre esta unidad
+Cierre del Caso 2: estudio de caso de **conteos, tasas e intensidad del riesgo** sobre una cartera de
+auto, con exposición y Q&A individual. No hay teoría nueva; se integra y evalúa todo lo anterior.
+Objetivo general: **comunicar y reproducir** (estudio de caso reproducible), de forma acumulativa sobre
+los hilos de conteos, mixtos y supervivencia. Esta **misma cartera** vuelve como **estudio de caso del
+Caso 3** (coste de los siniestros y duración de la póliza): lo que aquí modelas como *frecuencia* será
+una de las **tres lentes** del cliente.
+:::
+
+## 8.1 El estudio de caso (entregable) {#sec-u28-caso}
+
+### El encargo
+
+Te contrata la **dirección técnica** de una **aseguradora de automóvil**, que gestiona su cartera a
+través de una red de **agencias**. No son estadísticos: te traen sus datos y sus preguntas, y esperan
+**respuestas y recomendaciones** para tarificar y planificar, no una clase de modelos. Como en el
+Caso 1, tú **eliges y justificas** el modelo en cada caso.
+
+> **Lo que la dirección quiere saber**
+>
+> *Sobre el ritmo de siniestros y qué lo explica*
+>
+> 1. ¿A qué **ritmo** tienen siniestros nuestras pólizas, y qué factores lo suben o lo bajan —y **cuánto**?
+> 2. ¿Podríais estimar el ritmo esperado, **con su margen**, de una **póliza nueva** de un perfil concreto?
+> 3. Las **asistencias en carretera**, ¿siguen el mismo patrón de riesgo que los siniestros, o responden a
+>    otras cosas?
+> 4. ¿Están **asociados** entre sí el tipo de vehículo, la zona y el combustible, y con tener o no algún
+>    siniestro? Nos interesa saber **quién con quién**: si dos de ellos parecen ir juntos solo porque
+>    ambos se relacionan con un tercero, no queremos confundirnos.
+> 5. Reevaluamos el **bonus-malus** cada año: ¿cómo se mueven las pólizas de un nivel a otro? ¿Es un vaivén
+>    equilibrado o hay **deriva** (empeoran más de las que mejoran)? ¿Y tiene ese movimiento alguna
+>    **regularidad** que podamos resumir en pocos números, o hay que mirar las 25 casillas una a una?
+>
+> *Sobre la enorme variabilidad y los ceros*
+>
+> 6. Unas pocas pólizas concentran **muchísimos partes** y la mayoría casi ninguno. ¿Vuestro modelo refleja
+>    esa variabilidad o se queda corto? ¿Qué implica para la **tarifa** y para lo fiables que son vuestros
+>    números?
+> 7. ¿A qué se debe esa variabilidad de más: hay pólizas **intrínsecamente más siniestrosas** que las
+>    variables no capturan?
+> 8. La mayoría de reclamaciones **nunca pasa por revisión antifraude**. ¿Hay pólizas que por su naturaleza
+>    **no la levantan**, frente a otras que aún no lo han hecho? ¿Cómo las distinguimos?
+>
+> *Sobre las agencias y el territorio*
+>
+> 9. ¿El volumen de **gestiones** depende de la **agencia** que lleva la póliza, o es cosa de la propia
+>    póliza? ¿**Cuánta** variación es atribuible a la agencia?
+> 10. ¿Hay un efecto de **región** por encima de las agencias?
+> 11. ¿Qué agencias se **desvían** —mejor o peor de lo que cabría esperar por su cartera—?
+> 12. Si abrimos una **agencia nueva**, ¿qué deberíamos esperar?
+>
+> *Sobre cómo evoluciona el riesgo en el tiempo*
+>
+> 13. ¿Cómo cambia el riesgo del **primer siniestro** a lo largo de la antigüedad de la póliza? ¿Sube, baja,
+>     se mantiene?
+> 14. Con el **historial completo** de partes, ¿el riesgo de los **siguientes** siniestros se comporta como
+>     el del primero, o distinto?
+> 15. ¿Cada cuánto conviene **revisar** a las pólizas de más riesgo?
+>
+> *Sobre un modelo sencillo, fiable y responsable*
+>
+> 16. Manejamos **muchísimas variables**: ¿cuáles merece la pena **conservar** para anticipar la
+>     siniestralidad, sin perder fiabilidad?
+> 17. Tenemos el **sexo** del conductor y sabemos que predice, pero la ley **prohíbe** tarificar con él:
+>     ¿cómo hacéis una selección que lo **respete** y no lo cuele por la puerta de atrás (proxies)?
+> 18. Y si lo quitamos del modelo, ¿estamos ya tranquilos? ¿Hay alguna de las variables que **sí** podemos
+>     usar que vaya tan de la mano del sexo que en realidad lo esté sustituyendo? Si es así, decidnos
+>     **cuál** y **cuánto** de la diferencia entre hombres y mujeres se nos sigue colando por ahí.
+> 19. Última cosa, y va sin ánimo de ofender: estos números los vamos a usar para fijar precios. ¿Cómo
+>     comprobáis vosotros mismos que no os habéis equivocado? Si el mismo dato se puede analizar de dos
+>     maneras distintas, ¿os dan lo mismo?
+
+<!-- Mapa docente (no revelar al alumno). Cada pregunta -> unidad + técnica:
+     Q1 Poisson + offset + IRR (2.1) · Q2 predicción con intervalo para un perfil nuevo (2.1) ·
+     Q3 comparar dos respuestas de tasa (n_siniestros vs n_asistencia): estructuras de riesgo distintas (2.1) ·
+     Q4 log-lineal de 3 vías: JERARQUÍA completa (mutua/conjunta/condicional/homogénea/saturado),
+        gl, y OR marginal vs condicional (Simpson + colapsabilidad) (2.2).
+        OJO: la tabla es tipo x zona x COMBUSTIBLE x siniestro. Con `uso` (15%) en lugar de
+        combustible, 4 de las 36 celdas bajan de 5 casos y el LRT de orden alto no es fiable ·
+     Q5 tabla cuadrada: simetría -> cuasi-simetría -> homogeneidad marginal como S|QS; deriva;
+        y ASOCIACIÓN ORDINAL (uniforme, 1 gl frente a los 16 del saturado) + inercia de la diagonal.
+        La verdad del DGP es un proceso de un paso ASIMÉTRICO: se sube tantos niveles como partes
+        hubo, se baja de uno en uno y solo con prob. 1-persistencia (2.2) ·
+     Q6 sobredispersión: quasi-Poisson vs binomial negativa; efecto en errores estándar e inferencia (2.3) ·
+     Q7 heterogeneidad no observada: OLRE / fragilidad — puente 2.3<->2.5<->2.6 ·
+     Q8 exceso de ceros: hurdle vs zero-inflated; las dos partes (2.4) ·
+     Q9 GLMM de Poisson; ICC; % de varianza de agencia (2.5) ·
+     Q10 anidamiento región > agencia (efectos aleatorios cruzados/anidados) (2.5) ·
+     Q11 BLUPs / caterpillar; shrinkage; agencias atípicas (2.5) ·
+     Q12 predicción condicional vs marginal; agencia nueva (2.5) ·
+     Q13 riesgos a trozos ≡ Poisson; hazard base por tramo; comparación Cox/KM (2.6) ·
+     Q14 eventos recurrentes (Andersen-Gill) sobre el PANEL, con offset variable (2.6, callout avanzado) ·
+     Q15 recomendación operativa a partir del hazard (2.6) ·
+     Q16 selección: AIC/BIC vs validación cruzada vs regularización/lasso (2.7) ·
+     Q17 fairness: factor PROHIBIDO (sexo, Test-Achats) y proxies en la selección (2.7) ·
+     Q18 proxy como INDEPENDENCIA CONDICIONAL en tabla: sexo x tipo x siniestro (2.2).
+        VERDAD DEL DGP: `tipo_vehiculo` ES un proxy por construcción -> P(moto|H)=0.20 vs
+        P(moto|M)=0.06, OR = 3.92, con la marginal de tipo intacta (0.75/0.13/0.12).
+        zona, uso, combustible, estado_civil, forma_pago y nivel_estudios son CONTROLES
+        NEGATIVOS (independientes de sexo): el estudiante debe discriminar, no solo detectar.
+        Fuga teórica vía tipo_moto: x1.026 en frecuencia, x1.043 en severidad, x1.070 en prima
+        pura -> el proxy fuga MÁS por severidad que por frecuencia (gancho al Caso 3).
+        Todo verificable con attr(cartera, "verdad")$proxy ·
+     Q19 control de calidad: la equivalencia log-lineal saturado <-> logística (2.2). Formulada
+        como pregunta del cliente ("¿cómo comprobáis que no os habéis equivocado?") para que la
+        VERIFICACIÓN sea un entregable y no un adorno metodológico. Los OR deben coincidir hasta
+        el redondeo; si no coinciden, el estudiante tiene un error que localizar.
+     El coste (Gamma/IG) y la baja (AFT/Cox) NO entran aquí: son el estudio de caso del Caso 3. -->
+
+### Los datos que te proporcionamos
+
+Como los datos son **simulados** (con proceso generador conocido), podrás validar tus estimaciones
+contra la verdad. Cada fila es una **póliza**, observada durante su `antiguedad` en la cartera. La
+**exposición** entra como *offset* (`offset = log(exposicion)`): los partes se leen **por unidad de
+tiempo expuesto**, no en bruto.
+
+| Papel | Variables |
+|---|---|
+| Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (tiempo expuesto como fracción del cliente más veterano → *offset*); `antiguedad` (años en la cartera) |
+| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia) |
+| Predictores de riesgo | `edad_conductor`; `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
+| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Úsalo para **discutir** *fairness* y variables *proxy*, no para el modelo final. Aviso: excluirlo del modelo **no garantiza** que su información quede fuera —eso es lo que te toca averiguar en Q18— |
+| Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
+| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
+| Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
+
+Hay **más variables de las que necesitarás**: algunas son ruido, a propósito, para que ejercites la
+selección y decidas qué entra en el modelo.
+
+::: {.callout-note}
+## La misma cartera, tres lentes
+Esta cartera lleva además el **coste** de cada siniestro y el **tiempo hasta la baja** de la póliza
+(`coste_total`, `coste_medio`, la tabla de siniestros con `attr(cartera, "siniestros")`, y `t_baja`,
+`baja`). No los necesitas para el Caso 2 —aquí modelas **frecuencia**—, pero son las otras dos lentes
+(¿**cuánto** cuesta? ¿**cuánto** dura?) que retomarás en el **estudio de caso del Caso 3**.
+:::
+
+### Tu trabajo
+
+Entregas un **informe de consultoría reproducible**. Para **cada** pregunta sigues el mismo ciclo que en
+el Caso 1: **identifica el objetivo** (qué te preguntan de verdad), **propón y justifica** el análisis
+(qué modelo y por qué, frente a alternativas), **resuélvelo**, **interprétalo en la escala correcta**
+(IRR, efectos marginales, probabilidades) y **recomienda** en términos que la dirección entienda. Cuando
+proceda, **predice** (p. ej. el ritmo de una póliza nueva) con su incertidumbre.
+
+Trabajas con **control de calidad** contra la verdad del DGP (`attr(cartera, "verdad")`): ajusta **a
+ciegas** y valida **al final**, comprobando si recuperas los efectos y parámetros conocidos. Y cuidas la
+**reproducibilidad**: cuaderno Quarto con semilla fija, código y datos documentados y reejecutables.
+
+::: {.callout-important}
+## El factor prohibido
+`sexo` tiene señal real, pero la ley (primas unisex) **prohíbe** usarlo para tarificar. Tu informe debe
+(i) **no** incluirlo en el modelo de tarificación, (ii) **contrastar** qué variables permitidas son
+*proxies* —no basta sospecharlo: es un contraste de **independencia condicional** en una tabla, ver
+[2.6](#sec-u22-proxy)—, (iii) **cuantificar la fuga** que queda por ese canal, y (iv) razonar cómo
+harías una selección **responsable**. Es parte de la nota (reflexión individual).
+
+Que exista un proxy no implica que haya que eliminar la variable: si tiene efecto causal propio,
+quitarla sacrifica poder predictivo legítimo. Lo que se te exige es que la decisión sea **explícita y
+cuantificada**, no un descuido.
+:::
+
+::: {.callout-tip}
+## Cada equipo, una cartera distinta
+Cada equipo trabaja **su propia cartera**, generada con una configuración diferente —pero coherente— del
+DGP (`R/generar_datos_equipos_auto.R`, en `datos_equipos_auto/equipo_XX/`). El enunciado es común;
+las conclusiones numéricas cambian de un equipo a otro. La cartera de teoría se carga con
+`cargar_cartera_auto()`; la de tu equipo, desde su carpeta.
+:::
+
+## 8.2 Checklist de tareas {#sec-u28-checklist}
+
+Un guion de mínimos (no exhaustivo; el orden es orientativo). No hace falta agotar cada apartado: prioriza
+según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
+
+- **Exploración y exposición.** Descriptivo de las cuatro respuestas (media, % de ceros, máximo, var/media)
+  y de la exposición. Justifica el *offset* `log(exposicion)`: modelas **tasas**, no recuentos brutos.
+
+- **Ritmo y perfiles (Q1–Q3 · 2.1).** Poisson con *offset* e interpretación en **IRR** (Q1); **predicción**
+  del ritmo de una póliza nueva **con intervalo** (Q2); compara la estructura de riesgo de `n_siniestros`
+  frente a `n_asistencia` —¿mismos factores, misma fuerza?— (Q3).
+
+- **Asociación y cambio (Q4–Q5 · [2.2](#sec-u22)).** Cruza `tipo_vehiculo`, `zona_circulacion` y
+  `combustible` con *tener o no* siniestro —son **cuatro** factores: recórrelos **por orden de
+  interacción**, no enumerando modelos—, fija el orden máximo necesario, poda dentro de él y traduce el
+  modelo final a **enunciados de independencia condicional**, justificándolo por LRT/AIC y con el
+  **recuento de gl**; compara el OR **marginal** con el **condicional** y razona la
+  **colapsabilidad** (Q4). Sobre la **tabla cuadrada** `bonus_malus_prev` →
+  `bonus_malus_act`: **simetría**, **cuasi-simetría** y **homogeneidad marginal** como diferencia entre
+  ambas, magnitud y sentido de la **deriva**, y aprovechamiento del **orden** de los niveles con la
+  **asociación uniforme** (1 gl frente a 16) más un término de **inercia** de la diagonal si aporta (Q5).
+  Diagnostica con **residuos ajustados** y **mosaico**, y comprueba la ocupación de las celdas antes de
+  interpretar cualquier $p$-valor.
+
+- **Variabilidad y ceros (Q6–Q8 · 2.3–2.4).** Diagnostica la **sobredispersión** (var/media, dispersión) y
+  compara **quasi-Poisson** vs **binomial negativa**, explicando el efecto en errores estándar e inferencia
+  —y en la tarifa— (Q6); razona el origen como **heterogeneidad no observada** (OLRE / fragilidad), enlazando
+  con los mixtos y la supervivencia (Q7); sobre `n_fraude`, distingue **ceros estructurales** de muestrales y
+  compara **hurdle** vs **zero-inflated**, interpretando las **dos partes** (Q8).
+
+- **Agencias y territorio (Q9–Q12 · 2.5).** GLMM de Poisson `(1 | id_agencia)` con **región** por encima
+  (anidamiento); estima el **ICC** / porcentaje de varianza de agencia (Q9–Q10); identifica agencias
+  **atípicas** con BLUPs / *caterpillar* y comenta el **shrinkage** (Q11); distingue predicción
+  **condicional** vs **marginal** y responde qué esperar de una **agencia nueva** (Q12).
+
+- **El riesgo en el tiempo (Q13–Q15 · 2.6).** Riesgos a trozos ≡ Poisson sobre el **persona-periodo**;
+  describe el **hazard base** por tramo de antigüedad y compáralo con **Kaplan–Meier / Cox** (Q13); con el
+  **panel** y el **historial**, plantea los **eventos recurrentes** (Andersen–Gill) con *offset* variable y
+  discute si el riesgo del 2.º, 3.º… siniestro difiere del primero (Q14, avanzado); traduce el hazard en una
+  **recomendación** de cada cuánto revisar (Q15).
+
+- **Modelo fiable y responsable (Q16–Q19 · 2.7 y [2.2](#sec-u22)).** Compara **AIC/BIC**, **validación
+  cruzada** y **regularización** (lasso); entrega un modelo **corto y fiable** y justifica qué variables
+  conservas (Q16). **Fairness:** excluye `sexo` del modelo de tarificación y razona una selección
+  **responsable** (Q17). Y **detecta los proxies formalmente** (Q18): contrasta la **independencia
+  condicional** entre `sexo` y cada covariable permitida, distingue las que sí lo son de las que no —hay
+  controles negativos— y **mide la fuga** comparando el efecto **marginal** de `sexo` con el **ajustado**
+  por el proxy. Lleva la conclusión a la reflexión individual: ¿qué haces con esa variable, y a qué coste?
+  Cierra con el **control de calidad** (Q19): reajusta al menos una asociación por dos vías —log-lineal
+  saturado y logística— y comprueba que los odds ratios coinciden; explica por qué **deben** coincidir y
+  qué habrías concluido si no lo hicieran.
+
+- **Control de calidad y reproducibilidad.** Valida contra `attr(cartera, "verdad")` (ajuste a ciegas,
+  validación al final); cuaderno Quarto con **semilla fija**, reejecutable; interpretación en la **escala
+  correcta** en todo el informe.
+
+## 8.3 Rúbricas {#sec-u28-rubricas}
+
+Las rúbricas están en la **guía docente (§7.4)** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se
+reproducen aquí.

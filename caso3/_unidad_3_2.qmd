@@ -90,7 +90,7 @@ que no depende de convenios de cálculo ni de correcciones de escala—. Aun as�
 alternativas: el objetivo de la unidad no es solo acertar, es **saber comparar**.
 
 ::: {.callout-tip}
-## Más allá de la Gamma: familias positivas (y a medida) en `glm()`
+## 🔧 En R. Más allá de la Gamma — familias positivas (y a medida) en `glm()`
 La Gamma es la primera respuesta para una continua positiva, pero no la única —y elegir entre ellas es el
 asunto de esta unidad—. Conviene tener a la vista el **mapa completo** de lo que ofrece el marco.
 
@@ -98,7 +98,7 @@ asunto de esta unidad—. Conviene tener a la vista el **mapa completo** de lo q
 `inverse.gaussian()`, con $\operatorname{Var}\propto\mu^{3}$: la misma idea (media positiva, dispersión
 relativa creciente) pero con una **cola aún más pesada**, apropiada cuando la asimetría es extrema. Su
 enlace canónico es $1/\mu^{2}$, aunque también admite `log` e `identity`. Cuál encaja mejor con el coste
-—Gamma frente a inversa gaussiana— es lo que resolvemos enseguida (@sec-u32-ig).
+—Gamma frente a inversa gaussiana— es lo que resolvemos enseguida ([Sección 2.2](#sec-u32-ig)).
 
 **Sin comprometerse con una distribución completa.** Si solo confías en la **relación media–varianza** y
 no en toda la forma distribucional, `quasi(link = ..., variance = "mu^2")` (o `"mu^3"`, `"constant"`…)
@@ -117,7 +117,7 @@ que quieres fijar.
 **Y una que no es familia `glm`.** La **lognormal** no se ajusta como GLM, sino como un lineal gaussiano
 sobre `log(coste_euros)`. Parece equivalente al enlace log, pero **no lo es** —modela la media del
 logaritmo, no el logaritmo de la media—, y devolver las predicciones a euros esconde una trampa que
-abordamos en la @sec-u32-lognormal.
+abordamos en la [Sección 2.3](#sec-u32-lognormal).
 :::
 
 ## 2.2 Inversa gaussiana {#sec-u32-ig}
@@ -275,6 +275,26 @@ Con ese término —y solo con él— los tres AIC quedan en la **misma escala**
 corregir, la lognormal parece ganar por miles de puntos: es puro artefacto de escala.
 :::
 
+::: {.callout-tip}
+## 🔧 En R. Comparar AIC entre modelos sobre respuestas distintas
+`AIC()` **no** sirve para enfrentar el log-OLS con los GLM: cada `logLik` se calcula en la escala en que se
+ajustó el modelo (`log Y` frente a `Y`) y `AIC()` la toma tal cual. Hay que llevar la log-verosimilitud del
+log-OLS **a euros** a mano:
+
+```r
+ll_ln  <- as.numeric(logLik(m_ln)) - sum(log(base$coste_euros))  # + jacobiano del cambio y -> log y
+gl_ln  <- attr(logLik(m_ln), "df")                               # nº de parámetros (incluye sigma)
+aic_ln <- -2 * ll_ln + 2 * gl_ln                                 # ya comparable con AIC(m_gam), AIC(m_ig)
+```
+
+- **`logLik(m)`** devuelve la log-verosimilitud; `as.numeric()` la extrae como número suelto.
+- El término **`- sum(log(y))`** es el jacobiano de $y\mapsto\log y$: sin él, la lognormal «gana» por miles
+  de puntos —puro artefacto de escala—.
+- **`attr(logLik(m), "df")`** da los grados de libertad (los parámetros que `AIC()` contaría por dentro).
+- La Gamma y la inversa gaussiana **sí** se comparan entre sí con `AIC()` directamente: ya viven en la misma
+  escala (euros).
+:::
+
 ```{r}
 #| label: tbl-u32-aic
 #| tbl-cap: "Comparación de las tres familias por AIC en la escala del euro. Se muestra además el AIC de la lognormal SIN el jacobiano, para ilustrar lo engañoso de compararlo tal cual."
@@ -330,7 +350,7 @@ $\hat\phi$ (en torno a **0,33**) **dobla** su valor verdadero (**0,17**); ningun
 arregla eso, porque no es un problema de **familia** sino de **estructura**. Sobra variabilidad porque las
 averías se **agrupan por máquina** —cada máquina aporta varias, correlacionadas— y el modelo no lo sabe.
 Es la misma señal que ya vimos inflar $\hat\phi$ en la 3.1 y asomar en la dispersión de la
-@sec-u32-dispersion. Cambiar la forma de la distribución no puede resolver un problema de dependencia;
+[Sección 2.4](#sec-u32-dispersion). Cambiar la forma de la distribución no puede resolver un problema de dependencia;
 para eso hacen falta los **efectos aleatorios** de la [Unidad 3.3](#sec-u33).
 
 ::: {.callout-important}

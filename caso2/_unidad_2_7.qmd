@@ -1,194 +1,580 @@
-<!-- Partial · Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML.
-     Espejo de la Unidad 1.6: encargo de consultoría + datos + checklist. Rúbricas en la guía.
-     Estudio de caso del Caso 2 sobre la CARTERA DE AUTO (dgp_auto.R). La misma cartera se
-     reutiliza como ESTUDIO DE CASO del Caso 3 (coste y duración) → síntesis "tres lentes".
-     Nota: la TEORÍA del Caso 3 usa un banco industrial distinto; la cartera de auto vuelve
-     solo en el proyecto del estudiante. -->
+<!-- Partial · Incluir con {{< include _unidad_2_7.qmd >}}. Sin YAML. Chunks u27-.
+     Capstone de selección: de AIC/BIC a la validación cruzada y la regularización.
+     Se trabaja sobre la Poisson limpia (n_asistencia) de la cartera auto, que ya trae
+     predictores de ruido "para que el lasso tenga qué descartar". Validación contra el DGP. -->
 
-# 7 · Estudio de caso, exposición y evaluación {#sec-u27}
+# 7 · Selección, validación cruzada y regularización {#sec-u27}
+
+Hasta aquí, cada vez que hemos tenido que **elegir** entre modelos —qué predictores entran, si añadir un
+término, qué familia— nos hemos apoyado en criterios que se calculan sobre **los mismos datos con los que
+ajustamos**: la *deviance*, la razón de verosimilitudes, el AIC y el BIC. Son criterios *in-sample*: miran
+lo bien que el modelo reproduce la muestra que ya ha visto. El problema es que un modelo puede reproducir su
+propia muestra cada vez mejor cuantos más parámetros le demos —hasta memorizarla— sin por ello **predecir**
+mejor una póliza nueva. Esta unidad da dos pasos para separar *ajustar bien* de *predecir bien*. Primero, la
+**validación cruzada**: en lugar de penalizar la complejidad con una fórmula (el `2k` del AIC), estimamos el
+error de predicción **fuera de la muestra**, dejando fuera parte de los datos y prediciéndolos. Segundo, la
+**regularización** —*ridge*, *lasso* y *elastic-net*—, que en vez de elegir modelos uno a uno **encoge** los
+coeficientes hacia cero y, en el caso del *lasso*, pone algunos **exactamente** a cero: selección y ajuste en
+una sola pasada. Cerramos comprobando que es la **misma máquina** que ya usamos en la logística del Caso 1:
+solo cambia la familia.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Cierre del Caso 2: estudio de caso de **conteos, tasas e intensidad del riesgo** sobre una cartera de
-auto, con exposición y Q&A individual. No hay teoría nueva; se integra y evalúa todo lo anterior.
-Objetivo general: **comunicar y reproducir** (estudio de caso reproducible), de forma acumulativa sobre
-los hilos de conteos, mixtos y supervivencia. Esta **misma cartera** vuelve como **estudio de caso del
-Caso 3** (coste de los siniestros y duración de la póliza): lo que aquí modelas como *frecuencia* será
-una de las **tres lentes** del cliente.
+Objetivo general: **conteos y tasas** — comparar y seleccionar modelos de Poisson pasando de los criterios
+*in-sample* (AIC/BIC) a la evaluación *out-of-sample* (**validación cruzada**) y a la **regularización**
+(*ridge*/*lasso*/*elastic-net*, con `glmnet` sobre la familia Poisson). Es el eco, en la escala de la tasa,
+de lo que en el Caso 1 hacíamos con la *deviance* y el AUC *in-sample*.
 :::
 
-## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
+<!-- ============================================================================
+     ESQUEMA:
+       7.1 De la selección clásica a la validación cruzada (AIC/BIC -> CV k-fold; sesgo-varianza).
+       7.2 Regularización: ridge, lasso y elastic-net (glmnet Poisson + cv.glmnet; lasso = selección;
+           validación contra la "verdad" del DGP).
+       7.3 La misma máquina en la binaria (glmnet family="binomial"; nota Gamma -> Caso 3).
+============================================================================ -->
 
-### El encargo
+Trabajaremos sobre la respuesta **limpia** de la cartera, `n_asistencia` (la Poisson bien portada de la
+[Unidad 2.1](#sec-u21)), con su *offset* de exposición. La elegimos a propósito: sin sobredispersión ni
+exceso de ceros de por medio, aislamos el fenómeno de esta unidad —**qué variables conservar**—. Y la
+cartera es el banco de pruebas ideal porque, junto a los predictores que **de verdad** mueven la tasa, trae
+un bloque de variables de **ruido** (sexo, color del vehículo, forma de pago…) que el DGP generó **sin
+relación** con las respuestas, precisamente para que tengamos algo que descartar y podamos **comprobar contra
+la verdad** si lo descartamos bien.
 
-Te contrata la **dirección técnica** de una **aseguradora de automóvil**, que gestiona su cartera a
-través de una red de **agencias**. No son estadísticos: te traen sus datos y sus preguntas, y esperan
-**respuestas y recomendaciones** para tarificar y planificar, no una clase de modelos. Como en el
-Caso 1, tú **eliges y justificas** el modelo en cada caso.
+```{r}
+#| label: u27-datos
+# Predictores del riesgo (activos en el DGP) + bloque de ruido (relación nula por diseño).
+activos <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo",
+             "zona_circulacion", "uso", "tipo_vehiculo")
+ruido   <- c("sexo", "estado_civil", "color_vehiculo", "tiene_garaje", "forma_pago",
+             "financiado", "km_declarados", "valor_vehiculo", "n_conductores", "antiguedad_cliente")
+predictores <- c(activos, ruido)
 
-> **Lo que la dirección quiere saber**
->
-> *Sobre el ritmo de siniestros y qué lo explica*
->
-> 1. ¿A qué **ritmo** tienen siniestros nuestras pólizas, y qué factores lo suben o lo bajan —y **cuánto**?
-> 2. ¿Podríais estimar el ritmo esperado, **con su margen**, de una **póliza nueva** de un perfil concreto?
-> 3. Las **asistencias en carretera**, ¿siguen el mismo patrón de riesgo que los siniestros, o responden a
->    otras cosas?
-> 4. ¿Están **asociados** el tipo de vehículo, la zona y el uso con tener o no algún siniestro, o son
->    **independientes** entre sí?
-> 5. Reevaluamos el **bonus-malus** cada año: ¿cómo se mueven las pólizas de un nivel a otro? ¿Es un vaivén
->    equilibrado o hay **deriva** (empeoran más de las que mejoran)?
->
-> *Sobre la enorme variabilidad y los ceros*
->
-> 6. Unas pocas pólizas concentran **muchísimos partes** y la mayoría casi ninguno. ¿Vuestro modelo refleja
->    esa variabilidad o se queda corto? ¿Qué implica para la **tarifa** y para lo fiables que son vuestros
->    números?
-> 7. ¿A qué se debe esa variabilidad de más: hay pólizas **intrínsecamente más siniestrosas** que las
->    variables no capturan?
-> 8. La mayoría de reclamaciones **nunca pasa por revisión antifraude**. ¿Hay pólizas que por su naturaleza
->    **no la levantan**, frente a otras que aún no lo han hecho? ¿Cómo las distinguimos?
->
-> *Sobre las agencias y el territorio*
->
-> 9. ¿El volumen de **gestiones** depende de la **agencia** que lleva la póliza, o es cosa de la propia
->    póliza? ¿**Cuánta** variación es atribuible a la agencia?
-> 10. ¿Hay un efecto de **región** por encima de las agencias?
-> 11. ¿Qué agencias se **desvían** —mejor o peor de lo que cabría esperar por su cartera—?
-> 12. Si abrimos una **agencia nueva**, ¿qué deberíamos esperar?
->
-> *Sobre cómo evoluciona el riesgo en el tiempo*
->
-> 13. ¿Cómo cambia el riesgo del **primer siniestro** a lo largo de la antigüedad de la póliza? ¿Sube, baja,
->     se mantiene?
-> 14. Con el **historial completo** de partes, ¿el riesgo de los **siguientes** siniestros se comporta como
->     el del primero, o distinto?
-> 15. ¿Cada cuánto conviene **revisar** a las pólizas de más riesgo?
->
-> *Sobre un modelo sencillo, fiable y responsable*
->
-> 16. Manejamos **muchísimas variables**: ¿cuáles merece la pena **conservar** para anticipar la
->     siniestralidad, sin perder fiabilidad?
-> 17. Tenemos el **sexo** del conductor y sabemos que predice, pero la ley **prohíbe** tarificar con él:
->     ¿cómo hacéis una selección que lo **respete** y no lo cuele por la puerta de atrás (proxies)?
+cartera |> dplyr::select(n_asistencia, exposicion, dplyr::all_of(predictores)) |> dplyr::glimpse()
+```
 
-<!-- Mapa docente (no revelar al alumno). Cada pregunta -> unidad + técnica:
-     Q1 Poisson + offset + IRR (2.1) · Q2 predicción con intervalo para un perfil nuevo (2.1) ·
-     Q3 comparar dos respuestas de tasa (n_siniestros vs n_asistencia): estructuras de riesgo distintas (2.1) ·
-     Q4 tablas de contingencia / log-lineal: asociación vs independencia (2.1) ·
-     Q5 tabla cuadrada: simetría / homogeneidad marginal / movilidad / deriva (2.1) ·
-     Q6 sobredispersión: quasi-Poisson vs binomial negativa; efecto en errores estándar e inferencia (2.2) ·
-     Q7 heterogeneidad no observada: OLRE / fragilidad — puente 2.2<->2.4<->2.5 ·
-     Q8 exceso de ceros: hurdle vs zero-inflated; las dos partes (2.3) ·
-     Q9 GLMM de Poisson; ICC; % de varianza de agencia (2.4) ·
-     Q10 anidamiento región > agencia (efectos aleatorios cruzados/anidados) (2.4) ·
-     Q11 BLUPs / caterpillar; shrinkage; agencias atípicas (2.4) ·
-     Q12 predicción condicional vs marginal; agencia nueva (2.4) ·
-     Q13 riesgos a trozos ≡ Poisson; hazard base por tramo; comparación Cox/KM (2.5) ·
-     Q14 eventos recurrentes (Andersen-Gill) sobre el PANEL, con offset variable (2.5, callout avanzado) ·
-     Q15 recomendación operativa a partir del hazard (2.5) ·
-     Q16 selección: AIC/BIC vs validación cruzada vs regularización/lasso (2.6) ·
-     Q17 fairness: factor PROHIBIDO (sexo, Test-Achats) y proxies en la selección (2.6).
-     El coste (Gamma/IG) y la baja (AFT/Cox) NO entran aquí: son el estudio de caso del Caso 3. -->
+## 7.1 De la selección clásica a la validación cruzada {#sec-u27-cv}
 
-### Los datos que te proporcionamos
+### Ajustar bien no es predecir bien
 
-Como los datos son **simulados** (con proceso generador conocido), podrás validar tus estimaciones
-contra la verdad. Cada fila es una **póliza**, observada durante su `antiguedad` en la cartera. La
-**exposición** entra como *offset* (`offset = log(exposicion)`): los partes se leen **por unidad de
-tiempo expuesto**, no en bruto.
+Un modelo tiene dos errores muy distintos. Uno es lo bien que reproduce **la muestra con la que se ajustó**
+—su *deviance* de entrenamiento—; el otro, lo bien que predeciría **una póliza que nunca ha visto**. Solo el
+segundo importa para tarificar al cliente que entra mañana, y no coinciden: añadiendo predictores, el primero
+**siempre** mejora (o al menos no empeora), aunque esos predictores sean puro ruido, porque el ajuste puede
+usar sus fluctuaciones muestrales para pegarse un poco más a los datos. A ese espejismo se le llama
+**optimismo** del error *in-sample*, y es la razón por la que la *deviance* de entrenamiento, sola, no sirve
+para elegir: premiaría siempre al modelo más grande.
 
-| Papel | Variables |
-|---|---|
-| Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (tiempo expuesto como fracción del cliente más veterano → *offset*); `antiguedad` (años en la cartera) |
-| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia) |
-| Predictores de riesgo | `edad_conductor`; `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
-| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Úsalo para **discutir** *fairness* y variables *proxy*, no para el modelo final |
-| Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
-| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
-| Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
+Se ve en una línea. Ajustemos el modelo con solo los predictores activos y el modelo que además mete **todo**
+el ruido, y comparemos sus *deviances* de entrenamiento:
 
-Hay **más variables de las que necesitarás**: algunas son ruido, a propósito, para que ejercites la
-selección y decidas qué entra en el modelo.
+```{r}
+#| label: u27-optimismo
+f_activos <- reformulate(c(activos, "offset(log(exposicion))"), response = "n_asistencia")
+f_todo    <- reformulate(c(predictores, "offset(log(exposicion))"), response = "n_asistencia")
 
-::: {.callout-note}
-## La misma cartera, tres lentes
-Esta cartera lleva además el **coste** de cada siniestro y el **tiempo hasta la baja** de la póliza
-(`coste_total`, `coste_medio`, la tabla de siniestros con `attr(cartera, "siniestros")`, y `t_baja`,
-`baja`). No los necesitas para el Caso 2 —aquí modelas **frecuencia**—, pero son las otras dos lentes
-(¿**cuánto** cuesta? ¿**cuánto** dura?) que retomarás en el **estudio de caso del Caso 3**.
-:::
+m_activos <- glm(f_activos, family = poisson, data = cartera)
+m_todo    <- glm(f_todo,    family = poisson, data = cartera)
 
-### Tu trabajo
+c(dev_activos = deviance(m_activos), dev_todo = deviance(m_todo),
+  gl_activos = m_activos$df.residual, gl_todo = m_todo$df.residual)
+```
 
-Entregas un **informe de consultoría reproducible**. Para **cada** pregunta sigues el mismo ciclo que en
-el Caso 1: **identifica el objetivo** (qué te preguntan de verdad), **propón y justifica** el análisis
-(qué modelo y por qué, frente a alternativas), **resuélvelo**, **interprétalo en la escala correcta**
-(IRR, efectos marginales, probabilidades) y **recomienda** en términos que la dirección entienda. Cuando
-proceda, **predice** (p. ej. el ritmo de una póliza nueva) con su incertidumbre.
+La *deviance* del modelo con ruido es **menor** (ajusta «mejor»), aunque sabemos —porque conocemos el DGP—
+que esas variables no aportan nada. Ha gastado grados de libertad en modelar azar. Necesitamos un criterio
+que **cobre** por esa complejidad.
 
-Trabajas con **control de calidad** contra la verdad del DGP (`attr(cartera, "verdad")`): ajusta **a
-ciegas** y valida **al final**, comprobando si recuperas los efectos y parámetros conocidos. Y cuidas la
-**reproducibilidad**: cuaderno Quarto con semilla fija, código y datos documentados y reejecutables.
+La respuesta clásica a la pregunta «¿es **real** ese descenso?» es el **test de la razón de verosimilitudes**
+(LRT). Como los modelos están **anidados** —`m_activos` es `m_todo` con los 14 coeficientes del ruido puestos a
+cero—, la diferencia de *deviances* se distribuye, bajo la hipótesis nula de que **todos** esos coeficientes son
+cero, como una $\chi^2$ con tantos grados de libertad como parámetros de más (aquí, los 14 del bloque de ruido).
+`anova()` lo calcula:
 
-::: {.callout-important}
-## El factor prohibido
-`sexo` tiene señal real, pero la ley (primas unisex) **prohíbe** usarlo para tarificar. Tu informe debe
-(i) **no** incluirlo en el modelo de tarificación, (ii) comentar el riesgo de **proxies** —variables
-permitidas que lo correlacionan (p. ej. tipo de vehículo o potencia)— y (iii) razonar cómo harías una
-selección **responsable**. Es parte de la nota (reflexión individual).
-:::
+```{r}
+#| label: u27-lrt
+anova(m_activos, m_todo, test = "LRT")
+```
+
+Con datos generados sin relación con el ruido, el descenso **no supera** lo que 14 parámetros extra compran por
+azar —aquí, una caída de *deviance* de $\approx 18$ sobre $14$ grados de libertad, con $p \approx 0.22$—, así que
+el test **no rechaza**: no hay evidencia de que esas variables pertenezcan al modelo, justo lo que dice el DGP.
+Fíjate en que el LRT es, en el fondo, **otra forma de cobrar por la
+complejidad**: no mira el descenso a secas, sino si **supera** el umbral de una $\chi^2_{14}$; esa misma idea
+—descenso de *deviance* frente a número de parámetros— es la que el AIC convierte en un cargo fijo de $2$ por
+coeficiente. Pero el LRT tiene tres límites que son, exactamente, los que empujan hacia lo que sigue: exige
+modelos **anidados** (no compara dos modelos cualesquiera), responde a «¿hay **asociación**?» y no a «¿predice
+**mejor** fuera de la muestra?», y **no escala** a rastrear entre decenas de predictores. Para eso necesitamos
+estimar el error de predicción **directamente**.
+
+### El apaño analítico: AIC y BIC
+
+La primera respuesta, la que ya usábamos en el Caso 1, es **penalizar analíticamente** el número de
+parámetros. El AIC [@akaike1974] suma a la *deviance* un cargo de $2k$ por los $k$ parámetros; el BIC
+[@schwarz1978] cobra $k\log n$, más caro cuando $n$ es grande, así que tiende a modelos más pequeños. Ambos
+convierten «ajusta mejor» en «ajusta mejor **descontando** lo que cuesta»:
+
+```{r}
+#| label: u27-aic-bic
+tibble::tibble(
+  modelo = c("solo activos", "activos + ruido"),
+  gl     = c(length(coef(m_activos)), length(coef(m_todo))),
+  AIC    = c(AIC(m_activos), AIC(m_todo)),
+  BIC    = c(BIC(m_activos), BIC(m_todo)))
+```
+
+Con el cargo por complejidad, el modelo **sin ruido** gana en ambos: su *deviance* es un pelín mayor, pero no
+paga por los catorce coeficientes inútiles del bloque de ruido. AIC y BIC son rápidos y, para comparar unos pocos modelos anidados,
+suficientes. Tienen dos límites que motivan lo que sigue. Primero, son una **aproximación**: valen bajo el
+modelo y el tamaño muestral adecuados, y estiman el error de predicción de forma indirecta, vía la
+verosimilitud. Segundo, y más importante en la práctica, **no escalan a la búsqueda**: si hay 17 predictores
+—o 170—, comparar todos los subconjuntos por AIC es inviable, y la selección paso a paso (`step()`) explora
+solo una fracción y hereda los problemas de la inferencia tras seleccionar. Queremos estimar el error de
+predicción **directamente** y, después, un método que **no tenga que enumerar** modelos.
+
+### La validación cruzada: medir el error donde importa
+
+La idea de la **validación cruzada** [@stone1974] es tan simple como honesta: si lo que importa es predecir
+datos nuevos, **escondamos** algunos, ajustemos sin ellos y midamos el error al predecirlos. En la variante
+de $k$ *bloques* (*k-fold*), partimos la cartera en $k$ trozos; por turnos, uno hace de test y los otros
+$k-1$ de entrenamiento; cada póliza se predice **exactamente una vez**, siempre con un modelo que **no la vio**.
+El error de predicción es el promedio sobre los $k$ turnos. Como estamos en Poisson, la métrica natural no es
+el error cuadrático sino la **deviance de Poisson** por observación (dos veces la log-verosimilitud que le
+falta a la predicción), que es la misma vara con la que ajustamos.
+
+**¿Cuántos bloques?** La elección de $k$ es, ella misma, un compromiso sesgo–varianza, pero esta vez sobre la
+**estimación del error**, no sobre el modelo. Con $k = n$ —validación cruzada *dejando uno fuera* (LOOCV)— el
+estimador es casi insesgado pero **muy variable** y caro de calcular; con $k$ pequeño ($2$ o $3$) es barato pero
+**sesga el error al alza**, porque cada modelo se entrena con una fracción mucho menor de los datos. La
+bibliografía [@james2021; @hastie2009] recomienda, como término medio, **$k = 5$ o $k = 10$**, que es la
+elección estándar. Aquí usamos **$k = 10$** en todo el capítulo (también en `cv.glmnet`, vía `nfolds = 10`).
+
+**¿Cómo lo resolvemos sobre estos datos?** Repartimos las $n$ pólizas en $10$ bloques del mismo tamaño con una
+asignación **aleatoria** —fijando la semilla del curso, para que sea reproducible—; cada bloque hace de test una
+vez, entrenando con los otros nueve; predecimos el bloque de test **arrastrando su *offset*** y acumulamos su
+deviance; al final promediamos por observación. Un apunte sobre la métrica, que resuelve una duda razonable:
+la `deviance(fit)` que devuelve un modelo ajustado es la de **entrenamiento** —mide el ajuste sobre las mismas
+filas que lo entrenaron—, y lo que necesitamos es la deviance sobre las filas **que el modelo no vio**, que el
+objeto ajustado no guarda; por eso la evaluamos nosotros sobre el bloque de test. Pero **no reinventamos la
+fórmula**: reutilizamos la definición de deviance de la **propia familia**, `poisson()$dev.resids(y, mu, w)`,
+que es exactamente la que R suma por dentro para producir `deviance(fit)` —solo que aplicada a la `y` de test
+frente a la `mu` predicha—.
+
+```{r}
+#| label: u27-cv-funcion
+# Deviance de Poisson OUT-OF-SAMPLE = deviance de la familia aplicada a (y de test, mu predicha).
+# poisson()$dev.resids(y, mu, w) da las contribuciones a la deviance que R suma en deviance(fit);
+# aquí las sumamos sobre las filas que el modelo NO vio. No hay que rehacer la fórmula a mano.
+dev_poisson <- function(y, mu) sum(poisson()$dev.resids(y, mu, wt = 1))
+
+# Validación cruzada de k = 10 bloques para un glm de Poisson con offset. Devuelve la deviance
+# de predicción (out-of-sample) por observación.
+cv_deviance <- function(formula, datos, k = 10, semilla = SEMILLA_CURSO) {
+  set.seed(semilla)
+  bloque <- sample(rep(seq_len(k), length.out = nrow(datos)))  # partición aleatoria en k bloques
+  dev_test <- 0
+  for (b in seq_len(k)) {
+    ent <- datos[bloque != b, ]; test <- datos[bloque == b, ]  # entrena con k-1 bloques, evalúa en el b
+    fit <- glm(formula, family = poisson, data = ent)
+    mu  <- predict(fit, newdata = test, type = "response")     # incluye el offset
+    dev_test <- dev_test + dev_poisson(test$n_asistencia, mu)
+  }
+  dev_test / nrow(datos)      # deviance de predicción por observación
+}
+```
+
+```{r}
+#| label: u27-cv-comparar
+f_nulo <- n_asistencia ~ offset(log(exposicion))
+tibble::tibble(
+  modelo       = c("nulo", "solo activos", "activos + ruido"),
+  cv_deviance  = c(cv_deviance(f_nulo, cartera),
+                   cv_deviance(f_activos, cartera),
+                   cv_deviance(f_todo, cartera)))
+```
+
+La lectura es la clave de toda la unidad. El modelo **nulo** predice mal: no usa información. El de
+**activos** baja claramente la *deviance* de predicción: esos predictores **generalizan**. Y el de **activos +
+ruido** ya **no mejora** —normalmente empeora un poco— respecto al de activos: el ruido ayudaba *dentro* de la
+muestra (bajaba la *deviance* de entrenamiento) pero **no fuera**. La validación cruzada ve lo que el AIC
+aproximaba y la *deviance* de entrenamiento escondía. La misma cuenta, hecha a mano aquí para que se vea el
+mecanismo, la da `boot::cv.glm(datos, fit, K = 10)` pasándole una función de coste; preferimos el bucle
+explícito porque deja claro que **el offset viaja con la predicción** y que la métrica es la *deviance*.
 
 ::: {.callout-tip}
-## Cada equipo, una cartera distinta
-Cada equipo trabaja **su propia cartera**, generada con una configuración diferente —pero coherente— del
-DGP (`R/generar_datos_equipos_auto.R`, en `datos_equipos_auto/equipo_XX/`). El enunciado es común;
-las conclusiones numéricas cambian de un equipo a otro. La cartera de teoría se carga con
-`cargar_cartera_auto()`; la de tu equipo, desde su carpeta.
+## 🔧 En R. Validación cruzada de un GLM
+- **Bucle k-fold a mano** — se parte con `sample(rep(seq_len(k), length.out = n))`, se ajusta el `glm`
+  sobre `k-1` bloques y se predice el restante con `predict(fit, newdata = test, type = "response")`; el
+  ***offset* viaja solo** en la predicción (va escrito en la fórmula).
+- **Métrica out-of-sample** — no reinventes la deviance: reutiliza la de la familia,
+  `poisson()$dev.resids(y, mu, wt = 1)`, con la `y` de test y la `mu` predicha. Es lo que R suma por
+  dentro para `deviance(fit)`, pero evaluado en las filas que el modelo **no vio**.
+- **Versión de paquete** — `boot::cv.glm(datos, fit, K = 10, cost = ...)` hace lo mismo pasándole una
+  función de coste; el bucle explícito solo se prefiere aquí por transparencia.
 :::
 
-## 7.2 Checklist de tareas {#sec-u27-checklist}
+::: {.callout-note}
+## El compromiso sesgo–varianza, en una frase
+Un modelo **demasiado simple** (el nulo) tiene mucho **sesgo**: se deja fuera estructura real y predice mal
+por sistema. Uno **demasiado complejo** (con ruido) tiene mucha **varianza**: se ajusta a fluctuaciones que no
+se repiten, y predice mal de forma inestable. La *deviance* de entrenamiento solo ve el sesgo y por eso siempre
+pide más complejidad; la validación cruzada ve **la suma de los dos** y por eso tiene un mínimo en el punto
+medio. Todo lo que viene ahora —la regularización— es una forma de **movernos por ese eje** de manera continua,
+sin tener que enumerar modelos.
+:::
 
-Un guion de mínimos (no exhaustivo; el orden es orientativo). No hace falta agotar cada apartado: prioriza
-según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
+Antes de seguir, un puente con el Caso 1. Allí evaluábamos la clasificación con el **AUC** y la calibración, y
+lo hacíamos, casi siempre, **sobre la misma muestra del ajuste**: un AUC *in-sample* optimista, igual que esta
+*deviance* de entrenamiento. Todo lo de esta sección se traslada tal cual a aquella logística: la forma honesta
+de comparar clasificadores es el **AUC (o la *log-loss*) validado en k bloques**. Cambia la métrica —AUC en vez
+de *deviance* de Poisson—; el andamiaje de partir, ajustar sin ver y predecir es idéntico.
 
-- **Exploración y exposición.** Descriptivo de las cuatro respuestas (media, % de ceros, máximo, var/media)
-  y de la exposición. Justifica el *offset* `log(exposicion)`: modelas **tasas**, no recuentos brutos.
+## 7.2 Regularización: *ridge*, *lasso* y *elastic-net* {#sec-u27-reg}
 
-- **Ritmo y perfiles (Q1–Q5 · 2.1).** Poisson con *offset* e interpretación en **IRR** (Q1); **predicción**
-  del ritmo de una póliza nueva **con intervalo** (Q2); compara la estructura de riesgo de `n_siniestros`
-  frente a `n_asistencia` —¿mismos factores, misma fuerza?— (Q3); **tabla de contingencia** y modelo
-  **log-lineal** para asociación vs independencia entre `tipo_vehiculo`, `zona_circulacion` y `uso` (Q4);
-  **tabla cuadrada** `bonus_malus_prev` → `bonus_malus_act` con contrastes de **simetría** y **homogeneidad
-  marginal** y medida de la **deriva** (Q5).
+La validación cruzada nos dice **cuál** de un puñado de modelos predice mejor, pero sigue exigiendo que
+alguien proponga esos modelos. Con muchos predictores eso no escala. La **regularización** cambia de estrategia:
+en vez de elegir entre modelos discretos, ajusta **uno solo** pero le añade a la función objetivo un **castigo
+por coeficientes grandes**, y luego usa la validación cruzada solo para graduar **cuánto** castigar. En lugar
+de encender y apagar variables, las **encoge**.
 
-- **Variabilidad y ceros (Q6–Q8 · 2.2–2.3).** Diagnostica la **sobredispersión** (var/media, dispersión) y
-  compara **quasi-Poisson** vs **binomial negativa**, explicando el efecto en errores estándar e inferencia
-  —y en la tarifa— (Q6); razona el origen como **heterogeneidad no observada** (OLRE / fragilidad), enlazando
-  con los mixtos y la supervivencia (Q7); sobre `n_fraude`, distingue **ceros estructurales** de muestrales y
-  compara **hurdle** vs **zero-inflated**, interpretando las **dos partes** (Q8).
+### Encoger para predecir mejor
 
-- **Agencias y territorio (Q9–Q12 · 2.4).** GLMM de Poisson `(1 | id_agencia)` con **región** por encima
-  (anidamiento); estima el **ICC** / porcentaje de varianza de agencia (Q9–Q10); identifica agencias
-  **atípicas** con BLUPs / *caterpillar* y comenta el **shrinkage** (Q11); distingue predicción
-  **condicional** vs **marginal** y responde qué esperar de una **agencia nueva** (Q12).
+Ajustar por máxima verosimilitud busca los $\beta$ que mejor explican la muestra. La regularización busca los
+que mejor la explican **sujeto a un presupuesto** sobre su tamaño: minimiza
 
-- **El riesgo en el tiempo (Q13–Q15 · 2.5).** Riesgos a trozos ≡ Poisson sobre el **persona-periodo**;
-  describe el **hazard base** por tramo de antigüedad y compáralo con **Kaplan–Meier / Cox** (Q13); con el
-  **panel** y el **historial**, plantea los **eventos recurrentes** (Andersen–Gill) con *offset* variable y
-  discute si el riesgo del 2.º, 3.º… siniestro difiere del primero (Q14, avanzado); traduce el hazard en una
-  **recomendación** de cada cuánto revisar (Q15).
+$$
+-\,\ell(\beta) \;+\; \lambda \, P(\beta),
+$$
 
-- **Modelo fiable y responsable (Q16–Q17 · 2.6).** Compara **AIC/BIC**, **validación cruzada** y
-  **regularización** (lasso); entrega un modelo **corto y fiable** y justifica qué variables conservas (Q16).
-  **Fairness:** excluye `sexo` del modelo de tarificación, detecta posibles **proxies** y razona una selección
-  **responsable** (Q17).
+donde $-\ell(\beta)$ es la *deviance* (el desajuste) y $P(\beta)$ un **castigo** que crece con la magnitud de
+los coeficientes. El parámetro $\lambda \ge 0$ marca el precio del castigo: con $\lambda = 0$ recuperamos la
+máxima verosimilitud de siempre; según sube, los coeficientes se **encogen** hacia cero. ¿Por qué habría de
+predecir mejor un ajuste **sesgado a propósito**? Por el compromiso de antes: encoger introduce algo de sesgo
+pero **recorta mucha varianza**, y en predicción esa permuta casi siempre sale a cuenta —sobre todo con
+predictores **correlacionados** o **numerosos**, donde la máxima verosimilitud reparte coeficientes grandes y de
+signo inestable—.
 
-- **Control de calidad y reproducibilidad.** Valida contra `attr(cartera, "verdad")` (ajuste a ciegas,
-  validación al final); cuaderno Quarto con **semilla fija**, reejecutable; interpretación en la **escala
-  correcta** en todo el informe.
+La forma del castigo define tres métodos:
 
-## 7.3 Rúbricas {#sec-u27-rubricas}
+- **Ridge** [@hoerl1970] castiga la suma de **cuadrados**, $P(\beta)=\sum_j \beta_j^2$ (norma $L_2$). Encoge todos
+los coeficientes de forma continua hacia cero, pero **nunca los hace exactamente cero**: reparte, no elige. Es
+el mejor cuando muchos predictores aportan un poco y están correlacionados.
 
-Las rúbricas están en la **guía docente (§7.4)** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se
-reproducen aquí.
+- **Lasso** [@tibshirani1996] castiga la suma de **valores absolutos**, $P(\beta)=\sum_j |\beta_j|$ (norma $L_1$).
+Su geometría —de esquinas— hace que, al apretar, algunos coeficientes lleguen a **cero exacto**: el *lasso*
+**selecciona** variables mientras ajusta. Es lo que buscamos aquí: un modelo **corto** que diga qué conservar.
+
+- **Elastic-net** [@zou2005] **mezcla** ambos, $P(\beta)=\alpha\sum_j|\beta_j| + (1-\alpha)\sum_j \beta_j^2$, con
+$\alpha \in [0,1]$ ($\alpha=1$ es *lasso* puro; $\alpha=0$, *ridge* puro). Combina lo mejor de los dos: selecciona
+como el *lasso* pero, ante un grupo de predictores correlacionados, tiende a **quedarse con el grupo** en vez de
+elegir caprichosamente uno solo, que es una conocida inestabilidad del *lasso*.
+
+::: {.callout-tip}
+## Por qué el $L_1$ pone ceros y el $L_2$ no
+Piensa en el presupuesto como una región alrededor del origen dentro de la cual deben caer los coeficientes. Con
+*ridge* esa región es una **circunferencia** (suave): la solución la toca, casi siempre, en un punto con **todas**
+las coordenadas distintas de cero. Con *lasso* la región es un **rombo** con **vértices sobre los ejes**: la
+solución tiende a tocarlo en un **vértice**, y un vértice tiene coordenadas nulas. Esa esquina es, literalmente,
+la que convierte «encoger» en «seleccionar».
+:::
+
+### `glmnet` sobre la Poisson
+
+El paquete **`glmnet`** [@friedman2010] ajusta estos modelos para toda la familia GLM, la Poisson incluida, y
+lo hace para **toda una rejilla de $\lambda$ a la vez** (la *ruta de regularización*) de forma muy eficiente.
+Tres detalles de su uso, distintos de `glm()`:
+
+1. `glmnet` no toma una fórmula, sino una **matriz de diseño** `x` (sin intercepto: lo maneja aparte) y un vector
+respuesta `y`. Construimos `x` con `model.matrix()`, que expande los factores en indicadores. 
+2. El *offset* de la
+exposición no va dentro de `x`: se pasa por el argumento **`offset`**. 
+3. Y, por defecto, `glmnet`
+**estandariza** internamente los predictores antes de penalizar —imprescindible, porque el castigo depende de la
+escala: sin estandarizar, castigaría más a `km_declarados` (miles) que a `potencia_cv` (decenas) por el mero
+hecho de venir en unidades distintas—.
+
+```{r}
+#| label: u27-glmnet-matriz
+library(glmnet)
+x  <- model.matrix(reformulate(predictores), data = cartera)[, -1]  # quita el intercepto
+y  <- cartera$n_asistencia
+os <- log(cartera$exposicion)                                       # offset de la exposición
+dim(x)
+```
+
+Ajustamos la ruta *lasso* completa ($\alpha = 1$) y miramos cómo entra cada coeficiente según relajamos el
+castigo (de $\lambda$ grande, todo a cero, a $\lambda$ pequeño, casi la máxima verosimilitud):
+
+```{r}
+#| label: fig-u27-ruta-lasso
+#| fig-width: 8
+#| fig-height: 5
+#| fig-cap: "Ruta de regularización del lasso Poisson. Cada curva es un coeficiente según log(lambda); a la derecha (lambda grande) todos valen cero, y van entrando —en orden de importancia— al relajar el castigo. Los primeros en aparecer son los predictores con más señal."
+fit_lasso <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)
+plot(fit_lasso, xvar = "lambda", label = TRUE)
+```
+
+Los coeficientes que **entran antes** (con más castigo todavía puesto) son los de más señal; los que solo
+aparecen cuando $\lambda$ es ya muy pequeño son los prescindibles. La ruta ordena los predictores por su
+aportación **a la predicción**, no por su significación *in-sample*.
+
+### Elegir $\lambda$: `cv.glmnet`
+
+La ruta ofrece un modelo por cada $\lambda$; falta decidir **cuál**. Y aquí se cierra el círculo con la
+Sección 7.1: elegimos el $\lambda$ por **validación cruzada**, con la *deviance* de Poisson como métrica.
+`cv.glmnet` hace exactamente eso —parte en k bloques, recorre la rejilla y promedia la *deviance*
+*out-of-sample*—:
+
+```{r}
+#| label: fig-u27-cvglmnet
+#| fig-width: 8
+#| fig-height: 5
+#| fig-cap: "Validación cruzada del lasso Poisson: deviance out-of-sample (± 1 error estándar) frente a log(lambda). La línea de puntos izquierda marca lambda.min (mínimo error); la derecha, lambda.1se (el modelo más parsimonioso a un error estándar del mínimo). Los números de arriba son el nº de coeficientes no nulos."
+set.seed(SEMILLA_CURSO)
+cv_lasso <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
+                      type.measure = "deviance", nfolds = 10)
+plot(cv_lasso)
+c(lambda_min = cv_lasso$lambda.min, lambda_1se = cv_lasso$lambda.1se)
+```
+
+La curva tiene el mínimo que anticipaba el compromiso sesgo–varianza. `cv.glmnet` marca dos $\lambda$ de
+referencia: **`lambda.min`**, el del error mínimo, y **`lambda.1se`**, el mayor $\lambda$ (modelo más simple)
+cuyo error queda **a un error estándar** del mínimo. La regla del `1se` es la que suele usarse para
+**seleccionar**: entre dos modelos estadísticamente indistinguibles en predicción, se queda con el más corto —la
+navaja de Occam, cuantificada—.
+
+::: {.callout-tip}
+## 🔧 En R. Regularizar con `glmnet` y `cv.glmnet`
+```r
+x   <- model.matrix(reformulate(predictores), data)[, -1]        # matriz de diseño, sin intercepto
+fit <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)  # ruta (alpha: 1=lasso, 0=ridge)
+cv  <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
+                 type.measure = "deviance", nfolds = 10)          # elige lambda por CV
+coef(cv, s = "lambda.1se")                                       # coeficientes en ese lambda (0 = descartada)
+```
+
+- **No usa fórmula**: toma una **matriz** `x` (`model.matrix(...)[, -1]`, sin intercepto) y un vector `y`;
+  los factores se expanden en indicadores.
+- **El *offset* va aparte**, en el argumento `offset =` (no dentro de `x`). `glmnet` **estandariza** los
+  predictores por defecto antes de penalizar —imprescindible: el castigo depende de la escala—.
+- **`alpha`** fija la penalización (1 lasso, 0 ridge, intermedio elastic-net); **`family`** la
+  distribución (`"poisson"`, `"binomial"`, `"cox"`…).
+- **`cv.glmnet`** recorre la rejilla de $\lambda$ y marca dos de referencia: **`lambda.min`** (error
+  mínimo) y **`lambda.1se`** (el modelo más parco a un EE del mínimo). `coef(cv, s = "lambda.1se")` extrae
+  esos coeficientes.
+:::
+
+### El *lasso* como selección: ¿acierta con la verdad?
+
+Veamos qué predictores **retiene** el *lasso* en cada $\lambda$ de referencia. Como el modelo es de Poisson con
+enlace log, exponenciar cada coeficiente lo lleva a la escala de la **razón de tasas (IRR)** de la
+[Unidad 2.1](#sec-u21): el factor por el que se multiplica la tasa de asistencias:
+
+```{r}
+#| label: u27-lasso-coef
+#| output: asis
+coef_1se <- coef(cv_lasso, s = "lambda.1se")
+coef_min <- coef(cv_lasso, s = "lambda.min")
+
+retenidas <- function(coefs) {
+  m <- as.matrix(coefs); nz <- rownames(m)[m[, 1] != 0]
+  setdiff(nz, "(Intercept)")
+}
+
+# Imprime, para cada lambda, la lista de variables retenidas (con su número).
+lista_retenidas <- function(nombre, vars) {
+  cat("**`", nombre, "`** — ", length(vars), " variables retenidas:\n\n", sep = "")
+  cat(paste0("- `", vars, "`"), sep = "\n")
+  cat("\n\n")
+}
+lista_retenidas("lambda.1se", retenidas(coef_1se))
+lista_retenidas("lambda.min", retenidas(coef_min))
+```
+
+```{r}
+#| label: u27-lasso-irr
+# Coeficientes no nulos del modelo 1se, en escala IRR (exp del coeficiente).
+m1 <- as.matrix(coef_1se)
+tibble::tibble(termino = rownames(m1), coef = m1[, 1]) |>
+  dplyr::filter(coef != 0, termino != "(Intercept)") |>
+  dplyr::mutate(IRR = exp(coef)) |>
+  dplyr::arrange(dplyr::desc(abs(coef)))
+```
+
+Ahora el **control de calidad contra el DGP**, que es lo que hace honesta a toda la unidad. Sabemos la verdad:
+la tasa de `n_asistencia` la generan los **siete predictores activos** —con enlace log y estos coeficientes
+sobre las variables tipificadas— y **nada** del bloque de ruido:
+
+```{r}
+#| label: u27-verdad
+verdad <- attr(cartera, "verdad")
+tibble::tibble(termino = verdad$nombres_beta, beta = verdad$betas$limpio) |>
+  dplyr::mutate(IRR = exp(beta))
+```
+
+::: {.callout-tip}
+## Cómo (no) comparar la tabla estimada con la de la verdad
+Es tentador poner las dos tablas lado a lado y leerlas **fila a fila**, pero no son comparables número a número,
+por tres motivos:
+
+- **La escala.** Los coeficientes verdaderos van sobre los predictores **tipificados** (`z_edad`, `z_pot`…: cada
+  uno es el efecto de **una desviación típica**), mientras que `glmnet` devuelve los suyos en las **unidades
+  originales** (por año de edad, por CV de potencia). Así, el `IRR ≈ 0.997` estimado para `edad_conductor` es «por
+  año», y no se compara con el `0.861` de la verdad, que es «por SD» (unos 14 años): elevado a esa desviación
+  típica, el estimado ronda `0.95`, y lo que aún falta hasta `0.86` es **encogimiento**.
+- **La categoría de referencia.** La verdad toma *rural* como base (urbana y mixta suman **sobre ella**), mientras
+  que `model.matrix()` toma *urbana*, así que los indicadores estimados (`zona…mixta`, `zona…rural`) miden **otros
+  contrastes**. Alinear `urbana` con `zona…mixta` sería comparar cosas distintas.
+- **El sesgo del lasso.** En `lambda.1se` los coeficientes están **encogidos a propósito** hacia cero (IRR hacia
+  $1$), de modo que serán, por construcción, más planos que los verdaderos.
+
+Para cotejar **magnitudes** de tú a tú habría que **tipificar** los predictores antes de `glmnet` (o leer sus
+coeficientes estandarizados) y usar la misma categoría de referencia. Lo que **sí** se lee sin más es el **signo**
+—los tres predictores del `1se` lo llevan **correcto**: edad y antigüedad de carnet bajan la tasa, la potencia la
+sube, igual que en la verdad— y, sobre todo, la **selección**: qué variables entran y cuáles no. Eso último es lo
+que esta sección quiere validar.
+:::
+
+Contrastando las tablas aparece algo más interesante que un acierto limpio —y por eso conviene enunciarlo al
+alumno como resultado a **verificar**, no a creer—: los dos criterios de $\lambda$ **fallan la diana por lados
+opuestos**. El `lambda.1se`, muy exigente, se queda con un modelo **cortísimo** —en este ajuste, solo
+`edad_conductor`, `antiguedad_carnet` y `potencia_cv`, con coeficientes tan encogidos que sus IRR apenas se
+despegan de $1$— y en el camino **suelta incluso efectos verdaderos y fuertes**, como la zona urbana o el uso
+comercial, que en la tabla de la verdad están entre los mayores. El `lambda.min`, más generoso, retiene una
+**quincena** de términos: recupera casi todos los activos (zona, uso, tipo de vehículo, antigüedad del vehículo)
+pero **ya cuela ruido** —color, valor del vehículo, kilómetros, antigüedad del cliente—. Ninguno de los dos
+reproduce la verdad (siete grupos activos, cero ruido): el `1se` peca de **simple** y sacrifica estructura real;
+el `min` peca de **generoso** y admite azar. La verdad queda **en medio**.
+
+Y nada de esto es un fallo del método —es su carácter, y merece explicarse—. Primero, el *lasso* no selecciona
+por «ser verdad» sino por **aportar a la predicción**, y aquí la señal es **débil**: la *deviance* de validación
+apenas baja de $\approx 0.97$ (modelo nulo) a $\approx 0.94$ (activos). Con tan poco que ganar, el `1se` prefiere
+un modelo minúsculo y estable a rescatar efectos que solo mejoran la predicción de forma marginal. Segundo, los
+efectos **categóricos** entran troceados en varios indicadores (la zona en dos, el tipo en dos) y cada trozo,
+penalizado por separado, carga menos señal que un predictor continuo que la concentra en un único coeficiente: de
+ahí que los continuos sobrevivan antes. Es, en el fondo, la diferencia entre **significación** y **relevancia
+predictiva** hecha operativa, y la razón por la que **elegir $\lambda$ es una decisión con consecuencias**, no un
+trámite: el `1se` cuando quieres un modelo **corto y conservador**; el `min` cuando priorizas **no perder**
+predictores, a costa de admitir alguno de más.
+
+### *Ridge*, *lasso* y *elastic-net*, comparados
+
+Cerramos la sección viendo los tres en la misma cartera. El `1se` de cada uno, evaluado por validación cruzada,
+nos dice cuánto encoge cada penalización y cuántas variables deja vivas:
+
+```{r}
+#| label: u27-tres-penalizaciones
+set.seed(SEMILLA_CURSO)
+cv_ridge <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0,   type.measure = "deviance", nfolds = 10)
+cv_enet  <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0.5, type.measure = "deviance", nfolds = 10)
+
+n_no_nulos <- function(cvfit) sum(as.matrix(coef(cvfit, s = "lambda.1se"))[, 1] != 0) - 1
+tibble::tibble(
+  metodo          = c("ridge (a=0)", "elastic-net (a=0.5)", "lasso (a=1)"),
+  dev_cv_1se      = c(cv_ridge$cvm[cv_ridge$index["1se", ]],
+                      cv_enet$cvm[cv_enet$index["1se", ]],
+                      cv_lasso$cvm[cv_lasso$index["1se", ]]),
+  variables_vivas = c(n_no_nulos(cv_ridge), n_no_nulos(cv_enet), n_no_nulos(cv_lasso)))
+```
+
+El *ridge* deja **todas** las variables vivas —las 23— y solo las encoge: no sirve para seleccionar, aunque en
+predicción pura suele ser competitivo y es el más estable con predictores muy correlacionados. El *lasso* y el
+*elastic-net* recortan al mismo puñado (**3** términos). Las tres *deviances* de validación quedan **pegadas**
+(en torno a $0.95$–$0.96$), con el *elastic-net* rozando la menor: con señal tan débil **ninguna penalización
+domina** en predicción, y la elección se juega más en la **parsimonia** y la **interpretabilidad**. En general el
+*elastic-net* es la apuesta por defecto cuando sospechas **grupos** de predictores correlacionados y quieres
+selección **sin** la volatilidad del *lasso* puro (que ante un grupo tiende a quedarse con uno solo, al azar). La
+validación cruzada es el árbitro, no el gusto —pero cuando declara un empate técnico, es legítimo quedarse con el
+modelo más **corto y explicable**.
+
+::: {.callout-warning}
+## Un coeficiente encogido no tiene el error estándar de siempre
+La regularización compra predicción a cambio de **sesgo deliberado**, y con ello se lleva por delante la
+inferencia clásica: `glmnet` **no** da errores estándar, valores $p$ ni intervalos de confianza para sus
+coeficientes, y estaría **mal** calcularlos como si el modelo se hubiera fijado de antemano. La razón es la
+**inferencia tras la selección**: hemos usado los datos para **elegir** las variables *y* para **estimarlas**,
+así que los intervalos ingenuos serían demasiado estrechos. Si lo que necesitas es un IRR con su intervalo para
+**informar** —no solo predecir—, el patrón habitual es de **dos etapas**: usar el *lasso* para **seleccionar**
+las variables y luego reajustar un `glm()` clásico **solo con las seleccionadas** para la inferencia (sabiendo
+que sigue siendo optimista), o recurrir a métodos de inferencia post-selección. Regularizar es una herramienta
+de **predicción y cribado**, no de contraste.
+:::
+
+## 7.3 La misma máquina en la binaria {#sec-u27-binomial}
+
+Todo lo anterior no es de la Poisson: es de los **GLM**. `glmnet` regulariza cualquier familia sin más que
+cambiar el argumento `family`, con el mismo `x`, la misma `cv.glmnet` y la misma lectura del `lambda.1se`. Para
+comprobarlo, volvamos un momento al Caso 1 y regularicemos una **logística**: modelamos si la póliza tuvo algún
+siniestro (`evento`) con los mismos predictores, ahora con `family = "binomial"` —y sin *offset*, porque en la
+logística no hay exposición que descontar—:
+
+```{r}
+#| label: u27-binomial
+set.seed(SEMILLA_CURSO)
+cv_bin <- cv.glmnet(x, cartera$evento, family = "binomial",
+                    type.measure = "deviance", alpha = 1, nfolds = 10)
+
+# Nº de predictores retenidos en cada criterio (la señal binaria de 'evento' es débil).
+n_sel <- function(s) sum(as.matrix(coef(cv_bin, s = s))[, 1] != 0) - 1L
+c(no_nulos_1se = n_sel("lambda.1se"), no_nulos_min = n_sel("lambda.min"))
+```
+
+```{r}
+#| label: u27-binomial-min
+# Coeficientes que sobreviven a lambda.min, en escala ODDS RATIO (exp del coeficiente).
+m_bin <- as.matrix(coef(cv_bin, s = "lambda.min"))
+tibble::tibble(termino = rownames(m_bin), coef = m_bin[, 1]) |>
+  dplyr::filter(coef != 0, termino != "(Intercept)") |>
+  dplyr::mutate(odds_ratio = exp(coef)) |>          # en binomial, exp(coef) es un ODDS RATIO
+  dplyr::arrange(dplyr::desc(abs(coef)))
+```
+
+Cambia la métrica de la lectura —en la logística `exp(coef)` es un **odds ratio**, no una razón de tasas— y la
+familia; el resto es idéntico. Con estos datos la señal binaria de `evento` es tan débil que el criterio
+**`1se` se queda en el modelo nulo** (cero predictores): un recordatorio de que el `1se` es conservador y de que,
+cuando apenas hay señal, «no seleccionar nada» es una respuesta legítima. Relajando a `lambda.min` reaparecen los
+predictores de la **probabilidad** de siniestro —la misma máquina que en la Poisson elegía predictores de la
+**tasa** de asistencias—, y con el **mismo peaje** que allí: entre los retenidos vuelve a colarse algo de
+**ruido** (aquí el color del vehículo, que incluso encabeza la tabla), fiel al carácter generoso del `min`. Y con
+`type.measure = "auc"` la validación cruzada usaría directamente el **AUC**, cerrando del todo el puente con la
+evaluación de clasificadores del Caso 1, ahora sí *out-of-sample*.
+
+::: {.callout-tip}
+## 🔧 En R. Qué familias cubre `glmnet` (y cuál no)
+`glmnet` regulariza `gaussian` (lineal), `binomial` (logística), `poisson` (conteos/tasas), `multinomial`,
+`mgaussian` y `cox` (supervivencia). Cubre, por tanto, los dos primeros casos del curso y el nexo de
+supervivencia de la [Unidad 2.6](#sec-u26). **No** trae la familia **Gamma**, que será el corazón del Caso 3
+(continuas positivas): allí la regularización se tratará de forma **conceptual**, o con extensiones fuera de
+`glmnet`. La idea —*deviance* + castigo, $\lambda$ por validación cruzada— es la misma sea cual sea la familia.
+:::
+
+::: {.callout-important}
+## Tarea del estudiante (2.7) — Preguntas 16 y 17 del caso
+Sobre **la cartera de tu equipo**, la dirección pide un modelo **sencillo, fiable y responsable** para anticipar
+la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.8](#sec-u28)). Con `n_siniestros` y su
+*offset* de exposición:
+
+1. **Selección (P16).** Compara, por **validación cruzada** (*deviance* de Poisson en 10 bloques), el modelo
+   nulo, uno con los predictores que a priori consideres «del riesgo» y el modelo con **todas** las variables.
+   Contrástalo con **AIC** y **BIC**, y comenta las discrepancias.
+2. **Regularización (P16).** Ajusta un **Poisson regularizado** con `cv.glmnet` (*lasso*; prueba también *ridge*
+   y *elastic-net*). Presenta la **ruta de regularización** y la **curva de validación cruzada**, y **justifica**
+   tu elección de $\lambda$ (`min` frente a `1se`).
+3. **Modelo final (P16).** **Qué variables retiene** el *lasso* y qué **IRR** tienen. Interpreta las dos o tres
+   más relevantes en términos que la dirección entienda («la zona urbana multiplica por … la tasa de siniestros»).
+4. **Fairness (P17).** `sexo` predice, pero es **factor prohibido** (primas unisex, *Test-Achats*): **exclúyelo**
+   de la tarifa, detecta posibles **proxies** —variables permitidas que lo correlacionan— y razona una selección
+   **responsable**.
+5. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
+   activos** y **descarta el ruido**. Discute los **activos débiles**: ¿los retiene? ¿Por qué la selección por
+   predicción no coincide exactamente con la verdad, y por qué eso **no** es un error del método?
+
+Entrega, como siempre, un cuaderno **reproducible** (semilla fija) y ajusta **a ciegas**: mira la verdad solo al
+final, para validar.
+:::
+
+Con esto cerramos el recorrido teórico del Caso 2: de la Poisson y las tasas ([2.1](#sec-u21)) a la
+sobredispersión ([2.3](#sec-u23)) y el exceso de ceros ([2.4](#sec-u24)), de los conteos agrupados
+([2.5](#sec-u25)) al hazard como tasa ([2.6](#sec-u26)), y ahora a **elegir y encoger** modelos con validación
+cruzada y regularización. La [Unidad 2.8](#sec-u28) no añade teoría: pone todo esto a trabajar sobre una cohorte
+sanitaria, en un informe de consultoría donde tú decides —y justificas— qué modelo responde cada pregunta.

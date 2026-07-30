@@ -4,33 +4,38 @@
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_1.qmd.
 # Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
 #
-# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM; localiza
-# la raíz por _quarto.yml y resuelve solo las rutas del DGP y de la caché.
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
+#
+# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
+# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
 # =============================================================================
 
-# --- Librerías (idénticas al setup del documento del caso) -------------------
+.raiz <- getwd()
+while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
+if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
+
+# --- Preámbulo del caso (librerías y datos, como en el documento) ------------
+# Núcleo.
 library(broom)
 library(tidyverse)
-library(MASS)          # glm.nb
+library(MASS)          # glm.nb (base-recommended)
 library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos
-library(MuMIn); library(glmnet)
-library(vcdExtra)      # zero-inflated
+library(survival)      # riesgos a trozos (base-recommended)
+library(MuMIn); library(glmnet)   # selección / regularización 
+library(vcd)           # mosaicos para tablas de contingencia (2.2)
+library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
-# --- Datos: cartera de auto (misma llamada que el documento del caso) --------
-# Localiza la raíz del proyecto (donde está _quarto.yml), sea cual sea el wd:
-.raiz <- getwd()
-while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)
-if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")
-source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))  # simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
-cartera <- cargar_cartera("auto")    # lee datos/ si existe; si no (o si cambió el DGP), simula y cachea
+source(file.path(.raiz, "caso2", "R", "dgp_conteos.R"))            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+glimpse(cartera)
 
 # -----------------------------------------------------------------------------
 # [fig-u21-exposicion]  ·  1.1 Contexto: qué problemas resuelve este modelo
@@ -45,7 +50,7 @@ cartera |>
   labs(x = "exposición (fracción de la antigüedad máxima)", y = "media de partes por daños")
 
 # -----------------------------------------------------------------------------
-# [tbl-u21-contingencia]  ·  1.1 Contexto: qué problemas resuelve este modelo
+# [tbl-u21-contingencia]  ·  La variable exposicion: cuánto tiempo llevamos con el cliente
 # -----------------------------------------------------------------------------
 cartera |>
   mutate(danos = ifelse(n_danos > 0, "con daños", "sin daños")) |>
@@ -54,18 +59,18 @@ cartera |>
   mutate(pct_con_danos = round(`con daños` / (`con daños` + `sin daños`) * 100))
 
 # -----------------------------------------------------------------------------
-# [tbl-u21-cambio]  ·  1.1 Contexto: qué problemas resuelve este modelo
+# [tbl-u21-cambio]  ·  La variable exposicion: cuánto tiempo llevamos con el cliente
 # -----------------------------------------------------------------------------
 addmargins(table(previo = cartera$bonus_malus_prev, actual = cartera$bonus_malus_act))
 
 # -----------------------------------------------------------------------------
-# [tbl-u21-cambio-marg]  ·  1.1 Contexto: qué problemas resuelve este modelo
+# [tbl-u21-cambio-marg]  ·  La variable exposicion: cuánto tiempo llevamos con el cliente
 # -----------------------------------------------------------------------------
 rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
       actual = prop.table(table(cartera$bonus_malus_act))) |> round(3)
 
 # -----------------------------------------------------------------------------
-# [fig-u21-eda-modelo]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
+# [fig-u21-eda-modelo]  ·  🔧 En R. Ajustar un Poisson, el offset y el log-lineal > Aplicado a los cuatro problemas del contexto
 # -----------------------------------------------------------------------------
 dplyr::bind_rows(
   purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
@@ -82,14 +87,14 @@ dplyr::bind_rows(
   labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
-# [u21-fit-conteo]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
+# [u21-fit-conteo]  ·  🔧 En R. Ajustar un Poisson, el offset y el log-lineal > Aplicado a los cuatro problemas del contexto
 # -----------------------------------------------------------------------------
 m_conteo <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo,
                 family = poisson, data = cartera)
 broom::tidy(m_conteo)
 
 # -----------------------------------------------------------------------------
-# [u21-fit-tasa]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
+# [u21-fit-tasa]  ·  🔧 En R. Ajustar un Poisson, el offset y el log-lineal > Aplicado a los cuatro problemas del contexto
 # -----------------------------------------------------------------------------
 m_tasa <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                 offset(log(exposicion)),
@@ -97,7 +102,7 @@ m_tasa <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + u
 broom::tidy(m_tasa)
 
 # -----------------------------------------------------------------------------
-# [u21-fit-loglineal]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
+# [u21-fit-loglineal]  ·  🔧 En R. Ajustar un Poisson, el offset y el log-lineal > Aplicado a los cuatro problemas del contexto
 # -----------------------------------------------------------------------------
 tabla <- cartera |>
   dplyr::mutate(danos = ifelse(n_danos > 0, "con", "sin")) |>
@@ -110,7 +115,7 @@ m_sat   <- glm(n ~ zona_circulacion * danos, family = poisson, data = tabla)  # 
 cbind(tabla, indep = round(fitted(m_indep), 1), sat = round(fitted(m_sat), 1))
 
 # -----------------------------------------------------------------------------
-# [u21-fit-simetria]  ·  1.2 Modelización y estimación > Aplicado a los cuatro problemas del contexto
+# [u21-fit-simetria]  ·  🔧 En R. Ajustar un Poisson, el offset y el log-lineal > Aplicado a los cuatro problemas del contexto
 # -----------------------------------------------------------------------------
 cuad <- as.data.frame(table(prev = cartera$bonus_malus_prev, act = cartera$bonus_malus_act)) |>
   dplyr::mutate(i = as.integer(prev), j = as.integer(act),
@@ -140,7 +145,7 @@ perfiles <- data.frame(edad_conductor = 45, potencia_cv = 110,
 predict(m_tasa, perfiles, type = "response")   # esperadas: urbana vs rural
 
 # -----------------------------------------------------------------------------
-# [u21-loglin-or]  ·  1.3 Interpretación > En el log-lineal: la asociación
+# [u21-loglin-or]  ·  🔧 En R. Leer IRR y predecir tasas > En el log-lineal: la asociación
 # -----------------------------------------------------------------------------
 m_logit <- glm(I(n_danos > 0) ~ zona_circulacion, family = binomial, data = cartera)
 exp(coef(m_logit))   # odds ratios de 'con daños' respecto a la zona de referencia
@@ -183,13 +188,14 @@ simulateResiduals(m_tasa, plot = TRUE)      # residuos escalados; QQ y dispersi�
 performance::check_overdispersion(m_tasa)   # test formal del índice de dispersión
 
 # -----------------------------------------------------------------------------
-# [u21-sobredispersion]  ·  1.5 Bondad de ajuste, diagnóstico y predicción > El puente a la sobredispersión (Unidad 2.2)
+# [u21-sobredispersion]  ·  🔧 En R. Diagnóstico de dispersión y residuos en un Poisson > El puente a la sobredispersión (Unidad 2.3)
 # -----------------------------------------------------------------------------
 m_danos <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                  offset(log(exposicion)), family = poisson, data = cartera)
 c(asistencia = disp(m_tasa), danos = disp(m_danos))
 
 # -----------------------------------------------------------------------------
-# [u21-pred-celda]  ·  1.5 Bondad de ajuste, diagnóstico y predicción > Predicción
+# [u21-pred-celda]  ·  🔧 En R. Diagnóstico de dispersión y residuos en un Poisson > Predicción
 # -----------------------------------------------------------------------------
 transform(tabla, esperado_indep = round(fitted(m_indep), 1))   # observado (n) vs esperado si independientes
+

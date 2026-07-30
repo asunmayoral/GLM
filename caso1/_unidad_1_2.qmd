@@ -560,6 +560,21 @@ pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
         plot.subtitle = element_text(size = 8.5))
 ```
 
+:::: {.callout-tip}
+## 🔧 En R. Odds ratios, probabilidades y efectos marginales
+Tres escalas de lectura, cada una con su herramienta:
+
+- **Odds ratios con intervalo** — `broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)`, o a mano
+  `exp(cbind(OR = coef(m), confint(m)))`. `confint()` da el IC por **perfil de verosimilitud** (más fiable
+  que Wald); que el IC del OR no contenga el **1** equivale a que el de $\beta$ no contenga el 0.
+- **Probabilidades predichas** — `predict(m, newdata, type = "response")` da $\hat\pi$; con
+  `type = "link", se.fit = TRUE` se obtiene $\hat\eta$ y su error, y el IC se construye en la escala del
+  enlace y **se pasa por la sigmoide** (`plogis`) —nunca sumando ± en probabilidad—.
+- **Efecto marginal medio (AME)** — `marginaleffects::avg_slopes(m)`: el efecto en **puntos de
+  probabilidad**, casi invariante al enlace. `marginaleffects::predictions()` / `emmeans` dan
+  probabilidades por perfil. El **OR** comunica la fuerza del efecto; el **AME**, su impacto absoluto.
+::::
+
 ## 2.4 Estimación: máxima verosimilitud e IWLS {#sec-u12-iwls}
 
 A diferencia de OLS, **no hay fórmula cerrada** para $\hat{\boldsymbol\beta}$: se maximiza

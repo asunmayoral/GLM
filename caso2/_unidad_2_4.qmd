@@ -1,560 +1,591 @@
 <!-- Partial · DRAFT. Incluir con {{< include _unidad_2_4.qmd >}}. Sin YAML. Chunks u24-. -->
 
-# 4 · Conteos agrupados: modelos mixtos {#sec-u24}
+# 4 · Demasiados ceros {#sec-u24}
 
-En el Caso 1 ya usamos **efectos aleatorios** para datos agrupados; ahora los llevamos a los
-**conteos** y damos un paso más: el **anidamiento**. Las pólizas de la cartera no son independientes: se
-**agrupan por agencia**, y las agencias, a su vez, en **regiones** —una jerarquía anidada, región →
-agencia → póliza—. Cada nivel tramita los siniestros a su propio ritmo. Ignorar esa estructura —tratarla
-como una Poisson corriente—
-subestima los errores estándar (igual que la sobredispersión) y, sobre todo, impide responder a
-preguntas de negocio: *¿cuánto del ritmo depende de la agencia y cuánto de la póliza? ¿qué agencias se
-desvían? ¿qué esperar de una agencia nueva?*
+Aun con la binomial negativa, algunos conteos traen **más ceros de los que el azar del conteo explica**:
+apuntan a un **proceso aparte** que los genera. Es el caso de `n_fraude` en la cartera —reclamaciones
+**sometidas a revisión antifraude**—: cerca de la mitad de las pólizas registra un cero, **bastantes
+más** de los que una Poisson predeciría. Modelar bien ese cero exige distinguir **dos historias** que lo
+producen:
 
-Esta unidad es una **espiral**: reactiva los mixtos del Caso 1, ahora sobre la familia Poisson. Como es
-**un** modelo (el GLMM de Poisson con intercepto aleatorio) y no una familia de alternativas, seguimos
-el recorrido completo de la Unidad 2.1: contexto → modelización y estimación → interpretación →
-inferencia y selección → bondad de ajuste y diagnóstico.
+- **Ceros estructurales**: pólizas que **no pueden** generar el evento —no están «en riesgo»—, como un
+  asegurado que nunca cometería fraude. Un proceso aparte las fija en cero, pase lo que pase.
+- **Ceros muestrales**: pólizas sí **en riesgo**, pero que en el periodo observado no tuvieron ningún
+  caso (podrían haberlo tenido).
+
+La Poisson y la NB **mezclan** ambos tipos, y por eso se quedan cortas cuando los estructurales
+abundan. Dos familias de modelos los separan: los **zero-inflated** (ZIP/ZINB,
+[Sección 4.2](#sec-u24-zi)) y los **hurdle** ([Sección 4.3](#sec-u24-hurdle)).
+
+Como en la Unidad 2.3, seguimos el recorrido de la 2.1 aplicado al **problema** y a la **familia**, no a
+cada modelo: primero **qué es y cómo se identifica** (§4.1), luego un **bloque breve por modelo**
+(§4.2–4.3) y al final la **comparación y selección** (§4.4). Empezamos por **detectar** el exceso.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **mixtos** (espiral) — extender la Poisson a datos **agrupados y anidados**
-(interceptos aleatorios por región y agencia), interpretar los **componentes de varianza** (σ², ICC) y
-distinguir la media **condicional** de la **marginal**.
+Objetivo general: **Conteos y tasas** — modelar el **exceso de ceros** con modelos *hurdle* y
+*zero-inflated* (ZIP/ZINB); interpretar y comparar.
 :::
 
-## 4.1 Qué es y de dónde viene: el agrupamiento {#sec-u24-contexto}
+## 4.1 Qué es, de dónde viene y cómo se identifica {#sec-u24-ceros}
 
-La respuesta `n_gestiones` cuenta las gestiones de siniestro de cada póliza, tramitadas a través de su
-**agencia**; y las 30 agencias se reparten en **6 regiones**. En el margen `n_gestiones` parecía casi
-bien portada (var/media ≈ 1.2), pero esconde esa jerarquía: su ritmo varía **entre regiones** y, dentro
-de cada región, **entre agencias**. Lo vemos representando la tasa de gestiones de cada agencia,
-agrupada por su región:
+### La huella: más ceros de los que el modelo espera
+
+El síntoma se ve directo: comparar los ceros **observados** con los que **predice** el modelo. Ajustamos
+una Poisson a `n_fraude` y contamos cuántos ceros espera frente a los que hay:
 
 ```{r}
-#| label: fig-u24-anidamiento
-#| fig-cap: "Tasa de gestiones (por unidad de exposición) de cada agencia (puntos), agrupadas por región; la barra marca la media de cada región y la línea discontinua, la media global. Se ven **dos niveles de variación**: las regiones se separan entre sí y, dentro de cada una, las agencias se dispersan. Es un anidamiento región → agencia → póliza."
-#| fig-width: 6.5
-#| fig-height: 4
-tasa_global <- sum(cartera$n_gestiones) / sum(cartera$exposicion)
-cartera |>
-  dplyr::group_by(area = region, agencia) |>
-  dplyr::summarise(tasa = sum(n_gestiones) / sum(exposicion), .groups = "drop") |>
-  ggplot(aes(area, tasa, colour = area)) +
-  geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.6, colour = "grey25") +
-  geom_jitter(width = 0.15, height = 0, size = 2, alpha = 0.8) +
-  labs(x = "región", y = "tasa de gestiones (por unidad de exposición)") +
-  theme(legend.position = "none")
+#| label: u24-fraude-ceros
+m_fp <- glm(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
+            family = poisson, data = cartera)
+obs0 <- mean(cartera$n_fraude == 0)     # proporción observada de ceros
+esp0 <- mean(dpois(0, fitted(m_fp)))    # proporción esperada por la Poisson
+c(observados = obs0, esperados_poisson = esp0, ratio = obs0 / esp0)
 ```
 
-Conviene detenerse en **cómo se construye** la figura. Cada **punto** es una agencia, colocada a la
-altura de su **tasa de gestiones**: el total de gestiones de sus pólizas dividido por su exposición
-total, `sum(n_gestiones) / sum(exposicion)`. Es la tasa **ponderada por exposición** —el estimador
-natural del ritmo Poisson de la agencia—, no el promedio de las tasas póliza a póliza, que con un conteo
-tan escaso estaría dominado por el ruido de las pólizas de poca cobertura. La **barra** gris de cada
-región resume sus agencias (la media de sus tasas) y la **línea discontinua**, la tasa global de la
-cartera. Así, la altura de cada punto habla de una agencia y la de cada barra, de una región.
-
-Se aprecian **dos niveles de variación**: las **regiones** se separan entre sí (sus medias, las barras,
-están a alturas distintas) y, dentro de cada una, las **agencias** se dispersan. Es un **anidamiento**:
-región → agencia → póliza. De ahí, dos consecuencias que rompen la Poisson corriente:
-
-- **Dependencia jerárquica**: dos pólizas de la misma agencia se parecen más entre sí que a las de otra;
-  y dos agencias de la misma región, más que a las de otra. La independencia que la Poisson asume falla
-  **a los dos niveles**.
-- **Sobredispersión aparente**: esa variación entre grupos, vista en el margen, **infla la varianza**.
-  Es el mecanismo del efecto aleatorio a nivel de observación (OLRE) que nombramos en la
-  [Unidad 2.2](#sec-u22) y retomamos en la [§4.6](#sec-u24-olre); pero aquí el agrupamiento es **real** y
-  **jerárquico**, no una etiqueta por fila.
-
-Ignorarlo deja los errores estándar demasiado optimistas y no permite **cuantificar** cuánto del ritmo
-es de la región, cuánto de la agencia y cuánto de la póliza, ni **predecir** el de una agencia o región
-nuevas. El **modelo mixto anidado** lo resuelve: interceptos aleatorios por **región** y por **agencia**.
-
-## 4.2 El modelo mixto de Poisson {#sec-u24-modelo}
-
-### El modelo y su estimación
-
-Para la póliza $i$ de la agencia $j$, y siendo $r(j)$ la **única** región a la que pertenece esa agencia,
-mantenemos la Poisson pero añadimos un desplazamiento aleatorio del **log-ritmo** en cada nivel de la
-jerarquía. Con log-ritmo nos referimos al **logaritmo de la tasa**, $\log(\mu_{ij}/e_{ij})$: la escala
-en la que la Poisson con enlace log es lineal —la del predictor— y en la que, por tanto, sumamos los
-efectos. Un desplazamiento $u$ en esa escala equivale a multiplicar la tasa por $\exp(u)$.
-
-$$
-Y_{ij}\mid u^{\text{reg}}_{r(j)},\,u^{\text{ag}}_{j}\ \sim\ \operatorname{Poisson}(\mu_{ij}),
-$$
-
-$$
-\log \mu_{ij}=\underbrace{\log e_{ij}}_{\text{offset}}
-+\mathbf{x}_{ij}^{\top}\boldsymbol\beta
-+u^{\text{reg}}_{r(j)}+u^{\text{ag}}_{j},
-\qquad
-u^{\text{reg}}_{r}\sim N(0,\sigma^2_{\text{reg}}),\quad
-u^{\text{ag}}_{j}\sim N(0,\sigma^2_{\text{ag}}).
-$$
-
-El índice $r(j)$ es la clave del **anidamiento**: al depender de $j$, ata cada agencia a su región y hace
-que la póliza $i$ acumule los dos desplazamientos de su rama, $u^{\text{reg}}_{r(j)}+u^{\text{ag}}_{j}$.
-
-Los **efectos fijos** $\boldsymbol\beta$ son comunes a toda la cartera. Los **efectos aleatorios** son dos
-conjuntos de desplazamientos del log-ritmo, uno por cada nivel de la jerarquía:
-
-- $u^{\text{reg}}_{r}$ — **un valor por región** (6 en total). Recoge lo que hace que una región tramite
-  por encima o por debajo de la media —cultura de siniestralidad, regulación local, composición de la
-  cartera— sin que lo midamos, y lo **comparten todas las pólizas** de esa región.
-- $u^{\text{ag}}_{j}$ — **un valor por agencia** (30 en total). Recoge la desviación propia de cada
-  agencia respecto a **su** región —gestión, carga de trabajo, criterio al abrir expedientes—, y lo
-  comparten todas las pólizas de esa agencia.
-
-No son parámetros que estimemos uno a uno, sino **variables latentes**: se suponen normales de media 0 e
-independientes entre niveles, y de cada nivel solo estimamos su **varianza** ($\sigma^2_{\text{reg}}$,
-$\sigma^2_{\text{ag}}$). En la escala de la tasa, $\exp(u)$ es el factor multiplicativo que aplican: una
-agencia con $u^{\text{ag}}_{j}>0$ tramita por encima de lo esperado para su región.
-
-En la fórmula de R el anidamiento **no se ve** en `(1 | region) + (1 | agencia)`, que trataría región y
-agencia como factores **cruzados**. Por eso se escribe `(1 | region/agencia)`, que se despliega en
-`(1 | region) + (1 | region:agencia)`: el término `region:agencia` reetiqueta cada agencia **dentro de**
-su región y es lo que materializa la jerarquía. (Aquí, al ser únicos los identificadores de agencia,
-ambas formas coincidirían numéricamente, pero `region/agencia` es la manera explícita y segura de
-declararlo.)
-
-Condicionados a esos efectos, los conteos vuelven a ser Poisson independientes: toda la dependencia
-jerárquica queda recogida en los $u$ compartidos. El `offset(log(exposicion))` conserva la lectura en
-tasa (IRR), como en la [Unidad 2.1](#sec-u21). Como los $u$ no se observan, la verosimilitud los
-**integra** (verosimilitud marginal); para la Poisson-log esa integral no tiene forma cerrada, y `glmer`
-la aproxima por Laplace (o cuadratura adaptativa de Gauss-Hermite).
+Los ceros observados (≈ 57 %) casi **doblan** a los que la Poisson espera (≈ 33 %): un ratio de $1.7$.
+El rootograma lo enseña de un vistazo —la barra del **0** se dispara y falta masa en los positivos—:
 
 ```{r}
-#| label: u24-glmm
-m_pois <- glm(
-  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)),
-  family = poisson, data = cartera
-)
-
-m_glmm <- glmer(
-  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)) + (1 | region/agencia),
-  family = poisson, data = cartera
-)
-summary(m_glmm)
-```
-
-```{r}
-#| label: u24-vc
-# Desviaciones típicas de cada nivel (escala log).
-vc <- as.data.frame(VarCorr(m_glmm))
-sd_reg <- vc$sdcor[vc$grp == "region"]
-sd_ag  <- vc$sdcor[vc$grp == "agencia:region"]
-c(sigma_region = sd_reg, sigma_agencia = sd_ag)
-```
-
-## 4.3 Interpretación {#sec-u24-interpretacion}
-
-Hay tres cosas que leer: los efectos fijos como IRR, los componentes de varianza con el ICC (coeficiente de correlación intraclase), y los
-desplazamientos de cada agencia (BLUP) con la predicción condicional frente a la marginal.
-
-### Efectos fijos: IRR condicionales
-
-::: {.callout-note}
-## Recordatorio · IRR (razón de tasas)
-Cada coeficiente vive en la escala log; al exponenciarlo se obtiene la razón de tasas (*incidence rate
-ratio*): el factor por el que se multiplica la tasa cuando el predictor aumenta en una unidad.
-
-$$\text{IRR}_k=e^{\beta_k},\qquad \text{IC}_{95\%}=e^{\beta_k\pm 1.96\,\operatorname{SE}(\beta_k)}.$$
-
-$\text{IRR}>1$ eleva la tasa, $<1$ la reduce, $=1$ no la cambia. En R: `exp(coef(m))` o, con intervalos,
-`broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)`; aquí, sobre el GLMM, lo hacemos a mano
-exponenciando los coeficientes y su error estándar.
-:::
-
-```{r}
-#| label: u24-irr
-ef <- summary(m_glmm)$coefficients
-data.frame(
-  termino   = rownames(ef),
-  IRR       = exp(ef[, "Estimate"]),
-  conf.low  = exp(ef[, "Estimate"] - 1.96 * ef[, "Std. Error"]),
-  conf.high = exp(ef[, "Estimate"] + 1.96 * ef[, "Std. Error"])
-) |>
-  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
-```
-
-Se leen igual que en la Poisson de la [Unidad 2.1](#sec-u21) —cada factor multiplica la tasa por su
-IRR—, con un matiz: ahora son **condicionales** al grupo, el efecto de la covariable *fijada la agencia y
-la región*, ya neto del nivel jerárquico. La potencia eleva el ritmo de gestiones y el uso comercial
-también; la edad lo mueve poco (revísalo en la tabla). En un GLMM de Poisson los efectos fijos conservan
-esa lectura condicional; la tasa **marginal** (promediada sobre agencias) difiere ligeramente por la no
-linealidad del enlace, algo que retomamos en la predicción.
-
-### Componentes de varianza e ICC
-
-::: {.callout-note}
-## Recordatorio · ICC (correlación intraclase)
-Fracción de la varianza total —en la escala latente del log— que aporta cada nivel de agrupamiento (su
-*partición de varianza*):
-
-$$\text{ICC}_{\text{nivel}}=\frac{\sigma^2_{\text{nivel}}}{\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}}+\sigma^2_{\text{obs}}}.$$
-
-En una jerarquía, la del nivel **superior** (región) coincide con la **correlación** entre dos
-observaciones de la misma región. Para un nivel **anidado** hay que sumar: dos pólizas de la misma agencia
-comparten *también* su región, así que su correlación intraclase es
-$(\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/\text{total}$, **mayor** que la partición del nivel agencia por
-sí sola. Para la Poisson-log, $\sigma^2_{\text{obs}}$ es una varianza de observación propia de la
-distribución (del tipo $\ln(1+1/\bar\mu)$), que no hace falta calcular a mano. En R:
-`performance::icc(m, by_group = TRUE)` —mira el *adjusted*, que reparte solo la varianza de los efectos
-aleatorios—.
-:::
-
-Las desviaciones típicas estimadas son $\sigma_{\text{reg}}\approx$ `r round(sd_reg, 2)` entre regiones y
-$\sigma_{\text{ag}}\approx$ `r round(sd_ag, 2)` entre agencias (escala log). En términos multiplicativos,
-una agencia típica se separa de su región por un factor del orden de $\exp(\sigma_{\text{ag}})\approx$
-`r round(exp(sd_ag), 2)`. El **ICC** reparte esa variación: qué fracción de la variabilidad total del
-ritmo vive entre grupos, y cuánta corresponde a cada nivel.
-
-```{r}
-#| label: u24-icc
-performance::icc(m_glmm, by_group = TRUE)
-```
-
-### BLUP: qué agencias se desvían
-
-::: {.callout-note}
-## Recordatorio · BLUP (predicción del efecto aleatorio)
-El BLUP es el valor predicho del efecto aleatorio de un grupo, $\hat u_j$: una estimación **encogida**
-(*empirical Bayes*) de cuánto se desvía ese grupo, que combina su propio dato con la media general. En un
-modelo lineal,
-
-$$\hat u_j=\frac{\sigma^2_u}{\sigma^2_u+\sigma^2_\varepsilon/n_j}\,\big(\bar y_j-\bar{\mathbf x}_j^{\top}\boldsymbol\beta\big),$$
-
-así que los grupos con pocos datos ($n_j$ pequeño) se encogen más hacia 0. En el GLMM es la moda de la
-distribución del efecto dada la muestra. En R: `ranef(m)` (con `condVar = TRUE` para los intervalos del
-gráfico).
-:::
-
-Los interceptos aleatorios predichos (BLUP) sitúan cada agencia respecto a su región. El gráfico de
-intervalos ordena las agencias y señala las que tramitan a un ritmo atípico:
-
-```{r}
-#| label: fig-u24-blups
-#| fig-cap: "Desviación del log-ritmo (BLUP) de cada agencia respecto a su región, con intervalo aproximado. Las agencias por encima de 0 tramitan por encima de lo esperado para su región; las de abajo, por debajo."
+#| label: fig-u24-ceros
+#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por la Poisson ajustada. El exceso en el 0 (y el déficit en 1, 2, …) delata la inflación de ceros que la Poisson no capta."
 #| fig-width: 6
-#| fig-height: 5
-re  <- ranef(m_glmm, condVar = TRUE)$`agencia:region`
-re_df <- tibble::tibble(
-  agencia = rownames(re),
-  b  = re[, 1],
-  se = sqrt(attr(re, "postVar")[1, 1, ])
-) |>
-  dplyr::mutate(agencia = forcats::fct_reorder(agencia, b))
-ggplot(re_df, aes(b, agencia)) +
-  geom_vline(xintercept = 0, linetype = 2, colour = "grey60") +
-  geom_pointrange(aes(xmin = b - 1.96 * se, xmax = b + 1.96 * se), size = 0.3) +
-  labs(x = "desviación del log-ritmo (BLUP)", y = "agencia")
+#| fig-height: 3.4
+mu <- fitted(m_fp); K <- 0:8
+esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
+observado <- as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K)))
+
+tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
+  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, fill = fuente)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
+  labs(x = "nº de reclamaciones en revisión antifraude", y = "nº de pólizas", fill = NULL)
 ```
 
-### Predicción: condicional frente a marginal
+### De dónde viene: dos procesos de cero
 
-::: {.callout-note}
-## Recordatorio · Predicción condicional vs marginal
-La predicción **condicional** es la de un grupo **conocido**: usa su BLUP,
+Ya lo adelantamos: detrás de un cero hay **dos historias** —el **estructural** (no está en riesgo) y el
+**muestral** (en riesgo, pero sin evento aún)—. El exceso nace de **sumar**, a la Poisson de los que sí
+están en riesgo, una **masa de ceros estructurales** de los que nunca reclamarán. Se ve simulando una
+Poisson pura frente a esa misma Poisson con un 40 % de ceros estructurales añadidos:
 
-$$\hat\mu_{ij}=e_{ij}\,\exp\!\big(\mathbf{x}_{ij}^{\top}\hat{\boldsymbol\beta}+\hat u^{\text{reg}}_{r(j)}+\hat u^{\text{ag}}_{j}\big).$$
+```{r}
+#| label: fig-u24-mecanismo
+#| fig-cap: "Dos poblaciones con la misma parte de conteo (Poisson de media 2): a la derecha se añade un 40 % de ceros estructurales. El 0 se dispara y los positivos se encogen proporcionalmente: así aparece el exceso de ceros."
+#| fig-width: 6
+#| fig-height: 3.4
+set.seed(2026)
+n <- 5000; mu <- 2; pi_e <- 0.4
+dplyr::bind_rows(
+  tibble::tibble(poblacion = "Poisson",                       y = rpois(n, mu)),
+  tibble::tibble(poblacion = "Con 40 % de ceros estructurales", y = ifelse(rbinom(n, 1, pi_e) == 1, 0, rpois(n, mu)))) |>
+  dplyr::filter(y <= 8) |>
+  dplyr::count(poblacion, y) |>
+  ggplot(aes(y, n, fill = poblacion)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Poisson" = "steelblue", "Con 40 % de ceros estructurales" = "darkorange")) +
+  labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
+```
 
-La predicción **marginal** anula los efectos aleatorios ($u=0$) y responde a «¿qué esperar de un grupo
-cualquiera?»:
+### Por qué importa
 
-$$\hat\mu^{\,0}=e\,\exp\!\big(\mathbf{x}^{\top}\hat{\boldsymbol\beta}\big).$$
+Ignorar el exceso de ceros **distorsiona las dos caras** del problema. Al mezclar los ceros
+estructurales con los muestrales, el modelo reparte los eventos entre demasiadas pólizas e **infravalora
+la tasa** de las que sí están en riesgo, además de sesgar la inferencia. Y, sobre todo, se pierde una
+pregunta de negocio: *¿quién no está en riesgo, y quién simplemente no ha reclamado todavía?* —dos
+grupos con implicaciones muy distintas.
 
-Ojo: $\hat\mu^{\,0}$ es la tasa de un grupo *mediano* (con $u=0$), no la **media poblacional**. Por el
-enlace log, la media promediando sobre todos los grupos es algo mayor,
-$\;e\,\exp\!\big(\mathbf{x}^{\top}\hat{\boldsymbol\beta}+(\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/2\big)$.
-En R: `predict(m, nd, type = "response", re.form = NULL)` (condicional, con sus efectos) frente a
-`re.form = ~0` (marginal, sin ellos); para la media poblacional promediada, `marginaleffects` o `emmeans`.
+### Dónde aparece
+
+Es habitual siempre que conviven una subpoblación «inmune» y otra en riesgo: **seguros** (asegurados que
+nunca reclaman), **salud** (pacientes que no ingresarán), **ecología** (parcelas sin hábitat para la
+especie), **fiabilidad** (lotes sin defecto posible), **encuestas de consumo** (no consumidores). El
+cero de unos y otros es idéntico en el dato; distinto en su origen.
+
+### Cómo se identifica
+
+Un aviso primero, que enlaza con la [Unidad anterior](#sec-u23): el exceso debe medirse frente a la
+**mejor NB**, no a la Poisson, porque la sobredispersión de la NB **ya fabrica** ceros de más y podría
+absorber el exceso. De hecho, en la cartera `n_danos` (sobredispersa) y `n_fraude` (con ceros) tienen
+**casi el mismo** cociente varianza/media ($\approx 3$): en el margen se confunden, y solo mirando los
+**ceros** se distinguen.
+
+El contraste práctico es `DHARMa::testZeroInflation`, que compara los ceros observados con los simulados
+del modelo ajustado. Lo aplicamos a una **NB** de `n_fraude`: si aún sobran ceros, la inflación es
+**genuina** y no mera sobredispersión.
+
+```{r}
+#| label: u24-nb-zerotest
+m_fnb <- MASS::glm.nb(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                        offset(log(exposicion)), data = cartera)
+DHARMa::testZeroInflation(m_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
+```
+
+Aquí ocurre algo instructivo: la NB **reduce** el exceso a un ratio de apenas **1.06** —casi iguala los
+ceros—, aunque con $n\approx 3000$ el test siga siendo significativo. Es la moraleja de fondo: una NB
+flexible **imita** bastante bien la inflación de ceros, así que la distinción fina no la zanja este
+contraste, sino la **comparación de modelos** ([Sección 4.4](#sec-u24-elegir)) y la **pregunta** —¿hay
+una subpoblación que nunca reclama?—. Que aquí sepamos, por el DGP, que los ceros son estructurales es
+un lujo de laboratorio.
+
+La alternativa **paramétrica** clásica es el test de score de **Van den Broek** [@vandenbroek1995],
+implementado en `vcdExtra::zero.test()`:
+
+```{r}
+#| label: u24-scoretest
+vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
+```
+
+Da un $\chi^2$ enorme (≈ **2913**, $p<2\times10^{-16}$). Con un matiz que conviene enseñar:
+`zero.test()` usa la **media muestral** como tasa —**ignora covariables y *offset***—, así que es un
+contraste **marginal** que **exagera** la inflación, porque atribuye a los ceros parte de lo que en
+realidad explican las covariables (su exceso es mayor que el $1.7$ de la Poisson ajustada). Para el
+modelo con covariables son más fieles el covariate-aware `countreg::zitest()` o la **simulación** de
+`DHARMa`.
+
+Confirmado el exceso, ¿son esos ceros **estructurales** o **muestrales**? El dato no lo dice; lo fijan
+el **modelo** y su interpretación. Los *zero-inflated* y los *hurdle* formalizan cada historia, cada uno
+con un supuesto distinto. Es lo que vemos a continuación.
+
+::: {.callout-tip}
+## 🔧 En R. Detectar el exceso de ceros
+- **Frente a la NB, no a la Poisson** — se ajusta primero la mejor NB (`MASS::glm.nb`), porque su
+  sobredispersión ya fabrica ceros de más; el exceso **genuino** es el que sobra por encima de ella.
+- **Contraste por simulación** — `DHARMa::testZeroInflation(m)` compara los ceros observados con los
+  simulados del modelo ajustado; respeta covariables y *offset*, y es el más fiable.
+- **Score test de Van den Broek** — `vcdExtra::zero.test(y)`: rápido, pero **marginal** (usa la media
+  muestral, **ignora covariables y *offset***), así que **exagera** la inflación. La versión que sí
+  respeta covariables es `countreg::zitest(m)`.
 :::
 
-Una agencia **conocida** se predice con su BLUP (media condicional); una agencia **nueva** o cualquiera
-de la cartera se predice anulando los efectos aleatorios (media marginal, `re.form = ~0`):
+## 4.2 Modelos zero-inflated (ZIP / ZINB) {#sec-u24-zi}
+
+### El modelo: una mezcla de dos poblaciones
+
+El *zero-inflated* [@lambert1992] toma en serio las dos historias del cero y las **modela como una
+mezcla**. Con probabilidad $\pi_i$ la póliza es un **cero estructural** (nunca reclamará, aporta un 0
+seguro); con probabilidad $1-\pi_i$ es del grupo **en riesgo**, y ahí el conteo sigue una distribución
+$f$ (Poisson o NB). La probabilidad de cada valor combina las dos fuentes:
+
+$$P(Y_i=0)=\pi_i+(1-\pi_i)\,f(0),\qquad P(Y_i=k>0)=(1-\pi_i)\,f(k).$$
+
+Son, en el fondo, **dos submodelos** con enlaces distintos, que pueden usar predictores distintos:
+
+- un **logit** para la parte estructural, $\pi_i=\operatorname{logit}^{-1}(\mathbf{z}_i'\boldsymbol\gamma)$
+  —quién no está en riesgo—;
+- un **log** para la parte de conteo, $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ —a qué ritmo reclaman
+  los que sí lo están—.
+
+Si $f$ es la Poisson tenemos el **ZIP**; si los positivos están además sobredispersos, se usa la NB y
+tenemos el **ZINB**.
+
+### Verosimilitud y estimación
+
+Cada observación contribuye a la log-verosimilitud según sea cero o positiva (con
+$\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$, más el *offset*, y $\pi_i$ del logit):
+
+$$\ell_i=\begin{cases}\log\!\bigl(\pi_i+(1-\pi_i)\,e^{-\mu_i}\bigr) & y_i=0,\\[2pt]\log(1-\pi_i)+y_i\log\mu_i-\mu_i-\log(y_i!) & y_i>0.\end{cases}$$
+
+(En el ZINB, $e^{-\mu_i}$ y el núcleo Poisson se sustituyen por la masa y la pmf de la NB.) Las dos
+partes se estiman **conjuntamente** por máxima verosimilitud —los ceros están «repartidos» entre ambos
+procesos, así que no se pueden separar—. Al haber una **pertenencia latente** (¿es esta póliza un cero
+estructural o un cero muestral?), el método natural es el algoritmo **EM** [@dempster1977], que alterna
+estimar esa pertenencia y reajustar los dos submodelos; también se optimiza directamente. En R,
+`pscl::zeroinfl` (o `glmmTMB` con `ziformula`).
+
+### Ajuste e interpretación
+
+Antes de ajustar, conviene mirar **qué mueve cada parte**. La proporción de ceros baja al crecer la
+potencia y cambia con el uso —eso alimenta la parte **estructural**—; y la media de reclamaciones sube
+con la potencia —eso, la parte de **conteo**—:
 
 ```{r}
-#| label: u24-pred
-nd <- cartera |>
-  dplyr::slice(1) |>
-  dplyr::mutate(exposicion = 1)                       # ventana de exposición completa, misma póliza tipo
-
-c(
-  condicional = predict(m_glmm, nd, type = "response", re.form = NULL),  # su agencia
-  marginal    = predict(m_glmm, nd, type = "response", re.form = ~0)     # agencia cualquiera
-)
+#| label: fig-u24-zip-motiv
+#| fig-cap: "Motivación de las dos partes del ZIP. Izquierda (parte estructural): la proporción de ceros de `n_fraude` baja al crecer la potencia y difiere por uso. Derecha (parte de conteo): la media de reclamaciones sube con la potencia. Cada relación justifica un submodelo."
+#| fig-width: 7.5
+#| fig-height: 3.4
+cartera |>
+  dplyr::mutate(tramo_pot = dplyr::ntile(potencia_cv, 5)) |>
+  dplyr::group_by(tramo_pot, uso) |>
+  dplyr::summarise(`Parte estructural: P(cero)` = mean(n_fraude == 0),
+                   `Parte de conteo: media`     = mean(n_fraude), .groups = "drop") |>
+  tidyr::pivot_longer(-c(tramo_pot, uso), names_to = "parte", values_to = "v") |>
+  dplyr::mutate(parte = factor(parte, levels = c("Parte estructural: P(cero)", "Parte de conteo: media"))) |>
+  ggplot(aes(tramo_pot, v, colour = uso)) +
+  geom_line() + geom_point(size = 2) +
+  facet_wrap(~ parte, scales = "free_y") +
+  labs(x = "quintil de potencia (CV)", y = NULL, colour = NULL)
 ```
 
-La condicional usa el desplazamiento estimado de *esa* agencia; la marginal fija los efectos aleatorios
-en cero y responde a *«¿qué esperar de una agencia cualquiera?»*, con más incertidumbre. Por el enlace
-log, la media marginal exacta queda algo por encima de la predicción con $u=0$, en un factor
-$\exp\!\big((\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/2\big)$.
-
-## 4.4 Inferencia y selección {#sec-u24-inferencia}
-
-La inferencia opera en **dos niveles**: sobre los **efectos fijos** (¿importa cada covariable?) y sobre
-la **estructura aleatoria** (¿hace falta el agrupamiento?).
-
-### Los efectos fijos: contraste y selección
-
-El `summary(m_glmm)` ya incluye el contraste de Wald de cada coeficiente (su $z$ y su $p$). Para decidir
-si **prescindimos de una covariable**, el contraste más fiable es el de razón de verosimilitudes:
-`drop1()` reajusta el modelo quitando cada término y lo compara con el completo. Como `glmer` estima por
-máxima verosimilitud, este LRT sobre los efectos fijos es válido.
+La parte de conteo lleva además `zona_circulacion` y `tipo_vehiculo`; su **tasa** de reclamaciones
+también varía con ellas, lo que justifica incluirlas:
 
 ```{r}
-#| label: u24-drop1
-drop1(m_glmm, test = "Chisq")
+#| label: fig-u24-zip-motiv2
+#| fig-cap: "Tasa de `n_fraude` (reclamaciones por unidad de exposición) según `zona_circulacion` y `tipo_vehiculo`. Ambas mueven el conteo —zona urbana y ciertos vehículos reclaman a más ritmo—, así que entran en la parte de conteo del ZIP."
+#| fig-width: 7.5
+#| fig-height: 3.2
+dplyr::bind_rows(
+  cartera |> dplyr::group_by(predictor = "zona_circulacion", nivel = as.character(zona_circulacion)) |>
+    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop"),
+  cartera |> dplyr::group_by(predictor = "tipo_vehiculo",    nivel = as.character(tipo_vehiculo)) |>
+    dplyr::summarise(tasa = sum(n_fraude) / sum(exposicion), .groups = "drop")) |>
+  ggplot(aes(nivel, tasa)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x") +
+  labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
 ```
 
-Cada fila es un LRT que **elimina ese término**: un $p$ grande —y un AIC que no mejora al quitarlo—
-delata una covariable prescindible. Seleccionamos así el predictor fijo, igual que en la
-[Unidad 2.1](#sec-u21), pero ahora **por encima** de los interceptos aleatorios de región y agencia.
+Con esa lectura, la fórmula tiene **dos lados**, separados por `|`: a la izquierda el conteo (con los
+predictores de riesgo), a la derecha la parte de ceros (con lo que hace a una póliza «no reclamante»:
+`uso` y `potencia_cv`):
 
-### La estructura aleatoria: ¿hace falta el agrupamiento?
+```{r}
+#| label: u24-zip
+m_zip <- pscl::zeroinfl(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
+             uso + potencia_cv,
+  dist = "poisson", data = cartera)
+summary(m_zip)
+```
 
-Ahora la pregunta es si el agrupamiento aporta. Comparamos el mixto con la Poisson y con la binomial
-negativa por criterios de información:
+Se lee en **dos bloques**. En el de **conteo** (enlace log), $\exp(\beta)$ es una **razón de tasas**
+(IRR) entre las pólizas en riesgo: la **potencia** sube el ritmo ($\exp(0.0071)\approx 1.007$ por CV, es
+decir $\times 1.4$ por cada 50 CV extra); las zonas menos urbanas lo bajan (rural $\times 0.81$ frente a
+urbana); y la **moto** lo eleva ($\times 1.26$). En el de **ceros** (enlace logit), $\exp(\gamma)$ es el
+**odds ratio de ser un cero estructural** (no reclamante): el uso **comercial** lo reduce a menos de la
+mitad ($\exp(-0.78)\approx 0.46$: mucho más a menudo en riesgo) y la **potencia** también (por cada 50
+CV, $\times 0.59$). Dos preguntas —*quién está en riesgo* y *a qué ritmo reclama quien lo está*—
+respondidas a la vez. (Los signos coinciden con el DGP: `g_cero` penaliza a comercial y potencia; lo
+validaremos en la [Sección 4.4](#sec-u24-elegir).)
+
+¿Hace falta la NB en el conteo? Se ajusta el **ZINB** (`dist = "negbin"`) y se compara por AIC:
+
+```{r}
+#| label: u24-zinb
+m_zinb <- pscl::zeroinfl(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
+             uso + potencia_cv,
+  dist = "negbin", data = cartera)
+AIC(m_zip, m_zinb)
+```
+
+El AIC apenas se mueve —**8582** (ZIP) frente a **8584** (ZINB)—: la NB **no aporta nada** en el
+conteo, así que por **parsimonia** nos quedamos con el **ZIP**. Sabemos, por el DGP, que el conteo se
+generó con una Poisson (la sobredispersión venía **solo** de los ceros), lo que lo explica; pero en un
+caso real **eso no se sabe**: quien decide es el AIC (y el re-diagnóstico), no un conocimiento previo.
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar un ZIP / ZINB
+```r
+pscl::zeroinfl(y ~ x1 + x2 + offset(log(t)) | z1 + z2,   # conteo | ceros estructurales
+               dist = "poisson", data = ...)              # "negbin" -> ZINB
+```
+
+- La **fórmula de dos lados** separa por `|` la parte de **conteo** (izquierda, enlace log → IRR) de la
+  parte de **ceros estructurales** (derecha, enlace logit → OR de «no reclamante»), cada una con sus
+  propios predictores. El *offset* va en el lado del conteo.
+- **`dist = "poisson"`** da el ZIP; **`"negbin"`**, el ZINB (positivos sobredispersos). Se estiman
+  **conjuntamente** por ML (algoritmo EM), porque los ceros están repartidos entre ambos procesos.
+- **Predicción** — `predict(m, type = "response")` da la media marginal; `type = "prob"` la matriz de
+  $\hat P(Y=k)$ (la columna 1 son los ceros esperados); `type = "zero"` la probabilidad estructural y
+  `type = "count"` la media de la parte de conteo.
+- Alternativa con efectos aleatorios: `glmmTMB(y ~ ..., ziformula = ~ z1 + z2, family = ...)`.
+:::
+
+### Bondad de ajuste y diagnóstico
+
+Tres comprobaciones de **bondad de ajuste**: que el modelo reproduce los **ceros**, que ajusta los
+**positivos** (¿sobredispersos?) y que la **forma** general encaja.
+
+**Ceros.** Comparamos los observados con los que predice el ZIP (sumando $\hat P(Y_i=0)$ sobre las
+pólizas):
+
+```{r}
+#| label: u24-zip-diag
+c(observados    = sum(cartera$n_fraude == 0),
+  esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
+```
+
+Coinciden: el exceso está absorbido (y `testZeroInflation` sobre el ZIP ya no rechazaría).
+
+**Positivos.** Ya lo vimos: el **ZINB no mejora** al ZIP (AIC 8582 vs 8584), así que el conteo de las
+pólizas en riesgo es Poisson, **sin sobredispersión extra**.
+
+**Forma.** El rootograma confirma que el ZIP sigue de cerca tanto el 0 como los positivos:
+
+```{r}
+#| label: fig-u24-zip-root
+#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el ZIP. A diferencia de la Poisson (que erraba el 0), el ZIP reproduce el pico de ceros y también los conteos positivos."
+#| fig-width: 6
+#| fig-height: 3.2
+esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
+tibble::tibble(k = K,
+               Observado      = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
+               `ZIP ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, fill = fuente)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Observado" = "steelblue", "ZIP ajustado" = "darkorange")) +
+  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
+```
+
+Ceros reproducidos, positivos Poisson y forma ajustada: el **ZIP ajusta bien**. La comparación con el
+hurdle y los demás modelos va en la [Sección 4.4](#sec-u24-elegir).
+
+¿Y hace falta el ZIP frente a la **Poisson** a secas? Ya lo sabemos por vías fiables: el score test y
+`DHARMa` ([Sección 4.1](#sec-u24-ceros)) detectaron el exceso, y el **AIC** lo ratifica al comparar
+modelos ([Sección 4.4](#sec-u24-elegir)).
+
+::: {.callout-warning}
+## No uses el test de Vuong para esto
+En casi cualquier tutorial de *zero-inflation* verás el **test de Vuong** (`pscl::vuong`) para decidir
+Poisson vs ZIP. **Se desaconseja**: Vuong exige modelos **no anidados**, y la Poisson es un caso
+particular del ZIP ($\pi=0$), así que sus supuestos fallan y su $p$-valor no es interpretable
+[@wilson2015]. Quédate con el **score test**, `DHARMa` y el **AIC**.
+:::
+
+## 4.3 Modelos hurdle {#sec-u24-hurdle}
+
+### El modelo: una barrera y un conteo truncado
+
+El *hurdle* [@mullahy1986] cuenta **otra historia**: un proceso **en dos etapas**. Primero se cruza (o
+no) una **barrera** —¿ocurre **algún** evento?—; y solo si se cruza, un conteo dice **cuántos**, pero
+ya **sin posibilidad de cero** (truncado en 0). Con $p_i=\Pr(Y_i>0)$ la probabilidad de cruzar y $f$ la
+distribución de conteo:
+
+$$P(Y_i=0)=1-p_i,\qquad P(Y_i=k>0)=p_i\,\frac{f(k)}{1-f(0)}.$$
+
+La diferencia con el ZI es de raíz: aquí **todos** los ceros vienen de **un único** proceso (no cruzar
+la barrera); cruzada, el conteo es $\ge 1$. No hay «ceros muestrales» mezclados con los positivos.
+
+### Verosimilitud y estimación
+
+La gran ventaja es que las dos partes **no comparten parámetros**, así que la log-verosimilitud se
+**separa** y cada parte se estima por su cuenta (sin EM):
+
+$$\ell_i=\begin{cases}\log(1-p_i) & y_i=0,\\[2pt]\log p_i+\log f(y_i)-\log\!\bigl(1-f(0)\bigr) & y_i>0.\end{cases}$$
+
+Es decir: un **GLM binomial** para la barrera (0 vs $>0$) y un **conteo truncado en cero** (Poisson o
+NB) para los positivos, ajustables por separado por máxima verosimilitud. En R, `pscl::hurdle`.
+
+### Ajuste e interpretación
+
+Misma fórmula de dos lados (`conteo | barrera`):
+
+```{r}
+#| label: u24-hurdle
+m_hp <- pscl::hurdle(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
+             uso + potencia_cv,
+  dist = "poisson", data = cartera)
+summary(m_hp)
+```
+
+Ojo al **cambio de signo** respecto al ZI: aquí el bloque binario modela la probabilidad de **cruzar la
+barrera** (tener $\ge 1$ evento), no la de ser un cero estructural. Así, un coeficiente **positivo** en
+`uso` comercial significa que esas pólizas cruzan la barrera **con más frecuencia** (tienen algún parte
+más a menudo) —la misma realidad que en el ZI salía como «menos cero estructural», leída al revés—. El
+bloque de conteo se interpreta en IRR, sobre el conteo **truncado** (el ritmo entre quienes ya han
+cruzado).
+
+### Bondad de ajuste y diagnóstico
+
+El hurdle ajusta los ceros **exactamente por construcción** —la parte binaria reproduce la proporción
+observada—, así que «¿ajusta el 0?» es trivialmente sí:
+
+```{r}
+#| label: u24-hurdle-diag
+c(observados       = sum(cartera$n_fraude == 0),
+  esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
+```
+
+En efecto, 1755 = 1755. El diagnóstico se centra, pues, en la **parte positiva** (el conteo truncado):
+¿reproduce la forma de los conteos $>0$, o hay sobredispersión que pida NB? El **rootograma** debería
+ajustar también los positivos:
+
+```{r}
+#| label: fig-u24-hurdle-root
+#| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el hurdle-Poisson. El 0 coincide por construcción; los conteos positivos también se reproducen bien."
+#| fig-width: 6
+#| fig-height: 3.2
+esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
+tibble::tibble(k = K,
+               Observado         = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
+               `Hurdle ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+  tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, fill = fuente)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Observado" = "steelblue", "Hurdle ajustado" = "darkorange")) +
+  labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
+```
+
+Y para saber si los positivos necesitan **NB**, ajustamos el hurdle-NB y comparamos por AIC —si no
+mejora, la Poisson truncada basta—:
+
+```{r}
+#| label: u24-hurdle-nb
+m_hnb <- pscl::hurdle(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
+             uso + potencia_cv,
+  dist = "negbin", data = cartera)
+AIC(m_hp, m_hnb)
+```
+
+**Conclusión:** los ceros son exactos por construcción, los positivos se reproducen bien en el
+rootograma y el hurdle-NB no aporta (el conteo truncado es Poisson): el hurdle **ajusta bien**. La
+comparación con el ZI —y con qué criterio elegir— va en la [Sección 4.4](#sec-u24-elegir).
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar un hurdle
+```r
+pscl::hurdle(y ~ x1 + x2 + offset(log(t)) | z1 + z2,   # conteo truncado | barrera (0 vs >0)
+             dist = "poisson", data = ...)              # "negbin" para el conteo truncado
+```
+
+- Misma **fórmula de dos lados** que `zeroinfl`, pero el lado derecho es la **barrera** (un `glm`
+  binomial: ¿algún evento?) y el izquierdo un **conteo truncado en 0** (Poisson o NB). Las dos partes
+  **no comparten parámetros**, así que se estiman **por separado** (sin EM).
+- **Ojo al signo**: el bloque binario modela la probabilidad de **cruzar** la barrera (tener $\ge 1$), no
+  la de ser cero estructural —el signo sale al revés que en `zeroinfl`—.
+- **Predicción** — igual que en `zeroinfl` (`type = "response"` / `"prob"` / `"count"`). Los ceros ajustan
+  **exactos por construcción**: la parte binaria reproduce la proporción observada.
+:::
+
+## 4.4 Elegir, comparar y conectar {#sec-u24-elegir}
+
+Hemos ajustado seis modelos para `n_fraude` —Poisson, NB, ZIP, ZINB, hurdle-Poisson y hurdle-NB—. Toca
+compararlos, ver qué cambia en la predicción y **validar** contra el DGP.
+
+### Los modelos, lado a lado
+
+Todos tienen verosimilitud propia, así que se comparan por **AIC**, que no exige que estén anidados
+(usamos los seis ya ajustados, incluido el `m_hnb` de la [Sección 4.3](#sec-u24-hurdle)):
 
 ```{r}
 #| label: u24-aic
-m_nb <- glm.nb(
-  n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)),
-  data = cartera
-)
-performance::compare_performance(
-  Poisson = m_pois, NB = m_nb, GLMM = m_glmm,
-  metrics = c("AIC", "BIC", "RMSE")
-)
+mods <- list(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
+             `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb)
+data.frame(modelo = names(mods),
+           df  = sapply(mods, function(m) attr(logLik(m), "df")),
+           AIC = round(sapply(mods, AIC), 1)) |>
+  dplyr::arrange(AIC)
 ```
 
-El mixto debería quedar por delante. Aquí conecta con la [Unidad 2.2](#sec-u22): la variación entre
-grupos que en el margen parecía **sobredispersión** ($\phi>1$) el GLMM la explica de forma estructural,
-en vez de absorberla como dispersión sin estructura. La binomial negativa recogería ese exceso de
-varianza, pero no distingue región de agencia ni predice una agencia nueva; el mixto sí.
+El resultado es nítido: los que **tratan los ceros** dejan muy atrás a la Poisson (AIC ≈ 11003) y a la
+NB (9188). Entre ellos, como el conteo es Poisson, las versiones **NB no aportan** (ZINB 8584 ≈ ZIP
+8582; hurdle-NB 8594 ≈ hurdle-P 8592, con un parámetro más). Y —lo interesante— el **ZIP (8582) gana al
+hurdle-Poisson (8592) por unos 10 puntos de AIC**: aunque sus coeficientes de conteo son casi idénticos
+(la misma historia del ritmo), el ZIP ajusta mejor los **ceros**, porque el DGP los generó por
+**inflación estructural**, no por una barrera. Así que aquí los datos **sí** distinguen ZI de hurdle —el
+peso de Akaike se lo lleva el ZIP (≈ 0.72)—.
 
-::: {.callout-warning}
-## Un cuidado con el contraste de $\sigma^2=0$
-Contrastar si un componente de varianza es nulo coloca el parámetro en el **borde** de su espacio (una
-varianza no puede ser negativa). La distribución de referencia del cociente de verosimilitudes deja de
-ser una $\chi^2$ ordinaria y pasa a ser una **mezcla**; el $p$-valor ingenuo resulta conservador (hay que
-partirlo por la mitad). Por eso nos apoyamos en AIC/BIC y en la magnitud de los componentes, más que en
-un único $p$-valor.
-:::
-
-## 4.5 Bondad de ajuste y diagnóstico {#sec-u24-diagnostico}
-
-El diagnóstico combina las herramientas del compendio de conteo con las propias de los mixtos. Residuos
-simulados (`DHARMa`), que ya deberían salir bien portados si la estructura jerárquica captó el
-agrupamiento:
+La misma lectura estándar de bondad de ajuste (**AIC**, **BIC**, **RMSE**) para los seis modelos:
 
 ```{r}
-#| label: fig-u24-dharma
-#| fig-cap: "Residuos simulados (DHARMa) del GLMM de Poisson: QQ frente a la uniforme y residuos contra el predicho."
-#| fig-width: 7
-#| fig-height: 3.4
-res_glmm <- simulateResiduals(m_glmm)
-plot(res_glmm)
+#| label: u24-perf
+performance::compare_performance(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
+                                 `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb,
+                                 metrics = c("AIC", "BIC", "RMSE"))
 ```
 
-El $R^2$ de Nakagawa [@nakagawa2013; @nakagawa2017] separa lo que explican los efectos fijos (marginal)
-de lo que añade la estructura aleatoria (condicional); la brecha entre ambos cuantifica el peso del
-agrupamiento:
-
-```{r}
-#| label: u24-r2
-performance::r2(m_glmm)
-```
-
-Conviene además comprobar que el ajuste **convergió** y no es **singular** (`isSingular(m_glmm)`: un
-componente de varianza colapsado a 0 indicaría un modelo sobreparametrizado para estos datos). Y, como el
-banco es simulado, podemos **validar contra la verdad**: el DGP fijó $\sigma_{\text{reg}}=0.50$ y
-$\sigma_{\text{ag}}=0.60$; el mixto estima `r round(sd_reg, 2)` y `r round(sd_ag, 2)`.
-
-La región se recupera bien, pero la **agencia se queda claramente por debajo** de su valor verdadero,
-hasta el punto de invertir el orden —en la verdad la agencia varía más que la región, y aquí sale al
-revés—. No es un fallo del método, sino la dificultad de estimar el componente de agencia con **pocos
-grupos por región** (unas cinco agencias en cada una): la verosimilitud tiende a **encoger** esa varianza
-y a atribuir parte de ella al nivel superior. Es un aviso útil: los componentes de varianza —y el orden
-entre niveles— se estiman con **mucha** incertidumbre cuando hay pocos grupos, así que conviene leerlos
-con prudencia y no sobreinterpretar cuál pesa más.
-
-::: {.callout-note}
-## Bondad de ajuste en modelos mixtos
-Al recorrido de conteo (índice de dispersión, criterios de información y residuos simulados; véase el
-compendio de la [Unidad 2.2](#sec-u22-diagnostico)) los mixtos añaden: **residuos DHARMa** interpretados
-sobre la estructura aleatoria, **dispersión residual** (`testDispersion`), **$R^2$ de Nakagawa**
-—marginal frente a condicional—, el **ICC** por nivel, y el control de **convergencia y singularidad**.
-Ninguna medida resume el ajuste por sí sola: se leen juntas.
-:::
-
-## 4.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) {#sec-u24-olre}
-
-En la [Unidad 2.2](#sec-u22) aplazamos el **OLRE** hasta aquí, porque es, literalmente, un modelo mixto.
-La idea: añadir un intercepto aleatorio **por observación**, `(1 | id)`, de modo que cada fila reciba su
-propio impulso $v_i\sim N(0,\sigma^2_{\text{obs}})$ sobre el log-ritmo,
-
-$$
-\log\mu_i=\log e_i+\mathbf{x}_i^{\top}\boldsymbol\beta+v_i,\qquad v_i\sim N(0,\sigma^2_{\text{obs}}).
-$$
-
-Al integrar $v_i$, la respuesta marginal es una **Poisson-lognormal**: su varianza supera a la media, así
-que el OLRE **modela la sobredispersión** como un efecto aleatorio, en paralelo a lo que la binomial
-negativa hace con una mezcla Poisson-Gamma.
-
-### Por qué modelizar `n_danos` como OLRE
-
-`n_danos` fue la respuesta **sobredispersa** del caso: en la [Unidad 2.3](#sec-u22-nb) su cociente
-varianza/media superaba con holgura el 1 y la NB la ajustó mucho mejor que la Poisson. Lo confirmamos
-sobre el ajuste Poisson:
-
-```{r}
-#| label: u24-olre-disp
-m_pois_danos <- glm(
-  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)),
-  family = poisson, data = cartera
-)
-performance::check_overdispersion(m_pois_danos)
-```
-
-¿De dónde viene esa sobredispersión? De **heterogeneidad no observada entre pólizas**: dos conductores con
-las mismas covariables no comparten el mismo riesgo real —hábitos, entorno, azar—, y esas diferencias que
-no medimos hacen que unos acumulen más partes de los que «les tocaría» por su $\mathbf{x}$. Modelizar ese
-exceso como un impulso aleatorio por póliza, $v_i$, es **exactamente** un OLRE: cada póliza lleva su
-propio multiplicador $\exp(v_i)$ sobre la tasa.
-
-Conviene puntualizar una diferencia con el modelo anidado. Allí cada agencia agrupaba **muchas** pólizas,
-y el efecto aleatorio capturaba lo que comparten. Aquí, en cambio, la cartera tiene **una sola fila por
-póliza**: el efecto por observación coincide con uno por sujeto, de modo que cada «grupo» es de **tamaño
-1**. Por eso el OLRE no modela dependencia entre observaciones —no la hay— sino la heterogeneidad
-sobrante, es decir, la sobredispersión. Es la misma razón por la que sus herramientas de grupo (ICC,
-BLUP, condicional frente a marginal) aquí no aplican: no hay grupos que comparar.
-
-Y aquí está la conexión con la [Unidad 2.3](#sec-u22-nb): **el OLRE y la binomial negativa son el mismo
-tipo de modelo** —una Poisson con un multiplicador aleatorio por observación— y solo se diferencian en la
-**ley de ese multiplicador**. La NB usa una mezcla Poisson-**Gamma**; el OLRE, una Poisson-**lognormal**.
-Ambas añaden **un único** parámetro de dispersión y capturan la varianza extra. Por eso el OLRE es una
-alternativa sensata —y de igual coste— a la NB, y especialmente natural en esta unidad, donde ya
-trabajamos en el marco de los mixtos.
-
-En cambio, no lo aplicamos a `n_gestiones` porque su variación extra es el **agrupamiento** región/agencia
-que ya modelamos; un OLRE encima no tendría nada que absorber y su varianza saldría $\approx 0$. El OLRE
-luce ante sobredispersión **de observación**, no de grupo.
-
-### El modelo y su ajuste
-
-Añadimos a la Poisson de `n_danos` un intercepto aleatorio por póliza —un nivel por observación—:
-
-```{r}
-#| label: u24-olre
-cartera$id_obs <- factor(seq_len(nrow(cartera)))   # un nivel aleatorio por observación
-m_olre <- glmer(
-  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)) + (1 | id_obs),
-  family = poisson, data = cartera
-)
-sd_olre <- as.data.frame(VarCorr(m_olre))$sdcor[1]
-c(sigma_obs = sd_olre)
-```
-
-El componente estimado, $\sigma_{\text{obs}}\approx$ `r round(sd_olre, 2)` (escala log), es la magnitud de
-esa heterogeneidad de fila: en tasa, una póliza se aparta de su valor esperado por un factor del orden de
-$\exp(\sigma_{\text{obs}})$. Los efectos fijos se siguen leyendo como IRR, ahora **netos** de esa
-variabilidad individual. (Es el ajuste más lento de la unidad: lleva un nivel aleatorio por observación.)
-
-### Inferencia, bondad de ajuste y diagnóstico
-
-Que $\sigma_{\text{obs}}$ sea claramente **mayor que 0** confirma la sobredispersión, con la misma cautela
-del contraste en el borde de [§4.4](#sec-u24-inferencia): miramos su magnitud y los criterios de
-información, no un único $p$-valor. La prueba de fuego es el **diagnóstico de residuos**: si el OLRE ha
-absorbido el exceso de varianza, los residuos simulados de `DHARMa` quedan bien portados y el test de
-dispersión, no significativo:
-
-```{r}
-#| label: fig-u24-olre-diag
-#| fig-cap: "Residuos simulados (DHARMa) del OLRE sobre `n_danos`. Frente a la Poisson —sobredispersa—, el QQ y la prueba de dispersión deben indicar que la varianza extra ya está recogida."
-#| fig-width: 7
-#| fig-height: 3.4
-res_olre <- simulateResiduals(m_olre)
-plot(res_olre)
-```
-
-### Comparación con la binomial negativa
-
-Por último, ponemos lado a lado la Poisson, la NB2 y el OLRE:
-
-```{r}
-#| label: u24-olre-comp
-m_nb2 <- glm.nb(
-  n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
-    offset(log(exposicion)), data = cartera
-)
-performance::compare_performance(
-  Poisson = m_pois_danos, NB2 = m_nb2, OLRE = m_olre, metrics = c("AIC", "BIC", "RMSE")
-)
-```
-
-La columna **RMSE hay que leerla con cuidado**, porque para el OLRE engaña. `compare_performance` la
-calcula con las predicciones **condicionales** del modelo mixto —usando el efecto aleatorio estimado de
-cada observación, su BLUP—, de modo que cada punto se predice casi con su propio valor y el RMSE sale
-artificialmente bajo. No es que el OLRE ajuste muchísimo mejor: es que se evalúa a sí mismo con
-información que los otros modelos no usan. Para una comparación justa hay que forzar la predicción
-**poblacional** (marginal), anulando el efecto aleatorio con `re.form = NA`:
-
-```{r}
-#| label: u24-olre-rmse
-pred_marg <- predict(m_olre, type = "response", re.form = NA)     # población, sin el BLUP
-rmse_olre_marginal <- sqrt(mean((cartera$n_danos - pred_marg)^2))
-rmse_olre_marginal
-```
-
-Así medido, el RMSE del OLRE queda al nivel del de la NB2 y la Poisson —los tres predicen el mismo
-promedio poblacional—, que es lo esperable. Por eso la comparación honesta se apoya en el **AIC**, no en
-el RMSE condicional.
-
-Las dos correcciones dejan muy atrás a la Poisson y, entre sí, suelen quedar **próximas** en AIC: son dos
-lentes —Poisson-lognormal frente a Poisson-Gamma— para la misma sobredispersión. ¿Cuál elegir? La NB da
-una **distribución cerrada**, es más rápida y es la opción por defecto ante sobredispersión pura; el OLRE
-encaja con naturalidad cuando **ya tienes efectos aleatorios** —por ejemplo, si quisieras combinar la
-heterogeneidad de póliza con la de agencia en un mismo modelo— o cuando prefieres la mezcla lognormal.
-Para `n_danos`, sin estructura de grupo, la NB2 es la más práctica; el OLRE muestra que esa misma
-sobredispersión también se lee como un efecto aleatorio.
+Aquí hay una lección: el **RMSE es casi idéntico** (≈ 1.85) en los seis modelos —todos predicen la misma
+**media**—, pero el **AIC y el BIC** los separan con claridad, y el peso de Schwarz (BIC) casi entero se
+lo lleva el **ZIP** (≈ 0.98). El error de predicción **puntual** (RMSE) no distingue estos modelos; la
+bondad de ajuste **distribucional** (AIC/BIC), sí.
 
 ::: {.callout-tip}
-## Un ejemplo de manual: `grouseticks`
-El caso canónico de OLRE es `lme4::grouseticks`: el número de garrapatas en pollos de urogallo, un conteo
-muy sobredisperso y con estructura jerárquica (pollo dentro de nidada `BROOD` dentro de localidad
-`LOCATION`). Ahí el OLRE **convive** con otros efectos aleatorios —se añade `(1 | INDEX)`, con `INDEX` el
-identificador de fila que ya trae el propio conjunto de datos— para separar la sobredispersión de
-observación de la variación entre grupos, algo que una NB sola no distingue:
+## 🔧 En R. Bondad de ajuste con exceso de ceros
 
-```r
-data(grouseticks, package = "lme4")
-m <- glmer(TICKS ~ YEAR + HEIGHT + (1 | BROOD) + (1 | LOCATION) + (1 | INDEX),
-           family = poisson, data = grouseticks)
+Vale todo lo del [compendio de la Unidad 2.3](#sec-u23-elegir) —dispersión, AIC/BIC, pseudo-$R^2$,
+rootograma, `DHARMa`—, con **tres añadidos** propios del exceso de ceros:
+
+- **Contrasta frente a la NB, no a la Poisson**: la NB ya fabrica ceros; el exceso genuino es el que
+  sobra **por encima** de ella.
+- **Comprueba el ajuste del 0** (observados vs $\sum_i\hat P(Y_i{=}0)$): en el **hurdle** es exacto por
+  construcción; en el **ZI** no lo es —hay que verificarlo—.
+- **Diagnostica las dos partes**: los ceros/barrera **y** el conteo de los positivos (¿piden NB? →
+  ZINB / hurdle-NB, por AIC).
+
+Detección del exceso: score de Van den Broek (`vcdExtra::zero.test`, marginal) o, mejor,
+`DHARMa::testZeroInflation`.
+:::
+
+### Predicción: dos recetas, casi el mismo número
+
+Ambas familias predicen la **media marginal** $E[Y\mid x]$, pero la componen distinto —el ZI como
+$(1-\pi)\mu$, el hurdle como $p\cdot\mu/(1-e^{-\mu})$—. Como predicen el mismo **promedio** (ya vimos que
+el RMSE era idéntico), sus predicciones puntuales quedan muy próximas, aunque el AIC prefiera al ZIP:
+
+```{r}
+#| label: u24-pred
+nuevas <- cartera[1:5, ]
+cbind(ZIP    = predict(m_zip, nuevas, type = "response"),
+      Hurdle = predict(m_hp,  nuevas, type = "response"))
 ```
+
+Lo que las distingue no es el número, sino la **lectura de las dos partes**: `predict(type = "zero")` y
+`predict(type = "count")` dan, en cada modelo, la probabilidad estructural / de cruzar la barrera y la
+intensidad. Cada familia responde a una pregunta distinta.
+
+::: {.callout-note}
+## ZI o hurdle: cuándo cada uno
+
+A menudo ajustan parecido y la elección es de **modelo mental**; pero cuando un mecanismo generó de
+verdad los datos, el **AIC puede favorecerlo** —aquí el ZIP le gana al hurdle porque los ceros son
+estructurales, no de barrera—:
+
+- **Zero-inflated** si crees que hay una **subpoblación estructural** —pólizas que *nunca* reclamarán,
+  mezcladas con las de riesgo—. La parte de ceros estima *quién es inmune*.
+- **Hurdle** si lo ves como un **proceso en dos etapas** —primero «¿ocurre algo?», luego «¿cuánto?»—.
+  La parte binaria estima *quién cruza la barrera*.
+
+Si además hay sobredispersión en los **positivos**, la versión **NB** (ZINB / hurdle-NB); si no, basta
+la Poisson.
+:::
+
+### Validación contra el DGP
+
+Como los datos son simulados, comprobamos que el análisis **recupera la verdad**. El DGP generó los
+ceros por inflación estructural (`g_cero`) sobre un conteo Poisson (`b_ceros`):
+
+```{r}
+#| label: u24-validacion
+v <- attr(cartera, "verdad")
+v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
+```
+
+Los signos coinciden con el ZIP ajustado: en la parte estructural, `uso` comercial y `potencia` con
+coeficiente **negativo** (menos «no reclamantes») —el ajuste dio $-0.78$ y $\approx -0.4$ en escala
+estandarizada—; y el AIC prefiere el **ZIP** frente al ZINB (el conteo se generó **Poisson**) **y**
+frente al hurdle (los ceros son **estructurales**, no de barrera). Es decir, la comparación de modelos
+señala el mecanismo correcto. Es decir, a ciegas hemos elegido el modelo correcto y recuperado sus parámetros —el
+control de calidad que pediremos en el estudio de caso—.
+
+### Una estrategia general
+
+::: {.callout-tip}
+## Receta para el exceso de ceros
+
+1. **Ajusta Poisson y NB** y **diagnostica los ceros**: rootograma y `testZeroInflation` **frente a la
+   NB** (no a la Poisson).
+2. Si aún sobran ceros, **elige la historia**: subpoblación inmune → **ZI**; proceso en dos etapas →
+   **hurdle**.
+3. **Ajusta** ZIP/ZINB o hurdle-P/NB; decide la distribución del conteo (NB si los positivos están
+   sobredispersos) por **AIC** y re-diagnóstico.
+4. **Compara** ZI vs hurdle por AIC **y por la pregunta** (suelen empatar en ajuste).
+5. **Interpreta las dos partes** (estructural/barrera + intensidad) y **predice** la media marginal.
+6. **Valida** (contra el DGP en el curso; fuera de muestra en la práctica → [Unidad 2.7](#sec-u27)).
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.4) — Preguntas 9 a 12 del caso
-Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, intercepto aleatorio por
-**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.7](#sec-u27)):
-
-- **P9 · ¿Cuánta variación es de agencia?** Interpreta los efectos fijos en IRR (condicionales a la agencia)
-  y cuantifica el **ICC**.
-- **P10 · Territorio.** Añade la **región** al anidamiento (`(1 | id_region/id_agencia)`) y valora si aporta.
-- **P11 · Agencias atípicas.** Con BLUPs / *caterpillar*, identifica las que se **desvían** y comenta el
-  **shrinkage**.
-- **P12 · Agencia nueva.** Distingue predicción **condicional** vs **marginal**: ¿qué esperar de una agencia
-  sin historial?
-
-Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** los componentes de varianza estimados frente a
-$\sigma_a$ y $\sigma_{reg}$ del DGP (`attr(cartera, "verdad")$sigma_ag`, `$sigma_reg`).
+## Tarea del estudiante (2.4) — Pregunta 8 del caso
+Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.8](#sec-u28)): *la mayoría
+de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
+frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
+exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
+**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca la levanta,
+o proceso en dos etapas?). Interpreta las **dos partes** (quién puede levantarla / a qué ritmo) y **valida** la
+parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
 :::

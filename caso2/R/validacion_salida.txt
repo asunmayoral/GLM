@@ -2,24 +2,24 @@
 == Generando cartera de auto ==
 
 [0] Dimensiones y rangos
-  pólizas: 3071 | siniestros: 1703 | filas panel: 14516
+  pólizas: 3071 | siniestros: 1697 | filas panel: 14516
   exposicion [0.01, 1.00] | antiguedad [0.10, 10.00]
-  % con siniestro: 30.8 | % baja: 38.9 | media n_siniestros: 0.555
-  var/media n_siniestros = 2.50  (>1 => sobredispersión por fragilidad; verdad θ=1.20)
+  % con siniestro: 30.7 | % baja: 38.9 | media n_siniestros: 0.553
+  var/media n_siniestros = 2.47  (>1 => sobredispersión por fragilidad; verdad θ=1.20)
 
 [1] Frecuencia (binomial negativa, offset=log(exposicion))
-  θ estimado = 1.15  (verdad = 1.20)
+  θ estimado = 1.13  (verdad = 1.20)
   IRR estimadas vs verdad (algunas):
-    edad_tramo35-65        est 0.448 | verdad 0.450
-    usocomercial           est 1.358 | verdad 1.246
-    scale(log(densidad))   est 1.335 | verdad 1.419
-    tipo_vehiculomoto      est 1.325 | verdad 1.197
-    sexoH                  est 1.054 | verdad 1.105
+    edad_tramo35-65        est 0.435 | verdad 0.450
+    usocomercial           est 1.371 | verdad 1.246
+    scale(log(densidad))   est 1.318 | verdad 1.419
+    tipo_vehiculomoto      est 1.231 | verdad 1.197
+    sexoH                  est 1.065 | verdad 1.105
 
 [2] Severidad (Gamma, enlace log) a nivel de PARTE
-  coste medio estimado (intercepto) = 1890 €  (verdad base = 1800 €)
-  IRR valor_vehiculo est 1.310 | verdad 1.297
-  IRR tipo moto      est 1.285 | verdad 1.350
+  coste medio estimado (intercepto) = 1891 €  (verdad base = 1800 €)
+  IRR valor_vehiculo est 1.267 | verdad 1.297
+  IRR tipo moto      est 1.274 | verdad 1.350
 
 [3] Baja / churn: AFT log-logística (no-PH) y test de PH de Cox
   coef AFT uso=comercial est -0.266 | verdad -0.150 (log-tiempo; - = dura menos)
@@ -32,15 +32,49 @@ edad_tramo         14.6364  3 0.0022
 GLOBAL             17.8780  5 0.0031
 
 [4] Tiempo al primer siniestro: forma Weibull
-  forma Weibull estimada = 0.97 | verdad = 1.15  (survreg scale = 1/forma)
+  forma Weibull estimada = 0.98 | verdad = 1.15  (survreg scale = 1/forma)
 
 [5] Bonus-malus: tabla de transición prev -> act
     act
 prev    1    2    3    4    5
-   1 1131   51    2    0    0
-   2  258  384   28    1    0
-   3    0  216  321   37    9
-   4    0    0  142  210   27
-   5    0    0    0   83  171
+   1 1096   46    5    0    0
+   2  238  420   29    1    0
+   3    0  222  328   24    4
+   4    0    0  135  245   24
+   5    0    0    0   88  166
+
+[6] Proxy sexo -> tipo_vehiculo
+  diseño: P(moto|M)=0.06, P(moto|H)=0.20  =>  OR verdad = 3.92
+  marginal de tipo_vehiculo (debe ser ~0.75/0.13/0.12):
+
+  turismo      moto furgoneta 
+    0.748     0.127     0.125 
+    moto
+sexo moto no moto
+   M   98    1443
+   H  293    1237
+  OR(moto, H vs M) estimado = 3.49 | verdad = 3.92
+  LRT independencia condicional sexo _||_ tipo | siniestro (esperamos p PEQUEÑO: hay proxy):
+Analysis of Deviance Table
+
+Model 1: Freq ~ sexo * sin + tipo * sin
+Model 2: Freq ~ sexo * sin + tipo * sin + sexo * tipo
+  Resid. Df Resid. Dev Df Deviance  Pr(>Chi)    
+1         4     119.54                          
+2         2       1.07  2   118.47 < 2.2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+  controles negativos (esperamos p GRANDE: no son proxies):
+    sexo vs zona_circulacion   p = 0.049
+    sexo vs uso                p = 0.053
+    sexo vs combustible        p = 0.889
+  IRR sexoH marginal = 1.075 | ajustado por tipo = 1.047 | verdad (directo) = 1.105
+  fuga teórica vía tipo_moto: frecuencia x1.0255 | severidad x1.0429 | prima pura x1.0695
+
+[7] Ocupación de celdas (tablas de Q4 y Q17bis)
+  tipo x zona x uso x sin                        celdas= 36 min=   3 vacías=0 <5=3 <10=7
+  tipo x zona x combustible x sin                celdas= 36 min=   6 vacías=0 <5=0 <10=2
+  sexo x tipo x sin                              celdas= 12 min=  33 vacías=0 <5=0 <10=0
+  sexo x tipo x zona x sin                       celdas= 36 min=   4 vacías=0 <5=1 <10=3
 
 == Fin de la validación ==

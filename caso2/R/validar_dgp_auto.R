@@ -109,6 +109,62 @@ if (!is.null(m_w))
 cat("\n[5] Bonus-malus: tabla de transición prev -> act\n")
 print(table(prev = d$bonus_malus_prev, act = d$bonus_malus_act))
 
+# ---- 6 · PROXY del factor prohibido (Q17bis / Unidad 2.1b) ------------------
+cat("\n[6] Proxy sexo -> tipo_vehiculo\n")
+px <- v$proxy
+cat(sprintf("  diseño: P(moto|M)=%.2f, P(moto|H)=%.2f  =>  OR verdad = %.2f\n",
+            px$p_moto_sexo["M"], px$p_moto_sexo["H"], px$or_moto_HvsM))
+
+# 6a · La marginal de tipo NO debe haberse movido (0.75 / 0.13 / 0.12)
+cat("  marginal de tipo_vehiculo (debe ser ~0.75/0.13/0.12):\n")
+print(round(prop.table(table(d$tipo_vehiculo)), 3))
+
+# 6b · OR estimado del proxy en la tabla sexo x moto
+tb <- table(sexo = d$sexo, moto = ifelse(d$tipo_vehiculo == "moto", "moto", "no moto"))
+print(tb)
+or_est <- (tb["H","moto"] * tb["M","no moto"]) / (tb["H","no moto"] * tb["M","moto"])
+cat(sprintf("  OR(moto, H vs M) estimado = %.2f | verdad = %.2f\n", or_est, px$or_moto_HvsM))
+
+# 6c · Independencia condicional: sexo _||_ tipo | siniestro  -> debe RECHAZARSE
+tab3 <- as.data.frame(table(sexo = d$sexo, tipo = d$tipo_vehiculo,
+                            sin = ifelse(d$n_siniestros > 0, "con", "sin")))
+m_ci  <- glm(Freq ~ sexo*sin + tipo*sin, family = poisson, data = tab3)  # sexo _||_ tipo | sin
+m_hom <- glm(Freq ~ sexo*sin + tipo*sin + sexo*tipo, family = poisson, data = tab3)
+cat("  LRT independencia condicional sexo _||_ tipo | siniestro (esperamos p PEQUEÑO: hay proxy):\n")
+print(anova(m_ci, m_hom, test = "LRT"))
+
+# 6d · Controles negativos: sexo SÍ debe ser independiente de zona/uso/combustible
+cat("  controles negativos (esperamos p GRANDE: no son proxies):\n")
+for (vr in c("zona_circulacion", "uso", "combustible")) {
+  p <- chisq.test(table(d$sexo, d[[vr]]))$p.value
+  cat(sprintf("    sexo vs %-18s p = %.3f\n", vr, p))
+}
+
+# 6e · Lo que el proxy TRANSPORTA: efecto marginal vs ajustado de sexo
+m_marg <- glm(n_siniestros ~ sexo + offset(log(exposicion)), family = quasipoisson, data = d)
+m_adj  <- glm(n_siniestros ~ sexo + tipo_vehiculo + offset(log(exposicion)),
+              family = quasipoisson, data = d)
+cat(sprintf("  IRR sexoH marginal = %.3f | ajustado por tipo = %.3f | verdad (directo) = %.3f\n",
+            exp(coef(m_marg)["sexoH"]), exp(coef(m_adj)["sexoH"]),
+            exp(v$betas$claim["sexo_h"])))
+cat(sprintf("  fuga teórica vía tipo_moto: frecuencia x%.4f | severidad x%.4f | prima pura x%.4f\n",
+            exp(v$betas$claim["tipo_moto"] * diff(px$p_moto_sexo)),
+            exp(v$betas$sev["tipo_moto"]   * diff(px$p_moto_sexo)),
+            exp((v$betas$claim["tipo_moto"] + v$betas$sev["tipo_moto"]) * diff(px$p_moto_sexo))))
+
+# ---- 7 · Ocupación de celdas de las tablas del estudio de caso ---------------
+cat("\n[7] Ocupación de celdas (tablas de Q4 y Q17bis)\n")
+d$sin_lab <- ifelse(d$n_siniestros > 0, "con", "sin")
+ocupacion <- function(etiqueta, vars) {
+  n <- c(table(d[vars]))
+  cat(sprintf("  %-46s celdas=%3d min=%4d vacías=%d <5=%d <10=%d\n",
+              etiqueta, length(n), min(n), sum(n == 0), sum(n < 5), sum(n < 10)))
+}
+ocupacion("tipo x zona x uso x sin",          c("tipo_vehiculo","zona_circulacion","uso","sin_lab"))
+ocupacion("tipo x zona x combustible x sin",  c("tipo_vehiculo","zona_circulacion","combustible","sin_lab"))
+ocupacion("sexo x tipo x sin",                c("sexo","tipo_vehiculo","sin_lab"))
+ocupacion("sexo x tipo x zona x sin",         c("sexo","tipo_vehiculo","zona_circulacion","sin_lab"))
+
 cat("\n== Fin de la validación ==\n")
 sink()   # cierra el volcado a fichero
 cat("\n(Salida guardada en:", .log, ")\n")

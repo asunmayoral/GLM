@@ -100,15 +100,28 @@ El coste es una magnitud $Y>0$ asimétrica a la derecha: el terreno de la **Gamm
 multiplicativos). Y como el **tiempo entre fallos** es también positivo continuo, el mismo marco nos
 lleva a los modelos **AFT** y, con ellos, al cierre del hilo de supervivencia: **Cox** como frontera.
 
-| Unidad | Contenido | Objetivo |
-|---|---|---|
-| **3.1** | **GLM Gamma**: el coste de una avería. Dónde falla el gaussiano · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia (Wald y $F$) · diagnóstico y validación. | Continuas positivas |
-| **3.2** | **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; la **relación media-varianza** como criterio; retransformación y sesgo (**smearing** de Duan); **modelar la dispersión**; comparación por AIC (con jacobiano). | Continuas positivas |
-| **3.3** | **GLMM Gamma**: el coste con **efecto aleatorio de máquina** (máquinas crónicamente caras); intercepto y **pendiente aleatoria** en la edad (la que asomó en la dispersión de 3.2); condicional vs marginal; se resuelven la $\hat\phi$ inflada y el falso positivo de `fabricante`. | Mixtos (espiral) |
-| **3.4** | **Del coste al tiempo: AFT**. Kaplan–Meier; los **tiempos entre fallos** como positivos continuos; exponencial, Weibull y lognormal; **censura en la verosimilitud**; factor de aceleración; ¿acortar el intervalo de mantenimiento retrasa el fallo? | Continuas positivas + supervivencia |
-| **3.5** | **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; **fragilidad** de máquina; diagnóstico de la proporcionalidad (el mantenimiento la rompe). | Supervivencia (espiral) |
-| **3.6** | **Síntesis: las tres lentes** sobre el fallo (tiempo discreto/`cloglog`, Poisson a trozos, Cox) **+ Tweedie**: coste total por máquina y año (con ceros) = **frecuencia × severidad = presupuesto**. Selección y validación agrupada. | Síntesis |
-| **3.7** | **Estudio de caso, exposición y evaluación** (artículo de investigación). | Comunicar y reproducir |
+| Unidad | Contenido | Objetivo y datos |
+|:--:|:----------------------------------------------------------------|:------------------|
+| **3.1** | *«¿Cuánto cuesta una avería?»* — **GLM Gamma**: el coste de una avería. Dónde falla el gaussiano · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia (Wald y $F$) · diagnóstico y validación. | Continuas positivas<br>**Datos:** `averias` |
+| **3.2** | *«¿Es de verdad una Gamma, y en qué escala?»* — **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; la **relación media-varianza** como criterio; retransformación y sesgo (**smearing** de Duan); **modelar la dispersión**; comparación por AIC (con jacobiano). | Continuas positivas<br>**Datos:** `averias` |
+| **3.3** | *«¿Hay máquinas crónicamente caras?»* — **GLMM Gamma**: el coste con **efecto aleatorio de máquina**; intercepto y **pendiente aleatoria** en la edad (la que asomó en la dispersión de 3.2); condicional vs marginal; se resuelven la $\hat\phi$ inflada y el falso positivo de `fabricante`. | Mixtos (espiral)<br>**Datos:** `averias` (por `id_maquina`) |
+| **3.4** | *«¿Cada cuánto se avería una máquina?»* — **Del coste al tiempo: AFT**. Kaplan–Meier; los **tiempos entre fallos** como positivos continuos; exponencial, Weibull y lognormal; **censura en la verosimilitud**; factor de aceleración; ¿acortar el intervalo de mantenimiento retrasa el fallo? | Continuas positivas + supervivencia<br>**Datos:** `intervalos` |
+| **3.5** | *«¿El riesgo de fallo es proporcional en el tiempo?»* — **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; **fragilidad** de máquina; diagnóstico de la proporcionalidad (el mantenimiento la rompe). | Supervivencia (espiral)<br>**Datos:** `intervalos`, `seguimiento` |
+| **3.6** | *«¿Cuánto costará el mantenimiento el año que viene?»* — **Síntesis: las tres lentes** sobre el fallo (tiempo discreto/`cloglog`, Poisson a trozos, Cox) **+ Tweedie**: coste total por máquina y año (con ceros) = **frecuencia × severidad = presupuesto**. Selección y validación agrupada. | Síntesis<br>**Datos:** `seguimiento`, `panel` |
+| **3.7** | *«¿Qué recomendamos, y es reproducible?»* — **Estudio de caso, exposición y evaluación** (artículo de investigación). | Comunicar y reproducir<br>**Datos:** todo el banco |
+
+**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión (la lista
+completa, con su uso comentado, vive en cada `.qmd` y en los scripts de `caso3/scripts/`):
+
+| Unidad | Funciones y paquetes clave |
+|:--:|:-----------------------------------------------------------------------|
+| **3.1** | `glm(Gamma(link="log"))` · `broom::tidy` · `anova(…, test="F")` · `DHARMa::simulateResiduals` · `emmeans` / `marginaleffects` |
+| **3.2** | `glm(inverse.gaussian)` · `lm(log(y))` + **smearing** de Duan · `AIC` / `logLik` · `MASS` |
+| **3.3** | `glmmTMB(… + (1 + edad \| id_maquina))` · `car::Anova` · `performance::r2_nakagawa` / `icc` · `DHARMa::testDispersion` · `VarCorr` |
+| **3.4** | `survival::survreg` (Weibull/exp/lognormal) · `Surv` · `survfit` / `survdiff` (KM, log-rank) · `survminer::ggsurvplot` |
+| **3.5** | `survival::coxph` · `frailty(id_maquina)` · `cox.zph` (Schoenfeld) · `Surv(tstart, tstop, evento)` |
+| **3.6** | `glmmTMB(family = tweedie)` · `glm` (`cloglog` / Poisson a trozos) · `glmnet` · `rsample::group_vfold_cv` |
+| **3.7** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 
 # Presentación del caso {#sec-presentacion3}
@@ -280,8 +293,8 @@ p_coste + p_gap
 
 {{< include _unidad_3_3.qmd >}}
 
-::: {.callout-warning}
-## Unidades en reconstrucción
-Las unidades **3.4–3.7** se están reescribiendo sobre el banco de **averías** y se reconectarán una a una
-a medida que queden listas. Las Unidades 3.1, 3.2 y 3.3 ya están sobre el banco nuevo.
-:::
+{{< include _unidad_3_4.qmd >}}
+{{< include _unidad_3_5.qmd >}}
+{{< include _unidad_3_6.qmd >}}
+
+

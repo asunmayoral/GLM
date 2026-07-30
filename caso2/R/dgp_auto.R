@@ -54,6 +54,10 @@ simular_cartera_auto <- function(
     lambda_asist = 0.45, lambda_fraude = 0.10, lambda_gest = 0.30,
     g_cero = c(int = 0.2, uso = -0.6, pot = -0.3),  # logit de ceros estructurales (fraude)
     persistencia = 0.60,              # inercia del bonus-malus
+    # PROXY del factor prohibido: P(moto | sexo). La marginal de `tipo` se
+    # preserva exactamente (0.75/0.13/0.12) si p_moto_sexo promedia 0.13 con
+    # sexo 50/50. Poner c(M = .13, H = .13) desactiva el proxy (independencia).
+    p_moto_sexo = c(M = 0.06, H = 0.20),
     betas = NULL, semilla = SEMILLA_CURSO) {
 
   if (is.null(betas)) betas <- betas_auto_defecto()
@@ -79,9 +83,20 @@ simular_cartera_auto <- function(
   dens   <- round(.clip(rlnorm(N, log(300), 1.1), 5, 25000))        # hab/km²
   km     <- round(.clip(rlnorm(N, log(12000), 0.5), 1000, 60000))
   uso    <- sample(c("particular", "comercial"), N, TRUE, c(.85, .15))
-  tipo   <- sample(c("turismo", "moto", "furgoneta"), N, TRUE, c(.75, .13, .12))
   comb   <- sample(c("gasolina", "diesel"), N, TRUE, c(.45, .55))
   sexo   <- sample(c("M", "H"), N, TRUE, c(.5, .5))
+
+  # `tipo` CONDICIONADO a `sexo`: es el PROXY del factor prohibido (ver 2.1b/Q17bis).
+  # P(moto) depende del sexo; furgoneta queda fija en .12 y turismo absorbe el resto.
+  # Con sexo 50/50 y p_moto_sexo promediando .13, la marginal de `tipo` sigue siendo
+  # 0.75/0.13/0.12 -> ningún otro bloque del DGP cambia de comportamiento, pero
+  # `tipo_vehiculo` TRANSPORTA información de `sexo`: excluir `sexo` del modelo NO
+  # basta para que la tarifa sea ciega al sexo. El efecto AJUSTADO de sexo sigue
+  # siendo betas$claim["sexo_h"]; solo cambia el marginal.
+  p_moto <- unname(p_moto_sexo[sexo])
+  u_tipo <- runif(N)
+  tipo   <- ifelse(u_tipo < p_moto, "moto",
+            ifelse(u_tipo < p_moto + 0.12, "furgoneta", "turismo"))
 
   zona <- cut(dens, breaks = c(-Inf, 150, 1000, Inf), labels = c("rural", "mixta", "urbana"))
   edad_tramo <- cut(edad, breaks = c(-Inf, 25, 35, 65, Inf),
@@ -233,6 +248,22 @@ simular_cartera_auto <- function(
     T_max = T_max, lambda_asist = lambda_asist, lambda_fraude = lambda_fraude,
     lambda_gest = lambda_gest, N = N, semilla = semilla,
     prohibido = "sexo",
+    # PROXY: `tipo_vehiculo` está asociado a `sexo` por construcción (P(moto|H) >
+    # P(moto|M)) y además tiene efecto propio sobre la frecuencia y la severidad.
+    # Es, por tanto, un canal por el que la información prohibida entra en el
+    # modelo aunque `sexo` se excluya. Las demás covariables (zona, uso,
+    # combustible...) SÍ son independientes de `sexo`: son controles negativos.
+    proxy = list(
+      de = "sexo", via = "tipo_vehiculo", nivel = "moto",
+      p_moto_sexo = p_moto_sexo,
+      or_moto_HvsM = unname((p_moto_sexo["H"] / (1 - p_moto_sexo["H"])) /
+                            (p_moto_sexo["M"] / (1 - p_moto_sexo["M"]))),
+      controles_negativos = c("zona_circulacion", "uso", "combustible",
+                              "estado_civil", "forma_pago", "nivel_estudios"),
+      nota = paste("Asociación sexo-tipo_vehiculo por diseño. El efecto AJUSTADO de",
+                   "sexo (controlando tipo) es betas$claim['sexo_h']; el MARGINAL es",
+                   "mayor porque tipo_moto lo transporta. La diferencia entre ambos",
+                   "es lo que el proxy transmite.")),
     nota = "sexo tiene efecto REAL (claim y sev ~1.10) pero NO es factor de tarificación legal (Test-Achats).")
   d
 }

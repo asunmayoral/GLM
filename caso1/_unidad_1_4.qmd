@@ -3,7 +3,7 @@
      respuesta binaria de la cohorte simulada (ever, centro) y sobre GLOW (site_id).
      Verdad en attr(cohorte, "verdad"). El tiempo a evento y su fragilidad van a la Unidad 5. -->
 
-# 4 · Efectos aleatorios {#sec-u14}
+# 4 · Efectos Aleatorios y Modelos Mixtos {#sec-u14}
 
 Hasta aquí, cada coeficiente ha sido un **efecto fijo**: un único número válido para toda la
 población. Pero los datos rara vez son una masa homogénea —los pacientes se agrupan en centros,

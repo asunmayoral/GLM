@@ -6,7 +6,7 @@
      Cierra dos deudas de 3.1/3.2: la phi inflada y el falso positivo de `fabricante`.
      Datos: base <- banco$averias (creado en 3.1, con fase_proceso). -->
 
-# 3 · Continuas positivas agrupadas: GLMM Gamma {#sec-u33}
+# 3 · Efectos Aleatorios y Modelos Mixtos {#sec-u33}
 
 Las dos unidades anteriores trataron cada avería como una observación **independiente**: una fila, un
 coste. Pero el banco no es así. Una misma máquina sufre **varias averías** a lo largo de su vida, y sus
@@ -93,7 +93,7 @@ señal que ya asomó en la 3.2, cuando la dispersión crecía débilmente con la
 
 ## 3.2 El modelo mixto Gamma {#sec-u33-modelo}
 
-Mantenemos la **Gamma con enlace log** de la 3.1 —el coste sigue siendo positivo y asimétrico— y le
+Mantenemos la **Gamma con enlace log** de la [Sección 3.1](#sec-u33-contexto) —el coste sigue siendo positivo y asimétrico— y le
 añadimos los efectos aleatorios de máquina. Para la avería $k$ de la máquina $i$,
 $$\log \mu_{ik} = \underbrace{x_{ik}^{\top}\beta}_{\text{efectos fijos (los de 3.1)}}
 \;+\; \underbrace{b_{0i} + b_{1i}\,\widetilde{\text{edad}}_{ik}}_{\text{máquina } i},
@@ -125,8 +125,8 @@ máquina. Arrastramos `fabricante` desde la 3.1 —donde entró provisionalmente
 falso positivo—; lo **pondremos a prueba** en la [Sección 3.4](#sec-u33-inferencia), ahora que el
 agrupamiento sí está modelado.
 
-::: {.callout-note}
-## En R: cómo ajustar un GLM mixto
+::: {.callout-tip}
+## 🔧 En R. Cómo ajustar un GLM mixto
 Un GLMM es un `glm()` al que se le añade **estructura aleatoria** en la fórmula. El paquete de referencia
 es **`glmmTMB`** (con la misma sintaxis, también `lme4::glmer`):
 
@@ -157,8 +157,8 @@ en el callout siguiente.
 Un GLMM se lee en **dos capas**: los efectos fijos (la tendencia media de la población de máquinas) y los
 componentes de varianza (cuánta heterogeneidad hay alrededor).
 
-::: {.callout-note}
-## Salida ordenada en R 
+::: {.callout-tip}
+## 🔧 En R. Salida ordenada con `broom.mixed`
 `summary()` imprime todo en bruto; para tenerlo como con `broom::tidy` en un GLM,
 `glmmTMB` no trae método propio, pero **`broom.mixed`** sí:
 
@@ -427,32 +427,26 @@ llevan la variabilidad **entre máquinas**, lo que queda en los residuos es exac
 la Gamma espera. La $\hat\phi$ que en 3.1 salía **inflada** (≈ 0,33) ha vuelto a su sitio —y lo
 confirmamos aquí sin necesitar el DGP; la validación de abajo lo rematará con la verdad en la mano—.
 
-::: {.callout-note}
-## En R: diagnóstico de residuos y dispersión en un GLMM
-Con `m` el modelo ajustado con `glmmTMB`:
-
-**1. Residuos cuantil simulados (DHARMa)** —tratan bien la estructura jerárquica—:
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico de residuos y dispersión en un GLMM
+Los **residuos cuantil de DHARMa** (introducidos en la [Unidad 3.1](#sec-u31)) valen también aquí, con una
+ventaja: sobre un modelo de `glmmTMB`, `simulateResiduals` **respeta la estructura jerárquica**.
 
 ```r
-sim <- DHARMa::simulateResiduals(m, n = 1000)   # residuos simulados
+sim <- DHARMa::simulateResiduals(m, n = 1000)   # residuos simulados, respetando el agrupamiento
 plot(sim)                                        # QQ uniforme + residuos vs. predicho
 ```
 
-**Qué buscamos:** en el **QQ**, los puntos sobre la diagonal (uniformidad) y los contrastes que DHARMa
-superpone —KS, dispersión, atípicos— **no significativos**; en el panel derecho, una nube **sin
-estructura** (ni abanico ni curvatura).
+Lo **nuevo del GLMM** es comprobar que los efectos aleatorios han dejado la dispersión en su sitio:
 
-**2. Dispersión $\phi$** —estimarla y contrastarla—:
-
-La Gamma cumple $\operatorname{Var}=\phi\,\mu^2$.
 ```r
-sigma(m)^2                     # estimación de phi  (Var = phi * mu^2)
+sigma(m)^2                     # estimación de phi  (en la Gamma, Var = phi * mu^2)
 DHARMa::testDispersion(sim)    # contraste de sobre/infradispersión
 ```
 
-Un test **no significativo** indica que la dispersión está **bien especificada**: los efectos aleatorios
-se han llevado la variabilidad entre grupos y lo que queda es la de la familia. Es la comprobación válida
-**con datos reales**, sin conocer la verdad.
+Un `testDispersion` **no significativo** indica que la variabilidad entre máquinas ya la absorben los
+aleatorios y lo que queda es la de la familia. Es la comprobación válida **con datos reales**, sin conocer
+la verdad.
 :::
 
 ### Validación contra el DGP {#sec-u33-validacion}
@@ -534,8 +528,8 @@ la asimetría es la **mediana**, no la **media poblacional**. Promediar el coste
 da algo **mayor** —un factor $e^{\sigma^2/2}$ con $\sigma^2$ la varianza del intercepto aleatorio; aquí,
 un ~7 % más—. Para presupuestar la **flota entera**, conviene tenerlo en cuenta.
 
-::: {.callout-note}
-## En R: predicción en un GLMM
+::: {.callout-tip}
+## 🔧 En R. Predicción en un GLMM
 - **Predicción marginal** (solo efectos fijos, la máquina «típica»):
   `predict(m, newdata, type = "response", re.form = NA)`.
 - **Predicción condicional** (añade los efectos aleatorios de cada máquina, sus BLUP):

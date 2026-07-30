@@ -19,12 +19,52 @@
   doi       = {10.1201/9781315182780}
 }
 
+% AVISO: el proyecto maneja DOS libros de Agresti. Cuando la GUÍA DOCENTE cita "Agresti
+% (cap. X)" en las bibliografías semanales se refiere a ESTE (2015, Foundations): es el único
+% Agresti de su lista formal de referencias (§8) y de la "BIBLIOGRAFÍA BÁSICA UMH". El de 2013
+% (Categorical Data Analysis) solo figura en la "BIBLIOGRAFÍA ADICIONAL UMH" y su anotación lo
+% adscribe a la Unidad 3.
+% Índice VERIFICADO contra el propio cap. 1 del libro, donde Agresti describe el plan de la obra:
+%   1 Introducción · 2 Modelos lineales: mínimos cuadrados · 3 Modelos lineales normales:
+%   inferencia · 4 GLM: ajuste e inferencia · 5 Datos binarios · 6 Respuesta multinomial ·
+%   7 MODELOS PARA CONTEOS (Poisson y binomial negativa) · 8 Cuasi-verosimilitud ·
+%   9 Respuestas correlacionadas · 10 Bayesiano · 11 Extensiones.
+% Por tanto "Agresti (cap. 7)" en el Caso 2 de la guía es CORRECTO: es el cap. de conteos.
 @book{agresti2015,
   author    = {Agresti, Alan},
   title     = {Foundations of Linear and Generalized Linear Models},
   year      = {2015},
   publisher = {Wiley},
   isbn      = {978-1-118-73003-4}
+}
+
+% Log-lineales para tablas (Unidad 2.1b). Datos VERIFICADOS contra el PDF en bibliografia/:
+% 3.ª ed., Springer Texts in Statistics, 2025. Capítulos y páginas comprobados en el índice.
+% AVISO: simetría, cuasi-simetría y homogeneidad marginal aparecen en los EJERCICIOS del
+% cap. 2 (pp. 80-81), no en el texto principal: no citar como fuente de la exposición.
+@book{christensen2025,
+  author    = {Christensen, Ronald},
+  title     = {Log-Linear Models and Logistic Regression},
+  edition   = {3},
+  year      = {2025},
+  publisher = {Springer},
+  series    = {Springer Texts in Statistics},
+  address   = {Cham},
+  doi       = {10.1007/978-3-031-69038-9},
+  isbn      = {978-3-031-69037-2}
+}
+
+% Log-lineales con R (Unidad 2.1b), §10.4 pp. 378-397. VERIFICADO contra el PDF en
+% bibliografia/: Springer Texts in Statistics, 2018, ISBN 978-1-4419-0117-0.
+% No confundir con dunnsmyth1996 (artículo de residuos cuantil aleatorizados).
+@book{dunnsmyth2018,
+  author    = {Dunn, Peter K. and Smyth, Gordon K.},
+  title     = {Generalized Linear Models With Examples in R},
+  year      = {2018},
+  publisher = {Springer},
+  series    = {Springer Texts in Statistics},
+  address   = {New York},
+  isbn      = {978-1-4419-0117-0}
 }
 
 @book{faraway2016,
@@ -86,6 +126,14 @@
   isbn      = {978-0-521-68689-1}
 }
 
+% Estructura de capítulos de la 3.ª ed. VERIFICADA contra el apéndice de software del propio
+% autor (alanagresti.com/cda/R_web.pdf, "organized by chapter of presentation" de esta edición):
+%   caps. 2-3 tablas de dos vías · cap. 4 GLM · caps. 5-7 logística y respuesta binaria ·
+%   cap. 8 modelos de respuesta multinomial · caps. 9-10 MODELOS LOG-LINEALES ·
+%   cap. 11 Models for Matched Pairs (tablas cuadradas: simetría, cuasi-simetría, homogeneidad
+%   marginal, McNemar, Bradley-Terry) · cap. 12 marginales para respuestas agrupadas ·
+%   caps. 13-14 efectos aleatorios · cap. 15 clasificación no basada en modelos.
+% NO es el cap. 7: ése cae dentro del bloque de logística.
 @book{agresti2013,
   author    = {Agresti, Alan},
   title     = {Categorical Data Analysis},
@@ -329,7 +377,7 @@
 
 @article{cox1972,
   author  = {Cox, David R.},
-  title   = {Regression Models and Life-Tables},
+  title   = {Regression models and life-tables},
   journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
   year    = {1972},
   volume  = {34},
@@ -404,7 +452,7 @@
 
 @article{holford1980,
   author  = {Holford, Theodore R.},
-  title   = {The Analysis of Rates and of Survivorship Using Log-Linear Models},
+  title   = {The analysis of rates and of survivorship using log-linear models},
   journal = {Biometrics},
   volume  = {36},
   number  = {2},
@@ -415,7 +463,7 @@
 
 @article{laird1981,
   author  = {Laird, Nan and Olivier, Donald},
-  title   = {Covariance Analysis of Censored Survival Data Using Log-Linear Analysis Techniques},
+  title   = {Covariance analysis of censored survival data using log-linear analysis techniques},
   journal = {Journal of the American Statistical Association},
   volume  = {76},
   number  = {374},
@@ -799,28 +847,6 @@
   doi     = {10.1098/rsif.2017.0213}
 }
 
-@article{holford1980,
-  author  = {Holford, Theodore R.},
-  title   = {The analysis of rates and of survivorship using log-linear models},
-  journal = {Biometrics},
-  year    = {1980},
-  volume  = {36},
-  number  = {2},
-  pages   = {299--305},
-  doi     = {10.2307/2529982}
-}
-
-@article{laird1981,
-  author  = {Laird, Nan and Olivier, Donald},
-  title   = {Covariance analysis of censored survival data using log-linear analysis techniques},
-  journal = {Journal of the American Statistical Association},
-  year    = {1981},
-  volume  = {76},
-  number  = {374},
-  pages   = {231--240},
-  doi     = {10.1080/01621459.1981.10477634}
-}
-
 @article{schoenfeld1982,
   author  = {Schoenfeld, David},
   title   = {Partial residuals for the proportional hazards regression model},
@@ -843,15 +869,25 @@
   doi     = {10.1093/biomet/81.3.515}
 }
 
-@article{cox1972,
-  author  = {Cox, David R.},
-  title   = {Regression models and life-tables},
-  journal = {Journal of the Royal Statistical Society: Series B},
-  year    = {1972},
-  volume  = {34},
-  number  = {2},
-  pages   = {187--202},
-  doi     = {10.1111/j.2517-6161.1972.tb00899.x}
+@book{therneau2000,
+  author    = {Therneau, Terry M. and Grambsch, Patricia M.},
+  title     = {Modeling Survival Data: Extending the {Cox} Model},
+  publisher = {Springer},
+  address   = {New York},
+  year      = {2000},
+  series    = {Statistics for Biology and Health},
+  doi       = {10.1007/978-1-4757-3294-8}
+}
+
+@article{vaupel1979,
+  author  = {Vaupel, James W. and Manton, Kenneth G. and Stallard, Eric},
+  title   = {The impact of heterogeneity in individual frailty on the dynamics of mortality},
+  journal = {Demography},
+  year    = {1979},
+  volume  = {16},
+  number  = {3},
+  pages   = {439--454},
+  doi     = {10.2307/2061224}
 }
 
 @article{breslow1974,

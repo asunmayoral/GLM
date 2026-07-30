@@ -1,547 +1,1249 @@
-<!-- Partial · Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-.
-     Capstone de selección: de AIC/BIC a la validación cruzada y la regularización.
-     Se trabaja sobre la Poisson limpia (n_asistencia) de la cartera auto, que ya trae
-     predictores de ruido "para que el lasso tenga qué descartar". Validación contra el DGP. -->
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-. -->
 
-# 6 · Selección, validación cruzada y regularización {#sec-u26}
+# 6 · Del conteo al reloj. Supervivencia {#sec-u26}
 
-Hasta aquí, cada vez que hemos tenido que **elegir** entre modelos —qué predictores entran, si añadir un
-término, qué familia— nos hemos apoyado en criterios que se calculan sobre **los mismos datos con los que
-ajustamos**: la *deviance*, la razón de verosimilitudes, el AIC y el BIC. Son criterios *in-sample*: miran
-lo bien que el modelo reproduce la muestra que ya ha visto. El problema es que un modelo puede reproducir su
-propia muestra cada vez mejor cuantos más parámetros le demos —hasta memorizarla— sin por ello **predecir**
-mejor una póliza nueva. Esta unidad da dos pasos para separar *ajustar bien* de *predecir bien*. Primero, la
-**validación cruzada**: en lugar de penalizar la complejidad con una fórmula (el `2k` del AIC), estimamos el
-error de predicción **fuera de la muestra**, dejando fuera parte de los datos y prediciéndolos. Segundo, la
-**regularización** —*ridge*, *lasso* y *elastic-net*—, que en vez de elegir modelos uno a uno **encoge** los
-coeficientes hacia cero y, en el caso del *lasso*, pone algunos **exactamente** a cero: selección y ajuste en
-una sola pasada. Cerramos comprobando que es la **misma máquina** que ya usamos en la logística del Caso 1:
-solo cambia la familia.
+En el Caso 1 aplazamos el modelo de Cox y prometimos volver a la supervivencia desde otra familia. Aquí
+cumplimos: el **hazard** —el ritmo instantáneo al que ocurre el evento— es, en el fondo, una **tasa**, y
+ya sabemos modelar tasas con la Poisson y un *offset*. El evento de esta cartera es el **primer
+siniestro** de cada póliza (`tiempo_primer_sin`, `evento`), seguido a lo largo de la **antigüedad** del
+cliente con la aseguradora y sujeto a **censura** cuando su historial acaba sin siniestro. Trocearemos ese tiempo en
+intervalos, supondremos el hazard **constante dentro de cada intervalo** —el modelo **exponencial a
+trozos**— y veremos que su verosimilitud es, exactamente, la de una Poisson sobre datos
+**persona-periodo**. De ahí sale todo: razones de riesgo leídas como IRR, una curva de supervivencia, y
+la comparación con los clásicos —**Cox** y **Kaplan–Meier**— para comprobar que no es un mundo aparte,
+sino el **mismo hazard** visto desde los conteos. Cerramos con la **fragilidad** (*frailty*), que no es
+otra cosa que un GLMM de Poisson.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **conteos y tasas** — comparar y seleccionar modelos de Poisson pasando de los criterios
-*in-sample* (AIC/BIC) a la evaluación *out-of-sample* (**validación cruzada**) y a la **regularización**
-(*ridge*/*lasso*/*elastic-net*, con `glmnet` sobre la familia Poisson). Es el eco, en la escala de la tasa,
-de lo que en el Caso 1 hacíamos con la *deviance* y el AUC *in-sample*.
+Objetivo general: **supervivencia** (espiral) — el modelo de **riesgos a trozos** como `glm(poisson)`
+con `offset(log` tiempo-persona`)`; su equivalencia con el persona-periodo `cloglog` del Caso 1, la
+comparación con **Cox** y **Kaplan–Meier**, y el nexo con la **fragilidad** (*frailty* ≡ GLMM de Poisson).
 :::
 
 <!-- ============================================================================
-     ESQUEMA:
-       6.1 De la selección clásica a la validación cruzada (AIC/BIC -> CV k-fold; sesgo-varianza).
-       6.2 Regularización: ridge, lasso y elastic-net (glmnet Poisson + cv.glmnet; lasso = selección;
-           validación contra la "verdad" del DGP).
-       6.3 La misma máquina en la binaria (glmnet family="binomial"; nota Gamma -> Caso 3).
+     ESQUEMA PROPUESTO (a validar antes de desarrollar sección a sección):
+       6.1 Contexto: el hazard como una tasa.
+       6.2 El modelo exponencial a trozos como GLM de Poisson.
+       6.3 Dos lentes del mismo hazard: Poisson y cloglog (nexo Caso 1).
+       6.4 ¿Comparable con los clásicos? Cox y Kaplan-Meier.
+       6.5 Fragilidad = GLMM de Poisson (puente con la Unidad 2.5).
 ============================================================================ -->
 
-Trabajaremos sobre la respuesta **limpia** de la cartera, `n_asistencia` (la Poisson bien portada de la
-[Unidad 2.1](#sec-u21)), con su *offset* de exposición. La elegimos a propósito: sin sobredispersión ni
-exceso de ceros de por medio, aislamos el fenómeno de esta unidad —**qué variables conservar**—. Y la
-cartera es el banco de pruebas ideal porque, junto a los predictores que **de verdad** mueven la tasa, trae
-un bloque de variables de **ruido** (sexo, color del vehículo, forma de pago…) que el DGP generó **sin
-relación** con las respuestas, precisamente para que tengamos algo que descartar y podamos **comprobar contra
-la verdad** si lo descartamos bien.
+## 6.1 El hazard como una tasa: el problema del tiempo a evento {#sec-u26-contexto}
+
+### Los datos y la pregunta
+
+De cada póliza sabemos **cuándo** ocurrió su **primer siniestro** —o que **no** ha ocurrido en todo su
+historial con nosotros—. Dos columnas lo resumen: `tiempo_primer_sin`, el tramo de antigüedad del cliente (de 1 a `r max(cartera$tiempo_primer_sin)`) en que se observó el primer siniestro o, si no lo hubo, el último tramo observado; y `evento`, que vale 1 si el siniestro se observó y 0 si llegamos al final de su
+historial sin él. Cuánto tiempo lleva contratado cada cliente (antigüedad) lo marca la variable `exposicion`. En la cartera simulada, solo un `r round(mean(cartera$evento) * 100)`% de las pólizas ha registrado un primer siniestro; el resto no presentó ningún parte (está censurado).
 
 ```{r}
 #| label: u26-datos
-# Predictores del riesgo (activos en el DGP) + bloque de ruido (relación nula por diseño).
-activos <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo",
-             "zona_circulacion", "uso", "tipo_vehiculo")
-ruido   <- c("sexo", "estado_civil", "color_vehiculo", "tiene_garaje", "forma_pago",
-             "financiado", "km_declarados", "valor_vehiculo", "n_conductores", "antiguedad_cliente")
-predictores <- c(activos, ruido)
-
-cartera |> dplyr::select(n_asistencia, exposicion, dplyr::all_of(predictores)) |> dplyr::glimpse()
+cartera |>
+  dplyr::select(id_poliza, tiempo_primer_sin, evento, exposicion,
+                zona_circulacion, tipo_vehiculo, sexo) |>
+  head(8)
 ```
 
-## 6.1 De la selección clásica a la validación cruzada {#sec-u26-cv}
+Ese `0` de `evento` es la clave: es una observación **censurada**. Sabemos que la póliza estuvo sin
+siniestro *al menos* hasta donde la seguimos, pero no cuándo —ni si— habría dado el primer parte. Si queremos mantener la información de  **cuándo** se produjo ese primer evento, necesariamente hemos de conservar la variable relativa al tiempo, `tiempo_primer_sin`, junto a esta variable de censura `evento`, y en ningún momento podemos desligarlas y tratarlas de modo individual. 
 
-### Ajustar bien no es predecir bien
-
-Un modelo tiene dos errores muy distintos. Uno es lo bien que reproduce **la muestra con la que se ajustó**
-—su *deviance* de entrenamiento—; el otro, lo bien que predeciría **una póliza que nunca ha visto**. Solo el
-segundo importa para tarificar al cliente que entra mañana, y no coinciden: añadiendo predictores, el primero
-**siempre** mejora (o al menos no empeora), aunque esos predictores sean puro ruido, porque el ajuste puede
-usar sus fluctuaciones muestrales para pegarse un poco más a los datos. A ese espejismo se le llama
-**optimismo** del error *in-sample*, y es la razón por la que la *deviance* de entrenamiento, sola, no sirve
-para elegir: premiaría siempre al modelo más grande.
-
-Se ve en una línea. Ajustemos el modelo con solo los predictores activos y el modelo que además mete **todo**
-el ruido, y comparemos sus *deviances* de entrenamiento:
-
-```{r}
-#| label: u26-optimismo
-f_activos <- reformulate(c(activos, "offset(log(exposicion))"), response = "n_asistencia")
-f_todo    <- reformulate(c(predictores, "offset(log(exposicion))"), response = "n_asistencia")
-
-m_activos <- glm(f_activos, family = poisson, data = cartera)
-m_todo    <- glm(f_todo,    family = poisson, data = cartera)
-
-c(dev_activos = deviance(m_activos), dev_todo = deviance(m_todo),
-  gl_activos = m_activos$df.residual, gl_todo = m_todo$df.residual)
-```
-
-La *deviance* del modelo con ruido es **menor** (ajusta «mejor»), aunque sabemos —porque conocemos el DGP—
-que esas variables no aportan nada. Ha gastado grados de libertad en modelar azar. Necesitamos un criterio
-que **cobre** por esa complejidad.
-
-La respuesta clásica a la pregunta «¿es **real** ese descenso?» es el **test de la razón de verosimilitudes**
-(LRT). Como los modelos están **anidados** —`m_activos` es `m_todo` con los 14 coeficientes del ruido puestos a
-cero—, la diferencia de *deviances* se distribuye, bajo la hipótesis nula de que **todos** esos coeficientes son
-cero, como una $\chi^2$ con tantos grados de libertad como parámetros de más (aquí, los 14 del bloque de ruido).
-`anova()` lo calcula:
-
-```{r}
-#| label: u26-lrt
-anova(m_activos, m_todo, test = "LRT")
-```
-
-Con datos generados sin relación con el ruido, el descenso **no supera** lo que 14 parámetros extra compran por
-azar —aquí, una caída de *deviance* de $\approx 18$ sobre $14$ grados de libertad, con $p \approx 0.22$—, así que
-el test **no rechaza**: no hay evidencia de que esas variables pertenezcan al modelo, justo lo que dice el DGP.
-Fíjate en que el LRT es, en el fondo, **otra forma de cobrar por la
-complejidad**: no mira el descenso a secas, sino si **supera** el umbral de una $\chi^2_{14}$; esa misma idea
-—descenso de *deviance* frente a número de parámetros— es la que el AIC convierte en un cargo fijo de $2$ por
-coeficiente. Pero el LRT tiene tres límites que son, exactamente, los que empujan hacia lo que sigue: exige
-modelos **anidados** (no compara dos modelos cualesquiera), responde a «¿hay **asociación**?» y no a «¿predice
-**mejor** fuera de la muestra?», y **no escala** a rastrear entre decenas de predictores. Para eso necesitamos
-estimar el error de predicción **directamente**.
-
-### El apaño analítico: AIC y BIC
-
-La primera respuesta, la que ya usábamos en el Caso 1, es **penalizar analíticamente** el número de
-parámetros. El AIC [@akaike1974] suma a la *deviance* un cargo de $2k$ por los $k$ parámetros; el BIC
-[@schwarz1978] cobra $k\log n$, más caro cuando $n$ es grande, así que tiende a modelos más pequeños. Ambos
-convierten «ajusta mejor» en «ajusta mejor **descontando** lo que cuesta»:
-
-```{r}
-#| label: u26-aic-bic
-tibble::tibble(
-  modelo = c("solo activos", "activos + ruido"),
-  gl     = c(length(coef(m_activos)), length(coef(m_todo))),
-  AIC    = c(AIC(m_activos), AIC(m_todo)),
-  BIC    = c(BIC(m_activos), BIC(m_todo)))
-```
-
-Con el cargo por complejidad, el modelo **sin ruido** gana en ambos: su *deviance* es un pelín mayor, pero no
-paga por los catorce coeficientes inútiles del bloque de ruido. AIC y BIC son rápidos y, para comparar unos pocos modelos anidados,
-suficientes. Tienen dos límites que motivan lo que sigue. Primero, son una **aproximación**: valen bajo el
-modelo y el tamaño muestral adecuados, y estiman el error de predicción de forma indirecta, vía la
-verosimilitud. Segundo, y más importante en la práctica, **no escalan a la búsqueda**: si hay 17 predictores
-—o 170—, comparar todos los subconjuntos por AIC es inviable, y la selección paso a paso (`step()`) explora
-solo una fracción y hereda los problemas de la inferencia tras seleccionar. Queremos estimar el error de
-predicción **directamente** y, después, un método que **no tenga que enumerar** modelos.
-
-### La validación cruzada: medir el error donde importa
-
-La idea de la **validación cruzada** [@stone1974] es tan simple como honesta: si lo que importa es predecir
-datos nuevos, **escondamos** algunos, ajustemos sin ellos y midamos el error al predecirlos. En la variante
-de $k$ *bloques* (*k-fold*), partimos la cartera en $k$ trozos; por turnos, uno hace de test y los otros
-$k-1$ de entrenamiento; cada póliza se predice **exactamente una vez**, siempre con un modelo que **no la vio**.
-El error de predicción es el promedio sobre los $k$ turnos. Como estamos en Poisson, la métrica natural no es
-el error cuadrático sino la **deviance de Poisson** por observación (dos veces la log-verosimilitud que le
-falta a la predicción), que es la misma vara con la que ajustamos.
-
-**¿Cuántos bloques?** La elección de $k$ es, ella misma, un compromiso sesgo–varianza, pero esta vez sobre la
-**estimación del error**, no sobre el modelo. Con $k = n$ —validación cruzada *dejando uno fuera* (LOOCV)— el
-estimador es casi insesgado pero **muy variable** y caro de calcular; con $k$ pequeño ($2$ o $3$) es barato pero
-**sesga el error al alza**, porque cada modelo se entrena con una fracción mucho menor de los datos. La
-bibliografía [@james2021; @hastie2009] recomienda, como término medio, **$k = 5$ o $k = 10$**, que es la
-elección estándar. Aquí usamos **$k = 10$** en todo el capítulo (también en `cv.glmnet`, vía `nfolds = 10`).
-
-**¿Cómo lo resolvemos sobre estos datos?** Repartimos las $n$ pólizas en $10$ bloques del mismo tamaño con una
-asignación **aleatoria** —fijando la semilla del curso, para que sea reproducible—; cada bloque hace de test una
-vez, entrenando con los otros nueve; predecimos el bloque de test **arrastrando su *offset*** y acumulamos su
-deviance; al final promediamos por observación. Un apunte sobre la métrica, que resuelve una duda razonable:
-la `deviance(fit)` que devuelve un modelo ajustado es la de **entrenamiento** —mide el ajuste sobre las mismas
-filas que lo entrenaron—, y lo que necesitamos es la deviance sobre las filas **que el modelo no vio**, que el
-objeto ajustado no guarda; por eso la evaluamos nosotros sobre el bloque de test. Pero **no reinventamos la
-fórmula**: reutilizamos la definición de deviance de la **propia familia**, `poisson()$dev.resids(y, mu, w)`,
-que es exactamente la que R suma por dentro para producir `deviance(fit)` —solo que aplicada a la `y` de test
-frente a la `mu` predicha—.
-
-```{r}
-#| label: u26-cv-funcion
-# Deviance de Poisson OUT-OF-SAMPLE = deviance de la familia aplicada a (y de test, mu predicha).
-# poisson()$dev.resids(y, mu, w) da las contribuciones a la deviance que R suma en deviance(fit);
-# aquí las sumamos sobre las filas que el modelo NO vio. No hay que rehacer la fórmula a mano.
-dev_poisson <- function(y, mu) sum(poisson()$dev.resids(y, mu, wt = 1))
-
-# Validación cruzada de k = 10 bloques para un glm de Poisson con offset. Devuelve la deviance
-# de predicción (out-of-sample) por observación.
-cv_deviance <- function(formula, datos, k = 10, semilla = SEMILLA_CURSO) {
-  set.seed(semilla)
-  bloque <- sample(rep(seq_len(k), length.out = nrow(datos)))  # partición aleatoria en k bloques
-  dev_test <- 0
-  for (b in seq_len(k)) {
-    ent <- datos[bloque != b, ]; test <- datos[bloque == b, ]  # entrena con k-1 bloques, evalúa en el b
-    fit <- glm(formula, family = poisson, data = ent)
-    mu  <- predict(fit, newdata = test, type = "response")     # incluye el offset
-    dev_test <- dev_test + dev_poisson(test$n_asistencia, mu)
-  }
-  dev_test / nrow(datos)      # deviance de predicción por observación
-}
-```
-
-```{r}
-#| label: u26-cv-comparar
-f_nulo <- n_asistencia ~ offset(log(exposicion))
-tibble::tibble(
-  modelo       = c("nulo", "solo activos", "activos + ruido"),
-  cv_deviance  = c(cv_deviance(f_nulo, cartera),
-                   cv_deviance(f_activos, cartera),
-                   cv_deviance(f_todo, cartera)))
-```
-
-La lectura es la clave de toda la unidad. El modelo **nulo** predice mal: no usa información. El de
-**activos** baja claramente la *deviance* de predicción: esos predictores **generalizan**. Y el de **activos +
-ruido** ya **no mejora** —normalmente empeora un poco— respecto al de activos: el ruido ayudaba *dentro* de la
-muestra (bajaba la *deviance* de entrenamiento) pero **no fuera**. La validación cruzada ve lo que el AIC
-aproximaba y la *deviance* de entrenamiento escondía. La misma cuenta, hecha a mano aquí para que se vea el
-mecanismo, la da `boot::cv.glm(datos, fit, K = 10)` pasándole una función de coste; preferimos el bucle
-explícito porque deja claro que **el offset viaja con la predicción** y que la métrica es la *deviance*.
-
-::: {.callout-note}
-## El compromiso sesgo–varianza, en una frase
-Un modelo **demasiado simple** (el nulo) tiene mucho **sesgo**: se deja fuera estructura real y predice mal
-por sistema. Uno **demasiado complejo** (con ruido) tiene mucha **varianza**: se ajusta a fluctuaciones que no
-se repiten, y predice mal de forma inestable. La *deviance* de entrenamiento solo ve el sesgo y por eso siempre
-pide más complejidad; la validación cruzada ve **la suma de los dos** y por eso tiene un mínimo en el punto
-medio. Todo lo que viene ahora —la regularización— es una forma de **movernos por ese eje** de manera continua,
-sin tener que enumerar modelos.
-:::
-
-Antes de seguir, un puente con el Caso 1. Allí evaluábamos la clasificación con el **AUC** y la calibración, y
-lo hacíamos, casi siempre, **sobre la misma muestra del ajuste**: un AUC *in-sample* optimista, igual que esta
-*deviance* de entrenamiento. Todo lo de esta sección se traslada tal cual a aquella logística: la forma honesta
-de comparar clasificadores es el **AUC (o la *log-loss*) validado en k bloques**. Cambia la métrica —AUC en vez
-de *deviance* de Poisson—; el andamiaje de partir, ajustar sin ver y predecir es idéntico.
-
-## 6.2 Regularización: *ridge*, *lasso* y *elastic-net* {#sec-u26-reg}
-
-La validación cruzada nos dice **cuál** de un puñado de modelos predice mejor, pero sigue exigiendo que
-alguien proponga esos modelos. Con muchos predictores eso no escala. La **regularización** cambia de estrategia:
-en vez de elegir entre modelos discretos, ajusta **uno solo** pero le añade a la función objetivo un **castigo
-por coeficientes grandes**, y luego usa la validación cruzada solo para graduar **cuánto** castigar. En lugar
-de encender y apagar variables, las **encoge**.
-
-### Encoger para predecir mejor
-
-Ajustar por máxima verosimilitud busca los $\beta$ que mejor explican la muestra. La regularización busca los
-que mejor la explican **sujeto a un presupuesto** sobre su tamaño: minimiza
-
-$$
--\,\ell(\beta) \;+\; \lambda \, P(\beta),
-$$
-
-donde $-\ell(\beta)$ es la *deviance* (el desajuste) y $P(\beta)$ un **castigo** que crece con la magnitud de
-los coeficientes. El parámetro $\lambda \ge 0$ marca el precio del castigo: con $\lambda = 0$ recuperamos la
-máxima verosimilitud de siempre; según sube, los coeficientes se **encogen** hacia cero. ¿Por qué habría de
-predecir mejor un ajuste **sesgado a propósito**? Por el compromiso de antes: encoger introduce algo de sesgo
-pero **recorta mucha varianza**, y en predicción esa permuta casi siempre sale a cuenta —sobre todo con
-predictores **correlacionados** o **numerosos**, donde la máxima verosimilitud reparte coeficientes grandes y de
-signo inestable—.
-
-La forma del castigo define tres métodos:
-
-- **Ridge** [@hoerl1970] castiga la suma de **cuadrados**, $P(\beta)=\sum_j \beta_j^2$ (norma $L_2$). Encoge todos
-los coeficientes de forma continua hacia cero, pero **nunca los hace exactamente cero**: reparte, no elige. Es
-el mejor cuando muchos predictores aportan un poco y están correlacionados.
-
-- **Lasso** [@tibshirani1996] castiga la suma de **valores absolutos**, $P(\beta)=\sum_j |\beta_j|$ (norma $L_1$).
-Su geometría —de esquinas— hace que, al apretar, algunos coeficientes lleguen a **cero exacto**: el *lasso*
-**selecciona** variables mientras ajusta. Es lo que buscamos aquí: un modelo **corto** que diga qué conservar.
-
-- **Elastic-net** [@zou2005] **mezcla** ambos, $P(\beta)=\alpha\sum_j|\beta_j| + (1-\alpha)\sum_j \beta_j^2$, con
-$\alpha \in [0,1]$ ($\alpha=1$ es *lasso* puro; $\alpha=0$, *ridge* puro). Combina lo mejor de los dos: selecciona
-como el *lasso* pero, ante un grupo de predictores correlacionados, tiende a **quedarse con el grupo** en vez de
-elegir caprichosamente uno solo, que es una conocida inestabilidad del *lasso*.
 
 ::: {.callout-tip}
-## Por qué el $L_1$ pone ceros y el $L_2$ no
-Piensa en el presupuesto como una región alrededor del origen dentro de la cual deben caer los coeficientes. Con
-*ridge* esa región es una **circunferencia** (suave): la solución la toca, casi siempre, en un punto con **todas**
-las coordenadas distintas de cero. Con *lasso* la región es un **rombo** con **vértices sobre los ejes**: la
-solución tiende a tocarlo en un **vértice**, y un vértice tiene coordenadas nulas. Esa esquina es, literalmente,
-la que convierte «encoger» en «seleccionar».
+## Cómo leer una fila: `(exposicion,tiempo_primer_sin, evento)`
+
+Recordemos de la [Unidad 2.1](#sec-u21) que `exposicion` mide la antigüedad de cada cliente como
+**fracción de la del más veterano** (el más antiguo y aún vigente), a quien corresponde el valor 1. Para
+el análisis de supervivencia conviene ponerle una **escala**: llamemos $t_{\max}$ a esa antigüedad máxima
+—si fuera, por ejemplo, de 18 años, un cliente con 9 tendría `exposicion = 0.5`—.
+
+Por otro lado, esa antigüedad máxima $t_{\max}$, la hemos dividido en 6 periodos de registro de amplitud $t_{\text{per}}=t_{\max}/6$ años cada uno (3 si $t_{\max}=18$, con lo cual el historial de cada cliente se observaría por periodos de 3 años). Se anota su `tiempo_primer_sin` como el primer periodo de antigüedad en el que presentó un parte (y `evento=1`); en caso de no presentar partes, dicho cliente habrá quedado registrado con `tiempo_primer_sin` igual a su antigüedad (en periodos) en nuestra cartera y `evento=0`.
+
+Así, un cliente cualquiera puede registrar `tiempo_primer_sin` con valores posibles $\{1, ...,\lceil 6 \cdot \text{exposicion}\rceil\}$, siendo `exposicion` la proporción referida a su **antigüedad** y relativa a nuestro cliente más veterano. En general, si `tiempo_primer_sin=k`: con `evento = 0` el cliente no ha presentado nunca partes; si `evento=1`, entonces se mantuvo sin partes durante $k-1$ periodos en nuestra cartera y el primer parte ocurrió en el $k$-ésimo periodo.
 :::
 
-### `glmnet` sobre la Poisson
+Al igual que teníamos en el Caso 1, tenemos registrada la variable temporal de tiempo a evento -`tiempo_primer_sin`- en escala discreta del 1 al 6. La diferencia principal con la modelización de supervivencia que planteamos en el Caso 1 es que ahora vamos a dar el salto a **tiempo continuo** (aún con una variable temporal discreta). Allí modelizábamos la probabilidad de siniestro por periodo (tiempo discreto); aquí modelaremos la **tasa de ocurrencia** (el *hazard* continuo): la **intensidad instantánea** con la que se da el primer siniestro, contada como el número de (primeros) siniestros por unidad de tiempo en riesgo, entre las pólizas que todavía no han tenido ningún accidente. De ahí derivaremos la **supervivencia** (probabilidad de seguir sin siniestro) y las **razones de riesgo** asociadas a cada factor explicativo (cuánto cambia el riesgo cuando cambia el factor).
 
-El paquete **`glmnet`** [@friedman2010] ajusta estos modelos para toda la familia GLM, la Poisson incluida, y
-lo hace para **toda una rejilla de $\lambda$ a la vez** (la *ruta de regularización*) de forma muy eficiente.
-Tres detalles de su uso, distintos de `glm()`:
+La distinción entre **probabilidad** y **tasa** es la que hay entre una apuesta y una velocidad. La probabilidad de siniestro en un periodo es un número entre 0 y 1 —«de las pólizas que llegan sin siniestro, ¿qué fracción lo tiene durante este periodo?»—: está acotada, es adimensional y va ligada a la longitud del periodo. La tasa de ocurrencia es una velocidad: «¿a qué ritmo se producen los siniestros por unidad de tiempo expuesto?». No está acotada por 1 —puede ser 0.2, 1 o 3 siniestros por unidad de tiempo— y tiene unidades de 1/tiempo, igual que un coche marca 90 km/h. Para convertirla en un número esperado de siniestros se multiplica por el tiempo en riesgo: **eventos esperados = tasa × tiempo**. Ese producto es justo lo que modela la Poisson, y $\log(\text{tiempo en riesgo})$ es su offset.
 
-1. `glmnet` no toma una fórmula, sino una **matriz de diseño** `x` (sin intercepto: lo maneja aparte) y un vector
-respuesta `y`. Construimos `x` con `model.matrix()`, que expande los factores en indicadores. 
-2. El *offset* de la
-exposición no va dentro de `x`: se pasa por el argumento **`offset`**. 
-3. Y, por defecto, `glmnet`
-**estandariza** internamente los predictores antes de penalizar —imprescindible, porque el castigo depende de la
-escala: sin estandarizar, castigaría más a `km_declarados` (miles) que a `potencia_cv` (decenas) por el mero
-hecho de venir en unidades distintas—.
+Son dos formas de mirar el mismo fenómeno, y en la [Sección 6.3](#sec-u26-nexo) veremos que coinciden.
 
-```{r}
-#| label: u26-glmnet-matriz
-library(glmnet)
-x  <- model.matrix(reformulate(predictores), data = cartera)[, -1]  # quita el intercepto
-y  <- cartera$n_asistencia
-os <- log(cartera$exposicion)                                       # offset de la exposición
-dim(x)
-```
+### Del tiempo al riesgo: hazard y supervivencia en tiempo continuo
 
-Ajustamos la ruta *lasso* completa ($\alpha = 1$) y miramos cómo entra cada coeficiente según relajamos el
-castigo (de $\lambda$ grande, todo a cero, a $\lambda$ pequeño, casi la máxima verosimilitud):
+Como ya hemos comentado, vamos a describir el fenómeno en **tiempo continuo**. Suponemos que bajo los tramos (periodos en nuestro caso) el tiempo transcurre de forma continua —el siniestro ocurre en un instante real, aunque nosotros no lo registramos— y que los tramos son solo la **resolución** con la que lo observamos. Esa mirada continua es la que permite hablar de **tasa** en lugar de probabilidad y, por tanto, la que abre la puerta a la Poisson.
 
-```{r}
-#| label: fig-u26-ruta-lasso
-#| fig-width: 8
-#| fig-height: 5
-#| fig-cap: "Ruta de regularización del lasso Poisson. Cada curva es un coeficiente según log(lambda); a la derecha (lambda grande) todos valen cero, y van entrando —en orden de importancia— al relajar el castigo. Los primeros en aparecer son los predictores con más señal."
-fit_lasso <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)
-plot(fit_lasso, xvar = "lambda", label = TRUE)
-```
+Con ese supuesto, tres funciones describen el tiempo a evento. La **supervivencia** $S(t)=P(T>t)$ es la
+probabilidad de seguir sin siniestro, cuando ya hemos llegado al instante $t$. El **hazard** $h(t)$ es la tasa instantánea de siniestro entre quienes siguen en riesgo,
 
-Los coeficientes que **entran antes** (con más castigo todavía puesto) son los de más señal; los que solo
-aparecen cuando $\lambda$ es ya muy pequeño son los prescindibles. La ruta ordena los predictores por su
-aportación **a la predicción**, no por su significación *in-sample*.
+$$h(t)=\lim_{\Delta t\to 0}\frac{P(t\le T<t+\Delta t \mid T\ge t)}{\Delta t},$$
 
-### Elegir $\lambda$: `cv.glmnet`
+y el **hazard acumulado**, que integra el hazard hasta $t$,
 
-La ruta ofrece un modelo por cada $\lambda$; falta decidir **cuál**. Y aquí se cierra el círculo con la
-Sección 6.1: elegimos el $\lambda$ por **validación cruzada**, con la *deviance* de Poisson como métrica.
-`cv.glmnet` hace exactamente eso —parte en k bloques, recorre la rejilla y promedia la *deviance*
-*out-of-sample*—:
+$$H(t)=\int_0^t h(u)\,\mathrm{d}u$$ 
+enlaza ambas:
 
-```{r}
-#| label: fig-u26-cvglmnet
-#| fig-width: 8
-#| fig-height: 5
-#| fig-cap: "Validación cruzada del lasso Poisson: deviance out-of-sample (± 1 error estándar) frente a log(lambda). La línea de puntos izquierda marca lambda.min (mínimo error); la derecha, lambda.1se (el modelo más parsimonioso a un error estándar del mínimo). Los números de arriba son el nº de coeficientes no nulos."
-set.seed(SEMILLA_CURSO)
-cv_lasso <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
-                      type.measure = "deviance", nfolds = 10)
-plot(cv_lasso)
-c(lambda_min = cv_lasso$lambda.min, lambda_1se = cv_lasso$lambda.1se)
-```
+$$S(t)=\exp\!\big(-H(t)\big).$$
 
-La curva tiene el mínimo que anticipaba el compromiso sesgo–varianza. `cv.glmnet` marca dos $\lambda$ de
-referencia: **`lambda.min`**, el del error mínimo, y **`lambda.1se`**, el mayor $\lambda$ (modelo más simple)
-cuyo error queda **a un error estándar** del mínimo. La regla del `1se` es la que suele usarse para
-**seleccionar**: entre dos modelos estadísticamente indistinguibles en predicción, se queda con el más corto —la
-navaja de Occam, cuantificada—.
+El hazard es pues, un ritmo de eventos por unidad de tiempo en riesgo —no
+una probabilidad—, es decir, es una **tasa**, y resulta que las tasas ya sabemos modelarlas con Poisson y *offset*.
 
-### El *lasso* como selección: ¿acierta con la verdad?
+Queda un problema práctico: $h(t)$ es una **función** —con infinitos valores— y no podemos estimarla
+libremente: hemos de darle una forma. Puesto que no tenemos más información que los intervalos/tramos de observación, la suponemos **constante dentro de cada tramo**, y conseguimos entonces el **modelo exponencial a trozos**: un $\lambda_k$ por cada intervalo. Así el hazard queda descrito como una función escalonada, con valores dados en los escalones por el conjunto de tasas  $\lambda_k$ —uno por tramo—. 
 
-Veamos qué predictores **retiene** el *lasso* en cada $\lambda$ de referencia. Como el modelo es de Poisson con
-enlace log, exponenciar cada coeficiente lo lleva a la escala de la **razón de tasas (IRR)** de la
-[Unidad 2.1](#sec-u21): el factor por el que se multiplica la tasa de asistencias:
+La supervivencia en los bordes se obtiene acumulando la función hazard en los sucesivos tramos (con sus amplitudes $\Delta_j$:
 
-```{r}
-#| label: u26-lasso-coef
-#| output: asis
-coef_1se <- coef(cv_lasso, s = "lambda.1se")
-coef_min <- coef(cv_lasso, s = "lambda.min")
+$$H_k=\sum_{j\le k}\lambda_j\Delta_j$$
+y la supervivencia al final de cada trozo se obtiene exponenciando (en negativo) la función hazard acumulada: 
 
-retenidas <- function(coefs) {
-  m <- as.matrix(coefs); nz <- rownames(m)[m[, 1] != 0]
-  setdiff(nz, "(Intercept)")
-}
+$$S_k=e^{-H_k}$$
 
-# Imprime, para cada lambda, la lista de variables retenidas (con su número).
-lista_retenidas <- function(nombre, vars) {
-  cat("**`", nombre, "`** — ", length(vars), " variables retenidas:\n\n", sep = "")
-  cat(paste0("- `", vars, "`"), sep = "\n")
-  cat("\n\n")
-}
-lista_retenidas("lambda.1se", retenidas(coef_1se))
-lista_retenidas("lambda.min", retenidas(coef_min))
-```
+Con esa forma ya podemos cerrar el círculo con el Caso 1: las dos descripciones **coinciden exactamente en
+los bordes de los tramos**, que son realmente los únicos puntos que observamos. Allí el hazard era una **probabilidad** por periodo, $h_j$, con $S_k=\prod_{j\le k}(1-h_j)$ (y enlace `cloglog`); aquí es una **tasa** $\lambda_j$ con $S_k=e^{-H_k}$. Ambas se enlazan pues, al final del tramo por su supervivencia
 
-```{r}
-#| label: u26-lasso-irr
-# Coeficientes no nulos del modelo 1se, en escala IRR (exp del coeficiente).
-m1 <- as.matrix(coef_1se)
-tibble::tibble(termino = rownames(m1), coef = m1[, 1]) |>
-  dplyr::filter(coef != 0, termino != "(Intercept)") |>
-  dplyr::mutate(IRR = exp(coef)) |>
-  dplyr::arrange(dplyr::desc(abs(coef)))
-```
+$$S_k= \prod_{j\le k}(1-h_j) = e^{-H_k} = \prod_{j\le k} e^{-\lambda_j\Delta_j}$$
 
-Ahora el **control de calidad contra el DGP**, que es lo que hace honesta a toda la unidad. Sabemos la verdad:
-la tasa de `n_asistencia` la generan los **siete predictores activos** —con enlace log y estos coeficientes
-sobre las variables tipificadas— y **nada** del bloque de ruido:
+y tenemos:
 
-```{r}
-#| label: u26-verdad
-verdad <- attr(cartera, "verdad")
-tibble::tibble(termino = verdad$nombres_beta, beta = verdad$betas$limpio) |>
-  dplyr::mutate(IRR = exp(beta))
-```
+$$h_j=1-e^{-\lambda_j\Delta_j}$$
+e interpreta el riesgo de "caer" en el tramo $j$ como una probabilidad de que el fallo se produzca en dicho tramo si el tiempo de fallo $T \sim Exp(\lambda_j)$ y la amplitud del tramo es $\Delta_j$ --$Pr(T\leq \Delta_j)=1-e^{-\lambda_j\Delta_j}$, y también como la probabilidad de que se produzca algún fallo durante dicho tramo si los fallos se producen según un proceso de Poisson de parámetro $\lambda_j$, con el número de eventos $N \sim Po(\lambda_j \Delta_j)$, esto es, $Pr(N \geq 1)=1-e^{-\lambda_j\Delta_j}$.
 
-::: {.callout-tip}
-## Cómo (no) comparar la tabla estimada con la de la verdad
-Es tentador poner las dos tablas lado a lado y leerlas **fila a fila**, pero no son comparables número a número,
-por tres motivos:
+Tenemos así la siguiente interpretación:
+ *La probabilidad discreta de fallar en el intervalo $j$ ($h_j$) es exactamente igual a la probabilidad de que el evento ocurra en un proceso continuo con tasa constante $\lambda_j$ durante un periodo de amplitud $\Delta_j$*.
 
-- **La escala.** Los coeficientes verdaderos van sobre los predictores **tipificados** (`z_edad`, `z_pot`…: cada
-  uno es el efecto de **una desviación típica**), mientras que `glmnet` devuelve los suyos en las **unidades
-  originales** (por año de edad, por CV de potencia). Así, el `IRR ≈ 0.997` estimado para `edad_conductor` es «por
-  año», y no se compara con el `0.861` de la verdad, que es «por SD» (unos 14 años): elevado a esa desviación
-  típica, el estimado ronda `0.95`, y lo que aún falta hasta `0.86` es **encogimiento**.
-- **La categoría de referencia.** La verdad toma *rural* como base (urbana y mixta suman **sobre ella**), mientras
-  que `model.matrix()` toma *urbana*, así que los indicadores estimados (`zona…mixta`, `zona…rural`) miden **otros
-  contrastes**. Alinear `urbana` con `zona…mixta` sería comparar cosas distintas.
-- **El sesgo del lasso.** En `lambda.1se` los coeficientes están **encogidos a propósito** hacia cero (IRR hacia
-  $1$), de modo que serán, por construcción, más planos que los verdaderos.
+- En el mundo discreto, para sobrevivir al tramo $j$, multiplicas por la probabilidad de no fallar, $1-h_j$.
+- En el mundo continuo, para sobrevivir a ese mismo tramo de duración $\Delta_j$, exponencias la tasa en negativo, $e^{-\lambda_j \Delta_j}$.
 
-Para cotejar **magnitudes** de tú a tú habría que **tipificar** los predictores antes de `glmnet` (o leer sus
-coeficientes estandarizados) y usar la misma categoría de referencia. Lo que **sí** se lee sin más es el **signo**
-—los tres predictores del `1se` lo llevan **correcto**: edad y antigüedad de carnet bajan la tasa, la potencia la
-sube, igual que en la verdad— y, sobre todo, la **selección**: qué variables entran y cuáles no. Eso último es lo
-que esta sección quiere validar.
+Al igualar ambas supervivencias tramo a tramo, el modelo exponencial por tramos logra rellenar el vacío continuo que el modelo discreto ignora, pero garantizando que en los momentos en que medimos (los bordes), ambos universos den exactamente el mismo resultado.
+
+:::{.callout-tip}
+Imagina que estás cruzando una serie de habitaciones con trampas (los tramos).
+
+- El modelo discreto solo mira la foto final: *"tienes un 20% de probabilidad de caer en esta habitación, $h_j=0.20$"*.
+- El modelo exponencial por tramos te mira caminar continuamente: *"Cruzar te lleva 10 segundos ($\Delta_j=10$) y avanzas con un peligro constante de $0.022$ por segundo ($\lambda_j$), pues $0.2=1-e^{-0.022\cdot 10}$.
 :::
 
-Contrastando las tablas aparece algo más interesante que un acierto limpio —y por eso conviene enunciarlo al
-alumno como resultado a **verificar**, no a creer—: los dos criterios de $\lambda$ **fallan la diana por lados
-opuestos**. El `lambda.1se`, muy exigente, se queda con un modelo **cortísimo** —en este ajuste, solo
-`edad_conductor`, `antiguedad_carnet` y `potencia_cv`, con coeficientes tan encogidos que sus IRR apenas se
-despegan de $1$— y en el camino **suelta incluso efectos verdaderos y fuertes**, como la zona urbana o el uso
-comercial, que en la tabla de la verdad están entre los mayores. El `lambda.min`, más generoso, retiene una
-**quincena** de términos: recupera casi todos los activos (zona, uso, tipo de vehículo, antigüedad del vehículo)
-pero **ya cuela ruido** —color, valor del vehículo, kilómetros, antigüedad del cliente—. Ninguno de los dos
-reproduce la verdad (siete grupos activos, cero ruido): el `1se` peca de **simple** y sacrifica estructura real;
-el `min` peca de **generoso** y admite azar. La verdad queda **en medio**.
 
-Y nada de esto es un fallo del método —es su carácter, y merece explicarse—. Primero, el *lasso* no selecciona
-por «ser verdad» sino por **aportar a la predicción**, y aquí la señal es **débil**: la *deviance* de validación
-apenas baja de $\approx 0.97$ (modelo nulo) a $\approx 0.94$ (activos). Con tan poco que ganar, el `1se` prefiere
-un modelo minúsculo y estable a rescatar efectos que solo mejoran la predicción de forma marginal. Segundo, los
-efectos **categóricos** entran troceados en varios indicadores (la zona en dos, el tipo en dos) y cada trozo,
-penalizado por separado, carga menos señal que un predictor continuo que la concentra en un único coeficiente: de
-ahí que los continuos sobrevivan antes. Es, en el fondo, la diferencia entre **significación** y **relevancia
-predictiva** hecha operativa, y la razón por la que **elegir $\lambda$ es una decisión con consecuencias**, no un
-trámite: el `1se` cuando quieres un modelo **corto y conservador**; el `min` cuando priorizas **no perder**
-predictores, a costa de admitir alguno de más.
+### Una primera mirada: la curva de supervivencia
 
-### *Ridge*, *lasso* y *elastic-net*, comparados
+Ya con el lenguaje definido, veamos qué dicen los datos **sin imponer ningún modelo**. El estimador de
+**Kaplan–Meier** reconstruye $S(t)$ directamente de las observaciones, respetando la censura. Su forma es
+un producto: en cada instante $t_j$ en que se observa algún siniestro, con $n_j$ pólizas aún en riesgo y
+$d_j$ siniestros,
 
-Cerramos la sección viendo los tres en la misma cartera. El `1se` de cada uno, evaluado por validación cruzada,
-nos dice cuánto encoge cada penalización y cuántas variables deja vivas:
+$$\hat S(t)=\prod_{t_j\le t}\left(1-\frac{d_j}{n_j}\right).$$
+
+Cada factor es «la fracción que sobrevive a ese instante» y el producto los acumula. Fíjate en que es
+exactamente la forma discreta $S_k=\prod_j(1-h_j)$ de la que hablábamos: Kaplan–Meier estima cada $h_j$
+por la proporción observada $d_j/n_j$, **sin suponer nada** sobre la forma del hazard. Por eso será la
+referencia natural contra la que contrastemos nuestro modelo en la [Sección 6.4](#sec-u26-clasicos). 
+
+Representamos a continuación KM en función de la `zona_circulacion`, que es uno de los factores de interés:
 
 ```{r}
-#| label: u26-tres-penalizaciones
-set.seed(SEMILLA_CURSO)
-cv_ridge <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0,   type.measure = "deviance", nfolds = 10)
-cv_enet  <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0.5, type.measure = "deviance", nfolds = 10)
-
-n_no_nulos <- function(cvfit) sum(as.matrix(coef(cvfit, s = "lambda.1se"))[, 1] != 0) - 1
-tibble::tibble(
-  metodo          = c("ridge (a=0)", "elastic-net (a=0.5)", "lasso (a=1)"),
-  dev_cv_1se      = c(cv_ridge$cvm[cv_ridge$index["1se", ]],
-                      cv_enet$cvm[cv_enet$index["1se", ]],
-                      cv_lasso$cvm[cv_lasso$index["1se", ]]),
-  variables_vivas = c(n_no_nulos(cv_ridge), n_no_nulos(cv_enet), n_no_nulos(cv_lasso)))
+#| label: fig-u26-km
+#| fig-cap: "Supervivencia (Kaplan–Meier) sin primer siniestro a lo largo de los tramos de antigüedad del cliente, por zona de circulación. Que las curvas se separen anticipa un efecto de la zona sobre el riesgo; que todas bajen, un hazard que se acumula con el tiempo."
+#| fig-width: 6.5
+#| fig-height: 4
+km <- survfit(Surv(tiempo_primer_sin, evento) ~ zona_circulacion, data = cartera)
+broom::tidy(km) |>
+  ggplot(aes(time, estimate, colour = strata)) +
+  geom_step(linewidth = 0.8) +
+  labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = "zona")
 ```
 
-El *ridge* deja **todas** las variables vivas —las 23— y solo las encoge: no sirve para seleccionar, aunque en
-predicción pura suele ser competitivo y es el más estable con predictores muy correlacionados. El *lasso* y el
-*elastic-net* recortan al mismo puñado (**3** términos). Las tres *deviances* de validación quedan **pegadas**
-(en torno a $0.95$–$0.96$), con el *elastic-net* rozando la menor: con señal tan débil **ninguna penalización
-domina** en predicción, y la elección se juega más en la **parsimonia** y la **interpretabilidad**. En general el
-*elastic-net* es la apuesta por defecto cuando sospechas **grupos** de predictores correlacionados y quieres
-selección **sin** la volatilidad del *lasso* puro (que ante un grupo tiende a quedarse con uno solo, al azar). La
-validación cruzada es el árbitro, no el gusto —pero cuando declara un empate técnico, es legítimo quedarse con el
-modelo más **corto y explicable**.
+Se lee de un vistazo: la supervivencia **cae** conforme avanza la antigüedad —el riesgo se acumula— y las
+curvas **se separan** por zona, lo que adelanta que la zona modula el hazard. Cuantificar esa forma y el
+efecto de cada factor es la tarea del modelo.
 
-::: {.callout-warning}
-## Un coeficiente encogido no tiene el error estándar de siempre
-La regularización compra predicción a cambio de **sesgo deliberado**, y con ello se lleva por delante la
-inferencia clásica: `glmnet` **no** da errores estándar, valores $p$ ni intervalos de confianza para sus
-coeficientes, y estaría **mal** calcularlos como si el modelo se hubiera fijado de antemano. La razón es la
-**inferencia tras la selección**: hemos usado los datos para **elegir** las variables *y* para **estimarlas**,
-así que los intervalos ingenuos serían demasiado estrechos. Si lo que necesitas es un IRR con su intervalo para
-**informar** —no solo predecir—, el patrón habitual es de **dos etapas**: usar el *lasso* para **seleccionar**
-las variables y luego reajustar un `glm()` clásico **solo con las seleccionadas** para la inferencia (sabiendo
-que sigue siendo optimista), o recurrir a métodos de inferencia post-selección. Regularizar es una herramienta
-de **predicción y cribado**, no de contraste.
-:::
+### La transformación a persona-periodo (y por qué)
 
-## 6.3 La misma máquina en la binaria {#sec-u26-binomial}
+Con el hazard ya escalonado, el seguimiento de cada póliza se descompone en sus tramos en riesgo y, en
+cada tramo, que ocurra o no el siniestro (dado el tiempo expuesto) se comporta como un **conteo de
+Poisson** de media proporcional a $\lambda_k$. La consecuencia es notable: la verosimilitud de
+supervivencia coincide **exactamente** con una verosimilitud de **Poisson** [@holford1980; @laird1981].
 
-Todo lo anterior no es de la Poisson: es de los **GLM**. `glmnet` regulariza cualquier familia sin más que
-cambiar el argumento `family`, con el mismo `x`, la misma `cv.glmnet` y la misma lectura del `lambda.1se`. Para
-comprobarlo, volvamos un momento al Caso 1 y regularicemos una **logística**: modelamos si la póliza tuvo algún
-siniestro (`evento`) con los mismos predictores, ahora con `family = "binomial"` —y sin *offset*, porque en la
-logística no hay exposición que descontar—:
+Merece la pena ver **por qué**. Con hazard $\lambda_{ik}$ para la póliza $i$ en el tramo $k$, tiempo en
+riesgo $t_{ik}$ e indicador $d_{ik}$ (1 si el siniestro ocurre en ese tramo), la verosimilitud del
+exponencial a trozos es:
+
+$$L=\prod_i\prod_k \lambda_{ik}^{\,d_{ik}}\;e^{-\lambda_{ik}t_{ik}}.$$
+
+Y si tratamos cada $d_{ik}$ como un **conteo de Poisson** de media $\mu_{ik}=\lambda_{ik}t_{ik}$,
+
+$$L_{\text{Poisson}}=\prod_i\prod_k\frac{e^{-\mu_{ik}}\,\mu_{ik}^{\,d_{ik}}}{d_{ik}!}\;\propto\;
+\prod_i\prod_k \lambda_{ik}^{\,d_{ik}}\;e^{-\lambda_{ik}t_{ik}}.$$
+
+Las dos coinciden salvo el factor $t_{ik}^{\,d_{ik}}/d_{ik}!$, que **no depende de los parámetros**. Llegamos pues, a las mismas estimaciones máximo-verosímiles y la misma inferencia. Y como
+$\log\mu_{ik}=\log t_{ik}+\log\lambda_{ik}$, modelar $\log\lambda_{ik}=\alpha_k+\mathbf{x}_i^{\top}
+\boldsymbol\beta$ es exactamente un **GLM de Poisson con enlace log y `offset` $\log t_{ik}$**.
+
+
+Para explotarla, reescribimos los datos en formato **persona-periodo**: una fila por póliza y por tramo
+en el que estuvo en riesgo. En cada fila, la respuesta `y` vale 1 solo en el tramo donde ocurrió el
+siniestro (0 en el resto; 0 en todos si la póliza está censurada). El **tiempo en riesgo** del tramo
+haría de *offset* (`log` tiempo-persona), pero como aquí todos los tramos tienen la misma anchura, ese
+offset es constante y quedará absorbido por el efecto de `tramo` $\alpha_k$ —lo retomamos en la [Sección 6.2](#sec-u26-piecewise)—. 
+
+**¿Por qué y para qué esta transformación?** Pues porque convierte un problema de supervivencia en una **regresión de Poisson corriente**: cada póliza aporta tantas filas como tramos sobrevivió, el factor `tramo`
+capturará la forma del hazard base $h_k$, las covariables entran como en cualquier GLM, y la **censura se
+trata sola** —una póliza censurada simplemente aporta filas con `y = 0` hasta donde se la siguió, sin fila
+de evento—. Con los datos así dispuestos, en la [Sección 6.2](#sec-u26-piecewise) el modelo será,
+literalmente, un `glm(..., family = poisson)`.
+
+La expansión a ese formato persona-periodo la hace la función preprogramada `expandir_poliza_tramo()`, que aplicamos a nuestros datos:
 
 ```{r}
-#| label: u26-binomial
-set.seed(SEMILLA_CURSO)
-cv_bin <- cv.glmnet(x, cartera$evento, family = "binomial",
-                    type.measure = "deviance", alpha = 1, nfolds = 10)
-
-# Nº de predictores retenidos en cada criterio (la señal binaria de 'evento' es débil).
-n_sel <- function(s) sum(as.matrix(coef(cv_bin, s = s))[, 1] != 0) - 1L
-c(no_nulos_1se = n_sel("lambda.1se"), no_nulos_min = n_sel("lambda.min"))
+#| label: u26-pp
+pp <- expandir_poliza_tramo(cartera, "tiempo_primer_sin", "evento", col_id = "id_poliza")
+# la primera póliza, desplegada en sus tramos en riesgo:
+head(pp[pp$id == pp$id[1], c("id", "tramo", "y", "zona_circulacion", "uso")], 8)
 ```
-
-```{r}
-#| label: u26-binomial-min
-# Coeficientes que sobreviven a lambda.min, en escala ODDS RATIO (exp del coeficiente).
-m_bin <- as.matrix(coef(cv_bin, s = "lambda.min"))
-tibble::tibble(termino = rownames(m_bin), coef = m_bin[, 1]) |>
-  dplyr::filter(coef != 0, termino != "(Intercept)") |>
-  dplyr::mutate(odds_ratio = exp(coef)) |>          # en binomial, exp(coef) es un ODDS RATIO
-  dplyr::arrange(dplyr::desc(abs(coef)))
-```
-
-Cambia la métrica de la lectura —en la logística `exp(coef)` es un **odds ratio**, no una razón de tasas— y la
-familia; el resto es idéntico. Con estos datos la señal binaria de `evento` es tan débil que el criterio
-**`1se` se queda en el modelo nulo** (cero predictores): un recordatorio de que el `1se` es conservador y de que,
-cuando apenas hay señal, «no seleccionar nada» es una respuesta legítima. Relajando a `lambda.min` reaparecen los
-predictores de la **probabilidad** de siniestro —la misma máquina que en la Poisson elegía predictores de la
-**tasa** de asistencias—, y con el **mismo peaje** que allí: entre los retenidos vuelve a colarse algo de
-**ruido** (aquí el color del vehículo, que incluso encabeza la tabla), fiel al carácter generoso del `min`. Y con
-`type.measure = "auc"` la validación cruzada usaría directamente el **AUC**, cerrando del todo el puente con la
-evaluación de clasificadores del Caso 1, ahora sí *out-of-sample*.
-
-::: {.callout-note}
-## Qué familias cubre `glmnet` (y cuál no)
-`glmnet` regulariza `gaussian` (lineal), `binomial` (logística), `poisson` (conteos/tasas), `multinomial`,
-`mgaussian` y `cox` (supervivencia). Cubre, por tanto, los dos primeros casos del curso y el nexo de
-supervivencia de la [Unidad 2.5](#sec-u25). **No** trae la familia **Gamma**, que será el corazón del Caso 3
-(continuas positivas): allí la regularización se tratará de forma **conceptual**, o con extensiones fuera de
-`glmnet`. La idea —*deviance* + castigo, $\lambda$ por validación cruzada— es la misma sea cual sea la familia.
-:::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.6) — Preguntas 16 y 17 del caso
-Sobre **la cartera de tu equipo**, la dirección pide un modelo **sencillo, fiable y responsable** para anticipar
-la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.7](#sec-u27)). Con `n_siniestros` y su
-*offset* de exposición:
+## ¿No viola la independencia usar varias filas por póliza?
+Es la objeción natural: si una póliza aporta cuatro filas, ¿no estamos tratando como independientes
+observaciones que claramente no lo son? La respuesta es que **no estamos suponiendo tal cosa**. Fíjate en
+de dónde sale el producto sobre filas en la expresión anterior: de **partir una integral**, no de
+multiplicar probabilidades de sucesos independientes. El hazard acumulado se descompone tramo a tramo,
+$\int_0^{T}h(u)\,\mathrm{d}u=\sum_k \lambda_{ik}t_{ik}$, y por eso la contribución de la póliza $i$ —que
+es **una sola**, la de su historia completa— acaba escrita como un producto de términos, uno por tramo.
 
-1. **Selección (P16).** Compara, por **validación cruzada** (*deviance* de Poisson en 10 bloques), el modelo
-   nulo, uno con los predictores que a priori consideres «del riesgo» y el modelo con **todas** las variables.
-   Contrástalo con **AIC** y **BIC**, y comenta las discrepancias.
-2. **Regularización (P16).** Ajusta un **Poisson regularizado** con `cv.glmnet` (*lasso*; prueba también *ridge*
-   y *elastic-net*). Presenta la **ruta de regularización** y la **curva de validación cruzada**, y **justifica**
-   tu elección de $\lambda$ (`min` frente a `1se`).
-3. **Modelo final (P16).** **Qué variables retiene** el *lasso* y qué **IRR** tienen. Interpreta las dos o tres
-   más relevantes en términos que la dirección entienda («la zona urbana multiplica por … la tasa de siniestros»).
-4. **Fairness (P17).** `sexo` predice, pero es **factor prohibido** (primas unisex, *Test-Achats*): **exclúyelo**
-   de la tarifa, detecta posibles **proxies** —variables permitidas que lo correlacionan— y razona una selección
-   **responsable**.
-5. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
-   activos** y **descarta el ruido**. Discute los **activos débiles**: ¿los retiene? ¿Por qué la selección por
-   predicción no coincide exactamente con la verdad, y por qué eso **no** es un error del método?
+Dicho de otro modo: cada fila no es una observación nueva, sino **un factor de la verosimilitud de esa
+misma póliza**, y cada factor va **condicionado a seguir en riesgo** al empezar el tramo. Esa cadena de
+condicionales es exacta —es la regla del producto, no una aproximación—. Como además aquí solo nos
+interesa el **primer** siniestro, la póliza abandona el conjunto de riesgo en cuanto ocurre: su secuencia
+es $0,0,\dots,0,1$ y no queda dependencia adicional que modelar.
 
-Entrega, como siempre, un cuaderno **reproducible** (semilla fija) y ajusta **a ciegas**: mira la verdad solo al
-final, para validar.
+Por eso los errores estándar del `glm` son correctos y **no hacen falta** errores robustos por
+conglomerado. La cosa cambiaría si hubiera **heterogeneidad no observada** entre pólizas —una fragilidad
+compartida—: entonces sí quedaría correlación dentro del sujeto, y de eso trata precisamente la
+[Sección 6.5](#sec-u26-frailty).
 :::
 
-Con esto cerramos el recorrido teórico del Caso 2: de la Poisson y las tasas ([2.1](#sec-u21)) a la
-sobredispersión ([2.2](#sec-u22)) y el exceso de ceros ([2.3](#sec-u23)), de los conteos agrupados
-([2.4](#sec-u24)) al hazard como tasa ([2.5](#sec-u25)), y ahora a **elegir y encoger** modelos con validación
-cruzada y regularización. La [Unidad 2.7](#sec-u27) no añade teoría: pone todo esto a trabajar sobre una cohorte
-sanitaria, en un informe de consultoría donde tú decides —y justificas— qué modelo responde cada pregunta.
+
+Una última observación sobre esa respuesta: vale 0 o 1 porque solo seguimos el **primer** siniestro, así
+que no es realmente un conteo. Si en cada tramo pudiéramos contar **varios** partes, el mismo modelo
+seguiría valiendo —y la Poisson dejaría de ser un truco para ser el modelo natural—. Esa lectura, y el
+mapa de situaciones prácticas que abre, las recogemos al cerrar la unidad en la
+[Sección 6.6](#sec-u26-conteos).
+
+## 6.2 El modelo de riesgos a trozos como GLM de Poisson {#sec-u26-piecewise}
+
+### Qué dicen los datos antes de modelar
+
+**Qué variables ponemos sobre la mesa.** La cartera trae más columnas de las que conviene meter en un
+modelo, y no todas juegan el mismo papel: hay variables de **estructura** (`id_poliza`, `exposicion`, y las
+de agrupación `agencia` y `region`), de **riesgo**, y un bloque de **adicionales** incluidas a propósito
+para practicar la selección. Para no dispersarnos, este recorrido se confina a cinco predictores más el
+eje temporal:
+
+| Papel | Variables |
+|---|---|
+| Eje del tiempo | `tramo` |
+| Continuas | `edad_conductor`, `antiguedad_carnet` |
+| Factores | `sexo`, `tipo_vehiculo`, `zona_circulacion` |
+
+Son variables que cualquier aseguradora pide al tarificar, y las traemos **sin prejuzgar** cuáles
+funcionan: parte del trabajo del descriptivo es precisamente separar las que aportan de las que no.
+`agencia` y `region` quedan fuera porque su papel natural es el de **agrupación**, que retomaremos en la
+[Sección 6.5](#sec-u26-frailty).
+
+Antes de nada conviene fijar **cuál es ahora la variable respuesta**, porque ha cambiado. Ya no es un
+conteo de siniestros por póliza: tras la expansión, cada fila es un par **póliza-tramo** y la respuesta es
+**`y`**, que vale **1 si el primer siniestro ocurrió en ese tramo** y **0 si la póliza lo atravesó sin
+novedad**. Es, por tanto, binaria: el «conteo» de siniestros de esa celda, que solo puede valer 0 o 1
+porque la póliza abandona el conjunto de riesgo en cuanto tiene el suyo.
+
+Esa naturaleza 0/1 trae una consecuencia muy cómoda para explorar: **la media de `y` en un grupo es el
+hazard empírico de ese grupo** (realmente, la probabilidad de siniestro). Si de 500 pólizas en riesgo 30 registran el siniestro, la media de `y`
+vale 0.06, que es exactamente $d/n$. Así que todo el análisis descriptivo se reduce a calcular medias
+de `y`.
+
+**Qué mirar antes de ajustar.** El descriptivo en supervivencia tiene repertorio propio, distinto del de
+una regresión corriente, porque la respuesta no es un número sino un par *(tiempo, censura)*. Lo habitual
+es recorrer cinco piezas: 
+
+1. La **curva de Kaplan–Meier**, global y separada por cada factor —ya la vimos en la
+   [Sección 6.1](#sec-u26-contexto)—. *Qué comprobamos*: que la supervivencia efectivamente **caiga**
+   (si fuera casi plana, apenas habría eventos que modelar) y que las curvas **se separen** por los
+   factores candidatos. *Qué esperamos*: separaciones nítidas en los predictores que importan; curvas
+   superpuestas anticipan coeficientes cercanos a 1.
+
+1. El **hazard empírico por tramo**, que enseña la *forma* del riesgo que la KM solo muestra acumulada.
+   *Qué comprobamos*: si el riesgo es constante, crece, decrece o tiene forma de bañera. *Qué esperamos*:
+   un perfil **no plano** justifica dedicar un parámetro $\alpha_k$ a cada tramo; si saliera plano,
+   bastaría un único intercepto y el modelo se reduciría a un exponencial simple.
+
+1. El **tamaño del conjunto de riesgo** en cada tramo. *Qué comprobamos*: cuántas pólizas y cuántos
+   eventos sostienen cada punto. *Qué esperamos*: un vaciado progresivo; la señal de alarma es que los
+   últimos tramos queden con muy pocos eventos, porque entonces sus $\alpha_k$ serán inestables y
+   convendrá **agrupar tramos** en vez de estimar uno por cada uno.
+
+1. La relación de **cada predictor** con ese hazard, agrupando en cuantiles las variables continuas.
+   *Qué comprobamos*: si el hazard se despega del promedio al movernos por los niveles del predictor, y
+   **cómo** lo hace. *Qué esperamos*: un patrón **monótono** en las continuas, que respalde meterlas de
+   forma lineal en el log-hazard; si apareciera forma de U, habría que pensar en un spline.
+
+1. El **gráfico log-log**, chequeo visual clásico de la proporcionalidad. *Qué comprobamos*: si las
+   curvas de los niveles de un factor son **paralelas**. *Qué esperamos*: separación constante —cuya
+   magnitud estima el log del *hazard ratio*—; si convergen, divergen o se cruzan de forma sostenida, el
+   supuesto de riesgos proporcionales está en cuestión y habría que dejar que ese efecto varíe con el
+   tiempo.
+
+Recorramos esas piezas: primero el eje temporal, después los predictores en tres miradas sucesivas.
+
+#### El eje del tiempo: el hazard base
+
+Empezamos por el tramo, que es el eje sobre el que se construye el hazard base. La curva de Kaplan–Meier
+de la [Sección 6.1](#sec-u26-contexto) ya anticipaba que la supervivencia cae con la antigüedad; ahora
+miramos el hazard por tramos directamente, junto con el tamaño que lo sostiene:
+
+```{r}
+#| label: u26-haz-emp
+pp |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(en_riesgo = dplyr::n(), eventos = sum(y),
+                   hazard = round(mean(y), 4), .groups = "drop")
+```
+
+```{r}
+#| label: fig-u26-haz-emp
+#| fig-cap: "Hazard empírico por tramo ($d_k/n_k$). El perfil creciente es lo que justifica dar a cada tramo su propio nivel en el modelo."
+#| fig-width: 6
+#| fig-height: 3.6
+pp |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(hazard = mean(y), .groups = "drop") |>
+  ggplot(aes(as.integer(tramo), hazard)) +
+  geom_line(linewidth = 0.8, colour = "steelblue") +
+  geom_point(size = 2.5, colour = "steelblue") +
+  labs(x = "tramo de antigüedad", y = "hazard empírico (eventos / en riesgo)")
+```
+
+La lectura es clara y tiene tres partes. 
+
+1. **La forma**: el hazard crece de forma sostenida, de $0.054$ en el primer tramo a $0.108$ en el último —**se duplica**—, así que el riesgo de dar el primer parte aumenta con
+la antigüedad del cliente. Un perfil así, lejos de ser plano, es exactamente lo que **justifica** dedicar un parámetro $\alpha_k$ a cada tramo en lugar de un único intercepto.
+
+2. **El soporte**: la columna `en_riesgo` se vacía deprisa, de 3071 pólizas en el primer tramo a 464 en el último, y los eventos bajan de 166 a 50. Los últimos puntos, por tanto, descansan en poca información y son los más inestables.
+
+3. **El matiz**: los tramos 5 y 6 salen prácticamente iguales ($0.1077$ y $0.1078$). Ese estancamiento final puede ser real o puede ser el ruido que cabe esperar con 464 pólizas; conviene recordarlo, porque
+reaparecerá al validar contra el DGP. En conjunto, el eje temporal se comporta bien: hay señal suficiente
+para estimar seis niveles, con la reserva de que los dos últimos podrían agruparse si buscáramos un modelo más parco.
+
+#### Los predictores, en tres miradas
+
+::: {.callout-tip}
+## 🔧 En R. Calcular supervivencia y hazard
+Todo lo que sigue se apoya en dos funciones del paquete `survival`. Supongamos unos datos con una variable
+de **tiempo** `t`, una de **censura** `cen` (1 si el evento se observó, 0 si no) y un predictor `x`.
+
+**El objeto de supervivencia.** `Surv()` empaqueta las dos piezas de información en un único objeto, que es
+lo que los modelos entienden por «respuesta»:
+
+```r
+Surv(t, cen)     # al imprimirlo, los censurados se marcan con '+': 2, 3+, 5, 6+, ...
+```
+
+**La curva de Kaplan–Meier.** `survfit()` la estima, global o separada por los niveles de un predictor; la
+fórmula se escribe igual que en cualquier modelo de R:
+
+```r
+km   <- survfit(Surv(t, cen) ~ 1, data = datos)   # curva global
+km_x <- survfit(Surv(t, cen) ~ x, data = datos)   # una curva por nivel de x
+```
+
+**Los resultados, en formato ordenado.** `broom::tidy()` convierte ese objeto en un `data.frame` con una
+fila por tiempo de evento y las columnas que necesitamos: `time`, `n.risk` (cuántos seguían en riesgo justo
+antes), `n.event` (cuántos fallaron entonces), `estimate` —que es $\hat S(t)$—, sus intervalos de confianza
+y, si se ha estratificado, `strata`:
+
+```r
+broom::tidy(km_x)
+```
+
+**El hazard empírico** sale de esas mismas columnas, porque no es más que la proporción de los que estaban
+en riesgo y fallaron:
+
+```r
+broom::tidy(km_x) |> dplyr::mutate(hazard = n.event / n.risk)
+```
+
+Conviene notar algo práctico: si los datos ya están en formato **persona-periodo**, ese mismo hazard es
+simplemente la **media de `y`** dentro de cada grupo. Son dos rutas al mismo número, y usaremos una u otra
+según convenga.
+
+**La escala log-log**, para juzgar la proporcionalidad, es una transformación de la supervivencia estimada.
+Hay que descartar los valores 0 y 1, donde el doble logaritmo no está definido:
+
+```r
+broom::tidy(km_x) |>
+  dplyr::filter(estimate > 0, estimate < 1) |>
+  dplyr::mutate(loglog = log(-log(estimate)))
+```
+:::
+
+Preparamos el terreno: agrupamos en quintiles las dos variable continuas —para poder estratificar curvas— y calculamos de una vez las Kaplan–Meier de todos los predictores, que servirán para la primera y la tercera mirada.
+
+```{r}
+#| label: u26-eda-prep
+vars_cont <- c("edad_conductor", "antiguedad_carnet")
+vars_cate <- c("sexo", "tipo_vehiculo", "zona_circulacion")
+
+cartera_eda <- cartera |>
+  dplyr::mutate(dplyr::across(dplyr::all_of(vars_cont),
+                              \(x) factor(dplyr::ntile(x, 5)),
+                              .names = "{.col}_q"))
+vars_eda <- c(paste0(vars_cont, "_q"), vars_cate)
+
+pp_eda <- pp |>
+  dplyr::left_join(
+    dplyr::select(cartera_eda, id_poliza, dplyr::all_of(paste0(vars_cont, "_q"))),
+    by = "id_poliza"
+  )
+
+km_all <- purrr::map_dfr(vars_eda, \(v) {
+  f <- stats::as.formula(paste("Surv(tiempo_primer_sin, evento) ~", v))
+  broom::tidy(survfit(f, data = cartera_eda)) |>
+    dplyr::mutate(predictor = v, nivel = sub("^[^=]+=", "", strata))
+})
+```
+
+**Primera mirada: la supervivencia.** Curvas de Kaplan–Meier de cada predictor. Buscamos que los niveles
+**se separen** —señal de que la variable discrimina— y en qué dirección lo hacen.
+
+```{r}
+#| label: fig-u26-eda-km
+#| fig-cap: "Curvas de Kaplan–Meier por niveles de cada predictor candidato (las continuas, en quintiles). Niveles que se separan indican una variable con capacidad de discriminar; curvas superpuestas anticipan un efecto nulo."
+#| fig-width: 10
+#| fig-height: 5.5
+patchwork::wrap_plots(
+  purrr::map(vars_eda, \(v) {
+    km_all |>
+      dplyr::filter(predictor == v) |>
+      ggplot(aes(time, estimate, colour = nivel)) +
+      geom_step(linewidth = 0.7) +
+      labs(title = v, x = "tramo", y = "S(t)", colour = NULL) +
+      theme(plot.title = element_text(size = 10),
+            legend.key.size = unit(0.35, "cm"),
+            legend.text = element_text(size = 8))
+  }),
+  ncol = 3
+)
+```
+
+Tres cosas saltan a la vista. La **edad** discrimina con claridad y de forma **ordenada**: los quintiles se
+apilan sin cruzarse y el quinto —los conductores de más edad— termina con la supervivencia más baja. El
+**sexo**, en cambio, produce dos curvas prácticamente **superpuestas**, indistinguibles a lo largo de todo
+el seguimiento: es el aspecto de una variable que no discrimina. `tipo_vehiculo` y `zona_circulacion`
+separan de forma más modesta, con las motos y la circulación urbana en la parte baja, es decir, con más
+riesgo.
+
+El caso llamativo es **`antiguedad_carnet`**, porque separa **al revés** de lo que dicta la intuición: los
+quintiles con más años de carnet muestran **menos** supervivencia. ¿Los conductores experimentados son más
+siniestrosos? No: los años de carnet están fuertemente ligados a la **edad** —difícilmente se acumulan
+treinta años de carnet con veinticinco de edad—, y lo que estamos viendo es el efecto de la edad
+disfrazado. Es un ejemplo de manual de por qué un descriptivo **marginal** puede engañar: mide una
+variable arrastrando todo aquello con lo que va asociada. Solo un modelo que ajuste ambas a la vez podrá
+separar la experiencia de la edad.
+
+**Segunda mirada: el hazard.** La misma información, pero sobre el ritmo en lugar de sobre la
+supervivencia acumulada. Aquí buscamos **cuánto** se despega cada nivel del hazard global y, en las
+continuas, si el patrón es **monótono**.
+
+```{r}
+#| label: fig-u26-eda-haz
+#| fig-cap: "Hazard empírico (media de `y`) por niveles de cada predictor. La línea discontinua marca el hazard global de la cartera."
+#| fig-width: 9
+#| fig-height: 5.5
+purrr::map_dfr(vars_eda, \(v) pp_eda |>
+  dplyr::group_by(nivel = as.character(.data[[v]])) |>
+  dplyr::summarise(hazard = mean(y), .groups = "drop") |>
+  dplyr::mutate(predictor = v)) |>
+  ggplot(aes(nivel, hazard)) +
+  geom_hline(yintercept = mean(pp$y), linetype = 2, colour = "grey50") +
+  geom_point(size = 2.5, colour = "steelblue") +
+  facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
+  labs(x = NULL, y = "hazard empírico (media de y)")
+```
+
+El hazard confirma lo anterior y añade el matiz que la KM no daba: la **forma**. La **edad** dibuja un
+ascenso limpio y **monótono** a lo largo de sus cinco quintiles, de $0.069$ a $0.089$; ese patrón es
+justamente lo que respalda meterla en el modelo de forma **lineal** en el log-hazard, sin necesidad de
+splines. El **sexo** deja sus dos puntos pegados a la línea global —$0.077$ frente a $0.077$—, sin nada
+que modelar.
+
+En `tipo_vehiculo` la moto se despega hacia arriba ($0.082$) y la furgoneta hacia abajo ($0.072$), con el
+turismo en la media; en `zona_circulacion` la urbana queda por encima ($0.081$) y mixta y rural por debajo.
+Son separaciones pequeñas, del orden de una centésima, lo que anticipa coeficientes modestos y difíciles de
+distinguir del ruido.
+
+Y **`antiguedad_carnet`** vuelve a dar la nota, ahora de otra manera: su perfil es **errático**
+—$0.070$, $0.072$, $0.085$, $0.071$, $0.087$—, sin monotonía. Ni crece ni decrece de forma ordenada. Esa
+irregularidad es coherente con lo que ya sospechábamos: no estamos viendo un efecto propio, sino la mezcla
+confusa de su asociación con la edad.
+
+**Tercera mirada: la proporcionalidad.** El gráfico log-log. Si un factor multiplica el hazard por una
+constante, $\log(-\log S(t))$ de sus niveles difiere en una constante y las curvas salen **paralelas**.
+No buscamos que coincidan —eso sería ausencia de efecto—, sino que **mantengan la distancia**.
+
+```{r}
+#| label: fig-u26-eda-loglog
+#| fig-cap: "Gráfico log-log por niveles de cada predictor. Bajo riesgos proporcionales las curvas deben ser aproximadamente paralelas; su separación vertical estima el logaritmo del hazard ratio."
+#| fig-width: 10
+#| fig-height: 5.5
+patchwork::wrap_plots(
+  purrr::map(vars_eda, \(v) {
+    km_all |>
+      dplyr::filter(predictor == v, estimate > 0, estimate < 1) |>
+      ggplot(aes(time, log(-log(estimate)), colour = nivel)) +
+      geom_step(linewidth = 0.7) +
+      labs(title = v, x = "tramo", y = "log(-log S)", colour = NULL) +
+      theme(plot.title = element_text(size = 10),
+            legend.key.size = unit(0.35, "cm"),
+            legend.text = element_text(size = 8))
+  }),
+  ncol = 3
+)
+```
+
+El panorama es tranquilizador. En los cinco paneles las curvas suben **en paralelo**, manteniendo su
+separación a lo largo de los tramos: los quintiles de edad conservan su orden y su distancia, las dos
+curvas de sexo van superpuestas de principio a fin, y en `tipo_vehiculo` y `zona_circulacion` los niveles
+se desplazan sin cruzarse de forma sostenida. Nada de esto contradice el supuesto de riesgos
+proporcionales.
+
+Sí conviene señalar el **primer tramo**, donde varios paneles muestran los puntos más desordenados —el
+quintil superior de `antiguedad_carnet` aparece abajo del todo antes de situarse arriba, y `rural` arranca
+muy por debajo antes de converger con `mixta`—. Con un solo tramo de información acumulada, $\hat S$ está
+estimada sobre muy pocos eventos y el doble logaritmo **amplifica** esa imprecisión: es el punto menos
+fiable de todo el gráfico y no debe leerse como una violación del supuesto. La conclusión razonable es que
+la proporcionalidad resulta **plausible a priori**, dejando su contraste formal para el diagnóstico del
+modelo.
+
+#### Conclusión: qué modelo proponemos
+
+Recogiendo las tres miradas, el descriptivo deja un diagnóstico bastante nítido.
+
+**Funcionan.** El **tramo**, sin discusión: el hazard se duplica a lo largo de la antigüedad, así que cada
+tramo merece su propio nivel. Y la **edad del conductor**, que es el predictor más sólido del conjunto:
+separa las curvas de forma ordenada, su hazard crece de manera monótona y su gráfico log-log es
+razonablemente paralelo. Entra en el modelo de forma lineal con buena conciencia.
+
+**Funcionan poco.** `tipo_vehiculo` y `zona_circulacion` apuntan en direcciones plausibles —la moto y la
+circulación urbana, con más riesgo— pero con separaciones de apenas una centésima en el hazard. Cabe
+esperar coeficientes pequeños y con intervalos amplios; los mantenemos porque son variables sustantivas
+del negocio y porque un efecto débil no es lo mismo que un efecto nulo.
+
+**No funciona.** El **sexo**: curvas superpuestas, hazards idénticos y log-log indistinguible. Todo apunta
+a que no aporta nada. Lo conservamos en el modelo **a propósito**, para comprobar si el ajuste confirma
+ese diagnóstico y, sobre todo, para poder contrastarlo después contra la verdad del DGP.
+
+**Caso especial.** `antiguedad_carnet` merece atención: separa con el **signo contrario** al esperable y
+con un perfil errático, síntomas los dos de su **confusión con la edad**. Precisamente por eso entra en el
+modelo: el ajuste multivariante es la herramienta que puede separar lo que el descriptivo marginal mezcla,
+y será interesante ver si al controlar por edad el efecto de la experiencia recupera su signo protector.
+
+**Sobre la proporcionalidad**, los gráficos log-log no muestran convergencias, divergencias ni cruces
+sostenidos, así que el supuesto parece razonable a priori. Es una conclusión provisional, que someteremos
+a contraste formal en el diagnóstico.
+
+En suma, el modelo que proponemos es el hazard a trozos con estos cinco predictores: uno fuerte, dos
+débiles, uno presumiblemente nulo y uno confundido. Una mezcla deliberadamente realista.
+
+### El modelo
+
+**La formulación general.** Con los datos en persona-periodo, la respuesta de cada celda es $y_{ik}$, el
+número de siniestros de la póliza $i$ en el tramo $k$, que modelamos como una Poisson de media
+$\mu_{ik}=\lambda_{ik}\,t_{ik}$: el **hazard** multiplicado por el **tiempo en riesgo**. Tomando
+logaritmos, esa media se descompone en el tiempo expuesto más el predictor lineal:
+
+$$\log \mu_{ik}=\underbrace{\log t_{ik}}_{\textit{offset}}+\;\alpha_k+\mathbf{x}_i^{\top}\boldsymbol\beta .$$
+
+Cada pieza cumple un papel. El **offset** $\log t_{ik}$ entra con coeficiente fijo igual a 1 —no se
+estima— y es el que convierte un conteo en una tasa. Los $\alpha_k$ son el **hazard base**: la forma del
+riesgo a lo largo de la antigüedad, sin imponerle ninguna curva, ya que cada tramo tiene su propio nivel.
+Y $\boldsymbol\beta$ desplaza ese perfil hacia arriba o hacia abajo según las covariables de la póliza.
+Como el desplazamiento es el **mismo en todos los tramos**, estamos asumiendo **riesgos proporcionales**:
+un factor multiplica el hazard por igual al principio y al final de la relación con el cliente.
+
+**La simplificación en nuestro caso.** Aquí cada fila representa **un tramo completo** y todos los tramos
+miden lo mismo, de modo que $t_{ik}=1$ para todas las celdas. El offset vale entonces $\log 1 = 0$ y
+desaparece de la ecuación:
+
+$$\log \mu_{ik}=\alpha_k+\mathbf{x}_i^{\top}\boldsymbol\beta .$$
+
+Y con él desaparece también la distinción entre media y hazard: si $t_{ik}=1$, entonces
+$\mu_{ik}=\lambda_{ik}$, así que **el valor ajustado del modelo es directamente el hazard**. Eso es lo que
+nos permitirá, al predecir, leer sin más conversiones lo que devuelve `predict(..., type = "response")`.
+
+Conviene no perder de vista que esta simplificación es una **comodidad de este banco**, no una propiedad
+del método. En cuanto los intervalos tengan anchuras distintas, o una póliza entre o salga a mitad de
+tramo —como en el escenario de conteos recurrentes del callout de la
+[Sección 6.1](#sec-u26-contexto)—, el offset vuelve a ser imprescindible y hay que escribirlo.
+
+### Ajuste e interpretación
+
+```{r}
+#| label: u26-pw
+m_pw <- glm(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
+  family = poisson, data = pp
+)
+broom::tidy(m_pw, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(!grepl("^tramo", term))
+```
+
+Al exponenciar, cada coeficiente es una **razón de riesgo** (*hazard ratio*): el factor por el que se
+multiplica el ritmo del primer siniestro. Conviene recordar de dónde sale esa lectura. Si comparamos dos
+pólizas idénticas salvo en la covariable $x_j$, que difiere en una unidad, el cociente de sus hazards es
+
+$$\frac{\lambda_{ik}(x_j+1)}{\lambda_{ik}(x_j)}
+=\frac{\exp\{\alpha_k+\beta_j(x_j+1)+\cdots\}}{\exp\{\alpha_k+\beta_j x_j+\cdots\}}
+=e^{\beta_j}\;\equiv\;\mathrm{HR}_j .$$
+
+Fíjate en **lo que se cancela**. Desaparece el hazard base $\alpha_k$ y, con él, toda dependencia del
+tramo: por eso el cociente vale lo mismo al principio y al final de la relación con el cliente —es,
+literalmente, la hipótesis de riesgos proporcionales— y por eso el efecto puede resumirse en **un único
+número**. Y desaparece también el resto de covariables, de modo que $\mathrm{HR}_j$ mide el efecto de
+$x_j$ **manteniendo las demás constantes**.
+
+De ahí se derivan las dos reglas de lectura que usaremos. Para un cambio de $c$ unidades el factor es
+$e^{c\beta_j}=\mathrm{HR}_j^{\,c}$, lo que permite acumular efectos por unidad; y para un factor
+categórico, $e^{\beta}$ compara cada nivel con el de referencia. Se leen en la misma escala que los IRR de
+la [Unidad 2.1](#sec-u21), pero hablan de **cuándo** ocurre el evento y no de cuántos hay: un
+$\mathrm{HR}>1$ adelanta el siniestro y, como $S=e^{-H}$, acorta la supervivencia; uno $<1$ lo retrasa.
+
+Los **continuos** se leen por unidad: la edad multiplica el hazard por
+`r round(exp(coef(m_pw)["edad_conductor"]), 4)` **por año** y los años de carnet, por
+`r round(exp(coef(m_pw)["antiguedad_carnet"]), 4)`. Parecen minúsculos, pero son efectos *por unidad* y se
+acumulan: veinte años de edad suponen `r round(exp(20 * coef(m_pw)["edad_conductor"]), 2)`, y diez años de
+carnet, `r round(exp(10 * coef(m_pw)["antiguedad_carnet"]), 2)`. Conviene mirar además si ambos apuntan en
+sentidos opuestos —más edad, más riesgo; más experiencia al volante, menos—, que es lo que cabría esperar.
+
+El resultado más limpio es el de **`sexo`**, que incluimos deliberadamente sin prejuzgar: su *hazard ratio*
+es $0.992$ con un intervalo de $0.871$ a $1.130$ y un $p$-valor de $0.91$. Es difícil imaginar un «no
+aporta nada» más rotundo, y coincide exactamente con lo que anticipaba el descriptivo. En realidad, la
+edad es el **único** predictor que alcanza significación aquí; los demás —experiencia, tipo de vehículo y
+zona— apuntan en direcciones razonables pero con intervalos que cruzan el 1 con holgura.
+
+Conviene no leer eso como que «no influyen». Con solo un `r round(mean(cartera$evento) * 100)` % de
+pólizas siniestradas, el estudio tiene poca **potencia** para efectos de la magnitud que veíamos en el
+descriptivo: distinguir un hazard de $0.081$ de otro de $0.073$ exige muchos más eventos de los que
+tenemos. Ausencia de evidencia no es evidencia de ausencia —salvo, como veremos al validar, en el caso del
+sexo, donde además sabemos que la verdad es cero—.
+
+::: {.callout-tip}
+## 🔧 En R. El modelo de riesgos a trozos como `glm(poisson)`
+```r
+pp <- expandir_poliza_tramo(datos, "tiempo", "evento", col_id = "id")   # a persona-periodo
+m  <- glm(y ~ tramo + covariables, family = poisson, data = pp)         # hazard a trozos
+```
+
+- **Persona-periodo** — una fila por sujeto y tramo en riesgo; `y` vale 1 solo en el tramo del evento (0
+  en el resto). La **censura se trata sola**: la póliza aporta filas `y = 0` hasta donde se la siguió.
+- **El factor `tramo`** estima el **hazard base** escalonado ($\alpha_k$); las covariables entran como en
+  cualquier GLM y su $e^{\hat\beta}$ es un ***hazard ratio*** —`broom::tidy(m, exponentiate = TRUE,
+  conf.int = TRUE)`—.
+- **`offset(log(t))`** — hace falta cuando los tramos tienen **anchuras distintas** o hay más de un evento
+  por celda; aquí, con tramos iguales y respuesta 0/1, vale $\log 1 = 0$ y se omite.
+- **Predicción** — `predict(m, newdata, type = "response")` da el hazard por tramo $\hat\lambda_k$; la
+  supervivencia se acumula: `S <- exp(-cumsum(lambda))`.
+- La versión **binomial `cloglog`** ([Sección 6.3](#sec-u26-nexo)) sobre los mismos datos da los mismos
+  *hazard ratios*.
+:::
+
+### Bondad de ajuste, diagnóstico y predicción
+
+#### Bondad de ajuste: qué sirve aquí y qué no
+
+Conviene empezar con una advertencia, porque venimos de dos unidades midiendo la dispersión y aquí esa
+herramienta **engaña**. El índice de dispersión y el rootograma de la [Unidad 2.3](#sec-u23) no son
+aplicables: nuestra respuesta es 0/1, de modo que $\operatorname{Var}(y)=p(1-p)<p=\operatorname{E}(y)$. El
+estadístico de dispersión saldrá **por debajo de 1 por construcción**, no porque el modelo ajuste bien o
+mal. Buscar sobredispersión en un modelo de primer evento carece de sentido; la habrá —y entonces sí
+importará— cuando la respuesta sean conteos de verdad, como en el escenario recurrente del callout de la
+[Sección 6.1](#sec-u26-contexto).
+
+¿Qué es entonces bondad de ajuste aquí? La pregunta pertinente es de **calibración**: ¿reproduce el modelo
+la supervivencia que se observa? La forma directa de responderla es enfrentar la curva predicha a la
+Kaplan–Meier —lo hacemos en la [Sección 6.4](#sec-u26-clasicos)—, y puede afinarse **por estratos**,
+comparando predicho y observado dentro de cada nivel de un factor. Para elegir entre especificaciones
+—más o menos tramos, con o sin cierta covariable— valen los **criterios de información** de siempre, ya
+que todos los modelos se ajustan sobre las mismas filas persona-tramo.
+
+#### Diagnóstico: los supuestos que sostienen el modelo
+
+El supuesto central es el de **riesgos proporcionales**: que el efecto de cada covariable multiplique el
+hazard por igual en todos los tramos. Es lo que anticipábamos con el gráfico log-log del descriptivo, y
+ahora toca contrastarlo formalmente: se deja que el efecto varíe por tramo —añadiendo la interacción con
+`tramo`— y se comprueba si esa flexibilidad aporta algo:
+
+```{r}
+#| label: u26-ph-check
+m_int <- update(m_pw, . ~ . + tramo:zona_circulacion)
+anova(m_pw, m_int, test = "Chisq")
+```
+
+La interacción consume 10 grados de libertad y reduce la desviación en $17.3$, con un $p$-valor de
+$0.068$: **no se rechaza** la proporcionalidad al nivel habitual (0.05). Los datos son compatibles con que el efecto de la zona sea el mismo en todos los tramos, que es lo que el modelo asume.
+
+Y en este caso
+lo sabemos con certeza, porque el DGP no incluyó ninguna interacción con el tiempo: la proporcionalidad se
+cumple exactamente y el contraste se está comportando como debe.
+
+La cautela pertinente: **no rechazar no es demostrar o aceptar proporcionalidad**. Este contraste
+reparte sus 10 grados de libertad entre todos los patrones imaginables de desviación, y lo hace con unos
+`r sum(pp$y)` eventos, así que su potencia es limitada: una no proporcionalidad moderada podría pasarle
+inadvertida. Lo correcto es concluir que **no hay evidencia en contra** del supuesto —no que quede
+probado— y corroborarlo por otras vías, como haremos en la [Sección 6.4](#sec-u26-clasicos) con los
+residuos de Schoenfeld [@schoenfeld1982] y a partir del modelo de Cox equivalente.
+
+::: {.callout-tip}
+## 🔧 En R. Contrastar la proporcionalidad (modelo a trozos)
+Comprobar el supuesto de riesgos proporcionales es rutina en supervivencia aplicada, y hay dos vías según
+el modelo con el que se trabaje.
+
+**En el modelo a trozos** la vía es la que acabamos de emplear: dejar que el efecto varíe por tramo
+—añadiendo la interacción con `tramo`— y contrastar si esa flexibilidad aporta algo.
+
+```r
+m_int <- update(m_pw, . ~ . + tramo:zona_circulacion)
+anova(m_pw, m_int, test = "Chisq")   # un p alto respalda la proporcionalidad
+```
+
+**En el modelo de Cox** el estándar es `cox.zph()`, de `survival`. Se apoya en los **residuos de
+Schoenfeld** [@schoenfeld1982], y que presentamos y calculamos en la  [Sección 6.4](#sec-u26-clasicos).
+:::
+
+¿Y si la no proporcionalidad fuese **real**? Entonces un único *hazard ratio* sería un promedio a lo largo
+del tiempo, potencialmente engañoso —podría incluso promediar un efecto protector al principio con uno
+perjudicial al final y dar algo cercano a 1—. Las salidas habituales son dejar que el coeficiente varíe con
+el tiempo (la propia interacción con `tramo`), **estratificar** por la variable problemática dándole un
+hazard base propio, o pasar a familias de modelos que no imponen proporcionalidad. El Caso 3 dedica una
+unidad entera a ese terreno.
+
+El segundo supuesto, menos comentado pero igual de real, es la **forma funcional** de las covariables
+continuas: al escribir `edad_conductor` estamos imponiendo que el log-hazard crezca de forma **lineal** con
+la edad. Se comprueba dándole libertad —un polinomio o un spline— y viendo si mejora el ajuste; si el
+efecto fuese, por ejemplo, en forma de U (riesgo alto en los muy jóvenes y en los muy mayores), la versión
+lineal lo promediaría y podría dejarlo en casi nada. En cuanto a `DHARMa`, puede aplicarse, pero con la
+respuesta 0/1 sus residuos simulados son mucho menos informativos que en los conteos de las unidades
+anteriores.
+
+#### Predicción: el hazard y la supervivencia de un perfil
+
+Con el modelo ajustado, predecir consiste en poner un **perfil concreto** —una póliza con sus covariables—
+y recorrer con él los tramos. El modelo devuelve su hazard en cada uno, $\hat\lambda_k$, y de ahí sale su
+curva de supervivencia acumulando, tal como vimos: $\hat H_k=\sum_{j\le k}\hat\lambda_j$ y
+$\hat S_k=e^{-\hat H_k}$. Nótese la doble lectura: esos mismos $\hat\lambda_k$ son, a la vez, la **forma
+estimada del hazard base** desplazada por el perfil elegido, así que el gráfico sirve para predecir y para
+interpretar.
+
+```{r}
+#| label: fig-u26-pw-surv
+#| fig-cap: "Modelo de riesgos a trozos ajustado sobre un perfil de referencia: hazard estimado en cada tramo (izquierda) y supervivencia derivada por acumulación, $\\hat S_k=e^{-\\hat H_k}$ (derecha)."
+#| fig-width: 8
+#| fig-height: 3.6
+perfil <- pp[rep(1, nlevels(pp$tramo)), ]
+perfil$tramo <- factor(levels(pp$tramo), levels = levels(pp$tramo))
+
+h_hat <- predict(m_pw, newdata = perfil, type = "response")   # hazard por tramo (t = 1)
+curva <- tibble::tibble(
+  tramo  = seq_along(h_hat),
+  hazard = as.numeric(h_hat),
+  S      = exp(-cumsum(h_hat))
+)
+
+curva |>
+  tidyr::pivot_longer(c(hazard, S), names_to = "curva", values_to = "valor") |>
+  dplyr::mutate(curva = factor(curva, c("hazard", "S"),
+                               c("hazard estimado por tramo", "supervivencia S(t)"))) |>
+  ggplot(aes(tramo, valor)) +
+  geom_step(direction = "hv", linewidth = 0.8, colour = "steelblue") +
+  geom_point(size = 2, colour = "steelblue") +
+  facet_wrap(~ curva, scales = "free_y") +
+  labs(x = "tramo de antigüedad", y = NULL)
+```
+
+El hazard base crece con la antigüedad y, en consecuencia, la supervivencia cae cada vez más deprisa: el
+riesgo de dar el primer parte se acumula conforme el cliente lleva más tiempo con nosotros.
+
+### Validación contra el DGP
+
+Como el banco es simulado conocemos la verdad, así que podemos comprobar si el ajuste la recupera. Pero
+conviene ordenar la comprobación: primero **qué** queremos validar, después **con qué** compararlo.
+
+**Qué queremos validar.** El modelo que hemos ajustado, $\log\lambda_{ik}=\alpha_k+\mathbf{x}_i^{\top}
+\boldsymbol\beta$, afirma tres cosas, y son esas tres las que hay que poner a prueba:
+
+1. **La forma del hazard base**: cómo evoluciona el riesgo con la antigüedad, recogida en los $\alpha_k$.
+2. **Los efectos de las covariables**: cuánto multiplica cada factor el riesgo, recogido en $\boldsymbol\beta$.
+3. **La estructura proporcional**: que esos efectos sean los mismos en todos los tramos.
+
+**Con qué lo comparamos.** El DGP guarda su verdad en `attr(cartera, "verdad")`: el hazard base
+`h0_tramo = c(0.05, 0.06, 0.07, 0.08, 0.09, 0.10)` y el vector de coeficientes `betas$evento`. Ahora bien,
+ninguna de las dos cosas es directamente comparable con lo que estima R, y entender por qué es medio
+trabajo hecho:
+
+- El **nivel** del hazard base depende del perfil de referencia, y el del DGP (todas las continuas en su
+  media, zona rural, uso particular, turismo) no coincide con el de R (primer nivel de cada factor). La
+  salida es comparar **razones entre tramos**, $\lambda_k/\lambda_1$, que bajo proporcionalidad son las
+  mismas para cualquier perfil.
+- Los **coeficientes** tampoco: el DGP usó las continuas **estandarizadas**, así que su $0.20$ para la
+  potencia significa «por desviación típica», mientras que el nuestro es «por CV». Basta multiplicar el
+  nuestro por `sd()` para ponerlos en la misma escala. Y en la zona, el DGP toma `rural` como referencia y
+  R toma `urbana`, de modo que hay que restar.
+
+#### 1. La forma del hazard base
+
+```{r}
+#| label: u26-pw-valida
+verdad    <- attr(cartera, "verdad")
+razon_dgp <- verdad$h0_tramo / verdad$h0_tramo[1]
+razon_est <- c(1, exp(coef(m_pw)[grep("^tramo", names(coef(m_pw)))]))
+
+tibble::tibble(
+  tramo     = seq_along(razon_dgp),
+  estimada  = round(as.numeric(razon_est), 2),
+  verdadera = round(razon_dgp, 2)
+)
+```
+
+El ajuste recupera lo esencial, y en el punto final con precisión notable: el riesgo del sexto tramo
+**duplica** exactamente al del primero, $2.00$ frente a $2.00$. En los tramos centrales se queda algo por
+encima ($1.29$ frente a $1.20$; $1.76$ frente a $1.60$), y la explicación no está en el modelo sino en la
+muestra: las razones del **hazard empírico** que calculamos al principio son prácticamente idénticas a las
+estimadas. El modelo reproduce con fidelidad lo que hay en los datos; es la muestra concreta la que salió
+un poco por encima del DGP.
+
+Añade que las seis razones **comparten denominador** —el hazard del tramo 1—, de modo que una fluctuación
+de ese primer tramo desplaza la columna entera en bloque: no son seis desviaciones independientes, sino
+una sola repetida. Y el empate del final ($2.00$ y $2.00$ para los tramos 5 y 6) reproduce el que ya
+habíamos visto en el hazard empírico, donde solo quedaban 464 pólizas en riesgo.
+
+#### 2. Los efectos de las covariables
+
+```{r}
+#| label: u26-pw-valida-beta
+b <- setNames(verdad$betas$evento, verdad$nombres_beta)
+
+# Continuas: el DGP las estandarizó -> llevamos nuestro coeficiente a esa escala
+cont <- c(edad_conductor = "z_edad", antiguedad_carnet = "z_exp")
+sd_v <- vapply(names(cont), \(v) sd(cartera[[v]]), numeric(1))
+
+# Categóricas; 'sexo' no interviene en el DGP del evento, así que su valor verdadero es 0
+cate <- c(grep("^sexo", names(coef(m_pw)), value = TRUE),
+          "tipo_vehiculomoto", "tipo_vehiculofurgoneta",
+          "zona_circulacionmixta", "zona_circulacionrural")
+
+dplyr::bind_rows(
+  tibble::tibble(
+    termino   = names(cont),
+    estimado  = as.numeric(coef(m_pw)[names(cont)] * sd_v),
+    verdadero = as.numeric(b[cont])
+  ),
+  tibble::tibble(
+    termino   = cate,
+    estimado  = as.numeric(coef(m_pw)[cate]),
+    # el DGP mide la zona frente a 'rural'; R, frente a 'urbana'
+    verdadero = as.numeric(c(0, b["moto"], b["furgoneta"],
+                             b["mixta"] - b["urbana"], -b["urbana"]))
+  )
+) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+```
+
+Empecemos por la fila más informativa: **`sexo`**, cuyo valor verdadero es **exactamente 0** porque el DGP
+no lo utiliza para generar el tiempo hasta el siniestro. Es un **control negativo** perfecto, y el modelo lo
+supera con nota: estima $-0.008$. No se ha inventado un efecto donde no lo había, y de paso nos da una
+referencia utilísima —**la magnitud del ruido**— con la que juzgar el resto de la tabla.
+
+Con esa vara de medir, los resultados se ordenan solos. La **edad** ($0.136$ frente a $0.15$) y la **zona
+mixta** ($-0.104$ frente a $-0.12$) se recuperan bien. Los demás se quedan **cortos** —la experiencia
+($-0.064$ frente a $-0.10$), la moto ($0.063$ frente a $0.20$), la zona rural ($-0.086$ frente a
+$-0.20$)— y la furgoneta llega a salir con el **signo cambiado** ($-0.059$ frente a $0.08$). Nótese que
+todos ellos son varias veces mayores que el ruido de $0.008$ que marca el sexo: no son cero, pero están
+mal medidos.
+
+Esto no es un fallo del método, sino la consecuencia directa de lo que ya decían los intervalos de
+confianza. Con unos `r sum(pp$y)` primeros siniestros no hay información suficiente para resolver efectos
+de esta magnitud, y las estimaciones se van con el azar de la muestra. Merece la pena quedarse con la
+lección: en supervivencia la precisión la marcan los **eventos**, no las filas. Y conviene recordar que
+todo esto lo sabemos **porque el banco es simulado**; con datos reales habríamos publicado un coeficiente
+negativo para la furgoneta sin sospechar que el verdadero es positivo.
+
+Un apunte final sobre `antiguedad_carnet`. En el descriptivo aparecía con el signo invertido, arrastrada
+por la edad; en el modelo ajustado recupera el **signo correcto** —negativo, protector—, aunque atenuado.
+El ajuste multivariante ha hecho su trabajo: separar la experiencia de la edad, que era justo lo que
+esperábamos de él.
+
+#### 3. La estructura proporcional
+
+Este tercer punto ya lo validamos en el diagnóstico: la interacción `tramo:zona_circulacion` no aportaba, tal como
+correspondía a un DGP que multiplica el hazard base por un factor constante. Los tres puntos del modelo
+quedan así comprobados.
+
+## 6.3 Dos lentes del mismo hazard: Poisson y `cloglog` {#sec-u26-nexo}
+
+### El mismo hazard, dos enlaces
+
+En el Caso 1 ya expandimos a persona-periodo y ajustamos allí un GLM. Pero usamos otra familia: una
+**binomial con enlace `cloglog`**, que modela la **probabilidad** de que el evento ocurra en el periodo.
+Aquí hemos usado una **Poisson con enlace log**, que modela la **tasa** por unidad de tiempo en riesgo.
+Mismos datos, mismo formato, distinta lente. La pregunta obligada es si dicen lo mismo, y la respuesta
+está en el álgebra que ya vimos en la [Sección 6.1](#sec-u26-contexto).
+
+La probabilidad de evento en un tramo y la tasa se enlazan por $h_k=1-e^{-\lambda_k\Delta_k}$. Despejando
+y aplicando logaritmos dos veces:
+
+$$\log\!\big(-\log(1-h_k)\big)=\log\lambda_k+\log\Delta_k .$$
+
+El lado izquierdo es, exactamente, el **enlace `cloglog`** aplicado a $h_k$. Así que modelar
+$\operatorname{cloglog}(h_{ik})=\alpha_k+\mathbf{x}_i^{\top}\boldsymbol\beta$ equivale a modelar
+$\log\lambda_{ik}=\alpha_k+\mathbf{x}_i^{\top}\boldsymbol\beta$: **el mismo predictor lineal y los mismos
+$\boldsymbol\beta$**. De ahí la posición especial del `cloglog` entre los enlaces binarios —es el único
+que convierte un modelo de probabilidades por periodo en un modelo de **riesgos proporcionales** sobre un
+hazard continuo—. Con `logit`, en cambio, lo que resulta proporcional son las **odds**, no los hazards, y
+los coeficientes ya no son log-*hazard ratios*.
+
+### Ajuste y comparación
+
+Ajustamos la versión `cloglog` sobre los mismos datos y ponemos los coeficientes lado a lado:
+
+```{r}
+#| label: u26-cloglog
+m_cll <- glm(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
+  family = binomial(link = "cloglog"), data = pp
+)
+
+comp <- dplyr::inner_join(
+  broom::tidy(m_pw)  |> dplyr::select(term, poisson = estimate),
+  broom::tidy(m_cll) |> dplyr::select(term, cloglog = estimate),
+  by = "term"
+) |>
+  dplyr::mutate(diferencia = cloglog - poisson,
+                dplyr::across(where(is.numeric), \(x) round(x, 3)))
+comp
+```
+
+Los dos ajustes coinciden casi cifra por cifra: la mayor discrepancia de toda la tabla es
+`r round(max(abs(comp$diferencia)), 3)` en la escala log. La razón es que
+$1-e^{-\lambda}\approx\lambda$ cuando $\lambda$ es pequeño, y aquí los hazards por tramo rondan el
+0.05–0.10.
+
+Pero fíjate en **dónde** se concentra la diferencia, porque no está repartida al azar. En las covariables
+es prácticamente nula —cero en los efectos continuos, hasta cinco milésimas en los factores—, mientras que
+en los términos `tramo` crece de forma ordenada: $0.008$, $0.015$, $0.022$, $0.030$, $0.030$. El patrón se
+explica solo: la Poisson lee el hazard como la propia proporción $h$, mientras que el `cloglog` lo
+convierte en $-\log(1-h)$, que es **algo mayor** y tanto más cuanto mayor sea $h$. Como el hazard crece con
+la antigüedad, la brecha crece con el tramo —y se estanca en los dos últimos, igual que el propio hazard—.
+
+La consecuencia práctica es tranquilizadora: la discrepancia vive en el **nivel base**, no en los efectos.
+Los *hazard ratios* —lo que se interpreta y se comunica— coinciden a efectos prácticos.
+
+Hay un matiz que merece la pena señalar. Para **estos** datos, el modelo `cloglog` está **exactamente
+bien especificado**: el DGP generó el evento con $P(\text{siniestro en } k)=1-e^{-h_{0k}e^{\mathbf{x}'\beta}}$,
+que es justo la forma agrupada. La Poisson a trozos es, en rigor, una **aproximación** —trata como un
+conteo sin cota lo que solo puede ser 0 o 1—, pero una aproximación excelente mientras el hazard sea
+bajo, como confirma la tabla.
+
+### Cuándo usar cada una
+
+Conviene el **`cloglog` binario** cuando el tiempo es intrínsecamente discreto —periodos que no se pueden
+subdividir: cursos académicos, ciclos, rondas— y cuando el riesgo por periodo es **alto**, porque
+entonces importa que la respuesta esté acotada por 1.
+
+Conviene la **Poisson** cuando se piensa en términos de **tasa y tiempo-persona**: cuando la exposición
+varía dentro de los intervalos y hace falta el *offset*, cuando puede haber **más de un evento** por
+celda (eventos recurrentes), y cuando interesa el puente con el resto de la maquinaria de conteos —IRR,
+sobredispersión, efectos aleatorios— o con el modelo de Cox, que veremos enseguida.
+
+En la práctica, con eventos poco frecuentes, la elección es casi irrelevante para los coeficientes: como
+acabas de ver, dan lo mismo. Elige la que mejor case con **cómo quieres contar la historia**.
+
+## 6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier {#sec-u26-clasicos}
+
+Llegados aquí cabe preguntarse si hemos construido un modelo **alternativo** a los clásicos de
+supervivencia o si estamos en el mismo sitio por otro camino. La respuesta —y es el mensaje de esta
+sección— es lo segundo. Lo comprobamos contra los dos referentes: **Cox** para los efectos y
+**Kaplan–Meier** para la curva.
+
+### Cox: el mismo efecto, otro trato del hazard base
+
+Los tres modelos que manejamos comparten la parte de las covariables —riesgos proporcionales, con
+$\boldsymbol\beta$ como log-*hazard ratios*— y se diferencian en **qué hacen con el hazard base**. Nosotros
+lo hemos modelado como un **escalón por tramo**, gastando un parámetro en cada uno. Cox toma la vía
+opuesta: **no lo modela en absoluto**. Mediante la verosimilitud parcial compara, en cada instante en que
+ocurre un evento, quién falla frente a quién seguía en riesgo; el nivel del hazard base se cancela en esa
+comparación y desaparece del problema.
+
+
+La conexión entre ambos es más estrecha de lo que parece. Nuestro modelo divide el tiempo en tramos y estima un nivel de riesgo para cada uno. ¿Qué pasa si usamos tramos cada vez más finos? Pues que, en el límite —cuando hay un tramo por cada momento en que ocurre un siniestro—, el modelo de Poisson coincide exactamente con el de Cox. Y aquí está lo bueno: en nuestros datos el tiempo solo toma `r max(cartera$tiempo_primer_sin)` valores, así que ya tenemos un tramo por cada momento de siniestro. No hace falta afinar más —no hay nada entre medias que separar—. Ya estamos en ese límite, de modo que Cox y Poisson no deberían parecerse, sino dar el mismo resultado.
+
+:::{.callout-note}
+Para ajustar el modelo de Cox equivalente al modelo exponencial a trozos utilizamos la aproximación de Breslow [@breslow1974], que asume la misma hipótesis: todos los eventos de un mismo tramo comparten el mismo conjunto de riesgo, y se obtiene en R con:
+
+```
+m_cox <- coxph(
+  Surv(t, censura) ~ x1+ x2 + ...,data = ..., ties = "breslow")
+```
+:::
+
+```{r}
+#| label: u26-cox
+m_cox <- coxph(
+  Surv(tiempo_primer_sin, evento) ~ edad_conductor + antiguedad_carnet + sexo +
+    tipo_vehiculo + zona_circulacion,
+  data = cartera, ties = "breslow"
+)
+
+comp_cox <- dplyr::inner_join(
+  broom::tidy(m_pw) |> dplyr::select(term, poisson = estimate),
+  broom::tidy(m_cox) |> dplyr::select(term, cox = estimate),
+  by = "term"
+) |>
+  dplyr::mutate(diferencia = cox - poisson,
+                dplyr::across(where(is.numeric), \(x) round(x, 3)))
+comp_cox
+```
+
+El resultado es contundente: la mayor diferencia de toda la tabla es
+`r round(max(abs(comp_cox$diferencia)), 3)`. No es que los modelos se parezcan —es que dan **lo mismo**,
+coeficiente a coeficiente, hasta la última cifra mostrada—. Un GLM de Poisson ajustado sobre filas
+póliza-tramo y una verosimilitud parcial de Cox, dos construcciones que parecen no tener nada que ver,
+producen exactamente las mismas estimaciones.
+
+Y ya que tenemos el ajuste, apliquemos el contraste de Schoenfeld [@schoenfeld1982] que anunciamos en la
+[Sección 6.2](#sec-u26-piecewise), que es la comprobación estándar de la **proporcionalidad** en el mundo de
+Cox [@grambsch1994].
+
+::: {.callout-tip}
+## 🔧 En R. Contrastar la proporcionalidad en un modelo de Cox
+
+Comprobar el supuesto de riesgos proporcionales en el modelo de Cox se realiza con la función `cox.zph()`, de `survival`. Se apoya en los **residuos de
+Schoenfeld** [@schoenfeld1982]: en cada tiempo de evento, la diferencia entre la covariable de quien falla
+y su valor esperado entre los que seguían en riesgo. Si la proporcionalidad se cumple, esos residuos no
+guardan relación con el tiempo (no muestran tendencia); si el efecto se refuerza o se atenúa, aparece una **tendencia**. La versión implementada usa residuos escalados y contrasta precisamente esa tendencia [@grambsch1994]:
+
+```r
+zph <- cox.zph(m_cox)
+zph          # un contraste por covariable y uno global; p bajo = sospecha de no proporcionalidad
+plot(zph)    # residuos escalados frente al tiempo, con banda suavizada
+```
+El gráfico (`plot`) dibuja, para cada covariable, el coeficiente **en función del tiempo**, $\beta(t)$,
+con su banda: bajo proporcionalidad debe salir **plano**.
+:::
+
+```{r}
+#| label: u26-zph
+cox.zph(m_cox)
+```
+
+La respuesta es contundente: ninguna covariable baja de $p=0.34$ y el contraste **global** llega a $0.94$.
+Los *hazard ratios* no cambian con el tiempo, que es justo lo que cabe esperar de un DGP que los fijó
+constantes.
+
+Y ahora el gráfico, que es donde se ve la trayectoria de cada efecto:
+
+```{r}
+#| label: fig-u26-zph
+#| fig-cap: "Residuos de Schoenfeld escalados frente al tiempo, uno por covariable. La curva suavizada estima $\\beta(t)$ —el coeficiente como función del tiempo— con su banda de confianza; bajo riesgos proporcionales debe ser compatible con una recta horizontal."
+#| fig-width: 9
+#| fig-height: 6
+par(mfrow = c(2, 3))
+plot(cox.zph(m_cox))
+par(mfrow = c(1, 1))
+```
+
+
+En los cinco paneles $\beta(t)$ es plano dentro de su banda —ni siquiera `zona_circulacion`, el que más ondula, escapa (p=0.93)—: confirma lo que decían los p-valores. Dos avisos: en los factores los puntos forman franjas por tener pocos valores, y las escalas verticales cambian entre paneles, así que solo cuenta la forma frente a su propia banda.
+
+Frente al 0.068 de la interacción `tramo:zona_circulacion` en la  [Sección 6.2](#sec-u26-piecewise), aquí el pvalor
+es mucho más alto: aquel contraste busca cualquier desviación y cox.zph solo una tendencia temporal, por lo que es más nítido cuando no la hay. 
+
+Podemos concluir pues, que la proporcionalidad se sostiene en estos datos; hasta aquí todas las pruebas realizadas concluyen lo mismo: el gráfico log-log del análisis descriptivo (las curvas de cada factor salían paralelas) , el contraste de la interacción y el test de Schoenfeld -sin tendencia temporal en los residuos y un pvalor global de 0.94).
+
+### Kaplan–Meier: la curva sin modelo frente a la del modelo
+
+Para la curva la comparación debe ser justa: enfrentamos la Kaplan–Meier **global** a la supervivencia de
+un modelo que solo lleva el hazard base, **sin covariables**.
+
+```{r}
+#| label: fig-u26-km-vs-pw
+#| fig-cap: "Supervivencia estimada por Kaplan–Meier (sin modelo) y por el modelo de Poisson a trozos ajustado solo con el efecto de tramo. Las dos curvas se superponen: son el mismo hazard estimado de dos maneras."
+#| fig-width: 6.5
+#| fig-height: 4
+m_base <- glm(y ~ 0 + tramo, family = poisson, data = pp)   # solo el hazard base
+S_pw   <- exp(-cumsum(exp(coef(m_base))))
+
+km0 <- survfit(Surv(tiempo_primer_sin, evento) ~ 1, data = cartera)
+
+dplyr::bind_rows(
+  broom::tidy(km0) |> dplyr::transmute(tramo = time, S = estimate, metodo = "Kaplan–Meier"),
+  tibble::tibble(tramo = seq_along(S_pw), S = as.numeric(S_pw), metodo = "Poisson a trozos")
+) |>
+  ggplot(aes(tramo, S, colour = metodo)) +
+  geom_step(direction = "hv", linewidth = 0.8) +
+  geom_point(size = 2) +
+  labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = NULL)
+```
+
+Las curvas se solapan, y no por casualidad. Al ajustar `y ~ 0 + tramo`, el modelo estima en cada tramo el hazard $\hat\lambda_k=d_k/n_k$ —la misma proporción empírica que calculamos en la [Sección 6.2](#sec-u26-piecewise)—, de modo que reconstruye la supervivencia con la misma información que la Kaplan–Meier. No es un método rival: es la KM alcanzada desde el modelo de Poisson. La ligera diferencia visible se debe a que ambas acumulan el hazard de forma algo distinta.
+
+::: {.callout-note}
+## Un mapa de equivalencias
+Todo lo que hemos visto son variaciones sobre un mismo tema —riesgos proporcionales— que se diferencian
+en **cómo tratan el hazard base**:
+
+| Método | Hazard base | Covariables |
+|---|---|---|
+| **Kaplan–Meier / Nelson–Aalen** | libre, estimado del dato | ninguna (solo estratos) |
+| **Poisson a trozos** (esta unidad) | escalonado, un parámetro por tramo | riesgos proporcionales |
+| **Binomial `cloglog`** ([Sección 6.3](#sec-u26-nexo)) | ídem, en escala de probabilidad | riesgos proporcionales |
+| **Cox** | libre, eliminado de la verosimilitud | riesgos proporcionales |
+
+Cuanto más se afina el troceado, más se acerca el modelo de Poisson a Cox; y si se le quitan las
+covariables, su curva reproduce la de Kaplan–Meier. El GLM de Poisson no es, por tanto, un rival de los
+clásicos: es **el mismo hazard alcanzado desde los conteos**, con la ventaja de traer consigo toda la
+maquinaria de los GLM —*offset*, diagnóstico, efectos aleatorios— que usaremos en la
+[Sección 6.5](#sec-u26-frailty).
+:::
+
+## 6.5 Fragilidad ≡ GLMM de Poisson {#sec-u26-frailty}
+
+En la [Sección 6.1](#sec-u26-contexto) dejamos una puerta abierta: la verosimilitud factoriza sin problemas
+de independencia **salvo que haya heterogeneidad no observada** entre pólizas. Por bien elegidas que estén
+las covariables, dos pólizas idénticas en `x` no corren el mismo riesgo real —quedan hábitos, entorno o
+azar que no medimos—. A ese factor latente se le llama **fragilidad** (*frailty*), y se modela como un
+multiplicador aleatorio del hazard,
+
+$$\lambda_i(t)=\lambda_0(t)\;e^{\mathbf{x}_i^{\top}\boldsymbol\beta}\;Z_i,\qquad Z_i>0,\ \ \mathbb{E}[Z_i]=1.$$
+
+Tomando logaritmos, $\log Z_i$ es un **intercepto aleatorio** sobre el log-hazard, así que el modelo a
+trozos se vuelve un **GLMM de Poisson** sobre el persona-periodo: es la [Unidad 2.5](#sec-u25) aplicada al
+reloj. Por eso no repetimos aquí cómo se ajusta ni cómo se leen la varianza, el ICC o los BLUP; nos
+quedamos con lo único que la supervivencia añade y que allí no aparecía —la **depleción**—, tras una
+comprobación rápida sobre nuestros datos.
+
+Esa fragilidad puede ser **compartida** por un grupo: un mismo $Z_j$ para todas sus pólizas. El ejemplo más
+claro es una **aseguradora** que segmenta por precio y capta perfiles de bajo riesgo: acaba con una cartera
+poco siniestra, y ese nivel común —que no explican las covariables individuales— es su fragilidad. Nuestro
+banco no tiene aseguradoras, pero sí **agencias**, así que podemos preguntarle a los datos si esconden esa
+heterogeneidad, con el mismo `glmer` de la [Unidad 2.5](#sec-u25):
+
+```{r}
+#| label: u26-frailty
+m_frag <- glmer(
+  y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion +
+    (1 | agencia),
+  family = poisson, data = pp
+)
+sd_frag <- as.data.frame(VarCorr(m_frag))$sdcor[1]
+c(sigma_agencia = sd_frag)
+```
+
+El componente estimado, $\hat\sigma\approx$ `r round(sd_frag, 3)`, es indistinguible de cero. No es un
+fracaso, sino un **control negativo**: el DGP generó el tiempo a evento solo a partir de las covariables,
+sin ningún efecto de agencia —al contrario que `n_gestiones`, donde sí lo había y la
+[Unidad 2.5](#sec-u25) recuperó $\sigma\approx0.6$—. Conviene reconocer esta señal, porque es la que verás
+cuando un agrupamiento no aporte: una varianza que se desploma y, en el límite, un ajuste **singular**.
+
+En nuestros datos ignorar la fragilidad es inocuo: no la hay. Pero no conviene generalizarlo, porque cuando sí está presente aparece un fenómeno propio de la supervivencia, la depleción. Los frágiles fallan antes, de modo que el conjunto de riesgo se va vaciando de ellos y queda cada vez más «sano». En consecuencia, el hazard de la población crece más despacio que el de cada individuo —puede incluso bajar aunque el riesgo individual no deje de subir—. Un modelo sin fragilidad estima esa curva poblacional aplanada; no es que se equivoque, sino que responde a otra pregunta: «¿cómo evoluciona el riesgo de los que siguen aquí?» en lugar de «¿cómo evoluciona mi riesgo?», que es el que importa al aconsejar a un cliente concreto.
+
+Dos apuntes para cerrar. Una fragilidad **por póliza** —`(1 | id_poliza)`— no se puede estimar con un solo
+evento por sujeto: solo la identifican las repeticiones, es decir, los **eventos recurrentes**. Y el bucle
+con la [Unidad 2.3](#sec-u23): una fragilidad **Gamma** sobre un proceso de Poisson integra exactamente a
+una **binomial negativa**, de modo que la sobredispersión de los conteos y la fragilidad de la supervivencia
+son el mismo modelo escrito en dos idiomas.
+
+## 6.6 Conteos y supervivencia: dos caras de la tasa {#sec-u26-conteos}
+
+Cerramos donde empezamos: **el hazard es una tasa**. Toda la unidad ha usado esa idea para llevar la
+supervivencia al terreno de la Poisson; conviene ahora darle la vuelta, porque en la práctica los datos de
+tiempo a evento y los de conteo son **el mismo fenómeno** medido de dos maneras. Esta sección es un mapa de
+referencia: según el detalle temporal que tengas, qué modelo plantear y con qué llamada de R.
+
+La raíz es una identidad. Si los siniestros llegan como un **proceso de Poisson** de tasa $\lambda$, el
+**número** en un periodo de duración $t$ es $\operatorname{Poisson}(\lambda t)$ y el **tiempo hasta el
+primero** es $\operatorname{Exponencial}(\lambda)$ —el mismo $\lambda$—. La probabilidad de no tener
+ninguno hasta $t$ es la cola de las dos a la vez:
+
+$$S(t)=P\{N(0,t)=0\}=e^{-\lambda t},$$
+
+que es la relación $S=e^{-H}$ de la [Sección 6.1](#sec-u26-contexto) con $H=\lambda t$. Se comprueba en una
+línea —la masa en cero de la Poisson es la supervivencia exponencial—:
+
+```{r}
+#| label: u26-bookend
+c(poisson_en_cero = dpois(0, 0.3), exp_supervivencia = exp(-0.3))
+```
+
+La consecuencia es bonita: el GLM de Poisson de la [Unidad 2.1](#sec-u21) **ya era**, sin que lo
+leyéramos así, un modelo de supervivencia exponencial. A partir de ahí, cómo modelizar depende de cuánto
+**detalle temporal** guarden los datos. Tres situaciones cubren casi todo.
+
+**1 · Solo el primer evento** (lo de esta unidad). Tienes el tiempo del primer siniestro y la censura.
+Se expande a persona-periodo (una fila por sujeto y tramo en riesgo, `y` = 0/1) y se ajusta el hazard a
+trozos; como los tramos son de igual anchura, el *offset* vale $\log 1=0$ y se omite:
+
+```r
+m <- glm(y ~ tramo + covariables, family = poisson, data = pp)
+# predicción: hazard por tramo -> H acumulado -> S(t) = exp(-H)
+```
+
+**2 · Conteos por subperiodo** (eventos recurrentes). Tienes el **número** de partes de cada sujeto en
+cada subperiodo, con su exposición. Mismo modelo, con dos diferencias: `y` es ahora un conteo (no un
+0/1) y el sujeto **no sale** del conjunto de riesgo tras un parte, así que el *offset* de la exposición
+vuelve a ser imprescindible:
+
+```r
+m <- glm(y ~ tramo + covariables + offset(log(exposicion)), family = poisson, data = pp)
+```
+
+Es el modelo de **Andersen–Gill**, que lleva Cox al terreno de los procesos de recuento. Ya no se modela
+el hazard del primer evento, sino la **intensidad** del proceso completo.
+
+**3 · Solo totales** (sin *cuándo*). Tienes el número de partes de cada sujeto en todo el periodo, pero
+no en qué momento ocurrieron. Sin información temporal solo cabe una **tasa media**, es decir, un hazard
+**constante** —un modelo exponencial—:
+
+```r
+m <- glm(n ~ covariables + offset(log(t)), family = poisson, data = conductores)
+lambda <- exp(predict(m))          # tasa por sujeto
+S_t    <- exp(-lambda * t)         # supervivencia; P(>=1 evento en una unidad de exposicion) = 1 - exp(-lambda)
+```
+
+Es el modelo de la [Unidad 2.1](#sec-u21) leído como supervivencia. Es también el precio de tener solo
+totales: la forma del riesgo que sí recuperamos en el caso 1 —que se duplicaba con la antigüedad— aquí es
+invisible.
+
+**Dos cautelas al pasar a conteos.** Con eventos recurrentes, el supuesto de proceso de Poisson
+—independencia entre eventos— se vuelve exigente y, sobre todo, **comprobable**: si unos sujetos son
+sistemáticamente más siniestrosos, aparece **sobredispersión**, y entran la binomial negativa o la
+fragilidad —ahora sí identificable, porque las repeticiones la sostienen—. Y si los conteos provienen de
+una ventana que no arranca en el origen (p. ej. «los últimos 5 años»), hay **truncamiento por la
+izquierda** y **selección por supervivencia**: los veteranos que observas son los que no abandonaron la
+cartera, de modo que un perfil de riesgo descendente puede confundir la experiencia con la mera depleción
+de los malos conductores.
+
+En los tres casos la moneda es la misma —la **tasa**— y el **persona-periodo** el formato que los unifica.
+Conteo y supervivencia no son dos modelos, sino dos preguntas sobre el mismo proceso.
+
+::: {.callout-important}
+## Tarea del estudiante (2.6) — Preguntas 13 a 15 del caso
+Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.8](#sec-u28)):
+
+- **P13 · El primer siniestro.** Expande a **persona-periodo** y ajusta el modelo de **riesgos a trozos**
+  (Poisson + offset) sobre `t_primer_sin`/`evento`; describe el **hazard base** por tramo de antigüedad, lee
+  las razones de riesgo, y compara la curva de supervivencia con **Kaplan–Meier** y **Cox**.
+- **P14 · Eventos recurrentes (avanzado).** Con el **panel** (`panel.csv`) y el historial de partes, plantea
+  el modelo de **Andersen–Gill** (offset variable) y discute si el riesgo del 2.º, 3.º… siniestro difiere del
+  primero —conexión con la fragilidad de la [2.3](#sec-u23)—.
+- **P15 · Recomendación.** Traduce el hazard en una política de **cada cuánto revisar** las pólizas de más
+  riesgo.
+
+**Valida** el hazard base contra la forma Weibull del DGP (`attr(cartera, "verdad")$weib_shape`, `$lambda0`).
+:::
