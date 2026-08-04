@@ -7,6 +7,7 @@ project:
   pre-render: _scripts/invalidar_freeze.R
   render:
     - index.qmd
+    - guia_docente_simplificada.qmd
     - caso1/caso1_binaria.qmd
     - caso2/caso2_conteos.qmd
     - caso3/caso3_continuas_positivas.qmd
@@ -22,6 +23,8 @@ website:
     left:
       - href: index.qmd
         text: Inicio
+      - href: guia_docente_simplificada.qmd
+        text: "Guía docente"
       - href: caso1/caso1_binaria.qmd
         text: "Caso 1 · Binaria"
       - href: caso2/caso2_conteos.qmd

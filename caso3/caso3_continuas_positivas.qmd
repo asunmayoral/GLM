@@ -43,7 +43,7 @@ editor:
 #| include: false
 
 # Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.6).
+# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
 library(broom)           # resultados ordenados de glm y modelos de supervivencia
@@ -57,8 +57,8 @@ library(marginaleffects) # efectos, contrastes y predicciones ajustadas
 library(emmeans)         # medias marginales y comparaciones
 
 library(lme4)            # lmer y glmer (mixtos)
-library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.6)
-library(glmnet)          # regularización (en 3.6, como límite conceptual en Gamma)
+library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
+library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
 
 library(survival)        # Kaplan-Meier, Cox y datos start-stop
@@ -74,41 +74,52 @@ theme_set(theme_minimal(base_size = 12))
 
 **Objetivo general (curso).** *Continuas positivas y vida útil:* ajustar, interpretar, diagnosticar y
 comparar/seleccionar modelos para respuestas **positivas y asimétricas** —el **coste** de una avería
-(Gamma e inversa gaussiana, enlaces log/inverso)— y para **tiempos de vida** —el **tiempo entre
-fallos**, mediante modelos **AFT** con censura—. Reactiva los objetivos de **mixtos** (efecto aleatorio
+(Gamma e inversa gaussiana, enlaces log/inverso)—, para **agregados con ceros** —el coste anual por
+máquina, mediante la familia **Tweedie**— y para **tiempos de vida** —el **tiempo entre fallos**,
+mediante modelos **AFT** con censura—. Reactiva los objetivos de **mixtos** (efecto aleatorio
 de máquina) y **supervivencia** —con **Cox** como frontera del marco— y culmina en el de **comunicar y
 reproducir** (estudio de caso).
 
-::: {.callout-note}
-## Pendiente
-Los **resultados de aprendizaje específicos** del Caso 3 se redactarán más adelante, como en los casos
-anteriores.
-:::
+Al completar el Caso 3, el estudiante será capaz de:
+
+- **RA1 · Respuestas positivas y asimétricas.** Reconocer cuándo la respuesta es una magnitud continua **estrictamente positiva** y sesgada, justificar por qué el modelo gaussiano no sirve (predicciones negativas, varianza constante), y ajustar e interpretar un **GLM Gamma** con enlace log en clave **multiplicativa**, con su parámetro de **dispersión** $\phi$ y su inferencia (Wald, contraste $F$).
+- **RA2 · Elegir familia y escala.** Comparar las familias de respuesta positiva —**Gamma**, **inversa gaussiana** y **lognormal** vía log-OLS— usando la **relación media-varianza** $\operatorname{Var}(Y)=\phi\,\mu^{p}$ como criterio; corregir el **sesgo de retransformación** (*smearing* de Duan); diagnosticar si la **dispersión está estructurada**; y comparar por AIC modelos definidos sobre respuestas en escalas distintas (corrección por el jacobiano).
+- **RA3 · Continuas agrupadas (mixtos).** Ajustar e interpretar un **GLMM Gamma** con **intercepto** y **pendiente aleatorios** por sujeto: componentes de varianza, ICC, BLUP y encogimiento, y la distinción entre predicción **condicional** y **marginal**. Reconocer qué resuelve el efecto aleatorio: la dispersión inflada y los falsos positivos que produce ignorar el agrupamiento.
+- **RA4 · Agregados con ceros: la familia Tweedie.** Reconocer una respuesta **mixta** —masa en el cero y parte continua positiva— como mezcla **Poisson–Gamma**, situarla en la recta $\operatorname{Var}(Y)=\phi\,\mu^{p}$ con $1<p<2$, estimar el **índice $p$** como un parámetro más, e interpretar el modelo como **frecuencia × severidad** para producir un **presupuesto** o **prima pura** con *offset* de exposición.
+- **RA5 · Vida útil y censura: modelos AFT.** Describir tiempos de vida con **Kaplan–Meier** y log-rank; formular la **censura** en la verosimilitud y explicar por qué una observación censurada informa sin ser un dato completo; ajustar modelos **AFT** (exponencial, Weibull, log-normal, log-logística), elegir la distribución del error con criterio, e interpretar en **factores de aceleración**.
+- **RA6 · Cox como frontera del marco.** Formular el modelo de **riesgos proporcionales**, entender por qué la **verosimilitud parcial** lo sitúa fuera de los GLM, interpretar *hazard ratios*, introducir la **fragilidad** para la dependencia intra-sujeto, diagnosticar la **proporcionalidad** (residuos de Schoenfeld) y extender el modelo con **covariables dependientes del tiempo** sobre datos *start-stop*.
+- **RA7 · El marco común y sus fronteras.** Reconocer que una misma pregunta de tiempo-a-evento admite tres lecturas —**binaria en tiempo discreto** (`cloglog`), **Poisson a trozos** y **Cox**— que estiman el mismo mecanismo, y explicar qué las hace coincidir. Identificar, sin desarrollarlas, las extensiones que quedan fuera del marco (dos partes, GAM, eventos recurrentes, riesgos competitivos, bayesiano) y el límite de la selección automática cuando la estructura vive en la **función de varianza**.
+- **RA8 · Bondad de ajuste, diagnóstico, predicción y validación.** Evaluar un modelo de respuesta positiva o de supervivencia con la herramienta que le corresponde —**residuos simulados** (DHARMa), Cox–Snell, Schoenfeld, calibración, concordancia—; **predecir** con su incertidumbre, distinguiendo el error de la **media** del **intervalo de predicción**; y validar mediante **validación cruzada agrupada** cuando las observaciones se repiten por sujeto.
+- **RA9 · Artículo científico reproducible.** Desarrollar, presentar y defender un **artículo de investigación** reproducible que aplique los modelos del bloque a un banco propio e **investigue y aplique una extensión** no vista en clase, justificando cada elección de modelización y validando los resultados contra la verdad conocida del proceso generador.
 
 ::: callout-note
 ## Mapa del caso
 
 En el Caso 1 preguntábamos *«¿ocurre el evento? ¿y cuándo?»*; en el Caso 2, *«¿cuántas veces y a qué
-ritmo?»*. Ahora todo gira sobre un mismo suceso —la **avería** de una máquina— y la pregunta tiene dos
-mitades:
+ritmo?»*. Ahora todo gira sobre un mismo suceso —la **avería** de una máquina—, y el bloque avanza en
+cuatro tramos:
 
-> **¿Cuánto cuesta una avería?** — la **severidad**: el coste de la reparación (€). Unidades 3.1–3.3.
-> **¿Cada cuánto se avería?** — la **frecuencia**: el tiempo entre fallos (días). Unidades 3.4–3.5.
-> **Y las dos juntas** — la Unidad 3.6 las sintetiza (presupuesto = frecuencia × severidad) y la 3.7 es el estudio de caso.
+> **¿Cuánto cuesta una avería?** — la **severidad**, euro a euro. Unidades 3.1–3.3.
+> **¿Cuánto costará el año que viene?** — el **agregado**: frecuencia × severidad, con ceros. Unidad 3.4.
+> **¿Cada cuánto se avería?** — la **frecuencia**: el tiempo hasta el siguiente fallo. Unidades 3.5–3.6.
+> **¿Y qué nos llevamos?** — el **cierre** (3.7) y el **estudio de caso** del estudiante (3.8).
 
 El coste es una magnitud $Y>0$ asimétrica a la derecha: el terreno de la **Gamma** (enlace log, efectos
-multiplicativos). Y como el **tiempo entre fallos** es también positivo continuo, el mismo marco nos
-lleva a los modelos **AFT** y, con ellos, al cierre del hilo de supervivencia: **Cox** como frontera.
+multiplicativos). Sumado por máquina y año pasa a ser una magnitud **mixta** —cero cuando no hubo
+averías, positiva cuando las hubo—, y ahí entra la **Tweedie**. Y como el **tiempo entre fallos** es
+también positivo continuo, el mismo marco lleva a los modelos **AFT** y, con ellos, al cierre del hilo
+de supervivencia: **Cox** como frontera.
 
-| Unidad | Contenido | Objetivo y datos |
+| Unidad | La pregunta y el modelo | Resultados de aprendizaje y datos |
 |:--:|:----------------------------------------------------------------|:------------------|
-| **3.1** | *«¿Cuánto cuesta una avería?»* — **GLM Gamma**: el coste de una avería. Dónde falla el gaussiano · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia (Wald y $F$) · diagnóstico y validación. | Continuas positivas<br>**Datos:** `averias` |
-| **3.2** | *«¿Es de verdad una Gamma, y en qué escala?»* — **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; la **relación media-varianza** como criterio; retransformación y sesgo (**smearing** de Duan); **modelar la dispersión**; comparación por AIC (con jacobiano). | Continuas positivas<br>**Datos:** `averias` |
-| **3.3** | *«¿Hay máquinas crónicamente caras?»* — **GLMM Gamma**: el coste con **efecto aleatorio de máquina**; intercepto y **pendiente aleatoria** en la edad (la que asomó en la dispersión de 3.2); condicional vs marginal; se resuelven la $\hat\phi$ inflada y el falso positivo de `fabricante`. | Mixtos (espiral)<br>**Datos:** `averias` (por `id_maquina`) |
-| **3.4** | *«¿Cada cuánto se avería una máquina?»* — **Del coste al tiempo: AFT**. Kaplan–Meier; los **tiempos entre fallos** como positivos continuos; exponencial, Weibull y lognormal; **censura en la verosimilitud**; factor de aceleración; ¿acortar el intervalo de mantenimiento retrasa el fallo? | Continuas positivas + supervivencia<br>**Datos:** `intervalos` |
-| **3.5** | *«¿El riesgo de fallo es proporcional en el tiempo?»* — **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; **fragilidad** de máquina; diagnóstico de la proporcionalidad (el mantenimiento la rompe). | Supervivencia (espiral)<br>**Datos:** `intervalos`, `seguimiento` |
-| **3.6** | *«¿Cuánto costará el mantenimiento el año que viene?»* — **Síntesis: las tres lentes** sobre el fallo (tiempo discreto/`cloglog`, Poisson a trozos, Cox) **+ Tweedie**: coste total por máquina y año (con ceros) = **frecuencia × severidad = presupuesto**. Selección y validación agrupada. | Síntesis<br>**Datos:** `seguimiento`, `panel` |
-| **3.7** | *«¿Qué recomendamos, y es reproducible?»* — **Estudio de caso, exposición y evaluación** (artículo de investigación). | Comunicar y reproducir<br>**Datos:** todo el banco |
+| **3.1** | *«¿Cuánto cuesta una avería?»* — **GLM Gamma**: el coste de una avería. Dónde falla el gaussiano · enlaces log e inverso · dispersión $\phi$ · interpretación multiplicativa · inferencia (Wald y $F$) · diagnóstico y validación. | **RA1** (y primer contacto con RA8)<br>**Datos:** `averias` |
+| **3.2** | *«¿Es de verdad una Gamma, y en qué escala?»* — **Elegir familia y escala**: inversa gaussiana y lognormal (**log-OLS**) frente a Gamma; la **relación media-varianza** como criterio; retransformación y sesgo (**smearing** de Duan); **modelar la dispersión**; comparación por AIC (con jacobiano). | **RA2**<br>**Datos:** `averias` |
+| **3.3** | *«¿Hay máquinas crónicamente caras?»* — **GLMM Gamma**: el coste con **efecto aleatorio de máquina**; intercepto y **pendiente aleatoria** en la edad (la que asomó en la dispersión de 3.2); condicional vs marginal; se resuelven la $\hat\phi$ inflada y el falso positivo de `fabricante`. | **RA3** (espiral de mixtos)<br>**Datos:** `averias` (por `id_maquina`) |
+| **3.4** | *«¿Cuánto costará el mantenimiento el año que viene?»* — **Tweedie**: el coste total por máquina y año, **con ceros**, como mezcla Poisson–Gamma = frecuencia × severidad. El hueco en la recta $\operatorname{Var}=\phi\mu^p$ · el índice $p$ como parámetro a estimar · predicción con intervalo · GLMM Tweedie y **validación cruzada agrupada**. | **RA4** (con RA3 y RA8)<br>**Datos:** `panel`, `seguimiento` |
+| **3.5** | *«¿Cada cuánto se avería una máquina?»* — **Del coste al tiempo: AFT**. Kaplan–Meier; los **tiempos entre fallos** como positivos continuos; exponencial, Weibull y lognormal; **censura en la verosimilitud**; factor de aceleración; ¿acortar el intervalo de mantenimiento retrasa el fallo? | **RA5** (espiral de supervivencia)<br>**Datos:** `intervalos` |
+| **3.6** | *«¿El riesgo de fallo es proporcional en el tiempo?»* — **Cox como frontera**: riesgos proporcionales, verosimilitud parcial y **por qué no es un GLM**; **fragilidad** de máquina; diagnóstico de la proporcionalidad; **Cox extendido** con la protección del mantenimiento, que decae. | **RA6** (con RA8)<br>**Datos:** `intervalos`, `seguimiento` |
+| **3.7** | *«¿Dicen lo mismo las tres lecturas del fallo?»* — **Cierre**: `cloglog` persona-periodo, **Poisson a trozos** y **Cox** sobre el mismo panel, la deuda pendiente desde el Caso 1; y un **mapa de fronteras** (hurdle, GAM, riesgos competitivos, bayesiano) con el límite de la regularización. | **RA7** (integra RA5 y RA6)<br>**Datos:** `seguimiento` |
+| **3.8** | *«¿Qué recomendamos, y es reproducible?»* — **Estudio de caso, exposición y evaluación** (artículo de investigación), sobre la cartera de la aseguradora del Caso 2. | **RA9** (integra RA1–RA8)<br>**Datos:** banco del Caso 2 |
 
 **Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión (la lista
 completa, con su uso comentado, vive en cada `.qmd` y en los scripts de `caso3/scripts/`):
@@ -118,10 +129,28 @@ completa, con su uso comentado, vive en cada `.qmd` y en los scripts de `caso3/s
 | **3.1** | `glm(Gamma(link="log"))` · `broom::tidy` · `anova(…, test="F")` · `DHARMa::simulateResiduals` · `emmeans` / `marginaleffects` |
 | **3.2** | `glm(inverse.gaussian)` · `lm(log(y))` + **smearing** de Duan · `AIC` / `logLik` · `MASS` |
 | **3.3** | `glmmTMB(… + (1 + edad \| id_maquina))` · `car::Anova` · `performance::r2_nakagawa` / `icc` · `DHARMa::testDispersion` · `VarCorr` |
-| **3.4** | `survival::survreg` (Weibull/exp/lognormal) · `Surv` · `survfit` / `survdiff` (KM, log-rank) · `survminer::ggsurvplot` |
-| **3.5** | `survival::coxph` · `frailty(id_maquina)` · `cox.zph` (Schoenfeld) · `Surv(tstart, tstop, evento)` |
-| **3.6** | `glmmTMB(family = tweedie)` · `glm` (`cloglog` / Poisson a trozos) · `glmnet` · `rsample::group_vfold_cv` |
-| **3.7** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
+| **3.4** | `glmmTMB(family = tweedie)` · `family_params` / `sigma` ($p$ y $\phi$) · `DHARMa` · `rsample::group_vfold_cv` |
+| **3.5** | `survival::survreg` (Weibull/exp/lognormal) · `Surv` · `survfit` / `survdiff` (KM, log-rank) · `survminer::ggsurvplot` |
+| **3.6** | `survival::coxph` · `frailty(id_maquina)` · `cox.zph` (Schoenfeld) · `Surv(tstart, tstop, evento)` · `tt()` |
+| **3.7** | `glm(binomial("cloglog"))` · `glm(poisson)` con *offset* · `coxph` · `glmmTMB` / `frailty` para las versiones agrupadas · `glmnet` (como límite conceptual) |
+| **3.8** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
+
+**Tres hilos atraviesan el bloque de arriba abajo**, y son lo que conviene llevarse de él.
+
+*Uno · la respuesta manda.* Importe, tiempo, indicador o euro anual: cada tipo de respuesta escoge su
+familia, y con ella el enlace, la función de varianza y la forma de interpretar. No es una preferencia
+de método; es una consecuencia de lo que se ha medido.
+
+*Dos · casi todo es el mismo marco.* La Unidad 3.4 pone las familias del curso en una sola recta,
+$\operatorname{Var}(Y)=\phi\,\mu^{p}$, donde la Tweedie ocupa el hueco que faltaba; y la 3.7 lo enseña
+de la forma más rotunda posible: tres maquinarias que parecían mundos distintos —una binaria, un conteo
+y un *hazard*— estimando el mismo mecanismo con las mismas cifras.
+
+*Tres · el mismo latente, cuatro veces.* La máquina que falla más *y* cuesta más aparece como intercepto
+aleatorio del coste en 3.3, como $\sigma_u$ del euro anual en 3.4 —ahí **elevada al cuadrado**, porque el
+coste anual la sufre por partida doble—, como fragilidad del riesgo en 3.6 y como intercepto de las tres
+lentes en 3.7. Reconocerla no es un refinamiento: sin ella, el `fabricante` parece significativo, el
+índice $\hat p$ sale inflado y los intervalos prometen una precisión inexistente.
 :::
 
 # Presentación del caso {#sec-presentacion3}
@@ -143,7 +172,7 @@ dos preguntas, que corresponden a las dos mitades del caso:
 
 Las dos mitades no son independientes: las une un **efecto latente de máquina** (una «fragilidad»). Hay
 máquinas «malas» que **fallan más a menudo y además cuestan más de reparar**. Esa pieza es el **efecto
-aleatorio** del GLMM (Unidad 3.3) y la **fragilidad** de la supervivencia (Unidad 3.5), y es lo que
+aleatorio** del GLMM (Unidad 3.3) y la **fragilidad** de la supervivencia (Unidad 3.6), y es lo que
 hace del caso un todo coherente.
 
 ### Las cinco tablas del banco
@@ -154,9 +183,9 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 |---|---|---|---|
 | `maquinas` | una **máquina** (ficha basal) | — | contexto y covariables |
 | `averias` (= `costes`) | una **avería** | `coste_euros` | 3.1 GLM Gamma · 3.2 familia/escala · 3.3 GLMM Gamma |
-| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | 3.4 AFT · 3.5 Cox |
-| `seguimiento` | una **máquina-mes** (*start-stop*) | `fallo` (+ `offset`) | Cox con covariable temporal (3.5); lentes discreta/a-trozos (3.6) |
-| `panel` | una **máquina-año** | `coste_total` (con ceros) | Tweedie (3.6) |
+| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | 3.5 AFT · 3.6 Cox |
+| `seguimiento` | una **máquina-mes** (*start-stop*) | `fallo` (+ `offset`) | Cox con covariable temporal (3.6); lentes discreta/a-trozos (3.7) |
+| `panel` | una **máquina-año** | `coste_total` (con ceros) | Tweedie (3.4) |
 
 ### Descripción detallada de las variables
 
@@ -224,7 +253,7 @@ glimpse(banco$averias)
 ```
 
 **¿Cuánto cuesta una avería?** Un descriptivo del coste —media, mediana, mínimo, máximo y el
-**coeficiente de variación** (CV = sd/media)—:
+**coeficiente de variación** (CV = sd/media)— (@tbl-averias-coste):
 
 ```{r}
 #| label: tbl-averias-coste
@@ -241,7 +270,8 @@ tibble::tibble(
 La media supera a la mediana y el máximo queda muy lejos de ambas: el coste es **positivo y asimétrico
 a la derecha**, el terreno del GLM Gamma (lo desarrollamos en la [Unidad 3.1](#sec-u31)).
 
-**¿Cada cuánto se avería?** El número de averías por máquina y el desenlace de supervivencia:
+**¿Cada cuánto se avería?** El número de averías por máquina y el desenlace de supervivencia
+(@tbl-averias-frecuencia):
 
 ```{r}
 #| label: tbl-averias-frecuencia
@@ -264,7 +294,7 @@ en el Caso 2 llevaba a la binomial negativa. Y en torno a una cuarta parte de lo
 **censurados** (la máquina llega al cierre del estudio sin volver a fallar).
 
 Y su aspecto —el coste (izquierda) y los tiempos entre fallos (derecha), ambos con su asimetría
-característica—:
+característica— en la @fig-averias-eda:
 
 ```{r}
 #| label: fig-averias-eda
@@ -296,5 +326,7 @@ p_coste + p_gap
 {{< include _unidad_3_4.qmd >}}
 {{< include _unidad_3_5.qmd >}}
 {{< include _unidad_3_6.qmd >}}
+{{< include _unidad_3_7.qmd >}}
+{{< include _unidad_3_8.qmd >}}
 
 

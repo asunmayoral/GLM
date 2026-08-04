@@ -77,7 +77,7 @@ predicción al 95 % cae bajo cero en el **80 %** de las averías (hasta unos −
 media que el gaussiano pone en «coste < 0» es del **11 %**. No es un problema de puntería, sino de
 **dominio**: el coste vive en $(0,\infty)$ y el gaussiano insiste en habitar toda la recta. El segundo
 frente es la **heterocedasticidad**: la dispersión no es constante, sino que crece con el nivel del
-coste, como muestra la @fig-u31-heterocedasticidad.
+coste.
 
 ```{r}
 #| label: fig-u31-heterocedasticidad
@@ -124,7 +124,7 @@ $\operatorname{Var}(Y)\propto\mu^2$ —desviación típica proporcional a la med
 ### ¿De qué depende el coste?
 
 El modelo debe responder a una pregunta industrial. Antes de ajustarlo, miramos la relación del coste
-con los **cinco predictores candidatos**. Primero los **categóricos** (@fig-u31-cat):
+con los **cinco predictores candidatos**. Primero los **categóricos**:
 
 ```{r}
 #| label: fig-u31-cat
@@ -168,10 +168,10 @@ puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al a
 ([Sección 1.4](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
-otra mitad del caso, que modelaremos en la [Unidad 3.5](#sec-u35).
+otra mitad del caso, que modelaremos en la [Unidad 3.4](#sec-u34).
 
 Por último, condicionamos el coste por proceso **y** criticidad a la vez, que es donde el banco esconde
-su estructura más rica (@fig-u31-interaccion-eda):
+su estructura más rica:
 
 ```{r}
 #| label: fig-u31-interaccion-eda
@@ -348,7 +348,7 @@ Leemos los factores de la @tbl-u31-coeficientes (entre paréntesis, la lectura r
 El factor de la criticidad, sin embargo, no cuenta toda la historia: como entra **en interacción con la
 fase del proceso**, su efecto no es un único número, sino que **depende de la fase**. Sumar a mano el
 término principal y el de interacción para cada combinación es incómodo; es más claro pedir directamente
-el **coste medio predicho** por criticidad dentro de cada fase (@tbl-u31-interaccion):
+el **coste medio predicho** por criticidad dentro de cada fase:
 
 ```{r}
 #| label: tbl-u31-interaccion
@@ -364,7 +364,7 @@ moderada; en la **fase 2**, el sobrecoste se dispara —porque ahí la avería n
 sino que **para la línea**—. Señala **dónde una avería sale más cara** —las máquinas críticas de
 Ensamblaje y Acabado— y, por tanto, dónde conviene concentrar repuestos y capacidad de respuesta; si
 además compensa **prevenirla** dependerá de con qué frecuencia falle, que es ya otra pregunta (la
-[Unidad 3.5](#sec-u35)). Lo vemos también en euros predichos frente a la antigüedad (@fig-u31-prediccion):
+[Unidad 3.4](#sec-u34)). Lo vemos también en euros predichos frente a la antigüedad:
 
 ```{r}
 #| label: fig-u31-prediccion
@@ -420,7 +420,7 @@ esa idea en la mano, la inferencia tiene **dos niveles**:
 
 **Primer nivel: cada coeficiente.** Reunimos en una sola tabla los coeficientes con su estadístico de
 Wald (estimación, error estándar, $t$ y $p$-valor) y, pegada, su versión **exponenciada** —el factor—
-con su intervalo de confianza al 95 % (@tbl-u31-inferencia):
+con su intervalo de confianza al 95 %:
 
 ```{r}
 #| label: tbl-u31-inferencia
@@ -510,7 +510,7 @@ anova(m_gamma, m_fab, test = "F")
 
 El bloque resulta **significativo** —lo aporta sobre todo uno de sus tres niveles— y, como confirma el
 **AIC** [@akaike1974] (comparable solo entre modelos sobre los mismos datos y la misma familia), añadir
-`fabricante` **reduce** el criterio (@tbl-u31-aic):
+`fabricante` **reduce** el criterio:
 
 ```{r}
 #| label: tbl-u31-aic
@@ -557,8 +557,8 @@ y redundancia empieza ahí.
 Conviene, eso sí, **no pedirle al modelo más de lo que dice**. Todo lo anterior es una lectura de
 **severidad** —*cuánto* cuesta una avería **si ocurre**—; no hemos modelado la **frecuencia** (cada
 cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo y el efecto del mantenimiento son el
-objeto de la [Unidad 3.5](#sec-u35); y el **presupuesto esperado = frecuencia × severidad** —donde la
-prevención se paga o no— se cierra con el enfoque Tweedie de la [Unidad 3.4](#sec-u34).
+objeto de la [Unidad 3.4](#sec-u34); y el **presupuesto esperado = frecuencia × severidad** —donde la
+prevención se paga o no— se cierra con el enfoque Tweedie de la [Unidad 3.6](#sec-u36).
 
 Lo tercero es un matiz que evita una decisión equivocada, y que la interacción hace explícito: la fase del
 proceso **no** encarece las reparaciones «en general». Concentrar esfuerzo en las máquinas *auxiliares*
@@ -580,8 +580,7 @@ la [Unidad 3.3](#sec-u33).
 Los residuos crudos $y-\hat\mu$ no sirven en un GLM Gamma (su dispersión crece con $\hat\mu$). Los de
 **deviance** corrigen bastante, pero en respuestas muy asimétricas siguen mostrando patrones espurios.
 La herramienta adecuada son los **residuos cuantil aleatorizados** [@dunnsmyth1996]: si el modelo es
-correcto se distribuyen **uniformemente**, sea cual sea la familia. Es lo que evalúa la
-@fig-u31-dharma.
+correcto se distribuyen **uniformemente**, sea cual sea la familia.
 
 ```{r}
 #| label: fig-u31-dharma
@@ -622,8 +621,7 @@ $$\log\operatorname{Var}(Y)=\log\phi + p\,\log\mu.$$
 En escala **log–log**, entonces, la nube de puntos (varianza frente a media, agrupando por valor
 ajustado) debe alinearse sobre una recta de **ordenada en el origen $\log\phi$** y **pendiente $p$**. Por
 eso ajustamos una recta a esos puntos y miramos su pendiente: si sale $\approx 2$, respalda la Gamma; un
-valor cercano a 1 apuntaría a Poisson y a 3, a la inversa gaussiana. La @fig-u31-varianza recoge esa
-nube y la recta ajustada.
+valor cercano a 1 apuntaría a Poisson y a 3, a la inversa gaussiana.
 
 ```{r}
 #| label: fig-u31-varianza
@@ -648,7 +646,7 @@ ggplot(mv, aes(media, varianza)) +
 ### Validación contra el DGP
 
 La ventaja de trabajar con datos simulados: comparamos lo estimado con la **verdad**. Empezamos por los
-efectos que el modelo **identifica con precisión** —tipo de avería, antigüedad y carga— (@tbl-u31-verdad):
+efectos que el modelo **identifica con precisión** —tipo de avería, antigüedad y carga—:
 
 ```{r}
 #| label: tbl-u31-verdad
@@ -670,7 +668,7 @@ broom::tidy(m_fab, conf.int = TRUE) |>
 ```
 
 Se recuperan bien. ¿Y la **criticidad y su interacción**? Conviene mirar el efecto **combinado** de una
-máquina crítica en cada fase (base + interacción), no cada coeficiente por separado (@tbl-u31-verdad-crit):
+máquina crítica en cada fase (base + interacción), no cada coeficiente por separado:
 
 ```{r}
 #| label: tbl-u31-verdad-crit
@@ -707,7 +705,7 @@ mixtos de la [Unidad 3.3](#sec-u33).
 
 Y queda la cuenta pendiente que dejamos «en cuarentena»: el **`fabricante`** que la selección hizo entrar
 en el modelo. La verdad del DGP zanja la duda —en el proceso generador del coste **no interviene**, así
-que su efecto verdadero es **cero**— (@tbl-u31-verdad-fab):
+que su efecto verdadero es **cero**—:
 
 ```{r}
 #| label: tbl-u31-verdad-fab
@@ -744,7 +742,7 @@ en escala log, y la media en euros es $\hat\mu=e^{\hat\eta}$. En R, `predict(m, 
 "response")` hace la exponenciación; los **intervalos** se calculan en la escala del enlace —donde la
 Normal aproxima bien— y se exponencian, que es justo lo que devuelve `marginaleffects::predictions`. Por
 ejemplo, para una avería mecánica y una electrónica en una máquina **crítica de la fase 2** (el punto
-caliente del sistema), a edad y carga medias (@tbl-u31-pred-marginal):
+caliente del sistema), a edad y carga medias:
 
 ```{r}
 #| label: tbl-u31-pred-marginal
@@ -768,20 +766,6 @@ población—. Es la única que un GLM puede dar, porque no distingue entre máq
 frase, lo que aportan los modelos mixtos.
 
 ::: {.callout-important}
-## Tarea del estudiante (3.1) · qué te llevas al estudio de caso
-Esta unidad te da la pieza central de la **severidad**: un GLM Gamma con enlace log sobre un importe
-individual. En la cartera de la [Unidad 3.8](#sec-u38) ese importe es `coste_k` de `siniestros.csv`
-—una fila por parte—, no `coste_medio` de la póliza.
-
-- **[Propuesta 2 · Por dónde se cuela el sexo en la tarifa](#sec-u38-p2)** *(unidad base)*. El
-  modelo de severidad con y sin el *proxy* es exactamente el ajuste de esta unidad, repetido dos
-  veces. Ensáyalo aquí: quita `fabricante` del modelo del coste de una avería y comprueba cuánto se
-  mueven los demás coeficientes. Si no se mueve nada, no hay canal; si se mueve, lo hay.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u38-p1)**. La «vía A» necesita una
-  predicción de **coste medio por siniestro** en la escala del euro, no del log. Practica aquí la
-  lectura multiplicativa y el paso de $\hat\eta$ a euros.
-
-**Aviso para las dos.** En la cartera, `coste_medio` es `NA` cuando la póliza no tuvo partes y
-promedia un número distinto de siniestros en cada póliza: **no** es la respuesta de un modelo de
-severidad. La respuesta es `coste_k`.
+## Tarea del estudiante (3.1)
+*Se planteará a partir del estudio de caso.*
 :::

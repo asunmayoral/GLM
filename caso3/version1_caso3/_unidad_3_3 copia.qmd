@@ -40,7 +40,7 @@ c(averias        = nrow(base),
 Cada máquina aporta un **puñado** de averías —unas pocas de media, hasta más de una decena las peores—,
 y esas averías comparten dueño. ¿Cuánto importa? Una medida cruda: descomponer la variabilidad del
 log-coste en la parte que hay **entre** máquinas (diferencias de nivel entre unas y otras) y la parte que
-queda **dentro** de cada máquina (@tbl-u33-icc-crudo).
+queda **dentro** de cada máquina.
 
 ```{r}
 #| label: tbl-u33-icc-crudo
@@ -173,7 +173,7 @@ componentes de varianza (cuánta heterogeneidad hay alrededor).
   a los datos los valores ajustados y los residuos.
 
 Para la familia **Gamma** se prefiere `glmmTMB` a `glmer`: es más robusto y admite extensiones —modelar
-la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.4](#sec-u34)—.
+la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.6](#sec-u36)—.
 :::
 
 
@@ -232,7 +232,7 @@ Tenemos dos vías para la inferencia:
 1. La primera es el **IC** de cada efecto: `confint` da el intervalo de Wald de los coeficientes
 —en factor, es la @tbl-u33-fijos: un factor cuyo IC **no cruza el 1** es significativo—. 
 2. La segunda es **`anova`**, que compara modelos anidados y nos resulta útil, junto con los criterios AIC/BIC para la selección de variables. La tabla de contrastes **por término** lo resume
-(`car::Anova`, Wald tipo II, @tbl-u33-anova-fijos):
+(`car::Anova`, Wald tipo II):
 
 ```{r}
 #| label: tbl-u33-anova-fijos
@@ -452,7 +452,7 @@ la verdad.
 ### Validación contra el DGP {#sec-u33-validacion}
 
 La ventaja de los datos simulados: ahora validamos también los **componentes de varianza**, no solo los
-efectos fijos (@tbl-u33-verdad).
+efectos fijos.
 
 ```{r}
 #| label: tbl-u33-verdad
@@ -486,7 +486,7 @@ Un modelo mixto predice en **dos niveles**, y conviene no confundirlos:
   *cualquiera* del perfil dado. Es la única que da un GLM (la predicción que conseguíamos en la [Unidad 3.1](#sec-u31)): no hay máquina
   concreta que añadir.
 - La predicción **condicional** añade los **efectos aleatorios** de una máquina concreta —sus BLUP—
-  (`re.form = NULL`): responde por *esa* máquina. La @fig-u33-cond-marg pone las dos una al lado de la otra.
+  (`re.form = NULL`): responde por *esa* máquina.
 
 ```{r}
 #| label: fig-u33-cond-marg
@@ -539,19 +539,6 @@ un ~7 % más—. Para presupuestar la **flota entera**, conviene tenerlo en cuen
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.3) · qué te llevas al estudio de caso
-El efecto aleatorio no es un adorno: en esta unidad ha resuelto una $\hat\phi$ inflada y un falso
-positivo. Esa es la herramienta que la cartera te va a pedir.
-
-- **[Propuesta 4 · ¿Hay agencias caras?](#sec-u38-p4)** *(unidad base)*. Un GLMM Gamma sobre
-  `coste_k` con `(1 | id_agencia)`, la misma estructura que aquí con `(1 | id_maquina)`. Ensaya aquí
-  las tres lecturas que allí necesitarás: el **contraste de frontera** para $\sigma_u$, los **BLUP**
-  con su *caterpillar*, y la diferencia entre predicción **condicional** y **marginal**.
-- **[Propuesta 1](#sec-u38-p1) y [Propuesta 7](#sec-u38-p7)**. En ambas los datos vienen agrupados
-  —varios partes por póliza, varios años por póliza—; ignorarlo produce los errores estándar
-  optimistas que esta unidad ha diagnosticado.
-
-**Aviso.** Antes de dar por hecho que un agrupamiento actúa sobre una respuesta, compruébalo: que
-`n_gestiones` tenga efecto de agencia no obliga a que `coste_k` lo tenga. Esa comprobación **es** la
-propuesta 4.
+## Tarea del estudiante (3.3)
+*Se planteará a partir del estudio de caso.*
 :::

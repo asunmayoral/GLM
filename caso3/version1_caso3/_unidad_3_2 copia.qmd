@@ -54,8 +54,7 @@ que nada.
 En la [Unidad 3.1](#sec-u31) ya usamos este gráfico para *comprobar* el supuesto de la Gamma; ahora lo
 usamos para *elegir*, añadiendo las tres pendientes teóricas como referencia visual. Recuérdese la forma
 analítica: como $\operatorname{Var}(Y)=\phi\,\mu^{p}$, en escala log–log es una recta,
-$\log\operatorname{Var}=\log\phi+p\,\log\mu$, de **pendiente $p$**. Es lo que dibuja la
-@fig-u32-potencia.
+$\log\operatorname{Var}=\log\phi+p\,\log\mu$, de **pendiente $p$**.
 
 ```{r}
 #| label: fig-u32-potencia
@@ -111,7 +110,7 @@ que quieres fijar.
 
 - **Tweedie** —familia con $\operatorname{Var}=\phi\,\mu^{p}$ y **potencia $p$ libre** (`statmod::tweedie`)—.
   Para $1<p<2$ es una mezcla **Poisson–Gamma** que genera **ceros y positivos a la vez**: exactamente el
-  `coste_total` por máquina-año que modelaremos en la [Unidad 3.4](#sec-u34).
+  `coste_total` por máquina-año que modelaremos en la [Unidad 3.6](#sec-u36).
 - **Objeto `family()` a medida.** R deja definir una familia propia (`linkfun`, `linkinv`, `variance`,
   `dev.resids`, `aic`…) si necesitas una combinación media-varianza-enlace que no viene de serie.
 
@@ -125,8 +124,7 @@ abordamos en la [Sección 2.3](#sec-u32-lognormal).
 
 La inversa gaussiana mantiene el soporte positivo y el enlace log, pero asume
 $\operatorname{Var}(Y)=\phi\,\mu^{3}$: la dispersión crece **más deprisa** con la media. Es la elección
-natural cuando la cola derecha es más pesada de lo que la Gamma puede acomodar. La @tbl-u32-ig recoge
-sus factores.
+natural cuando la cola derecha es más pesada de lo que la Gamma puede acomodar.
 
 ```{r}
 #| label: tbl-u32-ig
@@ -147,8 +145,7 @@ $p\approx 2$, no lo es—, ese descuento sale caro en ajuste. Lo confirmaremos c
 ## 2.3 Lognormal y log-OLS {#sec-u32-lognormal}
 
 La tercera vía es la más tentadora por familiar: si $\log Y$ parece normal —y en la @fig-u31-asimetria lo
-parecía—, ¿por qué no aplicar mínimos cuadrados a $\log Y$ y olvidarnos de los GLM? La
-@tbl-u32-lognormal resume ese ajuste.
+parecía—, ¿por qué no aplicar mínimos cuadrados a $\log Y$ y olvidarnos de los GLM?
 
 ```{r}
 #| label: tbl-u32-lognormal
@@ -191,7 +188,7 @@ falla. El GLM-log, en cambio, **no necesita nada de esto**: modela la media dire
 :::
 
 La consecuencia práctica aparece al volver a euros. Si uno exponencia sin más los valores ajustados,
-**subestima el coste medio de forma sistemática** (@tbl-u32-retransformacion):
+**subestima el coste medio de forma sistemática**:
 
 ```{r}
 #| label: tbl-u32-retransformacion
@@ -225,7 +222,7 @@ residuos de aspecto impecable y nada advierte de que sus predicciones en euros e
 Las tres familias comparten un supuesto que aún no hemos cuestionado: que $\phi$ es **constante**, la
 misma para toda avería. Podría no serlo. Para comprobarlo, un truco sencillo: los residuos de Pearson al
 cuadrado estiman la dispersión observación a observación, así que basta **modelarlos** frente a las
-covariables y ver si alguna los mueve (@tbl-u32-dispersion).
+covariables y ver si alguna los mueve.
 
 ```{r}
 #| label: tbl-u32-dispersion
@@ -298,8 +295,6 @@ aic_ln <- -2 * ll_ln + 2 * gl_ln                                 # ya comparable
   escala (euros).
 :::
 
-Con esa corrección hecha, las tres familias ya son comparables (@tbl-u32-aic):
-
 ```{r}
 #| label: tbl-u32-aic
 #| tbl-cap: "Comparación de las tres familias por AIC en la escala del euro. Se muestra además el AIC de la lognormal SIN el jacobiano, para ilustrar lo engañoso de compararlo tal cual."
@@ -320,8 +315,6 @@ Nótese de paso la magnitud del artefacto de escala: sin el jacobiano, la lognor
 orden por completo, y «habría ganado» por pura ilusión de cálculo.
 
 ### Validación contra el DGP
-
-La @tbl-u32-verdad enfrenta la familia y la potencia estimadas con las del proceso generador:
 
 ```{r}
 #| label: tbl-u32-verdad
@@ -361,18 +354,6 @@ Es la misma señal que ya vimos inflar $\hat\phi$ en la 3.1 y asomar en la dispe
 para eso hacen falta los **efectos aleatorios** de la [Unidad 3.3](#sec-u33).
 
 ::: {.callout-important}
-## Tarea del estudiante (3.2) · qué te llevas al estudio de caso
-Aquí has aprendido a **elegir**, no a ajustar: la relación media-varianza como criterio, el jacobiano
-para comparar escalas y el *smearing* para volver a euros.
-
-- **[Propuesta 5 · ¿Qué distribución describe el coste de un parte?](#sec-u38-p5)** *(unidad base)*.
-  Es esta unidad entera, trasladada a `coste_k`: estimar la potencia $p$ de
-  $\operatorname{Var}=\phi\mu^{p}$ agrupando por coste predicho, ajustar Gamma, inversa gaussiana y
-  log-OLS, y compararlas **con el AIC corregido**. La ampliación —modelar la dispersión— es el cabo
-  que la Sección 2.4 dejó suelto.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u38-p1)**. Antes de multiplicar frecuencia
-  por severidad conviene justificar la familia de la severidad. Este es el argumento.
-
-**Aviso.** El AIC del log-OLS **no** es comparable sin el jacobiano; es el error más frecuente al
-enfrentar las tres familias, y el que un artículo científico no puede permitirse.
+## Tarea del estudiante (3.2)
+*Se planteará a partir del estudio de caso.*
 :::

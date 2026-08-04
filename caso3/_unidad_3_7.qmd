@@ -1,59 +1,577 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_7.qmd >}}. Sin YAML.
-     Espejo de las unidades de estudio de caso (1.6 / 2.7): encargo + datos + checklist.
-     Rúbricas en la guía docente. Tipología de informe del Caso 3: ARTÍCULO DE INVESTIGACIÓN. -->
+<!-- Partial · Incluir con {{< include _unidad_3_7.qmd >}}. Sin YAML. Chunks u37-.
+     Unidad de CIERRE del Caso 3, de REFERENCIA: no introduce modelos nuevos.
+     Procede de las secciones 6.1 y 6.5 de la antigua unidad de síntesis; ver
+     PLAN_REORGANIZACION_CASO3.md. El recopilatorio "El caso, de un vistazo" se
+     RETIRÓ de aquí: su contenido pasa al Mapa del Caso, al inicio del bloque.
 
-# 7 · Estudio de caso, exposición y evaluación {#sec-u37}
+     DEPENDE de objetos de la Unidad 3.6 (Cox), en el mismo documento:
+       sg (= banco$seguimiento, con prot_mant), cox_mes_opt y cox_mes_opt_frag.
+     Datos: banco$seguimiento (máquina-mes).
+
+     CIFRAS VERIFICADAS contra el render (semilla 20252026):
+       - sg: 18252 tramos / 400 máquinas / 1144 meses con fallo / 1194 averías / 90 altas tardías.
+       - tres lentes (antiguedad, carga, prot_mant), verdad DGP 0.10 / 0.80 / -1.20:
+           cloglog          0.101   0.660   -1.212
+           Poisson a trozos 0.100   0.725   -1.204
+           Cox              0.102   0.658   -1.205
+       - semestres: cloglog LRT 5.16 (7 gl) p 0.640 ; Poisson 4.92 p 0.669 -> base plana.
+       - versiones agrupadas: cloglog GLMM 0.104/0.668/-1.190 (sd 0.388) ;
+         Poisson GLMM 0.103/0.727/-1.174 (sd 0.381) ; Cox frailty 0.104/0.662/-1.182
+         (theta 0.143 impresa). sd(logZ) del DGP = sqrt(trigamma(1/0.12)) = 0.357.
+       - IC95 de las tres lentes: los 9 cubren la verdad. carga SE 0.19 (fijo) / 0.23 (frailty).
+       - lectura aplicada: 10 años x2.77 ; +0.1 de carga x1.07 ; revisión al día 0/30/60/120
+         -> 0.30 / 0.48 / 0.64 / 0.85. -->
+
+# 7 · Más allá: las tres lentes y las fronteras {#sec-u37}
+
+Con el presupuesto entregado y la vida útil modelada, el Caso 3 ha terminado su trabajo. Esta última
+unidad no añade modelos: **mira hacia atrás y hacia fuera**. Hacia atrás, para comprobar algo que el
+curso ha ido insinuando sin demostrarlo del todo; hacia fuera, para poner nombre a lo que queda al
+otro lado de la frontera.
+
+Lo de atrás es una deuda pendiente. Hemos mirado el fallo de una máquina con tres **lentes** que
+parecían mundos distintos: en el Caso 1 era una respuesta **binaria en tiempo discreto** —¿falló en
+este periodo?—; en el Caso 2, un **conteo con *offset*** —¿cuántos fallos por unidad de exposición?—;
+y en este caso, un **tiempo con censura**, modelado por su riesgo instantáneo (Cox) o por su reloj
+(AFT). Cada una llegó con su vocabulario —probabilidades, tasas, hazards— y con su propia maquinaria
+de estimación. La [Sección 7.1](#sec-u37-lentes) las enfoca a las tres sobre los mismos datos y
+muestra que, en el fondo, **ven lo mismo**.
+
+Lo de fuera es un mapa. La [Sección 7.2](#sec-u37-fronteras) recorre las preguntas que este caso
+**no** ha respondido y señala dónde buscarlas, sin desarrollarlas: no para aprenderlas ahora, sino
+para reconocerlas cuando aparezcan.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Cierre del Caso 3: estudio de caso sobre **magnitudes positivas y vida útil** en mantenimiento
-industrial, con exposición y Q&A individual. No hay teoría nueva; se integra y se evalúa todo lo
-anterior. Objetivo general: **comunicar y reproducir**.
+Es una unidad de **referencia y cierre**. No hay modelos nuevos: hay reencuentro, comparación y
+criterio. Reactiva la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15) (tiempo discreto con
+`cloglog`), la [Unidad 2.6](../caso2/caso2_conteos.qmd#sec-u26) (riesgos a trozos con Poisson) y el
+Cox extendido de la [Sección 6.8](#sec-u36-extcox), y se apoya en los modelos que aquella unidad dejó
+ajustados.
+
+**Datos:** `banco$seguimiento` (`sg`), una fila por **máquina-mes**, con la respuesta «¿hubo avería
+en este tramo?». Es el mismo panel sobre el que la Unidad 3.6 montó el Cox extendido.
 :::
 
-## 7.1 El estudio de caso (entregable) {#sec-u37-caso}
+## 7.1 El mismo fallo, tres lentes {#sec-u37-lentes}
 
-<!-- TODO: encargo realista (dirección de mantenimiento de la empresa: ¿compensa extender el plan
-     preventivo? ¿a qué máquinas?). Preguntas que dirijan el informe y mapeen a las unidades:
-       - coste de intervención y sus factores  -> 3.1 (Gamma) y 3.2 (familia y escala)
-       - trayectorias de degradación por máquina -> 3.3 (GLMM Gamma)
-       - vida útil hasta el fallo y censura    -> 3.4 (KM + AFT)
-       - efecto del mantenimiento en el riesgo -> 3.5 (Cox y su proporcionalidad)
-       - qué lente responde a la pregunta      -> 3.6 (síntesis)
-     Datos del equipo (variante del DGP con semilla propia); control de calidad contra la verdad. -->
+### La pregunta, y una tabla que ya conocemos
 
-<!-- DATOS REALES (pendiente de preparar). Se contempla usar **Backblaze Drive Stats** como
-     contrapunto real al banco simulado, replicando lo que el Caso 1 hace con GLOW.
-       - Qué es: fiabilidad de discos duros en centros de datos, publicado por trimestres desde 2013.
-         Tiempo-a-fallo real con censura (discos retirados antes de fallar), covariables S.M.A.R.T.
-         dependientes del tiempo y agrupación por modelo/fabricante (análoga a nuestras plantas).
-       - Fuente: https://www.backblaze.com/cloud-storage/resources/hard-drive-test-data
-       - LICENCIA (verificada): uso libre CITANDO A BACKBLAZE como fuente; el usuario es responsable
-         del uso; se pueden vender obras derivadas; NO se puede vender el dato en sí (es gratuito).
-       - A resolver antes de adoptarlo:
-           (a) TAMAÑO: ~1 GB comprimido y ~12 GB en disco por trimestre (un CSV por día, una fila por
-               disco y día). Hay que preprocesar a tabla disco-nivel y distribuir el extracto.
-           (b) CENSURA EXTREMA: AFR ~1,4% => más del 98% censurados, frente al ~40% del banco
-               simulado. Es didáctico (otro régimen de censura), pero cambia la potencia.
-       - NO añadir aún la entrada a references.bib: los .qmd usan `nocite: @*` y aparecería en la
-         bibliografía de los tres casos. Añadirla al desarrollar esta unidad.
-     Ver PROPUESTA_CASO3.md, sección «Datos reales para el estudio de caso». -->
+Si tres lentes describen el mismo proceso, deberían contar la misma historia. ¿La cuentan? La
+pregunta no es retórica: `cloglog`, Poisson y Cox se presentaron en momentos distintos del curso,
+sobre datos distintos, y nada garantiza *a priori* que sus coeficientes sean siquiera comparables.
+El experimento para averiguarlo se diseña solo: poner a las tres ante **los mismos datos**, con **el
+mismo predictor**, y dejar que cada una lea la respuesta a su manera.
 
-## 7.2 Formato del informe: artículo de investigación {#sec-u37-formato}
+No partimos de cero: la [Unidad 2.6](../caso2/caso2_conteos.qmd#sec-u26-nexo) ya tendió estos puentes
+por pares —Poisson y `cloglog` como dos enlaces del mismo hazard, y su comparación con Cox y
+Kaplan–Meier— sobre el banco de pólizas: el caso fácil, con un solo evento por póliza y covariables
+fijas. Esta síntesis es la **prueba de estrés** de aquel mapa: eventos **recurrentes**, una covariable
+que **cambia dentro del seguimiento** y una fragilidad real detrás —y, además, una cuarta lente, el
+AFT, que entonces no existía—.
 
-<!-- TODO: la guía fija para el Caso 3 el formato de ARTÍCULO DE INVESTIGACIÓN (distinto del informe
-     técnico del Caso 1 y del ejecutivo del Caso 2): resumen, introducción, datos y métodos,
-     resultados, discusión, limitaciones y referencias. Recordar el apartado obligatorio de reflexión
-     sobre el uso ético de la IA (sin él, el informe no puede alcanzar «excelente»). -->
+Los **datos** ya los tenemos: **`sg`, el panel mensual *start-stop*** de la
+[Sección 6.8](#sec-u36-extcox-datos) —una fila por máquina y mes, con la covariable del mantenimiento
+`prot_mant` actualizándose tramo a tramo—. Y el **predictor** también: el **modelo óptimo** al que llegó
+la Unidad 3.6, **`antiguedad + carga + prot_mant`**.
 
-## 7.3 Checklist de tareas {#sec-u37-checklist}
+```{r}
+#| label: u37-datos
+c(tramos          = nrow(sg),
+  maquinas        = length(unique(sg$id_maquina)),
+  meses_con_fallo = sum(sg$fallo),
+  averias         = sum(sg$n_fallos),
+  altas_tardias   = sum(tapply(sg$tstart, sg$id_maquina, min) > 0))
+```
 
-<!-- TODO: adaptar el checklist al caso: elección y justificación de familia y enlace; interpretación
-     multiplicativa; estructura aleatoria justificada; tratamiento explícito de la censura;
-     diagnóstico de la proporcionalidad; comparación de las tres lentes; validación contra el DGP;
-     reproducibilidad (Quarto + renv + Git). -->
+Dos recordatorios de esa tabla que enseguida serán relevantes. Primero, la rejilla mensual
+**colapsa** eventos: las 1194 averías se quedan en 1144 meses con fallo, porque 50 caen en un mes
+que ya tenía otra —retened el dato, porque una de las lentes sabrá recuperarlas—. Segundo, 90
+máquinas entraron en observación **después** del día 0 (altas escalonadas): sus primeras filas
+empiezan tarde, y el formato *start-stop* recoge esa entrada retardada sin que tengamos que hacer
+nada.
 
-## 7.4 Rúbricas {#sec-u37-rubricas}
+Un vistazo a las columnas que las tres lentes van a usar, sobre la misma máquina M227 de la
+[Sección 6.8](#sec-u36-extcox-datos):
 
-Las rúbricas están en la **guía docente** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se reproducen
-aquí.
+```{r}
+#| label: u37-head
+head(subset(sg, id_maquina == "M227",
+            select = c(id_maquina, tstart, tstop, exposicion, fallo, n_fallos,
+                       antiguedad, carga, prot_mant)), 8)
+```
+
+En estas ocho filas está todo lo que las lentes van a leer:
+
+- Las **respuestas**: `fallo` marca los
+meses con avería (aquí, el 1.º y el 7.º) y `n_fallos` los cuenta; a ambas las acompañan
+`exposicion` —los días en riesgo del tramo— y el propio tramo $(\text{tstart}, \text{tstop}]$. 
+- Y el **predictor**: `antiguedad` crece mes a mes (el reloj 1 de la [Sección 6.8](#sec-u36-extcox-datos)),
+`carga` es constante por máquina, y `prot_mant` oscila entre 0.64 y 0.39 —el diente de sierra del
+reloj 2: una máquina revisada cada 60 días, vista con rejilla de 30—.
+
+### Tres lentes, un solo riesgo
+
+Fijemos antes la notación sobre el panel: en el **tramo mensual** $j$ de la máquina $i$, con
+exposición $e_{ij}$ (días en riesgo), las tres lentes comparten el **predictor lineal**
+
+$$\eta_{ij} \;=\; \beta_1\,\texttt{antiguedad}_{ij} \;+\; \beta_2\,\texttt{carga}_{i}
+\;+\; \beta_3\,\texttt{prot\_mant}_{ij},$$
+
+y difieren **solo en dos cosas**: qué respuesta leen en cada fila, y cómo tratan el **riesgo de
+base** —el nivel de riesgo que corre por debajo de las covariables, que en las lentes GLM será un
+intercepto por periodo, $\alpha_{s(j)}$, y en Cox una función libre $h_0(t)$—:
+
+- **Lente 1 · tiempo discreto (Caso 1).** Lee el **indicador** `fallo` y modela la probabilidad de
+  fallar en el tramo con enlace `cloglog` y la exposición como *offset*. Es el modelo
+  persona-periodo de la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15): si por debajo hay un hazard
+  proporcional en tiempo continuo, el `cloglog` agrupado estima **sus mismos coeficientes**
+  [@prentice1978; @allison1982]:
+  $$\texttt{fallo}_{ij}\sim\text{Bernoulli}(p_{ij}),\qquad
+  \operatorname{cloglog}(p_{ij})=\log\!\big(-\log(1-p_{ij})\big)
+  =\alpha_{s(j)}+\eta_{ij}+\log e_{ij}.$$
+- **Lente 2 · riesgos a trozos (Caso 2).** Lee el **conteo** `n_fallos` y modela la tasa con una
+  Poisson y `log(exposicion)` como *offset*. Con el tiempo troceado y un término por tramo, su
+  verosimilitud **coincide exactamente** con la de un modelo de supervivencia exponencial a trozos
+  [@holford1980; @laird1981]: es la lente de la [Unidad 2.6](../caso2/caso2_conteos.qmd#sec-u26). Al
+  contar de verdad, recupera las 50 averías que el indicador colapsa:
+  $$\texttt{n\_fallos}_{ij}\sim\text{Poisson}(\mu_{ij}),\qquad
+  \log \mu_{ij}=\alpha_{s(j)}+\eta_{ij}+\log e_{ij}.$$
+- **Lente 3 · Cox (este caso).** Lee `Surv(tstart, tstop, fallo)` y estima por verosimilitud parcial,
+  **dejando libre el riesgo de base** [@cox1972]: es el Cox extendido de la
+  [Sección 6.8](#sec-u36-extcox):
+  $$h_i(t)\;=\;h_0(t)\,\exp\{\eta_i(t)\},$$
+  donde $\eta_i(t)$ es el **mismo** predictor evaluado en el instante $t$ —las covariables
+  temporales toman el valor de la fila vigente—.
+
+Queda un cabo: ese $\alpha_{s(j)}$. Las dos lentes GLM necesitan **decir algo** sobre el riesgo de
+base, porque su intercepto lo es. Les damos lo mismo que Cox se toma gratis, pero en versión a trozos: un intercepto por **periodo
+calendario**. ¿Y por qué *semestres*, si las filas son meses? Porque aquí conviven **dos rejillas
+que no tienen por qué coincidir**. La rejilla de las **filas** —mensual— decide cada cuánto se
+actualizan las covariables, y esa no se toca: engrosarla congelaría más tiempo `prot_mant` y
+atenuaría su coeficiente (el precio que midió el `tt()` de 6.8). La rejilla del **riesgo de base**
+solo decide cuántos escalones tiene $\alpha_{s(j)}$, y ahí mandan la parsimonia y los datos: un
+escalón por mes serían casi cincuenta parámetros a repartirse los 1144 meses con fallo; agrupando
+en **semestres**, $s(j)\in\{1,\dots,8\}$, cada escalón se apoya en unos 140 fallos y el riesgo de
+base aún puede dibujar una tendencia a lo largo de los cuatro años. La elección es **instrumental,
+no sustantiva**: los $\beta$ apenas dependen de ella —cambiad semestres por años o por meses y
+comprobadlo—.
+
+Con eso, el experimento queda montado: tres especificaciones paralelas —mismo predictor, misma
+exposición, riesgo de base a trozos (lentes 1 y 2) o libre (lente 3)—. La tercera no es un modelo
+nuevo: es **`cox_mes_opt`**, el gemelo sin fragilidad del modelo final de la
+[Sección 6.8](#sec-u36-comparar), que reajustamos aquí para tener las tres lentes a la vista en un
+mismo bloque.
+
+```{r}
+#| label: u37-tres-lentes
+# definimos el semestre en que se encuentra cada ventana (mes), con un máximo de 8 
+# el semestre 8 agrupa desde los días 1281 en adelante
+sg$semestre <- factor(1 + pmin(sg$tstart %/% 183, 7))
+
+# Lente 1 (Caso 1) · TIEMPO DISCRETO: binomial cloglog sobre el indicador                
+m_cll <- glm(fallo ~ antiguedad + carga + prot_mant + semestre + offset(log(exposicion)),
+             family = binomial("cloglog"), data = sg)
+
+# Lente 2 (Caso 2) · RIESGOS A TROZOS: Poisson sobre el conteo, con offset               
+m_poi <- glm(n_fallos ~ antiguedad + carga + prot_mant + semestre + offset(log(exposicion)),
+             family = poisson, data = sg)
+
+# Lente 3 (Caso 3) · COX extendido (start-stop), riesgo de base libre: cox_mes_opt   
+cox_mes_opt  <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant,
+                      data = sg)
+```
+
+::: {.callout-note}
+## En R: las tres lentes sobre un mismo panel
+Las tres se escriben casi igual; lo que cambia es la **respuesta** y el trato del riesgo de base.
+
+```r
+# 1 · tiempo discreto: indicador + enlace cloglog + offset
+glm(fallo ~ x + factor(periodo) + offset(log(exposicion)),
+    family = binomial("cloglog"), data = panel)
+
+# 2 · riesgos a trozos: conteo + Poisson + offset
+glm(n_fallos ~ x + factor(periodo) + offset(log(exposicion)),
+    family = poisson, data = panel)
+
+# 3 · Cox extendido: respuesta start-stop, riesgo de base libre
+coxph(Surv(tstart, tstop, fallo) ~ x, data = panel)
+```
+
+- **El *offset* va dentro de la fórmula**, siempre como `log()` de la exposición: sin él, los
+  coeficientes absorberían las diferencias de tiempo en riesgo entre filas.
+- **El riesgo de base es explícito en las lentes GLM** (`factor(periodo)`) e implícito en Cox. Si el
+  factor tiene muchos niveles, conviene **agrupar** el tiempo en tramos más gruesos: es una decisión
+  de parsimonia que no afecta a los $\hat\beta$.
+- **Comparar coeficientes entre modelos distintos**: `broom::tidy()` los devuelve en el mismo formato
+  (`term`, `estimate`, `std.error`…), y funciona igual con `glm` y con `coxph`; a partir de ahí, un
+  `dplyr::left_join()` por `term` pone las columnas lado a lado.
+- **Versión agrupada de cada lente**: `lme4::glmer(... + (1 | id))` para las dos GLM y
+  `coxph(... + frailty(id))` para Cox. Con `cloglog`, `glmer` es delicado: ayuda arrancar del ajuste
+  fijo (`etastart = predict(m_fijo)`) y usar `control = glmerControl(optimizer = "bobyqa")`.
+- **Leer las varianzas**: `VarCorr()` en los GLMM (desviación típica del intercepto, escala log) y la
+  línea `Variance of random effect` en el `coxph` con `frailty()`. **No son comparables sin
+  transformar**: van en parametrizaciones distintas.
+:::
+
+### Qué estima cada una, y cuánto coinciden
+
+Ponemos los tres juegos de coeficientes lado a lado —omitiendo intercepto y semestres, que son el
+riesgo de base— y añadimos la **verdad** del proceso generador:
+
+```{r}
+#| label: tbl-u37-lentes
+#| tbl-cap: "Coeficientes (escala log-hazard) del mismo evento por las tres lentes, frente a la verdad del DGP. Las tres columnas son casi idénticas: cloglog, Poisson a trozos y Cox estiman el mismo hazard proporcional."
+sacar <- function(m, nombre) broom::tidy(m) |>
+  dplyr::filter(term %in% c("antiguedad", "carga", "prot_mant")) |>
+  dplyr::transmute(term, !!nombre := round(estimate, 3))
+
+verdad_hz <- attr(banco, "verdad")$beta_hazard
+tab_verdad <- tibble::tibble(
+  term       = c("antiguedad", "carga", "prot_mant"),
+  verdad_DGP = c(verdad_hz[["antiguedad"]], verdad_hz[["carga"]], verdad_hz[["mant_inmediato"]]))
+
+sacar(m_cll, "cloglog") |>
+  dplyr::left_join(sacar(m_poi, "Poisson_trozos"), by = "term") |>
+  dplyr::left_join(sacar(cox_mes_opt, "Cox"), by = "term") |>
+  dplyr::left_join(tab_verdad, by = "term")
+```
+
+El resultado, en la @tbl-u37-lentes, es de los que se recuerdan: **las tres columnas cuentan la
+misma historia**. Las diferencias viven en la tercera cifra decimal —solo `carga` se mueve en la
+segunda, y enseguida veremos por qué es la covariable menos precisa de las tres—.
+
+¿Por qué coinciden? No es suerte: cada pareja tiene su teorema. Si el proceso subyacente tiene un
+hazard proporcional en tiempo continuo, el `cloglog` agrupado estima **esos mismos coeficientes**
+[@prentice1978]. Y la Poisson a trozos no es que *se parezca* a un modelo de supervivencia: **es** el
+modelo exponencial a trozos [@holford1980; @laird1981], que aproxima al Cox tanto mejor cuanto más
+fino el troceado —con la rejilla mensual, ya casi indistinguibles—. La moraleja es la que el curso
+lleva tejiendo desde la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15): **supervivencia = GLM con
+el enlace y el *offset* adecuados**; lo único que Cox hace distinto es no gastar parámetros en el
+riesgo de base.
+
+Y la lectura aplicada tampoco depende de la lente elegida: cada año de edad multiplica el riesgo por
+$e^{0.102}\approx 1.11$, y una revisión recién hecha lo deja en $e^{-1.205}\approx 0.30$ —el hazard
+ratio del mantenimiento con el que cerró la [Sección 6.8](#sec-u36-extcox)—. Tres vocabularios, un
+solo mecanismo.
+
+::: {.callout-tip}
+## Del coeficiente a la decisión: las preguntas de la fábrica, respondidas
+Un modelo no se ajusta para admirar sus coeficientes, sino para responder preguntas. Las que el caso
+viene arrastrando sobre el **riesgo** ya tienen respuesta, y —esta es la gracia— **la misma con
+cualquiera de las tres lentes**. Basta componer el predictor con los escenarios:
+
+```{r}
+#| label: u37-lectura-aplicada
+b <- coef(cox_mes_opt)
+round(c(
+  riesgo_10_anios   = exp(10 * b[["antiguedad"]]),          # 10 años vs recién estrenada
+  riesgo_carga_01   = exp(0.1 * b[["carga"]]),              # +0.1 de nivel de uso
+  revision_dia_0    = exp(b[["prot_mant"]] * exp(-0 / 60)),   # hazard ratio vs sin protección...
+  revision_dia_30   = exp(b[["prot_mant"]] * exp(-30 / 60)),  # ...según los días desde la revisión
+  revision_dia_60   = exp(b[["prot_mant"]] * exp(-60 / 60)),
+  revision_dia_120  = exp(b[["prot_mant"]] * exp(-120 / 60))), 2)
+```
+
+- *¿Cuánto pesa la edad?* Una máquina de **10 años** falla **2.8 veces más** que una recién
+  estrenada, a igualdad de todo lo demás: el desgaste es el motor principal del riesgo.
+- *¿Y el uso?* Cada décima de `carga` añade en torno a un **7 %** de riesgo: real, pero secundario.
+- *¿Qué compra una revisión?* El día de la revisión, el riesgo queda en el **30 %** del de una
+  máquina sin protección; al mes ya ha rebotado al **48 %**, a los dos meses al **64 %** y a los
+  cuatro apenas queda protección (**85 %**). La revisión no es un estado, es un **depósito que se
+  vacía** —y por eso el *intervalo* de mantenimiento, no el plan, es la palanca de decisión que
+  exploraron las Unidades [3.5](#sec-u35) y [3.6](#sec-u36)—.
+
+La pregunta de la dirección —**¿cuánto costará?**— no se responde con el riesgo a solas: es solo la
+mitad *frecuencia*, y ponerle precio fue el trabajo de la Tweedie en la [Unidad 3.4](#sec-u34).
+:::
+
+::: {.callout-tip}
+## ¿Y por qué no el `tt()` de 6.8, que era la versión exacta?
+Porque las lentes 1 y 2 **solo existen sobre tiempo troceado**: el troceado no es un atajo para
+ellas, es su definición, y la comparación exige los mismos datos para las tres. La versión exacta
+sigue siendo la referencia: por la [Sección 6.8](#sec-u36-extcox) sabemos que congelar la covariable
+atenúa `prot_mant` en torno a un 4 % ($-1.25$ con `tt()` frente a $-1.2$ aquí). Es decir, las tres
+lentes comparten esa misma atenuación, conocida y conservadora: se desvían **juntas y en cuantía
+medida**, que es justo lo que las hace comparables entre sí.
+:::
+
+::: {.callout-important}
+## El AFT es la lente distinta
+Falta una cuarta lectura, la de la [Unidad 3.5](#sec-u35), y **no** entra en esta tabla porque no
+estima un log-hazard: el AFT estima cuánto se **estira el reloj** (un factor de aceleración sobre el
+tiempo), no cuánto se **multiplica el riesgo**. Las dos familias solo coinciden en un caso especial
+—la **Weibull**, que es a la vez AFT y PH, con la exponencial como caso particular—… y nuestro banco
+está justo ahí: en 3.5 la Weibull dejó la forma en $\approx 1$, así que aquí la traducción
+$\text{HR} = \text{AF}^{-1/\sigma}$ funciona casi sin fricción. Que no engañe la suerte: fuera de la
+Weibull, AFT y PH responden a preguntas distintas, y elegir entre «acelerar el tiempo» y «multiplicar
+el riesgo» es, antes que una cuestión técnica, una cuestión de **qué se quiere comunicar**.
+:::
+
+### El riesgo de base que no estaba
+
+Las lentes a trozos hacen algo que Cox no hace: **enseñan** el riesgo de base que estiman. Cada una
+reconstruye su propia escalera de escalones semestrales —los $\alpha_{s(j)}$ que Cox dejó libres—;
+mirémoslas juntas, y contrastemos en ambas si los escalones aportan algo:
+
+```{r}
+#| label: u37-base-plana
+rbind(cloglog = round(coef(m_cll)[grep("semestre", names(coef(m_cll)))], 3),
+      Poisson = round(coef(m_poi)[grep("semestre", names(coef(m_poi)))], 3))
+anova(update(m_cll, . ~ . - semestre), m_cll, test = "Chisq")
+anova(update(m_poi, . ~ . - semestre), m_poi, test = "Chisq")
+```
+
+Dos lecturas, y las dos compartidas. 
+
+La primera: **las dos escaleras son casi la misma** —escalón a
+escalón, cloglog y Poisson estiman pasos parecidos (0.071 y 0.093 en el semestre 2; 0.192 y 0.186 en
+el 3)—: la coincidencia entre lentes no se limita a los $\beta$ de la tabla anterior, alcanza también
+al riesgo de base que cada una reconstruye. 
+
+La segunda: en ambas los escalones son minúsculos
+—ninguno llega a 0.2 en escala log— y los dos contrastes coinciden en el veredicto: quitar los
+semestres apenas mueve la deviance (5.2 y 4.9 con 7 grados de libertad; $p = 0.640$ y $0.669$). El
+riesgo de base **en tiempo calendario es plano**, y lo es con las dos lentes: es una propiedad del
+proceso, no un artefacto de una verosimilitud. ¿Sorpresa? No, si se piensa en el DGP: toda la dinámica temporal
+del riesgo vive en la **edad** de la máquina y en el **reloj del mantenimiento**, y ambas están ya en
+el predictor. Despejadas las dos, no queda tendencia que recoger. La moraleja tiene su punta: la
+flexibilidad del riesgo de base libre de Cox aquí **no se usa** —pero eso solo se sabe *después* de
+mirar, y son las lentes a trozos, con sus escalones explícitos, las que lo dejan a la vista—.
+
+### ¿Y la fragilidad?
+
+A estas alturas del curso, la objeción llega sola: las tres lentes de arriba son de **efectos
+fijos** —ninguna sabe que los 18252 tramos vienen de solo 400 máquinas, cada una con su propensión
+propia a fallar—, y llevamos dos casos aprendiendo que ignorar el agrupamiento tiene consecuencias.
+¿Invalida eso la comparación? Comprobémoslo, porque la simetría entre lentes alcanza también al
+agrupamiento: cada una tiene su versión agrupada —el **intercepto aleatorio por máquina** en las
+lentes GLM (el GLMM de la [Unidad 3.3](#sec-u33) y del Caso 2) y la **fragilidad** en Cox
+(`cox_mes_opt_frag`, el modelo final de la [Sección 6.8](#sec-u36-extcox), que reajustamos aquí
+igual que hicimos con su gemelo sin fragilidad)—. Repetimos la tabla con las tres:
+
+```{r}
+#| label: tbl-u37-fragilidad
+#| tbl-cap: "Las tres lentes con el agrupamiento por máquina explícito —intercepto aleatorio (GLMM) en las lentes GLM, fragilidad gamma en Cox—, frente a la verdad del DGP. Los coeficientes apenas se separan de los de la tabla de efectos fijos."
+# el cloglog es numéricamente delicado: se arranca del ajuste fijo (etastart);
+# bobyqa evita en ambos un aviso de convergencia del optimizador por defecto
+mm_cll <- glmer(fallo ~ antiguedad + carga + prot_mant + semestre + offset(log(exposicion)) +
+                  (1 | id_maquina), family = binomial("cloglog"), data = sg,
+                etastart = predict(m_cll), control = glmerControl(optimizer = "bobyqa"))
+mm_poi <- glmer(n_fallos ~ antiguedad + carga + prot_mant + semestre + offset(log(exposicion)) +
+                  (1 | id_maquina), family = poisson, data = sg,
+                control = glmerControl(optimizer = "bobyqa"))
+cox_mes_opt_frag <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant +
+                   frailty(id_maquina), data = sg)
+sel <- c("antiguedad", "carga", "prot_mant")
+tibble::tibble(term = sel,
+  cloglog_GLMM = round(fixef(mm_cll)[sel], 3),
+  Poisson_GLMM = round(fixef(mm_poi)[sel], 3),
+  Cox_frailty  = round(coef(cox_mes_opt_frag)[sel], 3),
+  verdad_DGP   = c(verdad_hz[["antiguedad"]], verdad_hz[["carga"]], verdad_hz[["mant_inmediato"]]))
+```
+
+En la @tbl-u37-fragilidad, las tres columnas vuelven a contar la misma historia y, frente a la
+@tbl-u37-lentes de efectos fijos, nada se mueve más allá de la segunda cifra decimal. **La objeción
+queda respondida**: el agrupamiento
+importa para la **inferencia** —lo vimos en la [Sección 6.6](#sec-u36-fragilidad) con el falso
+positivo de `fabricante`, y volverá a asomar enseguida con el error estándar de `carga`—, pero no
+para el **retrato del mecanismo**; la comparación en efectos fijos era justa. Lo nuevo de esta tabla
+está en el propio efecto de máquina:
+
+```{r}
+#| label: u37-fragilidad-var
+# theta_Cox va transcrita de la salida impresa de cox_mes_opt_frag ("Variance of
+# random effect"): el accesor history[[1]]$theta no es estable (ver 3.6, @tbl-u36-dgp)
+c(sd_cloglog  = round(sqrt(unlist(VarCorr(mm_cll)))[[1]], 3),
+  sd_Poisson  = round(sqrt(unlist(VarCorr(mm_poi)))[[1]], 3),
+  theta_Cox   = 0.143,
+  sd_logZ_DGP = round(sqrt(trigamma(1 / attr(banco, "verdad")$theta_frail)), 3))
+```
+
+Ojo al leerlo, porque las lentes no parametrizan igual el mismo latente. 
+
+- Los GLMM añaden al
+predictor un intercepto aleatorio **normal en escala log**,
+
+$$\eta_{ij} \;+\; u_i, \qquad u_i \sim \mathcal{N}(0,\ \sigma_u^2),$$
+
+que sobre el hazard actúa como un multiplicador **lognormal** $e^{u_i}$; sus desviaciones estimadas
+son $\hat\sigma_u = 0.39$ y $0.38$. 
+
+- La fragilidad de Cox, en cambio, multiplica el hazard por un
+factor **gamma**,
+
+$$h_i(t) \;=\; Z_i\, h_0(t)\, e^{\eta_i(t)}, \qquad
+Z_i \sim \text{Gamma}\!\left(\tfrac{1}{\theta},\ \theta\right), \quad
+\mathbb{E}[Z_i] = 1,\quad \operatorname{Var}(Z_i) = \theta,$$
+
+con $\hat\theta = 0.143$ (frente al $\theta = 0.12$ del DGP). 
+
+Una varianza vive, pues, en la escala
+del **logaritmo** ($\sigma_u^2$) y la otra en la del **multiplicador** ($\theta$): no son
+comparables tal cual. El puente es llevar la gamma a la escala log: si
+$Z \sim \text{Gamma}(1/\theta,\ \theta)$, entonces
+
+$$\operatorname{Var}(\log Z) \;=\; \psi'\!\left(\tfrac{1}{\theta}\right)
+\qquad\Longrightarrow\qquad
+\operatorname{sd}(\log Z)\,\Big|_{\theta = 0.12} \;=\; \sqrt{\psi'(1/0.12)} \;=\; 0.357,$$
+
+donde $\psi'$ es la función **trigamma** —es el valor `sd_logZ_DGP` del chunk—, justo donde caen las
+dos estimaciones de los GLMM. 
+
+Tres lentes, dos parametrizaciones y **un solo efecto de máquina**
+detrás: el mismo par de hilos en espiral del curso.
+
+::: {.callout-note}
+## Dónde vive el efecto aleatorio: la espiral, cerrada
+Merece la pena mirar atrás. En el Caso 1 el efecto aleatorio fue a la **clínica**, y la
+[Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15-hazard) argumentó por qué no al paciente: sus filas
+persona-periodo no son réplicas, sino la factorización de una única espera. En el Caso 2 fue a la
+**agencia**, y la fragilidad individual de cada póliza —inestimable con un solo episodio— quedó
+**integrada** en la binomial negativa (Gamma × Poisson = NB,
+[Unidad 2.6](../caso2/caso2_conteos.qmd#sec-u26-frailty)). Aquí, por primera vez, **el sujeto se
+repite** —cada máquina aporta varias esperas— y la fragilidad puede bajar al **nivel individual**,
+donde resulta estimable y significativa. La regla que unifica los tres casos: **el efecto aleatorio
+vive donde hay réplicas**.
+:::
+
+### Validación contra el DGP
+
+Las dos tablas de la sección han comparado **puntos**; la validación en regla pide también la
+**incertidumbre**. Cerramos con la estimación y su intervalo de confianza al 95 % (Wald) en cada
+lente, frente al valor verdadero del proceso generador:
+
+```{r}
+#| label: tbl-u37-validacion
+#| tbl-cap: "Estimación e intervalo de confianza al 95 % (Wald) de cada covariable en las tres lentes, frente al valor verdadero del DGP. Los nueve intervalos cubren su verdad."
+ic_lente <- function(m, nombre) broom::tidy(m) |>
+  dplyr::filter(term %in% c("antiguedad", "carga", "prot_mant")) |>
+  dplyr::transmute(term,
+    !!nombre := sprintf("%.3f (%.3f, %.3f)", estimate,
+                        estimate - 1.96 * std.error, estimate + 1.96 * std.error))
+
+ic_lente(m_cll, "cloglog") |>
+  dplyr::left_join(ic_lente(m_poi, "Poisson_trozos"), by = "term") |>
+  dplyr::left_join(ic_lente(cox_mes_opt, "Cox"), by = "term") |>
+  dplyr::left_join(tab_verdad, by = "term")
+```
+
+En la @tbl-u37-validacion, los **nueve intervalos cubren su valor verdadero**: validación superada
+en las tres lentes. Pero la lectura fina es más instructiva, porque las covariables no aprueban igual. `antiguedad` y
+`prot_mant` lo hacen con nota: intervalos **estrechos** y centrados en la verdad (0.10 y $-1.20$).
+`carga` aprueba de otra manera: su intervalo es **enorme** —$(0.29,\ 1.03)$ en el Cox, casi cuatro
+décimas a cada lado— y el 0.80 verdadero queda a menos de un error estándar del punto estimado. No
+hay sesgo que explicar; hay **poca información**.
+
+Un matiz más, que conecta con la subsección anterior: estos intervalos salen de los modelos de
+efectos fijos, que ignoran el agrupamiento, y son por tanto **optimistas**. Para `carga` —la
+covariable a la que el agrupamiento muerde—:
+
+```{r}
+#| label: u37-carga-se
+c(se_fijo    = round(summary(cox_mes_opt)$coefficients["carga", "se(coef)"], 2),
+  se_frailty = round(summary(cox_mes_opt_frag)$coefficients["carga", "se(coef)"], 2))
+```
+
+Con el error estándar honesto de la fragilidad, el intervalo se ensancha en torno a un 20 % y la
+verdad queda aún más cómodamente dentro —el de las covariables intra-máquina apenas se inmuta—. Y la
+asimetría entre covariables tiene una causa precisa que merece retenerse: `carga` es **constante por
+máquina**, así que sobre ella solo informan comparaciones **entre** máquinas —400 datos efectivos,
+enredados además con la fragilidad—. `antiguedad` y `prot_mant` **varían dentro** de cada máquina, y
+sobre ellas informan los 18252 tramos con contrastes intra-máquina que la fragilidad no contamina.
+**La precisión no la da el tamaño de la tabla, sino dónde varía la covariable** —la misma lección de
+diseño que el GLMM de la [Unidad 3.3](#sec-u33) contaba con la $\hat\phi$ inflada, ahora en clave de
+supervivencia—.
+
+Con esto queda saldada la deuda: el fallo de una máquina admite tres lecturas —probabilidad por
+periodo, tasa por tramos, hazard—, y las tres son, por debajo, **el mismo modelo lineal generalizado
+del riesgo**. Lo que separaba al Caso 1 del Caso 2 y del Caso 3 no era la estadística, sino la
+**forma en que se presentaban los datos**. Toca ahora mirar hacia fuera.
+
+## 7.2 Más allá del GLM: un mapa para seguir {#sec-u37-fronteras}
+
+El caso está cerrado: tenemos un modelo que responde a la pregunta que lo abrió y sabemos qué
+vale su respuesta. Pero un curso no termina cuando se acaban las respuestas, sino cuando se ven
+las **preguntas que quedan fuera**. Esta última sección no enseña modelos nuevos —ya hemos
+visto bastantes—: solo pone nombre a lo que hay al otro lado de la frontera, para que se
+reconozca cuando aparezca y se sepa dónde buscar.
+
+Conviene ordenarlo por **preguntas**, no por técnicas, que es como se presentan los problemas
+en la práctica. A continuación de cada pregunta te cuento Dónde mirar y qué librerías/funciones utilizar en R:
+
+**1.** ¿Y si el cero tuviera un **mecanismo propio** —máquinas paradas, sin contrato de mantenimiento— en vez de ser «no hubo averías»? 
+
+> Modelos **en dos partes** (*hurdle*) e **inflados de ceros**, que separan la probabilidad de gastar de la cuantía. En R: `glmmTMB(..., ziformula = ~ 1)`;  `pscl::hurdle()`
+
+**2.** ¿Y si el efecto de la edad **no fuera una recta** en escala log? 
+
+>**Modelos aditivos** (GAM): la covariable entra como una curva suave estimada de los datos. En R: `mgcv::gam(y ~ s(edad) + ...)`
+
+**3.** ¿Y si quisiéramos modelar la **secuencia** de averías de cada máquina, en vez de trocearla en esperas? 
+
+> Procesos de **eventos recurrentes** (Andersen–Gill y variantes). En R: `coxph(Surv(inicio, fin, evento) ~  x + cluster(id))`
+
+**4.** ¿Y si distinguiéramos **por qué** falla —mecánica, eléctrica…—, o quisiéramos seguir estados (operativa → degradada → averiada)? 
+
+>**Riesgos competitivos** y modelos **multiestado**. En R:  `survival::survfit()` con `etype`;   paquetes `cmprsk`, `mstate`.
+
+**5.** ¿Y si el efecto de una covariable **cambiara a lo largo del tiempo** de forma suave, en vez de ser constante? 
+
+>**Riesgos a trozos aditivos** (PAMM) y paramétricos flexibles de **Royston–Parmar**. En R: `pammtools`; `flexsurv::flexsurvspline()`
+
+**6.** ¿Y si interesara la **diferencia** de riesgo en lugar del cociente —cuántas averías más al año, no cuántas veces más—?
+
+> Modelo **aditivo de Aalen**. En R: `timereg::aalen()`
+
+**7.** ¿Y si quisiéramos que la incertidumbre de **todos** los parámetros llegara hasta la predicción final? 
+
+> Ajuste **bayesiano**: la predictiva incorpora de serie la incertidumbre de estimación. En R: `brms::brm(..., family = tweedie())`;  `rstanarm`
+
+
+Dos observaciones sobre esta lista. La primera es que **casi todas son extensiones, no sustituciones**:
+un GAM sigue siendo un GLM con el predictor lineal relajado; los eventos recurrentes siguen siendo
+Cox con otra respuesta; el modelo en dos partes son dos GLM. Lo aprendido no caduca —se recombina—.
+La segunda es que **la más ambiciosa es la última**, y por una razón que este caso ha dejado a la
+vista: nuestro intervalo de predicción trataba $\hat\beta$, $\hat\phi$, $\hat p$ y $\hat\sigma_u$ como
+si fueran exactos. Un ajuste bayesiano no necesita esa concesión.
+
+### Un límite distinto: hasta dónde llega la selección automática {#sec-u37-regularizacion}
+
+Cierro con una frontera de otro tipo, que no es un modelo sino una herramienta: la
+**regularización**. En el Caso 2 usamos `glmnet` para penalizar una Poisson con muchos predictores
+—encoger los coeficientes hacia cero y, con penalización $\ell_1$, seleccionar variables
+[@tibshirani1996; @friedman2010]—. En este estudio de caso que hemos ido trabajando en este último bloque **no hace falta** la regularización: con trece parámetros y 1531 filas no hay
+sobreajuste que corregir, como ya demostró la validación cruzada. Pero su límite en este
+terreno es instructivo y merece un minuto.
+
+Conviene primero corregir una idea extendida: suele decirse que `glmnet` no cubre familias como la
+Gamma. **Ya no es cierto** —desde la versión 4.0 admite cualquier objeto `family` de `stats::glm()`,
+resolviéndolo por Newton proximal en lugar de por descenso por coordenadas—. El límite real está en
+otro sitio, y es más interesante: **la penalización actúa sobre $\boldsymbol\beta$, no sobre los
+parámetros de la familia**. En una Tweedie eso significa que $p$ hay que fijarlo de antemano, o
+recorrer una rejilla en $p$ **y** en $\lambda$, validando en dos dimensiones a la vez.
+
+Y ahí está la moraleja que cierra la unidad, porque resume lo que la Tweedie nos ha enseñado:
+seleccionar automáticamente es fácil cuando toda la estructura del modelo vive en el **predictor
+lineal**. Cuando parte de ella vive en la **función de varianza** —como aquí—, la selección deja de
+ser un botón y vuelve a ser lo que ha sido durante todo el curso: **una decisión de modelización**.
+
+::: {.callout-important}
+## Tarea del estudiante (3.7) · qué te llevas al estudio de caso
+Esta unidad no aporta un modelo al estudio de caso: aporta **criterio** y el catálogo de extensiones.
+Recuerda que el artículo de la [Unidad 3.8](#sec-u38) exige **investigar y aplicar una extensión** no
+vista en clase, y que casi todas están en la tabla de la Sección 7.2.
+
+- **[Propuesta 6 · Del primer parte al historial completo](#sec-u38-p6)**. Las lentes de riesgos a
+  trozos y Cox sobre el mismo panel son literalmente las de esta unidad; su ampliación
+  —**Andersen–Gill**— es la primera fila de aquella tabla llevada a la práctica.
+- **[Propuesta 1](#sec-u38-p1)** toma de la tabla el **modelo en dos partes**;
+  **[la 3](#sec-u38-p3)**, los paramétricos flexibles de **Royston–Parmar**; y **[la 7](#sec-u38-p7)**
+  se apoya en el límite de la regularización que cierra esta unidad.
+
+**Aviso.** «Investigar una extensión» no es ajustarla: es localizar la **fuente original**, entender
+qué problema resuelve y **compararla** con el modelo base. Una extensión que se ajusta y no se
+compara con nada no cuenta.
+:::

@@ -50,6 +50,8 @@ Actúa como experto en modelización estadística (teórica y aplicada), program
 7. Por cada bloque/caso, la última unidad consiste en un Estudio de Caso que se propone como tarea del estudiante, alineada con los resultados de aprendizaje y el tipo de informe específico solicitado (conforme instrucciones del usuario).
 8. La tarea se formula en términos de cuestiones a responder.
 9. Las cuestiones a responder de la tarea del estudiante han de ser vinculadas a las diferentes unidades del bloque/caso (según resultados de aprendizaje). Se formulan al final de cada unidad y en dicha formulación se añaden tips e información para ayudar en la resolución. Se escriben en un callout.
+
+
 ## Normas de trabajo
 
 **Cifras: nunca antes de tenerlas**
@@ -83,19 +85,19 @@ Actúa como experto en modelización estadística (teórica y aplicada), program
 18. Verifica el orden de dependencias: ningún chunk usa un objeto antes de definirlo.
 
 **Narrativa**
-
-19. Un término, un significado. Si una palabra designa tres cosas distintas en la misma sección, la sección está rota.
-20. No repitas una explicación en dos sitios: decide dónde va y remite al otro.
-21. No adelantes conclusiones que una sección posterior debe descubrir.
-22. Una cifra citada debe ser **localizable** por el lector: si aparece antes del chunk que la produce, dilo explícitamente.
-23. Orden expositivo: pregunta → datos (tabla y variables) → exploración → modelo. El código nunca antes de presentar los datos que usa.
+19. La narrativa ha de discurrir de modo fluido, claro y muy didáctico, siempre ilustrando lo que estamos contando, con fórmulas analíticas y/o con datos/gráficos, para que quede claro qué buscamos y cómo los resolvemos.
+20. Un término, un significado. Si una palabra designa tres cosas distintas en la misma sección, la sección está rota.
+21. No repitas una explicación en dos sitios: decide dónde va y remite al otro.
+22. No adelantes conclusiones que una sección posterior debe descubrir.
+23. Una cifra citada debe ser **localizable** por el lector: si aparece antes del chunk que la produce, dilo explícitamente.
+24. Orden expositivo: pregunta → datos (tabla y variables) → exploración → modelo. El código nunca antes de presentar los datos que usa.
 
 **Proceso**
 
-24. Antes de proponer un cambio metodológico, **compruébalo numéricamente**. Si no puedes, dilo y espera.
-25. Distingue siempre en voz alta lo verificado de lo supuesto.
-26. Si los warnings del render se repiten, sospecha de la caché `freeze` antes que del contenido.
-27. Al informar, no presentes como progreso la corrección de errores propios: dilo con claridad.
+25. Antes de proponer un cambio metodológico, **compruébalo numéricamente**. Si no puedes, dilo y espera.
+26. Distingue siempre en voz alta lo verificado de lo supuesto.
+27. Si los warnings del render se repiten, sospecha de la caché `freeze` antes que del contenido.
+28. Al informar, no presentes como progreso la corrección de errores propios: dilo con claridad.
 
 
 ## Convenciones técnicas del repositorio

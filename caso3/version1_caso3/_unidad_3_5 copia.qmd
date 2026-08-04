@@ -1,6 +1,6 @@
 <!-- Partial · DRAFT. Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-.
      Cox como FRONTERA del marco GLM sobre el BANCO NUEVO de averías (recurrentes + fragilidad).
-     Depende de objetos de 3.5 (mismo documento): iv <- banco$intervalos ; aft_w (AFT Weibull).
+     Depende de objetos de 3.4 (mismo documento): iv <- banco$intervalos ; aft_w (AFT Weibull).
      Tablas: banco$intervalos (gap-level, Cox basal + fragilidad) ; banco$seguimiento (start-stop
      mensual, covariable temporal dias_desde_mant / mant_reciente -> Cox extendido).
 
@@ -30,17 +30,17 @@
            cox_ref->cox_mes_plan, cox_tt->cox_tt_opt, cox_tt_fr->cox_tt_opt_frag
            (cox_amb y su LRT ingenuo se eliminaron en la reestructuracion de jul-2026).
        - AFT<->Cox (Weibull, shape~1): HR implicado por AFT 0.540 ~= 0.538 de Cox. OK.
-       - Fragilidad (6.6): `cox_esp_opt_frag` = modelo óptimo de 6.5 SIN proceso (plan+antig+carga+fabricante):
+       - Fragilidad (5.6): `cox_esp_opt_frag` = modelo óptimo de 5.5 SIN proceso (plan+antig+carga+fabricante):
            varianza 0.135, frailty Chisq 168.75/108 df p 1.6e-04 ; fabricanteB coef -0.1851,
            se 0.0840 (se2 0.0705), p=0.0276 -> la fragilidad sola NO mata el falso positivo; quien lo
            desinfla es el WALD ROBUSTO con cluster(): bloque fabricante Chisq 4.19/2 df p 0.123.
-           `cox_esp_final_frag` (modelo óptimo de 6.6) = plan+antiguedad_ini+carga+frailty: varianza 0.1418,
+           `cox_esp_final_frag` (modelo óptimo de 5.6) = plan+antiguedad_ini+carga+frailty: varianza 0.1418,
            concordancia 0.683 (sube desde 0.62), LR 477.5 sobre 114.6 df.
        - cox.zph (5.7) se aplica a `cox_esp_final_frag` (NO al basal): plan 0.17, antiguedad_ini 0.65,
            carga 0.56, GLOBAL p 1.00 (con 114.63 df: el GLOBAL está diluido por la fragilidad, es
            poco informativo; los términos individuales son los que valen).
        - Cox extendido (banco$seguimiento, start-stop mensual: 18252 máquina-meses, 1144 meses con
-           fallo). Arco de 5 pasos: (1) modelo de 6.6 + mant_reciente + frailty -> mant_reciente
+           fallo). Arco de 5 pasos: (1) modelo de 5.6 + mant_reciente + frailty -> mant_reciente
            HR 0.648 (coef -0.4345) p 4.5e-05, plan aún significativo ; (2) criba robusta: todo
            aguanta (plan Chisq 20.57 p 5.8e-06) ; (3) perfil de tau por AIC: mínimo plano en 70-120
            (13310.0 en tau=100), se toma tau=60 (13312.9) por interpretabilidad ; (4) re-criba con
@@ -60,18 +60,18 @@
            Chisq 119.24/86.2 df p 0.0107, varianza 0.0984. Comparativa 2x2 (u35-tt-comparativa,
            verificada contra el render): coef -1.205/-1.182/-1.249/-1.238, concordancias
            0.623/0.690/0.625/0.672. cox_mes_opt y cox_mes_plan se definen en u35-comparar (la
-           comparación, que precede a tt). REGLAS + Prediccion + Validacion forman la seccion 6.9
-           (#sec-u36-cierre), fuera del 6.8.
+           comparación, que precede a tt). REGLAS + Prediccion + Validacion forman la seccion 5.9
+           (#sec-u35-cierre), fuera del 5.8.
        - OJO: el panel mensual colapsa meses con >1 fallo (1144 meses-evento vs 1194 fallos): es una
            aproximación honesta, se dice. -->
 
-# 6 · Cox: del tiempo al riesgo {#sec-u36}
+# 5 · Cox: del tiempo al riesgo {#sec-u35}
 
 Todo lo anterior ha comprometido siempre una **distribución** para la respuesta, ajustada por **máxima
 verosimilitud**: la **Gamma** del coste en el GLM de la [Unidad 3.1](#sec-u31), sus alternativas —inversa
 gaussiana y log-normal— al elegir familia y escala en la [Unidad 3.2](#sec-u32), el **GLMM Gamma** con
 efecto aleatorio de máquina de la [Unidad 3.3](#sec-u33), y la **Weibull** —con la exponencial y la
-log-normal como rivales— del **AFT** para el tiempo entre fallos en la [Unidad 3.5](#sec-u35). Todos son
+log-normal como rivales— del **AFT** para el tiempo entre fallos en la [Unidad 3.4](#sec-u34). Todos son
 un GLM o un pariente cercano (el AFT no es GLM), y todos parten de **fijar la forma de la respuesta**. El modelo de **Cox**
 da un paso al lado. No especifica ninguna distribución para el tiempo de fallo: deja
 el **riesgo de base libre** y estima solo cómo lo desplazan las covariables. Esa renuncia —no
@@ -79,7 +79,7 @@ comprometerse con una forma— es su gran fortaleza y la razón de su popularida
 marco: **Cox no es un GLM**. Esta unidad lo sitúa como la **frontera** del recorrido y aprovecha para
 las dos lecciones que mejor enseña sobre este banco: cómo se disciplina la correlación
 entre las averías de una misma máquina —una **fragilidad** más errores robustos, que cierran el falso
-positivo del fabricante que dejó abierto la [Unidad 3.5](#sec-u35)— y cómo el **diagnóstico de la proporcionalidad** depara aquí una sorpresa
+positivo del fabricante que dejó abierto la [Unidad 3.4](#sec-u34)— y cómo el **diagnóstico de la proporcionalidad** depara aquí una sorpresa
 instructiva.
 
 Y el **hilo de supervivencia** tampoco arranca aquí: lo venimos tejiendo desde los casos anteriores, y
@@ -93,7 +93,7 @@ discreto**: troceando el seguimiento en formato **persona-periodo** y ajustando 
 comparación con Cox y la **fragilidad**—. En ambos casos, el truco para no salir del GLM era el mismo:
 **discretizar el tiempo**.
 
-Lo que este bloque añade es la **mirada en tiempo continuo**, sin trocear. La [Unidad 3.5](#sec-u35) la
+Lo que este bloque añade es la **mirada en tiempo continuo**, sin trocear. La [Unidad 3.4](#sec-u34) la
 abrió con el **AFT**, que **sí** compromete una distribución para el tiempo. Y el **Cox** de esta unidad
 da el último paso: modela el hazard en continuo pero **deja el riesgo de base $h_0(t)$ completamente
 libre**, ni troceado ni con una forma impuesta. Esa es a la vez su **novedad** y su **precio**: máxima
@@ -113,7 +113,7 @@ dependientes del tiempo.
 
 
 
-## 6.1 Contexto: el reto y los datos {#sec-u36-contexto}
+## 5.1 Contexto: el reto y los datos {#sec-u35-contexto}
 
 La segunda mitad del caso pregunta por el **ritmo del fallo**. Ya no es *cuánto cuesta* una avería, sino
 *cuándo vuelve*: dado que una máquina lleva un tiempo sin averiarse, ¿cuál es su **riesgo instantáneo** de
@@ -123,7 +123,7 @@ hacerlo ahora, y cómo lo suben o bajan su **plan de mantenimiento**, su **edad*
 proporcionalidad— y, sobre todo, descubrir que **el riesgo de una máquina cambia a lo largo de su vida** por
 razones que el modelo más simple no puede ni representar. Ahí acabaremos necesitando un Cox **extendido**.
 
-Los datos son los **mismos intervalos entre fallos** de la [Unidad 3.5](#sec-u35): la tabla
+Los datos son los **mismos intervalos entre fallos** de la [Unidad 3.4](#sec-u34): la tabla
 **`banco$intervalos`**, con **una fila por espera** entre dos averías consecutivas, donde la **última espera de
 cada máquina** llega **censurada** al cierre de la ventana (≈ 1 de cada 4). Las columnas que nos importan
 son:
@@ -138,10 +138,10 @@ son:
 | `plan_mantenimiento` | plan de la máquina: `Correctivo` / `Preventivo` |
 | `carga`, `proceso`, `fabricante`, `criticidad` | covariables **fijas** de la máquina |
 
-Su descripción por Kaplan–Meier y log-rank ya la hicimos en la [Unidad 3.5](#sec-u35), así que aquí solo la recordamos con un recuento, y con el aspecto de la base de datos:
+Su descripción por Kaplan–Meier y log-rank ya la hicimos en la [Unidad 3.4](#sec-u34), así que aquí solo la recordamos con un recuento, y con el aspecto de la base de datos:
 
 ```{r}
-#| label: u36-datos
+#| label: u35-datos
 library(survival)
 iv <- banco$intervalos
 c(intervalos = nrow(iv), maquinas = length(unique(iv$id_maquina)),
@@ -149,11 +149,11 @@ c(intervalos = nrow(iv), maquinas = length(unique(iv$id_maquina)),
 head(iv,5)
 ```
 
-Mientras el AFT de la [Unidad 3.5](#sec-u35) modelaba el **tiempo** entre averías, el Cox va a modelar directamente **el riesgo** de sufrir una nueva avería.
+Mientras el AFT de la [Unidad 3.4](#sec-u34) modelaba el **tiempo** entre averías, el Cox va a modelar directamente **el riesgo** de sufrir una nueva avería.
 
 
 
-## 6.2 Riesgos proporcionales {#sec-u36-riesgos}
+## 5.2 Riesgos proporcionales {#sec-u35-riesgos}
 
 El modelo de Cox [@cox1972] escribe el **hazard** $h(t\mid x)$ —la propensión instantánea a
 fallar en el momento $t$ habiendo llegado sin fallar hasta $t$— para una máquina con vector de covariables
@@ -176,20 +176,20 @@ El riesgo de base $h_0(t)$ **se cancela**, y con él **desaparece el tiempo**: e
 perfiles es una **constante**, la misma a las dos semanas que a los dos años. Eso es la
 **proporcionalidad**: los hazards de dos máquinas se mantienen en razón fija a lo largo de toda su vida.
 Dicho en logaritmos —y esta es la imagen que usaremos para diagnosticarla en la
-[Sección 6.7](#sec-u36-ph)—,
+[Sección 5.7](#sec-u35-ph)—,
 $$\log h(t\mid x)=\log h_0(t)+x^\top\beta,$$
 las curvas de log-hazard de dos máquinas son **paralelas**: difieren en un desplazamiento vertical
 constante $(x_A-x_B)^\top\beta$ en **todo** $t$. Si en los datos ese desfase **cambiara** con el tiempo,
 la proporcionalidad fallaría —y es justo lo que la prueba de Schoenfeld irá a buscar—.
 
-Frente al AFT de la [Unidad 3.5](#sec-u35), el contraste es de **lente**: el AFT **estira o encoge el
+Frente al AFT de la [Unidad 3.4](#sec-u34), el contraste es de **lente**: el AFT **estira o encoge el
 reloj** (un factor de aceleración sobre el tiempo de espera); Cox **multiplica el riesgo** (un hazard
 ratio). En general son **dos modelos distintos** —una distribución suele ser AFT *o* PH, no ambas, y cada
 lente daría su propio ajuste—. La **Weibull es la excepción**: es la **única** familia que es **a la vez**
 AFT y de riesgos proporcionales, de modo que sus dos descripciones no compiten, sino que son **el mismo
 modelo reexpresado**, con el factor de aceleración y el hazard ratio ligados por una fórmula fija. De ahí
-que el efecto que midió el AFT Weibull de la [Unidad 3.5](#sec-u35) y el que estima Cox aquí
-**coincidan**; lo verificamos numéricamente en la [Sección 6.4](#sec-u36-interpretacion).
+que el efecto que midió el AFT Weibull de la [Unidad 3.4](#sec-u34) y el que estima Cox aquí
+**coincidan**; lo verificamos numéricamente en la [Sección 5.4](#sec-u35-interpretacion).
 
 ::: {.callout-tip}
 ## ¿Cuándo es idóneo Cox —y cuándo no?
@@ -208,24 +208,24 @@ situaciones realistas la incumplen:
   riesgo que se atenúa con la edad: el HR de un predictor **fijo cambia con $t$**, y el número único de
   Cox solo puede promediarlo. (Distinto de nuestro mantenimiento, cuyo *valor* —no su coeficiente— cambia
   con el tiempo: eso se resuelve con una **covariable dependiente del tiempo**,
-  [Sección 6.8](#sec-u36-extcox), sin salir de riesgos proporcionales.)
+  [Sección 5.8](#sec-u35-extcox), sin salir de riesgos proporcionales.)
 - **Curvas que se cruzan.** Una cirugía con **alto riesgo temprano** y bajo después frente a un
   tratamiento conservador; una inmunoterapia con **beneficio diferido** (nada al principio, mucho
   después). Si las curvas de supervivencia se cruzan, los hazards **no** son proporcionales y Cox no
   puede representarlo.
 - **Cuando importa el reloj absoluto.** Si la pregunta es *cuánto se prolonga la vida* (y no *cuánto se
-  multiplica el riesgo*), el **AFT** de la [Unidad 3.5](#sec-u35) suele ser más natural; y con fracción de
+  multiplica el riesgo*), el **AFT** de la [Unidad 3.4](#sec-u34) suele ser más natural; y con fracción de
   «curados» o desgaste acelerado, hay modelos específicos.
 
 La moraleja: la proporcionalidad **no se asume, se comprueba** —lo haremos con Schoenfeld en la
-[Sección 6.7](#sec-u36-ph)—. Y cuando el riesgo de una unidad **cambia a lo largo de su vida**, no siempre
+[Sección 5.7](#sec-u35-ph)—. Y cuando el riesgo de una unidad **cambia a lo largo de su vida**, no siempre
 hay que abandonar Cox: si lo que cambia es el **valor** de un predictor (nuestro mantenimiento), basta
-**extenderlo** con una covariable dependiente del tiempo ([Sección 6.8](#sec-u36-extcox)); solo la no
+**extenderlo** con una covariable dependiente del tiempo ([Sección 5.8](#sec-u35-extcox)); solo la no
 proporcionalidad **genuina** —un predictor fijo cuyo *efecto* varía, o curvas que se cruzan— pide otras
 herramientas.
 :::
 
-## 6.3 Estimación: la verosimilitud parcial (y por qué Cox no es un GLM) {#sec-u36-noglm}
+## 5.3 Estimación: la verosimilitud parcial (y por qué Cox no es un GLM) {#sec-u35-noglm}
 
 Si $h_0(t)$ queda **sin especificar**, no hay una densidad completa para el tiempo de fallo y, por tanto,
 no hay una verosimilitud ordinaria que maximizar: no podemos decir *con qué probabilidad* una máquina
@@ -278,13 +278,13 @@ el motor de estimación es otro.
 :::
 
 Con esa maquinaria, el **ajuste** en R es un único comando. Lo corremos sobre los **mismos intervalos** de
-la [Unidad 3.5](#sec-u35) —una fila por espera, `Surv(tiempo_entre, evento)` como respuesta y la última
+la [Unidad 3.4](#sec-u34) —una fila por espera, `Surv(tiempo_entre, evento)` como respuesta y la última
 espera de cada máquina censurada—. Tomamos las covariables del AFT y añadimos, como **control**, el **`fabricante`** —una
 etiqueta que el DGP genera sin efecto sobre el riesgo, pero que dejamos entrar de momento para ponerla a
 prueba, como haría cualquiera que no conociera la verdad—:
 
 ```{r}
-#| label: u36-cox
+#| label: u35-cox
 cox_esp <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
                    carga + proceso + fabricante, data = iv)
 summary(cox_esp)
@@ -321,15 +321,15 @@ coxph(Surv(tiempo, evento) ~ x1 + x2, data = datos, ties="efron")
 
 Sobre datos agrupados o con covariables que cambian en el tiempo la fórmula se amplía —`frailty()`,
 `cluster()`, `Surv(tstart, tstop, evento)`—, y a eso dedicamos las secciones
-[6.6](#sec-u36-fragilidad) y [6.8](#sec-u36-extcox).
+[5.6](#sec-u35-fragilidad) y [5.8](#sec-u35-extcox).
 :::
 
-## 6.4 Interpretación {#sec-u36-interpretacion}
+## 5.4 Interpretación {#sec-u35-interpretacion}
 
 Exponenciados, los coeficientes se leen como **hazard ratios**:
 
 ```{r}
-#| label: tbl-u36-hr
+#| label: tbl-u35-hr
 #| tbl-cap: "Hazard ratios del modelo de Cox (coeficientes exponenciados) con intervalo de confianza al 95 %. Un HR < 1 protege (menos riesgo de volver a averiarse); un HR > 1 lo agrava. Referencia del proceso: Corte."
 broom::tidy(cox_esp, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::transmute(term,
@@ -351,7 +351,7 @@ $p\approx 0.006$; el C apunta en la misma dirección sin separarse del ruido).
 ## AFT y Cox: dos preguntas, dos escalas
 Ambos modelan el **mismo** tiempo hasta el fallo, pero no responden a lo mismo.
 
-| | **AFT** ([Unidad 3.5](#sec-u35)) | **Cox** (esta unidad) |
+| | **AFT** ([Unidad 3.4](#sec-u34)) | **Cox** (esta unidad) |
 |---|---|---|
 | **Pregunta** | ¿Cuánto **se alarga o se acorta la vida**? | ¿Cuánto **se multiplica el riesgo** de fallar ahora? |
 | **Qué modela** | el **tiempo** de espera | el **hazard** (riesgo instantáneo) |
@@ -377,7 +377,7 @@ La lectura de Cox es un espejo, en la escala del riesgo, de lo que el AFT dijo e
   de riesgo»*.
 
 No son dos resultados, es **el mismo resultado en dos escalas**. Y no es casualidad que encajen: como
-vimos en la [Sección 6.2](#sec-u36-riesgos), en la Weibull las dos lecturas son el mismo modelo
+vimos en la [Sección 5.2](#sec-u35-riesgos), en la Weibull las dos lecturas son el mismo modelo
 reexpresado, ligadas por
 $$\text{HR}=\text{AF}^{-1/\sigma},$$
 con $\sigma$ la escala de la Weibull. 
@@ -385,7 +385,7 @@ Aquí $\sigma\approx 1$, así que $\text{HR}\approx 1/\text{AF} =
 1/1.85 = 0.54$ —y en efecto Cox estima $0.538$ por su cuenta—.
 
 ```{r}
-#| label: u36-aft-cox
+#| label: u35-aft-cox
 hr_implicado_aft <- exp(-coef(aft_w)["plan_mantenimientoPreventivo"] / aft_w$scale)
 hr_cox <- exp(coef(cox_esp)["plan_mantenimientoPreventivo"])
 
@@ -410,7 +410,7 @@ El ajuste vive en la escala del **log-hazard**; para leerlo hay que **exponencia
 - **La escala importa.** En covariables continuas el HR es «por **unidad**»: `carga` va de 0 a 1, así que su HR $\approx 2$ es el salto de una máquina **descargada a una a pleno rendimiento**, no un cambio pequeño.
 :::
 
-## 6.5 Inferencia y bondad de ajuste {#sec-u36-inferencia}
+## 5.5 Inferencia y bondad de ajuste {#sec-u35-inferencia}
 
 La verosimilitud **parcial** se contrasta como cualquier verosimilitud, y la inferencia trabaja en **dos
 niveles**: efecto de los predictores y bondad del ajuste.
@@ -418,7 +418,7 @@ niveles**: efecto de los predictores y bondad del ajuste.
 
 ### Efectos de los predictores
 
-Empecemos por el detalle: **qué covariables mueven el riesgo**. La @tbl-u36-hr trae, por
+Empecemos por el detalle: **qué covariables mueven el riesgo**. La @tbl-u35-hr trae, por
 coeficiente, el **contraste de Wald** ($z=\hat\beta/\text{EE}$; $H_0:\beta_j=0$, es decir HR $=1$) con su
 intervalo de confianza. Leído sobre los datos, separa el grano de la paja: el **plan** ($p<10^{-3}$), la
 **carga** ($p\approx 0.0002$) y la **antigüedad** ($p<10^{-3}$) tienen intervalos claramente alejados de
@@ -429,7 +429,7 @@ para hacernos dudar.
 Y aunque el Wald por coeficiente es cómodo, para decidir si un **factor** entra —y para no fiarlo todo al Wald— el instrumento fiable es el **contraste de razón de verosimilitudes** (LR) de **cada término completo**, hecho para **todos** a la vez y con cada uno **ajustado por el resto** (**tipo II**, sin depender del orden de entrada). `car::Anova` lo entrega en una tabla [@fox2019]:
 
 ```{r}
-#| label: u36-lrt-terminos
+#| label: u35-lrt-terminos
 car::Anova(cox_esp, test.statistic = "LR")   # LRT tipo II: cada término ajustado por los demás
 ```
 
@@ -438,12 +438,12 @@ La criba ordena el modelo. **plan**, **antigüedad** y **carga** aportan de form
 de significación del 5 %, no se consiguen evidencias a favor de considerar el `proceso` en el modelo
 (p-valor de 0.097), pero sí de incluir al `fabricante` (p-valor de 0.017), a pesar de que sabemos —según el
 DGP— que se diseñó como un factor de ruido sin efecto real. Ese falso positivo lo desmontaremos en la
-[Sección 6.6](#sec-u36-fragilidad), donde además de añadir el efecto aleatorio, contrastaremos los efectos con tests robustos de Wald en lugar de LR.
+[Sección 5.6](#sec-u35-fragilidad), donde además de añadir el efecto aleatorio, contrastaremos los efectos con tests robustos de Wald en lugar de LR.
 
 De momento, reajustamos el modelo prescindiendo de `proceso` y mostramos el AIC y BIC, así como el test LR para el nuevo modelo. 
 
 ```{r}
-#| label: u36-aic-terminos
+#| label: u35-aic-terminos
 # Crear el modelo actualizado
 cox_esp_opt <- update(cox_esp, . ~ . - proceso)
 
@@ -463,7 +463,7 @@ Al reajustar el modelo sin `proceso`, la variable `fabricante` permanece en el m
 
 #### El log-rank: comparar dos curvas (no medir un efecto)
 
-En la [Unidad 3.5](#sec-u35) comparamos las curvas de Kaplan–Meier del plan correctivo frente al
+En la [Unidad 3.4](#sec-u34) comparamos las curvas de Kaplan–Meier del plan correctivo frente al
 preventivo con el contraste de **log-rank** [@mantel1966]. Su lógica cabe en una frase: en cada instante
 de fallo confronta los fallos **observados** en cada grupo con los **esperados** si ambas curvas fueran
 una sola, y acumula esas discrepancias en un estadístico $\chi^2$ —aquí $\approx 75$ sobre 1 g.l., con
@@ -483,7 +483,7 @@ No es un primo lejano del Cox: es exactamente **su test de *score*** cuando el m
 factor. Comprobémoslo:
 
 ```{r}
-#| label: u36-score-logrank
+#| label: u35-score-logrank
 # las dos vías, con el plan como único predictor
 cox_plan <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)
 sd_plan  <- survdiff(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)
@@ -522,20 +522,20 @@ supervivencia del **AUC** de un clasificador: 0.5 es azar puro y 1 es discrimina
 Aquí vale
 **≈ 0.62**: el modelo ordena claramente mejor que el azar, pero sin milagros —lo esperable cuando buena
 parte del riesgo depende de la **fragilidad** de cada máquina, heterogeneidad que el modelo basal aún no
-recoge y que ajustaremos en la [Sección 6.6](#sec-u36-fragilidad)—. La concordancia vuelve en la [Unidad 3.7](#sec-u37) al comparar las tres lentes.
+recoge y que ajustaremos en la [Sección 5.6](#sec-u35-fragilidad)—. La concordancia vuelve en la [Unidad 3.6](#sec-u36) al comparar las tres lentes.
 
 
 ::: {.callout-note}
 ## De la Inferencia al Diagnóstico
 En el modelo de Cox el riesgo de base $h_0(t)$ absorbe toda la «forma» de modo no paramétrico, y los $\beta$
 son los **únicos** parámetros (más la varianza de fragilidad, si la añadimos, en la [Sección
-6.6](#sec-u36-fragilidad)). El lugar que en otras familias dedicábamos a preguntar «¿está bien la varianza?» lo ocupan aquí dos preguntas distintas: la **proporcionalidad** ([Sección 6.7](#sec-u36-ph)) y la **independencia**
-de las observaciones ([Sección 6.6](#sec-u36-fragilidad)).
+5.6](#sec-u35-fragilidad)). El lugar que en otras familias dedicábamos a preguntar «¿está bien la varianza?» lo ocupan aquí dos preguntas distintas: la **proporcionalidad** ([Sección 5.7](#sec-u35-ph)) y la **independencia**
+de las observaciones ([Sección 5.6](#sec-u35-fragilidad)).
 :::
 
-## 6.6 Fragilidad: el diagnóstico de independencia {#sec-u36-fragilidad}
+## 5.6 Fragilidad: el diagnóstico de independencia {#sec-u35-fragilidad}
 
-La criba de la [Sección 6.5](#sec-u36-inferencia) dejó **dentro** del modelo al `fabricante` (bloque LR
+La criba de la [Sección 5.5](#sec-u35-inferencia) dejó **dentro** del modelo al `fabricante` (bloque LR
 $p\approx 0.017$). Pero ese veredicto descansa en un
 supuesto que **no se cumple**: que las esperas son independientes. No lo son, pues existen varias por máquina, ligadas
 por su **fragilidad** (una máquina «mala» encadena averías cortas y caras), y esa correlación no
@@ -544,10 +544,10 @@ contrastar todos los efectos**.
 
 Esa cura es la análoga en supervivencia del intercepto aleatorio del GLMM: una **fragilidad**, un factor
 latente $Z_i$ por máquina que multiplica su hazard, $h_i(t\mid x)=Z_i\,h_0(t)\exp(x^\top\beta)$
-[@vaupel1979]. `coxph` la ajusta con un término `frailty(id_maquina)` [@therneau2000]. Arrancamos, pues, del modelo óptimo que conseguimos en la [Sección 6.5](#sec-u36-inferencia) para valorar el ajuste tras incluir este efecto aleatorio:
+[@vaupel1979]. `coxph` la ajusta con un término `frailty(id_maquina)` [@therneau2000]. Arrancamos, pues, del modelo óptimo que conseguimos en la [Sección 5.5](#sec-u35-inferencia) para valorar el ajuste tras incluir este efecto aleatorio:
 
 ```{r}
-#| label: u36-frailty
+#| label: u35-frailty
 cox_esp_opt_frag <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
                      carga + fabricante + frailty(id_maquina), data = iv)
 cox_esp_opt_frag
@@ -590,7 +590,7 @@ aleatorio—. Lo limpio es un **Wald por término con errores robustos**: `car::
 `cluster(id_maquina)`, que corrige los errores estándar por el agrupamiento **sin** tocar los $\hat\beta$:
 
 ```{r}
-#| label: u36-robust-screen
+#| label: u35-robust-screen
 cox_esp_opt_clus <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
                   carga + fabricante + cluster(id_maquina), data = iv)
 car::Anova(cox_esp_opt_clus, test.statistic = "Wald")   # Wald por término, con SE robustos por máquina
@@ -604,14 +604,14 @@ correlación reconocida —y separa el grano de la paja—:
 - **`fabricante`** se **desinfla** totalmente con un $p=0.123$, lo que nos mueve a sacarlo del modelo y reajustar.
   
 ```{r}
-#| label: u36-frailty-opt
+#| label: u35-frailty-opt
 cox_esp_final_frag <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
                      carga + frailty(id_maquina), data = iv)
 summary(cox_esp_final_frag)
 ```
 
 El reajuste deja la varianza de fragilidad en **0.142** y eleva la **concordancia** de $\approx 0.62$
-([Sección 6.5](#sec-u36-inferencia)) a **0.683**: conocer la fragilidad de cada máquina mejora
+([Sección 5.5](#sec-u35-inferencia)) a **0.683**: conocer la fragilidad de cada máquina mejora
 notablemente la ordenación del riesgo. Nótese, además, que los coeficientes son ahora **condicionales** a esa fragilidad y crecen ligeramente
 en magnitud —el HR del plan pasa de 0.54 a 0.51—. No pierden por ello validez poblacional: 0.51 es el
 efecto que el modelo atribuye a **cada** máquina de la población, comparando máquinas **de igual
@@ -630,7 +630,7 @@ lo que evita concluir que «el fabricante B es más fiable» cuando no lo es.
 :::
 
 
-## 6.7 Diagnóstico de la proporcionalidad {#sec-u36-ph}
+## 5.7 Diagnóstico de la proporcionalidad {#sec-u35-ph}
 
 Todo lo anterior descansa en un supuesto: que los hazard ratios son **constantes en el tiempo**. Si el
 efecto de una covariable crece o mengua a lo largo de la espera, el HR único que estima Cox es un
@@ -672,7 +672,7 @@ Su resultado central es que los residuos **escalados** —los de Schoenfeld repo
 matriz de información, $s^*_{ik}$— estiman precisamente esa desviación:
 $$\mathbb{E}[s^*_{ik}]\;\approx\;\beta_k(t_i)-\beta_k\;=\;\theta_k\,g(t_i).$$
 Dicho en palabras: **la media de los residuos escalados en el instante $t$ aproxima el coeficiente que
-regiría en ese momento**. Por eso el gráfico (@fig-u36-zph) se lee tan bien —la curva suavizada es, en la práctica, una
+regiría en ese momento**. Por eso el gráfico (@fig-u35-zph) se lee tan bien —la curva suavizada es, en la práctica, una
 estimación de $\beta_k(t)$— y por eso el contraste es, en el fondo, un **test de pendiente cero** en la
 regresión de $s^*_{ik}$ sobre $g(t_i)$. El estadístico resultante se distribuye, bajo $H_0$, como una
 $\chi^2$ con **1 grado de libertad** por covariable (y con tantos g.l. como términos en la fila `GLOBAL`),
@@ -688,17 +688,17 @@ pasar desapercibida en otra: ante la duda, conviene mirar más de una.
 ### El diagnóstico sobre nuestro modelo
 
 Lo aplicamos al **modelo que hemos dado por bueno** en la
-[Sección 6.6](#sec-u36-fragilidad) —`cox_esp_final_frag`: plan, antigüedad y carga, con fragilidad—, que es el que
+[Sección 5.6](#sec-u35-fragilidad) —`cox_esp_final_frag`: plan, antigüedad y carga, con fragilidad—, que es el que
 nos interesa validar:
 
 ```{r}
-#| label: u36-zph
+#| label: u35-zph
 ph <- cox.zph(cox_esp_final_frag)
 ph
 ```
 
 ```{r}
-#| label: fig-u36-zph
+#| label: fig-u35-zph
 #| fig-width: 9.5
 #| fig-height: 3.4
 #| fig-cap: "Residuos **escalados** de Schoenfeld del modelo óptimo frente al tiempo, con su banda de confianza: plan de mantenimiento, antigüedad y carga. Por el resultado de Grambsch y Therneau, la curva suavizada de cada panel estima el coeficiente $\\beta(t)$ que regiría en cada instante: si la proporcionalidad se cumple, debe ser **horizontal**. Lo es en los tres casos —la banda contiene una recta plana en todo el recorrido—, de modo que los tres hazard ratios pueden tomarse como constantes a lo largo de la espera, y la prueba no marca ninguno."
@@ -710,7 +710,7 @@ for (v in c("plan_mantenimiento", "antiguedad_ini", "carga")) {
 ```
 
 Y observamos que **ninguna** covariable viola la proporcionalidad:
-todos los p-valores de `cox.zph` son altos —el mínimo de **0.17**—, y la @fig-u36-zph lo confirma gráficamente: en ninguna de las tres covariables los residuos dibujan tendencia alguna. El modelo **pasa el diagnóstico** de proporcionalidad.
+todos los p-valores de `cox.zph` son altos —el mínimo de **0.17**—, y la @fig-u35-zph lo confirma gráficamente: en ninguna de las tres covariables los residuos dibujan tendencia alguna. El modelo **pasa el diagnóstico** de proporcionalidad.
 
 Una advertencia sobre la última fila: el **`GLOBAL` sale con $p=1.00$**, pero **no lo leamos como una
 validación rotunda**. Ese contraste agrega los términos del modelo, y aquí la **fragilidad** aporta muchos
@@ -772,7 +772,7 @@ las curvas de supervivencia se cruzan— hay dos caminos.
 - **estratificar** por la variable que viola PH: cada estrato recibe su **propio riesgo de base**, sin
   estimarle un hazard ratio. Útil cuando esa variable es un control que no necesitamos interpretar.
 
-**Cambiar de modelo**: el **AFT** ([Unidad 3.5](#sec-u35)) no exige proporcionalidad; y, más allá de este
+**Cambiar de modelo**: el **AFT** ([Unidad 3.4](#sec-u34)) no exige proporcionalidad; y, más allá de este
 curso, los **hazards aditivos** de Aalen ($h(t\mid x)=h_0(t)+x^\top\beta(t)$), los **paramétricos
 flexibles** (splines de Royston–Parmar) o el **aprendizaje automático** de supervivencia.
 
@@ -780,14 +780,14 @@ Y un puente hacia la síntesis: en la **lente GLM** en tiempo discreto o a trozo
 ([Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15),
 [Unidad 2.6](../caso2/caso2_conteos.qmd#sec-u26)), la no proporcionalidad es, sencillamente, una
 **interacción covariable × tiempo** —y sigue siendo un GLM de pleno derecho—. Las tres lentes del fallo
-convergen en la [Unidad 3.7](#sec-u37).
+convergen en la [Unidad 3.6](#sec-u36).
 :::
 
-Llegados a este punto, reflexionamos sobre el potencial real del mantenimiento, y es que cabe esperar que la protección que aporta a una máquina cada revisión (que renueva su protección, aunque no la rejuvenece) se vaya desvaneciendo con los días. Sin embargo, esta información de momento no la hemos incluido en el modelo, por lo que no podemos concluir sobre ella. Por otro lado, lo que cambia con el paso de los días es el **valor** de esa protección, lo que no implica que su **efecto** (sobre el fallo) cambie con el tiempo —hecho que sí violaría los riesgos proporcionales—. Planteamos pues, en la [Sección 6.8](#sec-u36-extcox), la incorporación de esta protección de los mantenimientos periódicos con un modelo de Cox **extendido**, que seguirá siendo de riesgos proporcionales.
+Llegados a este punto, reflexionamos sobre el potencial real del mantenimiento, y es que cabe esperar que la protección que aporta a una máquina cada revisión (que renueva su protección, aunque no la rejuvenece) se vaya desvaneciendo con los días. Sin embargo, esta información de momento no la hemos incluido en el modelo, por lo que no podemos concluir sobre ella. Por otro lado, lo que cambia con el paso de los días es el **valor** de esa protección, lo que no implica que su **efecto** (sobre el fallo) cambie con el tiempo —hecho que sí violaría los riesgos proporcionales—. Planteamos pues, en la [Sección 5.8](#sec-u35-extcox), la incorporación de esta protección de los mantenimientos periódicos con un modelo de Cox **extendido**, que seguirá siendo de riesgos proporcionales.
 
-## 6.8 Covariables que cambian con el tiempo: el Cox extendido {#sec-u36-extcox}
+## 5.8 Covariables que cambian con el tiempo: el Cox extendido {#sec-u35-extcox}
 
-### Contexto y datos {#sec-u36-extcox-datos}
+### Contexto y datos {#sec-u35-extcox-datos}
 
 Hasta aquí hemos tratado el riesgo de fallo como algo que las covariables desplazan por un factor
 **constante**: una máquina de plan preventivo mantiene siempre la misma ventaja sobre una correctiva, viva
@@ -797,7 +797,7 @@ motivos distintos que no conviene mezclar, dos "relojes" que corren a la vez—:
 
 - **Reloj 1 · la edad.** La máquina **envejece**: se desgasta, acumula horas y falla más cuanto más vieja.
   Es un reloj que solo avanza.
-  > La edad entró en el modelo la [Sección 6.6](#sec-u36-fragilidad) como `antiguedad_ini` —la que la máquina tenía al comenzar cada espera—, sobrevivió a la criba, y el diagnóstico de la [Sección 6.7](#sec-u36-ph) confirmó que su efecto es **proporcional**: un hazard ratio constante por año cumplido.
+  > La edad entró en el modelo la [Sección 5.6](#sec-u35-fragilidad) como `antiguedad_ini` —la que la máquina tenía al comenzar cada espera—, sobrevivió a la criba, y el diagnóstico de la [Sección 5.7](#sec-u35-ph) confirmó que su efecto es **proporcional**: un hazard ratio constante por año cumplido.
   
 - **Reloj 2 · el mantenimiento.** Cada intervención preventiva la **rejuvenece** temporalmente, y esa
   protección **se desvanece** hasta la siguiente revisión. Es un reloj que se **reinicia** una y otra
@@ -825,7 +825,7 @@ Esa resolución la aporta el banco de datos **`banco$seguimiento`** —que renom
 | `carga`, `proceso`, `fabricante` | covariables **fijas** de la máquina |
 
 ```{r}
-#| label: u36-datos-tv
+#| label: u35-datos-tv
 sg <- banco$seguimiento
 
 c(maquina_meses = nrow(sg),
@@ -864,7 +864,7 @@ hace comparables las tres periodicidades. Agrupamos esa fracción en quintiles y
 diseño reparte la exposición de forma casi uniforme entre quintiles (47–55 mil días, columna
 `exposicion`), los recuentos son directamente comparables.
 
-El patrón que buscábamos aflora con claridad en @fig-u36-mant-fallo: los fallos crecen de forma sostenida desde el primer
+El patrón que buscábamos aflora con claridad en @fig-u35-mant-fallo: los fallos crecen de forma sostenida desde el primer
 quintil de la fase (64) hasta el cuarto (91), un **40 % más de averías** cuando la revisión queda lejos
 que cuando está reciente. El último quintil (83) se desmarca ligeramente de la subida, una fluctuación
 compatible con el puro azar en recuentos de este tamaño. La lectura mecánica es la que el modelo
@@ -872,7 +872,7 @@ extendido necesitará: la protección es **máxima al salir de la revisión y se
 la fase** —no es un atributo fijo de la máquina, sino un estado que se agota—.
 
 ```{r}
-#| label: u36-fase-fallos
+#| label: u35-fase-fallos
 sg_prev <- subset(sg, !is.na(dias_desde_mant))   # solo preventivas: las correctivas no tienen reloj
 sg_prev$tramo_fase <- cut(sg_prev$dias_desde_mant / sg_prev$intervalo_mant,
                           breaks = seq(0, 1, by = 0.2), include.lowest = TRUE)
@@ -882,7 +882,7 @@ res
 ```
 
 ```{r}
-#| label: fig-u36-mant-fallo
+#| label: fig-u35-mant-fallo
 #| fig-width: 7
 #| fig-height: 3.2
 #| fig-cap: "Fallos acumulados por quintil de la **fase de mantenimiento** —fracción transcurrida entre dos revisiones: `dias_desde_mant` / `intervalo_mant`—, en máquinas de plan preventivo. Con la exposición casi uniforme entre quintiles (tabla previa), los recuentos son directamente comparables."
@@ -893,16 +893,16 @@ ggplot(res, aes(tramo_fase, fallos)) +
 ```
 
 Con este formato podemos **mirar los dos relojes por separado** y comprobar que **ambos** empujan el riesgo
-hacia arriba (@fig-u36-relojes). Si agrupamos los meses por la **edad** de la máquina y calculamos la
+hacia arriba (@fig-u35-relojes). Si agrupamos los meses por la **edad** de la máquina y calculamos la
 **tasa de avería** (fallos por 100 días de exposición), crece de forma sostenida: una máquina vieja falla
 más del **doble** que una nueva —el reloj 1—. Y si en cambio agrupamos por los **días desde la última
 intervención**, la tasa vuelve a crecer: es mínima recién revisada la máquina y **se duplica** cuando la
-revisión queda lejana —el reloj 2—. El modelo de la [Sección 6.6](#sec-u36-fragilidad) recogía el primero y
+revisión queda lejana —el reloj 2—. El modelo de la [Sección 5.6](#sec-u35-fragilidad) recogía el primero y
 resumía el segundo en una etiqueta fija; el extendido lo incorpora como covariable que se actualiza mes a
 mes.
 
 ```{r}
-#| label: fig-u36-relojes
+#| label: fig-u35-relojes
 #| fig-width: 8
 #| fig-height: 3.4
 #| fig-cap: "Los dos relojes, cuantificados: tasa de avería (fallos por 100 días de exposición) según la **edad** de la máquina (izquierda, todas las máquinas) y según los **días desde el último mantenimiento** (derecha, solo plan preventivo). Ambos ejes empujan el riesgo hacia arriba, pero son tiempos distintos."
@@ -927,7 +927,7 @@ ggplot(rr, aes(bin, tasa)) +
   labs(x = NULL, y = "fallos por 100 días de exposición")
 ```
 
-### El modelo extendido {#sec-u36-extcox-modelo}
+### El modelo extendido {#sec-u35-extcox-modelo}
 
 El **Cox extendido no es un modelo nuevo**: es **el
 mismo** modelo de riesgos proporcionales, con la misma verosimilitud parcial y los mismos coeficientes
@@ -965,14 +965,14 @@ coxph(Surv(tstart, tstop, evento) ~ x1 + x2, data = panel)
   dependencia**: si una unidad tiene un único evento y las filas son solo su covariable partida en tramos,
   la verosimilitud parcial y los errores estándar salen **idénticos** a los del formato sin trocear, y no
   hace falta corregir nada. Lo que exige `frailty(id)` o `cluster(id)` es que la unidad aporte **varios
-  eventos** —nuestro caso, [Sección 6.6](#sec-u36-fragilidad)— o que exista un agrupamiento real.
+  eventos** —nuestro caso, [Sección 5.6](#sec-u35-fragilidad)— o que exista un agrupamiento real.
 - **Construir el panel.** Aquí `banco$seguimiento` viene ya troceado; en la práctica se construye
   partiendo de los datos por unidad y añadiendo un corte cada vez que alguna covariable cambia de valor.
 - **Un peligro que evitar.** Nunca debe entrar en la fila información **del futuro** (por ejemplo, un valor
   medido *después* del fallo): sería un sesgo de anticipación, y el modelo «predeciría» lo que ya sabe.
 :::
 
-No empezamos de cero: tomamos el **modelo óptimo de la [Sección 6.6](#sec-u36-fragilidad)** —plan, antigüedad
+No empezamos de cero: tomamos el **modelo óptimo de la [Sección 5.6](#sec-u35-fragilidad)** —plan, antigüedad
 y carga, con `frailty(id_maquina)`—, lo trasladamos al panel y le **añadimos** el reloj del mantenimiento.
 Dos apuntes sobre el traslado: la **fragilidad se conserva** (las filas siguen agrupadas por máquina), y la
 edad pasa de `antiguedad_ini` —fija durante toda una espera— a **`antiguedad`**, que se actualiza mes a mes;
@@ -981,7 +981,7 @@ es decir, ganamos una segunda covariable temporal sin esfuerzo.
 Mantenemos también `plan_mantenimiento`, porque las correctivas **no tienen reloj**, de modo que para estas máquinas `dias_desde_mant` es `NA` en todas sus filas y `mant_reciente` vale siempre 0. Es una hipótesis razonable; la pondremos a prueba.
 
 ```{r}
-#| label: u36-cox-ext
+#| label: u35-cox-ext
 cox_mes_ind_frag <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad +
                    carga + mant_reciente + frailty(id_maquina), data = sg)
 cox_mes_ind_frag
@@ -991,11 +991,11 @@ Aflora el mecanismo: `mant_reciente` sale con coeficiente $-0.43$ —hazard rati
 fresca recorta en torno a un tercio el riesgo instantáneo—, y ese efecto es **local en el tiempo**, no una
 etiqueta permanente. Retén también el coeficiente del **plan**, $-0.43$: volveremos a él enseguida.
 
-Toca cribar los efectos con la disciplina de la [Sección 6.6](#sec-u36-fragilidad) —Wald por término con
+Toca cribar los efectos con la disciplina de la [Sección 5.6](#sec-u35-fragilidad) —Wald por término con
 errores robustos, sobre el ajuste gemelo con `cluster(id_maquina)`—:
 
 ```{r}
-#| label: u36-ext-screen
+#| label: u35-ext-screen
 cox_mes_ind_clus <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad +
                       carga + mant_reciente + cluster(id_maquina), data = sg)
 car::Anova(cox_mes_ind_clus, test.statistic = "Wald")
@@ -1004,7 +1004,7 @@ car::Anova(cox_mes_ind_clus, test.statistic = "Wald")
 **Todos los términos aguantan**, `plan_mantenimiento` incluido. Modelo cerrado… salvo por un detalle
 incómodo: para llegar hasta aquí hemos tomado **dos decisiones arbitrarias**, y conviene ver cuánto pesan.
 
-### Dos arbitrariedades que conviene quitar {#sec-u36-arbitrario}
+### Dos arbitrariedades que conviene quitar {#sec-u35-arbitrario}
 
 1. **El umbral de los 45 días.** ¿Por qué 45 y no 30, o 60? `mant_reciente` es un **acantilado**: protección
    plena hasta el día 45, ninguna a partir del 46. Nada en los datos justifica ese salto.
@@ -1016,13 +1016,13 @@ la segunda **dejando de trocear**.
 
 #### La primera arbitrariedad: dar forma en vez de poner un umbral
 
-La @fig-u36-relojes no muestra un escalón, sino un **desvanecimiento gradual**. Codifiquemos una nueva variable de protección por el mantenimiento, de la forma:
+La @fig-u35-relojes no muestra un escalón, sino un **desvanecimiento gradual**. Codifiquemos una nueva variable de protección por el mantenimiento, de la forma:
 $$\texttt{prot\_mant} = \exp(-\texttt{dias\_desde\_mant}/\tau),$$
 que vale 1 el día de la revisión y se apaga suavemente. Cambiamos un umbral arbitrario por una **escala**
 $\tau$, que al menos podemos elegir con los datos: ajustamos para una rejilla de valores y miramos el AIC.
 
 ```{r}
-#| label: u36-perfil-tau
+#| label: u35-perfil-tau
 taus <- c(20, 30, 40, 50, 60, 70, 80, 100, 120)
 perfil <- sapply(taus, function(tau) {
   sg$p <- ifelse(is.na(sg$dias_desde_mant), 0, exp(-sg$dias_desde_mant / tau))
@@ -1038,7 +1038,7 @@ pero 70, 80, 100 y 120 cambian en un solo punto de AIC. Tomamos $\tau = 60$ por 
 nula, siempre—, que es justo lo que le corresponde. Con la covariable así codificada, volvemos a cribar:
 
 ```{r}
-#| label: u36-ext-screen2
+#| label: u35-ext-screen2
 # definimos la variable de protección por mantenimiento
 sg$prot_mant <- ifelse(is.na(sg$dias_desde_mant), 0, exp(-sg$dias_desde_mant / 60))
 # Ajustamos el modelo con ella
@@ -1071,7 +1071,7 @@ curva.
 Retiramos el término prescindible y reajustamos, con la fragilidad de vuelta:
 
 ```{r}
-#| label: u36-cox-final
+#| label: u35-cox-final
 cox_mes_opt_frag <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant +
                    frailty(id_maquina), data = sg)
 cox_mes_opt_frag
@@ -1081,7 +1081,7 @@ El coeficiente de `prot_mant` sale **próximo a $-1.2$**: al intervenir, el ries
 $\exp(-1.2)\approx 0.30$ —cae a menos de un tercio— y remonta con los días. **Una arbitrariedad menos**, y
 un modelo más simple que el de partida.
 
-#### ¿Etiqueta o reloj? La comparación {#sec-u36-comparar}
+#### ¿Etiqueta o reloj? La comparación {#sec-u35-comparar}
 
 La caída del plan merece confirmación formal: ¿describe mejor el riesgo el **reloj** del mantenimiento
 que la **etiqueta** del plan? Los dos contendientes, sobre el **mismo panel mensual**, difieren solo en
@@ -1094,16 +1094,16 @@ $$\text{M}_{\texttt{reloj}}:\qquad \log h_i(t) \;=\; \log h_0(t)
 \;+\; \beta_1\,\texttt{antiguedad}_i(t) \;+\; \beta_2\,\texttt{carga}_i
 \;+\; \beta_3\,\underbrace{e^{-\texttt{dias\_desde\_mant}_i(t)/60}}_{\texttt{prot\_mant}_i(t)}$$
 
-$\text{M}_{\texttt{plan}}$ es el modelo óptimo de la [Sección 6.6](#sec-u36-fragilidad) trasladado al
+$\text{M}_{\texttt{plan}}$ es el modelo óptimo de la [Sección 5.6](#sec-u35-fragilidad) trasladado al
 panel: el mantenimiento como **etiqueta fija** de la máquina. $\text{M}_{\texttt{reloj}}$ es nuestro
 modelo final: la etiqueta sustituida por el **reloj** que se actualiza mes a mes. El duelo se disputa
 entre los **gemelos sin fragilidad** (`cox_mes_plan` y `cox_mes_opt`), por dos razones que aquí solo
-enunciamos —las sistematizamos en [las reglas del juego](#sec-u36-reglas)—: el AIC exige **los mismos
+enunciamos —las sistematizamos en [las reglas del juego](#sec-u35-reglas)—: el AIC exige **los mismos
 datos** (ambos usan las 18 252 filas del panel) y **no está definido** a través del término penalizado de
 una fragilidad. Que prescindir de ella no distorsiona el retrato lo comprobamos sobre la marcha:
 
 ```{r}
-#| label: u36-comparar
+#| label: u35-comparar
 cox_mes_plan <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad + carga,
                       data = sg)
 cox_mes_opt  <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant,
@@ -1122,7 +1122,7 @@ interpretación—: la fragilidad **no cambia el retrato del riesgo**; cambia la
 sus efectos y la **discriminación** del modelo. Con eso claro, el AIC puede ordenar las dos estructuras:
 
 ```{r}
-#| label: u36-comparar-aic
+#| label: u35-comparar-aic
 data.frame(
   modelo       = c("M_plan  (5.6 trasladado al panel)", "M_reloj (final)"),
   k            = c(length(coef(cox_mes_plan)), length(coef(cox_mes_opt))),
@@ -1152,7 +1152,7 @@ doble y consistente: el reloj **ajusta mejor** y lo hace con **menos supuestos a
 Una advertencia final que conviene no malinterpretar: la **concordancia** apenas se mueve (0.621 → 0.623).
 No contradice lo que vimos sobre la fragilidad, porque son comparaciones distintas: aquí cambiamos
 **covariables** manteniendo la estructura de agrupamiento, mientras que **añadir la fragilidad** subía la
-concordancia de ≈ 0.62 a ≈ 0.68 ([Sección 6.6](#sec-u36-fragilidad)). La lección es que **ajustar mejor el
+concordancia de ≈ 0.62 a ≈ 0.68 ([Sección 5.6](#sec-u35-fragilidad)). La lección es que **ajustar mejor el
 mecanismo no garantiza discriminar mejor entre máquinas**: buena parte de lo que separa a unas de otras no
 es ninguna covariable observada, sino su fragilidad individual.
 
@@ -1164,7 +1164,7 @@ Si **cualquier** troceado congela la covariable, la salida es no trocear. Y pode
 los datos en su forma exacta —una fila por espera, con sus tiempos reales— y pasamos la función:
 
 ```{r}
-#| label: u36-tt
+#| label: u35-tt
 # 1) Calendario de revisiones de cada máquina. Para evaluar la protección en un
 #    instante t cualquiera basta saber en qué día del ciclo caen las revisiones
 #    (su "fase"), que leemos del panel: día de revisión = punto medio - dias_desde_mant.
@@ -1219,7 +1219,7 @@ el modelo es la misma $\exp(-\texttt{dias\_desde\_mant}/60)$ de siempre; lo úni
 calcula** —ya no es una columna congelada, sino un valor evaluado en cada instante de fallo—. Por eso su
 coeficiente es comparable, aunque R lo etiquete crípticamente como `tt(idx)`.
 
-La @fig-u36-tt-viz lo hace visible sobre M227: `tt()` no consulta ninguna columna, sino que **reconstruye
+La @fig-u35-tt-viz lo hace visible sobre M227: `tt()` no consulta ninguna columna, sino que **reconstruye
 la trayectoria completa** de la protección y la evalúa **solo en los instantes de fallo** —en los dos
 suyos, donde M227 es numerador, y en los de las demás máquinas, donde comparece en el **denominador** del
 conjunto de riesgo—. Entre punto y punto, la curva no se consulta nunca: la verosimilitud parcial solo
@@ -1227,7 +1227,7 @@ mira las covariables cuando alguien falla. La escalera del panel, a su lado, mue
 le hacía a esa misma información.
 
 ```{r}
-#| label: fig-u36-tt-viz
+#| label: fig-u35-tt-viz
 #| fig-width: 8
 #| fig-height: 3.2
 #| fig-cap: "Qué evalúa `tt()`, visto sobre M227 (ventana: sus dos primeros fallos). La curva gris es su protección exacta, $\\exp(-\\texttt{dias\\_desde\\_mant}/60)$, que salta a 1 en cada revisión (días 48, 108, 168) y se desvanece después; los tramos azules son la versión **congelada** que usaba el panel mensual (solo dos valores, que ni alcanzan los picos ni los valles de la curva). Cada punto rojo marca un **instante en que falla alguna máquina del banco**: en ese momento la verosimilitud parcial forma su conjunto de riesgo, y `tt()` calcula la protección que M227 tenía **exactamente entonces** para incluirla en el denominador —M227 participa como término de comparación en los fallos ajenos—. Las ✕ son sus dos fallos propios, en los que además es numerador."
@@ -1258,7 +1258,7 @@ Y la **fragilidad** también cabe en el formato exacto —vuelve a salir signifi
 aunque con menos holgura que en el panel—:
 
 ```{r}
-#| label: u36-tt-frailty
+#| label: u35-tt-frailty
 cox_tt_opt_frag <- coxph(Surv(tstart, tstop, evento) ~ antiguedad_ini + carga + tt(idx) +
                      frailty(id_maquina), data = ag, tt = prot_tt)
 cox_tt_opt_frag
@@ -1267,10 +1267,10 @@ cox_tt_opt_frag
 Tenemos así las **cuatro combinaciones** —dos formatos de los datos, cada uno sin y con fragilidad— y
 podemos cerrar el cuadro reuniendo, para cada modelo, el coeficiente de la protección y su
 **concordancia**. (El AIC no cabe en esta tabla: panel y formato exacto son **datos distintos** — la
-regla la sistematizamos en [las reglas del juego](#sec-u36-reglas).)
+regla la sistematizamos en [las reglas del juego](#sec-u35-reglas).)
 
 ```{r}
-#| label: u36-tt-comparativa
+#| label: u35-tt-comparativa
 modelos <- list("panel mensual · sin fragilidad" = cox_mes_opt,
                 "panel mensual · con fragilidad" = cox_mes_opt_frag,
                 "tt() exacto   · sin fragilidad" = cox_tt_opt,
@@ -1290,7 +1290,7 @@ la covariable dentro de cada tramo es un error de medida, y un error de medida *
 
 - **Por fragilidad**: reconocerla apenas mueve la protección en ninguno de los dos formatos, pero **sube la
 discriminación** en ambos (concordancia 0.623 → 0.690 en el panel, 0.625 → 0.672 en el exacto) —la
-lección de la [Sección 6.6](#sec-u36-fragilidad), reproducida—. 
+lección de la [Sección 5.6](#sec-u35-fragilidad), reproducida—. 
 
 Las cuatro
 estimaciones caben en una **banda estrecha**: ninguna decisión de construcción cambia la conclusión; lo
@@ -1298,7 +1298,7 @@ que se mueve es la tercera cifra. Pero ahora sabemos **cuánto** cuesta cada ata
 suponer que no cuesta nada.
 
 Con todo lo visto hasta ahora, quedaría por tomar una decisión respecto a qué modelo utilizar. Es coherente 
-proponer la **pareja** del panel mensual (como haremos en la [Unidad 3.7](#sec-u37)), formada por `cox_mes_opt_frag` —el ajuste con fragilidad, con el que se interpreta y se infiere— y su gemelo sin fragilidad `cox_mes_opt`, al que recurriremos cuando la herramienta no admita el término penalizado (el AIC al comparar, el `survfit()` al predecir); ya sabemos que ambos comparten retrato.
+proponer la **pareja** del panel mensual (como haremos en la [Unidad 3.6](#sec-u36)), formada por `cox_mes_opt_frag` —el ajuste con fragilidad, con el que se interpreta y se infiere— y su gemelo sin fragilidad `cox_mes_opt`, al que recurriremos cuando la herramienta no admita el término penalizado (el AIC al comparar, el `survfit()` al predecir); ya sabemos que ambos comparten retrato.
 ¿Por qué el panel y no `tt()`? Porque el formato *start-stop*
 **se ve y se toca** —con él se entiende qué es un conjunto de riesgo—, y ahora sabemos cuánto cuesta esa
 comodidad: un 4–5 % de atenuación, siempre conservadora, que no altera ninguna conclusión. En un trabajo
@@ -1334,7 +1334,7 @@ coxph(Surv(tstart, tstop, evento) ~ x1 + tt(z), data = datos,
   gemelo de panel (`cox_mes_opt`), no del modelo con `tt()`.
 :::
 
-## 6.9 Cierre: comparar, predecir, validar {#sec-u36-cierre}
+## 5.9 Cierre: comparar, predecir, validar {#sec-u35-cierre}
 
 Cerramos la unidad con las tres tareas que convierten una colección de modelos en resultados: fijar las
 **reglas** con las que se comparan —mirando a todos los ajustes del recorrido—, **predecir** para ayudar
@@ -1342,9 +1342,9 @@ a decidir —con la pareja de trabajo del panel—, y **validar** lo aprendido c
 —confrontando los tres óptimos con fragilidad—.
 
 
-### Comparar modelos de Cox: las reglas del juego {#sec-u36-reglas}
+### Comparar modelos de Cox: las reglas del juego {#sec-u35-reglas}
 
-Entre esta unidad y el AFT de la [Unidad 3.5](#sec-u35) hemos ajustado **quince modelos de
+Entre esta unidad y el AFT de la [Unidad 3.4](#sec-u34) hemos ajustado **quince modelos de
 supervivencia** sobre **tres representaciones** de los mismos fallos, cada una con su respuesta:
 
 - **`esp`** — una fila por **espera**: tabla `intervalos` (`iv`), respuesta `Surv(tiempo_entre, evento)`;
@@ -1373,11 +1373,11 @@ parcial ordinaria; `clus` = errores robustos; `frag` = fragilidad):
 | `tt` | `cox_tt_opt` | antiguedad_ini + carga + tt(idx) | la protección exacta, sin congelar |
 | `tt` | `cox_tt_opt_frag` | ídem + `frailty` | ídem con fragilidad |
 
-: Los quince modelos de supervivencia del caso (más los nueve ajustes anónimos del perfil de $\tau$). {#tbl-u36-modelos}
+: Los quince modelos de supervivencia del caso (más los nueve ajustes anónimos del perfil de $\tau$). {#tbl-u35-modelos}
 
 Por el camino los hemos comparado de muchas maneras, y cada vez con la herramienta que tocaba. Merece la
-pena **sistematizar las reglas** antes de pasar a la predicción, porque son las mismas que gobernarán el
-cierre de la [Unidad 3.7](#sec-u37):
+pena **sistematizar las reglas** antes de pasar a la predicción, porque son las mismas que gobernarán la
+síntesis de la [Unidad 3.6](#sec-u36):
 
 | Situación | Herramienta | Por qué | Dónde lo hicimos |
 |---|---|---|---|
@@ -1410,7 +1410,7 @@ verosimilitud mide lo suyo**. Comparar dos números solo tiene sentido si miden 
 cuando no lo hacen, quedan los puentes que no dependen de la verosimilitud: coeficientes que estiman el
 mismo mecanismo, discriminación y predicciones.
 
-### Predicción: del modelo a la decisión {#sec-u36-prediccion}
+### Predicción: del modelo a la decisión {#sec-u35-prediccion}
 
 Un modelo ajustado no sirve solo para interpretar coeficientes: sirve para **anticipar**. Y aquí es donde el
 Cox extendido rinde su mejor fruto, porque permite preguntar algo que ningún modelo anterior podía
@@ -1427,7 +1427,7 @@ compara perfiles entre sí **sin necesidad del riesgo de base**. Se obtiene con 
 (el predictor lineal) o `type = "risk"` (su exponencial).
 
 ```{r}
-#| label: u36-pred-relativo
+#| label: u35-pred-relativo
 perfiles <- data.frame(
   perfil     = c("recién mantenida", "sin protección",
                  "vieja y cargada, recién mantenida", "vieja y cargada, sin protección"),
@@ -1452,7 +1452,7 @@ con el perfil. Con covariables dependientes del tiempo no basta un perfil fijo: 
 señalar con `id` a qué escenario pertenece cada fila.
 
 ```{r}
-#| label: u36-escenarios
+#| label: u35-escenarios
 # construye la trayectoria de una máquina bajo una política de mantenimiento dada
 escenario <- function(nombre, edad0, carga, intervalo, dias = 360) {
   t <- 0:(dias - 1)
@@ -1469,7 +1469,7 @@ head(nd, 4)
 ```
 
 ```{r}
-#| label: fig-u36-pred
+#| label: fig-u35-pred
 #| fig-width: 7.5
 #| fig-height: 3.6
 #| fig-cap: "Predicción para una **misma** máquina (5 años, carga 0.75) bajo tres políticas de mantenimiento: probabilidad de llegar a cada día **sin avería** durante un año de seguimiento. Las curvas combinan el riesgo de base estimado por `survfit()` con la trayectoria de covariables de cada escenario. Los **escalones** son comunes a las tres curvas: proceden del riesgo de base, que solo salta en los instantes de fallo observados (mensuales, por el troceado del panel). Lo que distingue a las curvas es su **separación creciente**: cuanto más frecuente la revisión, más lenta la caída."
@@ -1490,12 +1490,12 @@ ggplot(pred, aes(tiempo, surv, color = escenario)) +
 Y podemos leer la cifra concreta al cabo del año:
 
 ```{r}
-#| label: u36-pred-tabla
+#| label: u35-pred-tabla
 # la supervivencia al final del año: el último valor de cada curva
 aggregate(surv ~ escenario, data = pred, FUN = function(s) round(tail(s, 1), 3))
 ```
 
-La @fig-u36-pred lo resume, y la lectura es directamente **accionable**: al cabo de un año, la probabilidad
+La @fig-u35-pred lo resume, y la lectura es directamente **accionable**: al cabo de un año, la probabilidad
 de que esa máquina siga sin averiarse es del **58 %** con revisiones cada 60 días, baja al **51 %** si se
 espacian a 120, y cae al **38 %** sin mantenimiento preventivo.
 
@@ -1548,13 +1548,13 @@ survfit(cox, newdata = trayectorias, id = id)     # ídem, con covariables tempo
   **poblacional**.
 :::
 
-### Validación contra el DGP {#sec-u36-validacion}
+### Validación contra el DGP {#sec-u35-validacion}
 
 Como en las unidades anteriores, cerramos aprovechando que conocemos la **verdad** del proceso
 generador, almacenada en el propio banco:
 
 ```{r}
-#| label: u36-verdad
+#| label: u35-verdad
 verdad <- attr(banco, "verdad")
 c(verdad$beta_hazard[c("antiguedad", "carga", "mant_inmediato", "tau_mant")],
   theta_frail = verdad$theta_frail)
@@ -1567,9 +1567,9 @@ lejos—, todo multiplicado por una fragilidad de varianza **0.12**. La validaci
 preguntas**, casi todas contestadas ya por el camino:
 
 1. **¿Recuperan los modelos la *forma* del mecanismo?** Sí: una protección máxima al salir de la revisión
-   que se desvanece en decenas de días —el perfil de $\tau$ acotó la escala y la @fig-u36-mant-fallo la
+   que se desvanece en decenas de días —el perfil de $\tau$ acotó la escala y la @fig-u35-mant-fallo la
    enseñó en los datos crudos—.
-2. **¿Y la *magnitud* de los efectos?** La confronta la @tbl-u36-dgp sobre los tres óptimos con
+2. **¿Y la *magnitud* de los efectos?** La confronta la @tbl-u35-dgp sobre los tres óptimos con
    fragilidad; sí, con los matices que siguen a la tabla.
 3. **¿Descartan lo que no existe?** El plan no tiene efecto propio en el DGP, y la criba robusta lo
    expulsó ($\chi^2\approx 2.2$, $p\approx 0.14$) en cuanto el reloj entró bien codificado.
@@ -1582,7 +1582,7 @@ preguntas**, casi todas contestadas ya por el camino:
    **condicionada a la $\tau$ fijada**.
 
 ```{r}
-#| label: tbl-u36-dgp
+#| label: tbl-u35-dgp
 #| tbl-cap: "La verdad del DGP frente a los tres modelos óptimos con fragilidad. La columna de esperas no tiene celda de protección: ese formato no puede alojar el reloj y lo resume en la etiqueta del plan (coeficiente −0.674, sin verdad directa que confrontar)."
 # Las varianzas de fragilidad van transcritas de la salida impresa de cada ajuste
 # (la línea "Variance of random effect"): el objeto coxph penalizado no ofrece un
@@ -1630,7 +1630,7 @@ tenerlo todo a mano al abordar la tarea.
 
 **1 · Ajustar.** `coxph(Surv(tiempo, evento) ~ x1 + x2 + ...)`, por **verosimilitud parcial**. Para
 covariables **dependientes del tiempo**, la respuesta va en formato *start-stop*,
-`Surv(tstart, tstop, evento)` (el Cox extendido de la [Sección 6.8](#sec-u36-extcox)).
+`Surv(tstart, tstop, evento)` (el Cox extendido de la [Sección 5.8](#sec-u35-extcox)).
 
 **2 · Leer.** `summary(cox)` da los **hazard ratios**, la **concordancia** (índice C) y los **tres tests
 globales** —razón de verosimilitudes, Wald y *score/logrank*—; `broom::tidy(cox, exponentiate = TRUE,
@@ -1656,9 +1656,9 @@ la **varianza**; efectos **condicionales**), `cluster(id)` solo **corrige los er
 "Wald")` sobre el ajuste con `cluster(id)` (el LRT a través de la `frailty()` penalizada **no** vale).
 
 **5 · Diagnosticar la proporcionalidad.** `cox.zph(cox)` (residuos de Schoenfeld); `plot()` la dibuja. Y
-`survival::concordance()` da el índice *C* por separado (vuelve en la [Unidad 3.7](#sec-u37)).
+`survival::concordance()` da el índice *C* por separado (vuelve en la [Unidad 3.6](#sec-u36)).
 
-**6 · Comparar modelos.** Las reglas completas, en [las reglas del juego](#sec-u36-reglas): LRT
+**6 · Comparar modelos.** Las reglas completas, en [las reglas del juego](#sec-u35-reglas): LRT
 (`anova(m1, m2)`) entre **anidados** y `AIC()`/`BIC()` entre **no anidados**, siempre sobre **las mismas
 filas** y **sin** término de fragilidad por medio; con eventos repetidos por máquina, **Wald robusto** con
 `cluster()`; entre **respuestas distintas** (`intervalos` vs `seguimiento` vs exacto), nada de AIC ni LRT:
@@ -1667,25 +1667,25 @@ solo coeficientes, concordancia y predicciones.
 **7 · Predecir.** `predict(cox, newdata, type = "lp" | "risk")` da el riesgo **relativo** (no necesita el
 riesgo de base); `survfit(cox, newdata)` da la **curva de supervivencia** absoluta, y con covariables
 dependientes del tiempo se le pasa una **trayectoria** por escenario, `survfit(cox, newdata, id = id)`
-([Sección 6.9](#sec-u36-prediccion)).
+([Sección 5.9](#sec-u35-prediccion)).
 :::
 
 ::: {.callout-note}
-## El puente al cierre
+## El puente a la síntesis
 Acabamos de tratar el fallo con datos **troceados por intervalos** y covariables que cambian en el
-tiempo. Ese es, exactamente, el formato sobre el que la [Unidad 3.7](#sec-u37) montará las **tres
-lentes** —tiempo discreto, Poisson a trozos y Cox— para comprobar qué estima cada una del mismo
-proceso: la deuda que el curso lleva arrastrando desde el Caso 1. La frontera del marco GLM que hemos
-cruzado aquí es, precisamente, el punto de partida de esa comparación.
+tiempo. Ese es, exactamente, el formato sobre el que la [Unidad 3.6](#sec-u36) montará las **tres
+lentes** —tiempo discreto, Poisson a trozos y Cox— para comparar qué estima cada una del mismo proceso,
+y añadirá el **Tweedie** del panel máquina-año para cerrar con la prima pura. La frontera del marco GLM
+que hemos cruzado aquí es el punto de partida del cierre.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.6)
-Sobre el banco de averías del caso, con las tablas `intervalos` y `seguimiento`:
+## Tarea del estudiante (3.5)
+Sobre el banco de vuestro equipo, con las tablas `intervalos` y `seguimiento`:
 
 1. Ajustad un modelo de Cox con las covariables basales (`plan_mantenimiento`, `antiguedad_ini`,
    `carga`, `proceso`) e interpretad los hazard ratios del plan, la carga y la antigüedad. Comparad el HR
-   del plan con el factor de aceleración del AFT de 3.5 mediante $\text{HR}=\text{AF}^{-1/\sigma}$: ¿son
+   del plan con el factor de aceleración del AFT de 3.4 mediante $\text{HR}=\text{AF}^{-1/\sigma}$: ¿son
    coherentes?
 2. Añadid el `fabricante` a un ajuste **ingenuo**: ¿sale significativo alguno de sus niveles? Reajustad
    con `frailty(id_maquina)` y comparad: ¿basta la fragilidad, por sí sola, para desmontar el falso
@@ -1705,24 +1705,15 @@ Sobre el banco de averías del caso, con las tablas `intervalos` y `seguimiento`
    cambia el veredicto** y qué parámetro del DGP recupera el coeficiente final. ¿Por qué este efecto **no
    cabe** en una tabla con una fila por espera?
 5. **Comparad y predecid.** Justificad por qué **no** es lícito comparar el AIC de este modelo con el del
-   apartado 2, y realizad la comparación de forma correcta —[las reglas del juego](#sec-u36-reglas) os
+   apartado 2, y realizad la comparación de forma correcta —[las reglas del juego](#sec-u35-reglas) os
    guían—. Después, usad `survfit()` para predecir la
    probabilidad de que una máquina de vuestra elección **aguante un año sin avería** bajo dos políticas de
    mantenimiento distintas, y redactad la recomendación que daríais a la jefatura de planta (dos o tres
    frases, en lenguaje no técnico).
 6. **Inferencia y discriminación.** Comprobad que el test de *score* de un Cox con **solo** el plan
-   reproduce el **log-rank** de la [Unidad 3.5](#sec-u35). Añadid luego las **SE cluster-robustas**
+   reproduce el **log-rank** de la [Unidad 3.4](#sec-u34). Añadid luego las **SE cluster-robustas**
    (`cluster(id_maquina)`) al modelo con `fabricante` y comparad su $p$ con el de la fragilidad. Leed
    además la **concordancia** del `summary`: ¿discrimina el modelo mucho mejor que el azar?
 7. Argumentad en qué sentido el modelo de Cox está **fuera** del marco GLM. ¿Qué componente del GLM
    sustituye la verosimilitud parcial?
-
-**Y en el estudio de caso (3.8).** Esta unidad alimenta dos propuestas. La
-**[6 · Del primer parte al historial completo](#sec-u38-p6)** reutiliza el montaje *start-stop* de los
-apartados 4 y 5, ahora sobre `panel.csv`, con `edad_t` y `antig_veh_t` como covariables que cambian de
-tramo a tramo, y lo extiende a **Andersen–Gill**; el apartado 6 —errores robustos frente a
-fragilidad— es justamente la discusión que allí hay que cerrar. Y la
-**[3 · ¿Cuánto dura un cliente?](#sec-u38-p3)** te pide el `cox.zph` del apartado 3 sobre un banco
-donde el modelo verdadero **no** es de riesgos proporcionales: contrástalo con lo que aquí has
-aprendido sobre lo que un diagnóstico que no rechaza demuestra y lo que no.
 :::

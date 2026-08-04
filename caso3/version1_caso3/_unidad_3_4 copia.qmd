@@ -1,4 +1,4 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-.
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u34-.
      Unidad de MODELO ÚNICO (recorrido completo): del coste al tiempo -> AFT.
      Reactiva el hilo de SUPERVIVENCIA (espiral). Novedad conceptual: la CENSURA en la verosimilitud.
      Datos: banco$intervalos (tiempos ENTRE fallos, recurrentes; una fila = un gap; el último gap de
@@ -10,12 +10,12 @@
          gana por AIC/parsimonia. Es lo CONTRARIO del antiguo stub (tiempo al 1.er fallo, forma>1).
        - criticidad NO entra en el riesgo (solo en el coste, 3.1) -> sale NO significativa.
        - fabricante NO tiene efecto real; en el ajuste ingenuo puede salir espuriamente significativo
-         por la correlación intra-máquina (fragilidad). NO construir narrativa sobre él. -> puente a 3.6.
+         por la correlación intra-máquina (fragilidad). NO construir narrativa sobre él. -> puente a 3.5.
        - AF verificados (Weibull, plan+antiguedad_ini+carga+proceso): plan~1.85, carga~0.49/ud,
          antiguedad_ini~0.905/año; KM medianas Correctivo~248 d, Preventivo~434 d; log-rank p~4e-18.
          AIC: exp 16796.5 < weibull 16798.5 < loglogistic 16897 < lognormal 16972. -->
 
-# 5 · Del coste al tiempo: modelos de vida acelerada (AFT) {#sec-u35}
+# 4 · Del coste al tiempo: modelos de vida acelerada (AFT) {#sec-u34}
 
 Hasta aquí la respuesta ha sido un **coste**: cuántos euros cuesta reparar una avería. Ahora giramos la
 misma espina —la avería— y preguntamos por su **ritmo**: ¿cuántos días pasan **entre un fallo y el
@@ -36,14 +36,14 @@ AIC; y **diagnóstico y validación** (residuos de Cox–Snell, contraste con el
 escala —del euro al día—, pero el marco de **máxima verosimilitud** es el mismo.
 :::
 
-## 5.1 Contexto: el tiempo entre fallos y la censura {#sec-u35-contexto}
+## 4.1 Contexto: el tiempo entre fallos y la censura {#sec-u34-contexto}
 
 Trabajamos con `intervalos`: una fila por **intervalo entre fallos** (un *gap*), con su duración en días
 y si ese intervalo acabó en un **nuevo fallo** o en **censura**. Como las averías son **recurrentes**,
 una misma máquina aporta **varios** intervalos —tantos como fallos tuvo, más una última espera abierta—.
 
 ```{r}
-#| label: u35-datos
+#| label: u34-datos
 iv <- banco$intervalos
 head(iv,3)
 
@@ -70,7 +70,7 @@ extrae dentro de cada día, así que no hay empates. Segundo —y más important
 **recurrentes**, las varias filas de una misma máquina **no son independientes**: comparten su
 **fragilidad** (una máquina «mala» encadena esperas cortas). En esta unidad tratamos los intervalos como
 si lo fueran —una aproximación honesta que basta para estimar y para interpretar la dirección de los
-efectos—, y dejamos esa correlación intra-máquina para la [Unidad 3.6](#sec-u36), donde una **fragilidad**
+efectos—, y dejamos esa correlación intra-máquina para la [Unidad 3.5](#sec-u35), donde una **fragilidad**
 la modela de forma explícita. La censura, además, **no es única**: cada máquina se censura en el instante
 que le resta hasta el cierre, que depende de su alta (escalonada) y de su historial de fallos.
 :::
@@ -79,7 +79,7 @@ El objeto que empaqueta «tiempo + estado» es `Surv(tiempo_entre, evento)`, y e
 que sigue. A continuación se muestran los 12 primeros tiempos entre averías, seguidos de un `+` cuando la observación está censurada (`evento=0`):
 
 ```{r}
-#| label: u35-surv
+#| label: u34-surv
 library(survival)
 head(Surv(iv$tiempo_entre, iv$evento), 12)   # un "+" marca las esperas censuradas
 ```
@@ -88,10 +88,10 @@ head(Surv(iv$tiempo_entre, iv$evento), 12)   # un "+" marca las esperas censurad
 
 Los mismos datos permiten un primer vistazo **relacional**: ¿cómo se relaciona el tiempo entre fallos con
 las covariables candidatas —plan, edad, carga, proceso—? Un descriptivo rápido (sobre los fallos
-observados, como orientación) lo insinúa (@fig-u35-eda):
+observados, como orientación) lo insinúa:
 
 ```{r}
-#| label: fig-u35-eda
+#| label: fig-u34-eda
 #| fig-width: 8.5
 #| fig-height: 6
 #| fig-cap: "Descriptivo relacional entre el tiempo entre fallos (en escala log) y las cuatro covariables candidatas, sobre los fallos observados. Arriba, las categóricas (plan y proceso); abajo, las continuas (edad y carga) con recta de tendencia. Es descriptivo: usa solo los fallos observados, no corrige la censura."
@@ -130,18 +130,18 @@ mayor **carga** de uso, también más cortas (cuanto más se le exige, antes vue
 Son justo las cuatro que un modelo del **riesgo de fallo** debería recoger. La **criticidad** y el
 **fabricante** no aparecen: gobiernan el **coste** ([Unidad 3.1](#sec-u31)), no la frecuencia, y su
 irrelevancia para el tiempo la confirmaremos con un contraste formal en la
-[Sección 5.4](#sec-u35-interpretacion).
+[Sección 4.4](#sec-u34-interpretacion).
 
-## 5.2 Kaplan–Meier: la mirada descriptiva {#sec-u35-km}
+## 4.2 Kaplan–Meier: la mirada descriptiva {#sec-u34-km}
 
 Antes de modelar, describimos. El estimador de **Kaplan–Meier** [@kaplan1958] reconstruye la función de
 supervivencia $S(t)=\Pr(T>t)$ —aquí la probabilidad de que una máquina **aguante sin averiarse** al
 menos $t$ días desde su último fallo— **respetando la censura**: cada intervalo contribuye mientras está
 en observación y sale del conjunto de riesgo al fallar o al censurarse. Lo miramos por plan de
-mantenimiento (preventivo -si se aplica mantenimiento periódico- o correctivo -sin plan de mantenimiento-), que es la pregunta de negocio (¿interesa aplicar mantenimiento siempre/específico?, @fig-u35-km):
+mantenimiento (preventivo -si se aplica mantenimiento periódico- o correctivo -sin plan de mantenimiento-), que es la pregunta de negocio (¿interesa aplicar mantenimiento siempre/específico?):
 
 ```{r}
-#| label: fig-u35-km
+#| label: fig-u34-km
 #| fig-width: 7.5
 #| fig-height: 4.8
 #| fig-cap: "Curvas de Kaplan–Meier del tiempo entre fallos, por plan de mantenimiento, con intervalos de confianza y marcas de censura. La curva del plan preventivo se mantiene por encima: sus máquinas tardan más en volver a averiarse."
@@ -158,7 +158,7 @@ de seguir sin fallar es mayor. Lo resumimos con las medianas de supervivencia �
 ronda los **250 días** y la del preventivo supera los **430** (el cálculo a continuación)— y lo contrastamos seguidamente con la prueba de **log-rank** [@mantel1966]:
 
 ```{r}
-#| label: u35-logrank
+#| label: u34-logrank
 km                                            # imprime las medianas por grupo
 survdiff(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)   # log-rank
 ```
@@ -182,7 +182,7 @@ Cuatro funciones cubren todo lo descriptivo de esta sección:
   supervivencia difieren entre grupos (sin cuantificar cuánto ni ajustar por covariables).
 :::
 
-## 5.3 El modelo AFT y la censura en la verosimilitud {#sec-u35-modelo}
+## 4.3 El modelo AFT y la censura en la verosimilitud {#sec-u34-modelo}
 
 El modelo de **vida acelerada** (*accelerated failure time*, AFT) es el puente natural desde lo que ya
 sabemos. Modela el **logaritmo del tiempo** como lineal en las covariables:
@@ -223,10 +223,10 @@ el coste en la [Unidad 3.1](#sec-u31): descarta de entrada el gaussiano y nos si
 tiempo fuera **log-normal**, $\log T$ saldría aproximadamente **simétrico**; aquí, en cambio, $\log T$ es
 claramente **asimétrico hacia la izquierda**, y esa cola izquierda es justo la **huella de la distribución
 de valor extremo** que define la Weibull (recuerda: $\varepsilon$ de valor extremo $\Rightarrow T$
-Weibull). La @fig-u35-motiva enfrenta las dos escalas.
+Weibull).
 
 ```{r}
-#| label: fig-u35-motiva
+#| label: fig-u34-motiva
 #| fig-width: 8
 #| fig-height: 3.4
 #| fig-cap: "Distribución del tiempo entre fallos (solo los intervalos que acabaron en avería). Izquierda: en su escala original, T es positiva y con cola larga a la derecha (valores extremos), el terreno de la familia de supervivencia. Derecha: en escala logarítmica, log T queda asimétrico hacia la izquierda; esa cola izquierda —y no la simetría que exigiría una log-normal— es la firma de la distribución de valor extremo de la Weibull."
@@ -248,17 +248,17 @@ p_t + p_logt   # patchwork
 A esa señal empírica se suma una razón de fondo: la Weibull es el **caballo de batalla** de la
 supervivencia paramétrica —**generaliza la exponencial** añadiéndole un parámetro de **forma**— y es la
 **única familia que es a la vez AFT y de riesgos proporcionales**, lo que la convierte en el puente
-natural hacia el **Cox** de la [Unidad 3.6](#sec-u36). Es, pues, un punto de partida razonado, **no
+natural hacia el **Cox** de la [Unidad 3.5](#sec-u35). Es, pues, un punto de partida razonado, **no
 definitivo**: los histogramas son una motivación heurística —y con solo los fallos observados, la censura
 no está corregida—, así que la elección se **confirma (o se corrige) por AIC y por los residuos de
-Cox–Snell** en la [Sección 5.6](#sec-u35-diagnostico), que sí respetan la censura.
+Cox–Snell** en la [Sección 4.6](#sec-u34-diagnostico), que sí respetan la censura.
 
 Ajustamos un AFT con las cuatro covariables que el descriptivo relacional de la
-[Sección 5.1](#sec-u35-contexto) señaló —plan, edad, carga y proceso— mediante `survival::survreg`, que
+[Sección 4.1](#sec-u34-contexto) señaló —plan, edad, carga y proceso— mediante `survival::survreg`, que
 maximiza la verosimilitud incorporando la censura. Empezamos por la Weibull:
 
 ```{r}
-#| label: u35-aft-weibull
+#| label: u34-aft-weibull
 formula_aft <- Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
   carga + proceso
 
@@ -274,15 +274,15 @@ Un solo motor, `survival::survreg()`, cubre toda la familia paramétrica:
   verosimilitud incorporando la censura de forma automática (densidad $f$ para los fallos, supervivencia
   $S$ para los censurados). La fórmula usa el mismo `Surv(...)` de la sección anterior como respuesta.
 - **`dist =`** — elige la **familia**, que no es más que la forma de $\varepsilon$: `"weibull"`,
-  `"exponential"`, `"lognormal"` o `"loglogistic"`. Cambiarla es el experimento de la [Sección 5.6](#sec-u35-diagnostico).
+  `"exponential"`, `"lognormal"` o `"loglogistic"`. Cambiarla es el experimento de la [Sección 4.6](#sec-u34-diagnostico).
 - **`summary(aft_w)`** — imprime los coeficientes en **escala log-tiempo** (columna `Value`), sus errores
   estándar y el término `Log(scale)` $=\log\sigma$.
 - **`aft_w$scale`** — el $\sigma$ de la Weibull; su inversa **`1/aft_w$scale`** es la **forma** (shape),
-  que leeremos en la [Sección 5.4](#sec-u35-interpretacion). Y **`broom::tidy(aft_w, conf.int = TRUE)`**
+  que leeremos en la [Sección 4.4](#sec-u34-interpretacion). Y **`broom::tidy(aft_w, conf.int = TRUE)`**
   ordena la salida para exponenciar los coeficientes en factores de aceleración.
 :::
 
-## 5.4 Interpretación: el factor de aceleración {#sec-u35-interpretacion}
+## 4.4 Interpretación: el factor de aceleración {#sec-u34-interpretacion}
 
 En un AFT los coeficientes viven en la **escala del log-tiempo**, así que $e^{\beta}$ es un **factor de
 aceleración**: el número por el que se **multiplica el tiempo de espera** cuando la covariable sube una
@@ -292,11 +292,11 @@ la fuerza es la **distancia a 1**: cuanto más se aleja el factor de 1 —hacia 
 **mayor es el efecto** sobre la espera (un 1.8 la alarga casi el doble; un 0.5, la reduce a la mitad).
 Ojo, esa distancia es multiplicativa, no aditiva: 0.5 y 2 son efectos de **igual magnitud en sentidos
 opuestos** (en la escala log, $\log 0.5$ y $\log 2$ equidistan de 0). Es una lectura distinta —y más
-intuitiva para mantenimiento— que el *hazard ratio* que veremos en la [Unidad 3.6](#sec-u36): aquí
+intuitiva para mantenimiento— que el *hazard ratio* que veremos en la [Unidad 3.5](#sec-u35): aquí
 hablamos de **estirar o encoger el reloj**, no de multiplicar un riesgo instantáneo.
 
 ```{r}
-#| label: tbl-u35-af
+#| label: tbl-u34-af
 #| tbl-cap: "Factores de aceleración del AFT Weibull (coeficientes exponenciados): factor multiplicativo sobre el tiempo entre fallos, con intervalo de confianza al 95 %. Se omite el término de escala."
 broom::tidy(aft_w, conf.int = TRUE) |>
   dplyr::filter(term != "(Intercept)", term != "Log(scale)") |>
@@ -322,7 +322,7 @@ ese perfil. La diferencia entre ambas medianas, `dias_ganados`, es la **vida út
 añade**:
 
 ```{r}
-#| label: u35-pred-plan
+#| label: u34-pred-plan
 # Días de espera predichos (mediana) para una máquina promedio, según el plan
 nd <- data.frame(plan_mantenimiento = factor(c("Correctivo", "Preventivo"),
                                              levels = c("Correctivo", "Preventivo")),
@@ -338,7 +338,7 @@ La mediana sube de unos **245 días** con plan correctivo a unos **450** con pre
 días** —cerca de siete meses— de marcha adicional entre averías para una máquina típica, el factor de
 aceleración ($\approx 1.85$) puesto en el lenguaje del calendario.
 
-El resto de la @tbl-u35-af afina la historia. La **carga** es el predictor continuo más fuerte con diferencia:
+El resto de la @tbl-u34-af afina la historia. La **carga** es el predictor continuo más fuerte con diferencia:
 su factor de aceleración muy por debajo de 1 dice que una máquina muy exigida vive una **fracción** del
 tiempo entre fallos de una poco cargada —el desgaste es, sobre todo, cuestión de cuánto se le pide—. La
 **edad al empezar el intervalo** también acorta la espera, como cabía esperar: cada año de antigüedad
@@ -350,7 +350,7 @@ Y hay un contraste que cierra un hilo de la [Unidad 3.1](#sec-u31). Allí la **c
 del **coste**: una avería en una máquina crítica costaba mucho más. Aquí, sobre el **tiempo**, no aparece:
 
 ```{r}
-#| label: u35-criticidad
+#| label: u34-criticidad
 # ¿Aporta la criticidad algo a la explicación del TIEMPO entre fallos?
 aft_crit <- survreg(update(formula_aft, . ~ . + criticidad), dist = "weibull", data = iv)
 anova(aft_w, aft_crit)   # contraste de razón de verosimilitudes
@@ -381,7 +381,7 @@ como `Log(scale)` $=\log\sigma$—. La forma se recupera con la relación $k=1/\
 ajustado, como `1/aft_w$scale`:
 
 ```{r}
-#| label: u35-forma
+#| label: u34-forma
 forma_weibull <- 1 / aft_w$scale   # forma k = 1/sigma; k>1 creciente, k<1 decreciente, k=1 constante
 round(c(sigma_escala = aft_w$scale, forma_k = forma_weibull), 3)
 ```
@@ -410,7 +410,7 @@ Cuatro gestos cubren toda la interpretación de esta sección:
   Weibull ($k>1$ riesgo creciente, $k=1$ exponencial).
 :::
 
-## 5.5 Inferencia: del error estándar al contraste {#sec-u35-inferencia}
+## 4.5 Inferencia: del error estándar al contraste {#sec-u34-inferencia}
 
 Hemos estimado e interpretado; toca **cuantificar la incertidumbre**. Como el AFT se ajusta por **máxima
 verosimilitud**, la inferencia sigue el guion habitual de la verosimilitud, en dos niveles.
@@ -420,7 +420,7 @@ verosimilitud**, la inferencia sigue el guion habitual de la verosimilitud, en d
 un estadístico $z=\hat\beta/\text{EE}$ con su $p$ normal. Es el **contraste de Wald** de $H_0:\beta=0$:
 *¿mueve esta covariable el tiempo, a igualdad del resto?* El intervalo de confianza es
 $\hat\beta\pm z_{1-\alpha/2}\,\text{EE}$ en la **escala log-tiempo**; **exponenciado**, es el IC del
-**factor de aceleración** que ya leímos en la @tbl-u35-af.
+**factor de aceleración** que ya leímos en la @tbl-u34-af.
 
 ::: {.callout-tip}
 ## Aquí no hay problema de retransformación (a diferencia de 3.2)
@@ -435,10 +435,10 @@ OLS y exponenciar; aquí ajustamos **toda la distribución** por verosimilitud, 
 
 **Varios parámetros a la vez: razón de verosimilitudes.** Cuando la pregunta abarca **varios
 coeficientes** —¿aporta la `criticidad`, con sus dos niveles?— el instrumento no es Wald sino el **LRT**
-entre modelos anidados, con `anova()`, como en la [Sección 5.4](#sec-u35-interpretacion). 
+entre modelos anidados, con `anova()`, como en la [Sección 4.4](#sec-u34-interpretacion). 
 
 ```{r}
-#| label: u35-lrt-anova
+#| label: u34-lrt-anova
 # ¿Son significativas todas las variables
 anova(aft_w)
 ```
@@ -449,7 +449,7 @@ la exponencial *es* la Weibull con la forma fijada. Podemos preguntar directamen
 **aporta**:
 
 ```{r}
-#| label: u35-lrt-forma
+#| label: u34-lrt-forma
 # ¿Aporta la forma libre de la Weibull, o basta la exponencial? H0: sigma = 1 (k = 1)
 aft_exp <- survreg(formula_aft, dist = "exponential", data = iv)
 anova(aft_exp, aft_w)
@@ -457,7 +457,7 @@ anova(aft_exp, aft_w)
 
 El contraste sale **no significativo** (deviance $\approx 0.01$ sobre 1 g.l., $p\approx 0.93$): liberar
 la forma no mejora el ajuste de forma apreciable —coherente con la forma $\approx 1$ y con lo que el AIC
-confirmará en la [Sección 5.6](#sec-u35-diagnostico)—. Para modelos **no anidados** (familias distintas de $\varepsilon$,
+confirmará en la [Sección 4.6](#sec-u34-diagnostico)—. Para modelos **no anidados** (familias distintas de $\varepsilon$,
 como Weibull frente a log-normal) el LRT ya no aplica y la comparación pasa por el **AIC**, la herramienta
 de la sección siguiente.
 
@@ -470,14 +470,13 @@ directamente un LRT) es más fiel. En este banco —1594 intervalos, censura mod
 coinciden en la práctica; conviene, aun así, saber cuál se está usando.
 :::
 
-## 5.6 Elección de distribución, diagnóstico y validación {#sec-u35-diagnostico}
+## 4.6 Elección de distribución, diagnóstico y validación {#sec-u34-diagnostico}
 
 La Weibull es una elección, no la única. La familia AFT ofrece varias formas de $\varepsilon$, e —igual
-que en la [Unidad 3.2](#sec-u32) con las familias de la Gamma— la decisión se toma comparando ajustes, no asumiendo por defecto o simplemente mirando los datos (como hicimos al inicio de plantear el modelo en la [Sección 5.3](#sec-u35-modelo), si bien el histograma ya nos daba alguna pista interesante). Ajustamos pues el modelo con todas las distribuciones posibles, y los comparamos con el AIC
-(@tbl-u35-comparacion).
+que en la [Unidad 3.2](#sec-u32) con las familias de la Gamma— la decisión se toma comparando ajustes, no asumiendo por defecto o simplemente mirando los datos (como hicimos al inicio de plantear el modelo en la [Sección 4.3](#sec-u34-modelo), si bien el histograma ya nos daba alguna pista interesante). Ajustamos pues el modelo con todas las distribuciones posibles, y los comparamos con el AIC.
 
 ```{r}
-#| label: tbl-u35-comparacion
+#| label: tbl-u34-comparacion
 #| tbl-cap: "Comparación de distribuciones AFT por AIC (mismo predictor, distinta forma de la respuesta). La exponencial es la Weibull con forma fija en 1."
 purrr::map_dfr(c("exponential", "weibull", "lognormal", "loglogistic"), \(dd) {
   m <- survreg(formula_aft, dist = dd, data = iv)
@@ -495,7 +494,7 @@ no hay tal pico. Nos quedamos con la **Weibull** como modelo de trabajo (engloba
 la forma libre para que el dato hable), sabiendo que la exponencial sería una simplificación defendible.
 
 El AIC **ordena las familias con un número**, pero esa misma decisión también se puede **ver en un
-gráfico** —y, a diferencia de los histogramas de la [Sección 5.3](#sec-u35-modelo), uno que **sí tiene en
+gráfico** —y, a diferencia de los histogramas de la [Sección 4.3](#sec-u34-modelo), uno que **sí tiene en
 cuenta la censura**—. La idea es sencilla. Cada familia AFT tiene una **fórmula cerrada** para su supervivencia $S(t)$, y si a
 esa $S(t)$ le aplicamos la **transformación adecuada**, el resultado queda **lineal en $\log t$**. La
 Weibull lo ilustra bien: como $S(t)=\exp\!\big(-(t/\lambda)^{k}\big)$, tomando dos veces logaritmos,
@@ -505,10 +504,10 @@ dibujar $\log(-\log\hat S)$ frente a $\log t$ los puntos caerían **sobre una re
 su propia transformación linealizadora: la **Weibull**, $\log(-\log S)$; la **log-logística**,
 $\operatorname{logit}(1-S)$; la **log-normal**, $\Phi^{-1}(1-S)$ (el probit). Estimamos $S(t)$ por
 **Kaplan–Meier**, aplicamos las tres transformaciones y miramos **cuál sale más recta**: esa apunta a la
-familia que mejor describe los datos (@fig-u35-linealizado).
+familia que mejor describe los datos.
 
 ```{r}
-#| label: fig-u35-linealizado
+#| label: fig-u34-linealizado
 #| fig-width: 8.5
 #| fig-height: 3.3
 #| fig-cap: "Diagnóstico gráfico de familia AFT sobre la supervivencia de Kaplan–Meier (respeta la censura). Cada familia implica que una transformada de S(t) es lineal en log(t); el panel más recto identifica la mejor familia. La Weibull es la más lineal, y la pendiente de su recta estima la forma (≈ 1, casi exponencial)."
@@ -544,11 +543,10 @@ el modelo es correcto, esos residuos se comportan como una **muestra —censurad
 estándar** $\mathrm{Exp}(1)$ (los intervalos censurados heredan la censura y dan residuos censurados).
 Así que lo que se les **pide** es concreto: que su propia **supervivencia de Kaplan–Meier** coincida con
 la de una $\mathrm{Exp}(1)$, es decir, con la curva teórica $S(r)=e^{-r}$. Si ambas se **solapan**, la
-forma elegida encaja; una separación **sistemática** delataría que no. Es lo que examina la
-@fig-u35-diag.
+forma elegida encaja; una separación **sistemática** delataría que no.
 
 ```{r}
-#| label: fig-u35-diag
+#| label: fig-u34-diag
 #| fig-width: 6.5
 #| fig-height: 4
 #| fig-cap: "Residuos de Cox–Snell del AFT Weibull: supervivencia de Kaplan–Meier de los residuos (negro) frente a la de una exponencial estándar (rojo). Si el modelo ajusta, ambas curvas coinciden. El acuerdo razonable respalda la elección de distribución."
@@ -582,7 +580,7 @@ cual.
 Con esa cautela, el modelo acierta en lo que importa: el plan preventivo sale **protector** (alarga la
 espera), la **carga** y la **edad** la acortan, y la forma $\approx 1$ retrata fielmente la parte
 **sin memoria** del proceso. Lo que el AFT ingenuo **no** puede capturar es doble, y ambas grietas
-apuntan a la [Unidad 3.6](#sec-u36):
+apuntan a la [Unidad 3.5](#sec-u35):
 
 - **La correlación intra-máquina.** Los varios intervalos de una máquina comparten su fragilidad, así que
   no son independientes; tratarlos como si lo fueran encoge los errores estándar. El síntoma es concreto:
@@ -592,7 +590,7 @@ apuntan a la [Unidad 3.6](#sec-u36):
   modelada infla la confianza. Una **fragilidad** (3.5) disciplina aquí ese espejismo.
 - **La no proporcionalidad.** El efecto del mantenimiento **se debilita con el tiempo**, y un factor de
   aceleración **constante** solo puede promediar ese efecto cambiante. Esa grieta —la no
-  proporcionalidad— es justo la que abrirá la [Unidad 3.6](#sec-u36) con el modelo de Cox y su
+  proporcionalidad— es justo la que abrirá la [Unidad 3.5](#sec-u35) con el modelo de Cox y su
   diagnóstico.
 
 ::: {.callout-tip}
@@ -610,15 +608,15 @@ Un guion reutilizable para cualquier modelo de vida acelerada:
    $k=1$ constante (sin memoria), $k<1$ decreciente.
 5. **Cuida la independencia.** Con **eventos recurrentes o agrupamiento** (varias filas por unidad), los
    errores estándar ingenuos son **optimistas**: la corrección es una **fragilidad** o errores robustos
-   ([Unidad 3.6](#sec-u36)).
+   ([Unidad 3.5](#sec-u35)).
 6. **Ante censura fuerte o muestras pequeñas, prefiere la verosimilitud perfilada al Wald.** Y, si hay
    una «verdad» conocida (DGP/simulación), **valida la dirección** de los efectos, sin exigir coincidencia
    exacta cuando el AFT es solo una aproximación.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.5)
-Sobre el banco de averías del caso, con la tabla `intervalos`:
+## Tarea del estudiante (3.4)
+Sobre el banco de vuestro equipo, con la tabla `intervalos`:
 
 1. Estimad la supervivencia entre fallos por Kaplan–Meier según el plan de mantenimiento y contrastadla
    con log-rank. Interpretad las medianas de supervivencia en días.
@@ -640,14 +638,5 @@ Sobre el banco de averías del caso, con la tabla `intervalos`:
 6. (Palanca de decisión) El `intervalo_mant` es una variable prescriptiva: acortar el intervalo entre
    mantenimientos debería retrasar el fallo. Explorad, sobre las máquinas con plan preventivo, si un
    intervalo más corto se asocia a esperas más largas, y discutid por qué esta pregunta se responde mejor
-   con el modelo de la [Unidad 3.6](#sec-u36).
-
-**Y en el estudio de caso (3.8).** Todo lo anterior es el ensayo de la
-**[Propuesta 3 · ¿Cuánto dura un cliente?](#sec-u38-p3)**, donde la respuesta es el tiempo hasta la
-baja de una póliza: Kaplan–Meier descriptivo, elección de la distribución del error entre las cuatro
-—allí la log-logística deja de ser una candidata más— y lectura en factores de aceleración. Dos
-avisos que esta unidad ya ha preparado: el par correcto es `Surv(antiguedad, baja)` y **nunca**
-`t_baja`, que en las pólizas censuradas contiene información del futuro; y las pólizas, a diferencia
-de nuestras máquinas, aportan **una sola** espera, así que la dependencia intra-sujeto del apartado 5
-no se plantea ahí en los mismos términos.
+   con el modelo de la [Unidad 3.5](#sec-u35).
 :::

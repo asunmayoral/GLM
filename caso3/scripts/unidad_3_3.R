@@ -18,7 +18,7 @@ if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: n
 
 # --- Preámbulo del caso (librerías y datos, como en el documento) ------------
 # Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.6).
+# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
 library(broom)           # resultados ordenados de glm y modelos de supervivencia
@@ -32,8 +32,8 @@ library(marginaleffects) # efectos, contrastes y predicciones ajustadas
 library(emmeans)         # medias marginales y comparaciones
 
 library(lme4)            # lmer y glmer (mixtos)
-library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.6)
-library(glmnet)          # regularización (en 3.6, como límite conceptual en Gamma)
+library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
+library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
 
 library(survival)        # Kaplan-Meier, Cox y datos start-stop

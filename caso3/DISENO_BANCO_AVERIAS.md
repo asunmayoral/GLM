@@ -16,13 +16,18 @@ procesos sucesivos: **Corte → Mecanizado (CNC) → Lijado → Ensamblaje → A
 está asignada a un **proceso**. Las máquinas sufren **averías** a lo largo de su vida; de cada avería se
 registra **cuándo** ocurre, **de qué tipo** es y **cuánto cuesta** repararla.
 
-El bloque se organiza en dos preguntas sobre ese mismo suceso:
+El bloque se organiza en tres preguntas sobre ese mismo suceso:
 
 - **¿Cuánto cuesta una avería?** → `coste_euros` (€, positivo y asimétrico → **Gamma**). Unidades 3.1–3.3.
-- **¿Cada cuánto se avería?** → **tiempo entre fallos** (días, positivo continuo → **AFT / Cox**). Unidades 3.4–3.6.
+- **¿Cuánto costará el año que viene?** → `coste_total` por máquina-año, **con ceros** (→ **Tweedie**). Unidad 3.4.
+- **¿Cada cuánto se avería?** → **tiempo entre fallos** (días, positivo continuo → **AFT / Cox**). Unidades 3.5–3.6.
+
+Las cierran la Unidad 3.7 (las **tres lentes** del fallo y las fronteras del marco) y la 3.8 (estudio
+de caso del estudiante, sobre el banco del Caso 2).
 
 Las une un **efecto latente de máquina** (fragilidad): una máquina «mala» **falla más a menudo y cuesta
-más de reparar**. Es el efecto aleatorio del GLMM (3.3) y la fragilidad de la supervivencia (3.5).
+más de reparar**. Es el efecto aleatorio del GLMM (3.3), la $\sigma_u$ del coste anual (3.4) y la
+fragilidad de la supervivencia (3.6).
 
 ## 2. Entidades y tablas
 
@@ -47,8 +52,9 @@ descriptiva**, no se modela), `coste_euros` (**respuesta Gamma**).
 | Tabla | Una fila es… | Respuesta | Unidades |
 |---|---|---|---|
 | `costes` (= averías) | una avería | `coste_euros` | 3.1 GLM Gamma · 3.2 familia/escala · 3.3 GLMM Gamma (agrupa `id_maquina`) |
-| `intervalos` | un intervalo entre fallos | `tiempo_entre`, `evento` (1 fallo / 0 censura) | 3.4 AFT · 3.5 Cox (fragilidad, no-PH) |
-| `panel` | una máquina × periodo (año) | `coste_total`, `n_averias`, `exposicion` | 3.6 Tweedie · lentes discreta/a-trozos |
+| `panel` | una máquina × periodo (año) | `coste_total`, `n_averias`, `exposicion` | 3.4 Tweedie (y GLMM Tweedie) |
+| `intervalos` | un intervalo entre fallos | `tiempo_entre`, `evento` (1 fallo / 0 censura) | 3.5 AFT · 3.6 Cox (fragilidad, no-PH) |
+| `seguimiento` | una máquina × mes (*start-stop*) | `fallo` (+ `offset`) | 3.6 Cox extendido · 3.7 lentes discreta/a-trozos |
 
 ## 3. Variables y su papel
 
@@ -85,9 +91,9 @@ mantenimiento periódico explícito con `intervalo_mant` y `dias_desde_mant`; un
 3. **Mantenimiento preventivo periódico y explícito.** Las máquinas con plan preventivo se mantienen
    **cada `intervalo_mant` días** (constante por máquina). Se registran las fechas → `dias_desde_mant`
    como **covariable dependiente del tiempo** que **reduce el riesgo** justo tras el mantenimiento y
-   **decae** con el tiempo (efecto **no proporcional** → lo detecta `cox.zph` en 3.5). El **intervalo**
+   **decae** con el tiempo (efecto **no proporcional** → lo detecta `cox.zph` en 3.6). El **intervalo**
    es una **palanca de decisión**: «¿acortar `intervalo_mant` retrasa el fallo?» (pregunta prescriptiva
-   de 3.4–3.5). El plan se asigna **no al azar** (máquinas críticas/viejas lo usan más) → **confusión**.
+   de 3.5–3.6). El plan se asigna **no al azar** (máquinas críticas/viejas lo usan más) → **confusión**.
 
 4. **Coste por avería** `~ Gamma(μ, φ)`, con
    `log μ = α + f(tipo_averia) + f(proceso) + f(criticidad) + β·antiguedad + β·carga + log(Z_i)`.
@@ -108,19 +114,24 @@ Todo parámetro es argumento del simulador y queda en `attr(., "verdad")`: `β_c
 - **3.3 GLMM Gamma** — `... + (1 | id_maquina)`. El efecto aleatorio = «máquinas crónicamente caras»;
   averías repetidas por máquina = medidas correlacionadas. Recupera θ. (`proceso` va como fijo; el
   anidamiento se menciona como extensión.)
-- **3.4 AFT** — `tiempo_entre` con censura; KM descriptivo; Weibull/lognormal; factor de aceleración;
+- **3.4 Tweedie** — `coste_total` por máquina-año (con ceros) = **frecuencia × severidad = presupuesto
+  esperado**, como mezcla Poisson–Gamma. Sitúa la familia en la recta `Var = φ·μ^p` y estima el índice
+  `p`; predicción con intervalo; **GLMM Tweedie** por máquina y **validación cruzada agrupada**;
+  regularización como límite conceptual. Cierra el arco con la prima pura del Caso 2, en clave industrial.
+- **3.5 AFT** — `tiempo_entre` con censura; KM descriptivo; Weibull/lognormal; factor de aceleración;
   **predecir el siguiente fallo** y el efecto de acortar el intervalo de mantenimiento.
-- **3.5 Cox como frontera** — Cox de tiempos entre fallos con **fragilidad** (correlación intra-máquina)
-  y diagnóstico de proporcionalidad (el mantenimiento la rompe, por diseño).
-- **3.6 Síntesis** — tres lentes sobre el fallo (cloglog / Poisson a trozos / Cox) **+ Tweedie**:
-  `coste_total` por máquina-año (con ceros) = **frecuencia × severidad = presupuesto esperado**. Cierra
-  el arco con la prima pura del Caso 2, en clave industrial. Selección/validación agrupada; regularización
-  como límite conceptual.
+- **3.6 Cox como frontera** — Cox de tiempos entre fallos con **fragilidad** (correlación intra-máquina)
+  y diagnóstico de proporcionalidad (el mantenimiento la rompe, por diseño); **Cox extendido** sobre el
+  panel mensual con la protección del mantenimiento, que decae.
+- **3.7 Cierre** — las **tres lentes** sobre el mismo fallo (cloglog persona-periodo / Poisson a trozos /
+  Cox) sobre `seguimiento`, y el mapa de **fronteras** del marco GLM.
+- **3.8 Estudio de caso** — encargo del estudiante, sobre la cartera de la aseguradora del **Caso 2**
+  (coste y baja de pólizas): no consume el banco de averías.
 
 ## 6. Decisiones (todas cerradas)
 
 - Avería como unidad; supervivencia = tiempos entre fallos (recurrente); fragilidad **ligada**;
-  Tweedie como cierre; `proceso` (factor fijo) en vez de planta; `criticidad` **solo en el coste**
+  Tweedie como cierre del arco del coste; `proceso` (factor fijo) en vez de planta; `criticidad` **solo en el coste**
   (no en el riesgo), con interacción `criticidad × proceso-cuello`; riesgo **creciente con la edad**;
   GLMM con **intercepto y pendiente aleatorios** por máquina.
 - Mantenimiento preventivo **periódico** con fechas (`intervalo_mant`, `dias_desde_mant`); plan
@@ -138,6 +149,6 @@ Todo parámetro es argumento del simulador y queda en `attr(., "verdad")`: `β_c
 
 - Nuevo DGP `R/dgp_averias.R`, con la arquitectura de eventos recurrentes + fragilidad ya validada en
   `caso2/R/dgp_auto.R` como plantilla; regenerar la caché `caso3/datos`.
-- Re-contextualizar y **re-verificar** las seis unidades (la estadística no cambia: Gamma, GLMM Gamma,
+- Re-contextualizar y **re-verificar** las unidades (la estadística no cambia: Gamma, GLMM Gamma,
   AFT, Cox; cambian el banco y las cifras); la narrativa se **simplifica** (una espina, dos mitades).
 - Actualizar el documento madre y `PROPUESTA_CASO3.md`; archivar el banco «degradación» anterior.

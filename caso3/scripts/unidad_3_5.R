@@ -1,9 +1,12 @@
 # =============================================================================
-# Caso 3 · Unidad 3.5 — 5 · Cox: del tiempo al riesgo
+# Caso 3 · Unidad 3.5 — 5 · Del coste al tiempo: modelos de vida acelerada (AFT)
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_3_5.qmd.
 # Cada bloque va precedido de su LABEL y de la ruta de encabezados
 # (sección > subsección > apartado) en la que aparece dentro del documento.
+#
+# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
+# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
 #
 # EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;
 # localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.
@@ -15,7 +18,7 @@ if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: n
 
 # --- Preámbulo del caso (librerías y datos, como en el documento) ------------
 # Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.6).
+# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
 library(broom)           # resultados ordenados de glm y modelos de supervivencia
@@ -29,8 +32,8 @@ library(marginaleffects) # efectos, contrastes y predicciones ajustadas
 library(emmeans)         # medias marginales y comparaciones
 
 library(lme4)            # lmer y glmer (mixtos)
-library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.6)
-library(glmnet)          # regularización (en 3.6, como límite conceptual en Gamma)
+library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
+library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
 
 library(survival)        # Kaplan-Meier, Cox y datos start-stop
@@ -48,502 +51,219 @@ glimpse(banco$averias)
 
 # -----------------------------------------------------------------------------
 # [u35-datos]
-#   5 · Cox: del tiempo al riesgo > 5.1 Contexto: el reto y los datos
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.1 Contexto: el tiempo entre fallos y la censura
+# -----------------------------------------------------------------------------
+iv <- banco$intervalos
+head(iv,3)
+
+c(intervalos = nrow(iv),
+  maquinas   = length(unique(iv$id_maquina)),
+  fallos     = sum(iv$evento),
+  censuras    = sum(iv$evento == 0),
+  prop_censura = round(mean(iv$evento == 0), 3),
+  mediana_dias = round(median(iv$tiempo_entre), 1))
+
+# -----------------------------------------------------------------------------
+# [u35-surv]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.1 Contexto: el tiempo entre fallos y la censura
 # -----------------------------------------------------------------------------
 library(survival)
-iv <- banco$intervalos
-c(intervalos = nrow(iv), maquinas = length(unique(iv$id_maquina)),
-  fallos = sum(iv$evento), prop_censura = round(mean(iv$evento == 0), 3))
-head(iv,5)
+head(Surv(iv$tiempo_entre, iv$evento), 12)   # un "+" marca las esperas censuradas
 
 # -----------------------------------------------------------------------------
-# [u35-cox]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.3 Estimación: la verosimilitud parcial (y por qué Cox no es un GLM)
+# [fig-u35-eda]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.1 Contexto: el tiempo entre fallos y la censura
+#       > ¿Y qué covariables la mueven?
 # -----------------------------------------------------------------------------
-cox_esp <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
-                   carga + proceso + fabricante, data = iv)
-summary(cox_esp)
+fallos <- iv[iv$evento == 1, ]
+fallos$proceso <- factor(fallos$proceso,
+  levels = c("Acabado", "Ensamblaje", "Mecanizado", "Corte", "Lijado"))
+
+e_plan <- ggplot(fallos, aes(plan_mantenimiento, log(tiempo_entre))) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  labs(x = "plan de mantenimiento", y = "log(tiempo entre fallos)",
+       subtitle = "Plan: el preventivo alarga")
+
+e_proc <- ggplot(fallos, aes(proceso, log(tiempo_entre))) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6) +
+  labs(x = "proceso", y = NULL, subtitle = "Proceso: diferencias leves") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+e_edad <- ggplot(fallos, aes(antiguedad_ini, log(tiempo_entre))) +
+  geom_point(size = 0.5, alpha = 0.3, colour = "grey30") +
+  geom_smooth(method = "lm", se = FALSE, colour = "firebrick") +
+  labs(x = "antigüedad al inicio del intervalo (años)", y = "log(tiempo entre fallos)",
+       subtitle = "Edad: a más años, menos espera")
+
+e_carga <- ggplot(fallos, aes(carga, log(tiempo_entre))) +
+  geom_point(size = 0.5, alpha = 0.3, colour = "grey30") +
+  geom_smooth(method = "lm", se = FALSE, colour = "firebrick") +
+  labs(x = "carga de uso", y = NULL, subtitle = "Carga: a más uso, menos espera")
+
+(e_plan + e_proc) / (e_edad + e_carga)   # patchwork
 
 # -----------------------------------------------------------------------------
-# [tbl-u35-hr]
-#   5 · Cox: del tiempo al riesgo > 5.4 Interpretación
+# [fig-u35-km]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.2 Kaplan–Meier: la mirada descriptiva
 # -----------------------------------------------------------------------------
-broom::tidy(cox_esp, exponentiate = TRUE, conf.int = TRUE) |>
+km <- survfit(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)
+
+survminer::ggsurvplot(km, data = iv, conf.int = TRUE, risk.table = TRUE,
+                      censor = TRUE, legend.labs = c("Correctivo", "Preventivo"),
+                      xlab = "días desde el último fallo",
+                      ylab = "S(t) = probabilidad de seguir sin averiarse")
+
+# -----------------------------------------------------------------------------
+# [u35-logrank]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.2 Kaplan–Meier: la mirada descriptiva
+# -----------------------------------------------------------------------------
+km                                            # imprime las medianas por grupo
+survdiff(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)   # log-rank
+
+# -----------------------------------------------------------------------------
+# [fig-u35-motiva]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.3 El modelo AFT y la censura en la verosimilitud
+#       > ¿Por qué empezar por la Weibull?
+# -----------------------------------------------------------------------------
+fallos <- iv[iv$evento == 1, ]   # los fallos observados (la censura no tiene un tiempo de fallo que dibujar)
+
+p_t <- ggplot(fallos, aes(tiempo_entre)) +
+  geom_histogram(bins = 40, fill = "steelblue", colour = "white") +
+  labs(x = "tiempo entre fallos (días)", y = "frecuencia",
+       subtitle = "T: positiva, cola larga a la derecha")
+
+p_logt <- ggplot(fallos, aes(log(tiempo_entre))) +
+  geom_histogram(bins = 40, fill = "darkorange", colour = "white") +
+  labs(x = "log(tiempo entre fallos)", y = "frecuencia",
+       subtitle = "log T: asimétrica hacia la izquierda")
+
+p_t + p_logt   # patchwork
+
+# -----------------------------------------------------------------------------
+# [u35-aft-weibull]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.3 El modelo AFT y la censura en la verosimilitud
+#       > ¿Por qué empezar por la Weibull?
+# -----------------------------------------------------------------------------
+formula_aft <- Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
+  carga + proceso
+
+aft_w <- survreg(formula_aft, dist = "weibull", data = iv)
+summary(aft_w)
+
+# -----------------------------------------------------------------------------
+# [tbl-u35-af]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.4 Interpretación: el factor de aceleración
+# -----------------------------------------------------------------------------
+broom::tidy(aft_w, conf.int = TRUE) |>
+  dplyr::filter(term != "(Intercept)", term != "Log(scale)") |>
   dplyr::transmute(term,
-                   HR = round(estimate, 3),
-                   conf.low = round(conf.low, 3),
-                   conf.high = round(conf.high, 3),
+                   factor_aceleracion = round(exp(estimate), 3),
+                   conf.low = round(exp(conf.low), 3),
+                   conf.high = round(exp(conf.high), 3),
                    p.value = signif(p.value, 3))
 
 # -----------------------------------------------------------------------------
-# [u35-aft-cox]
-#   5 · Cox: del tiempo al riesgo > 5.4 Interpretación
+# [u35-pred-plan]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.4 Interpretación: el factor de aceleración
 # -----------------------------------------------------------------------------
-hr_implicado_aft <- exp(-coef(aft_w)["plan_mantenimientoPreventivo"] / aft_w$scale)
-hr_cox <- exp(coef(cox_esp)["plan_mantenimientoPreventivo"])
-
-round(c(HR_implicado_por_AFT = unname(hr_implicado_aft),
-        HR_estimado_por_Cox  = unname(hr_cox)), 3)
-
-# -----------------------------------------------------------------------------
-# [u35-lrt-terminos]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.5 Inferencia y bondad de ajuste
-#       > Efectos de los predictores
-# -----------------------------------------------------------------------------
-car::Anova(cox_esp, test.statistic = "LR")   # LRT tipo II: cada término ajustado por los demás
+# Días de espera predichos (mediana) para una máquina promedio, según el plan
+nd <- data.frame(plan_mantenimiento = factor(c("Correctivo", "Preventivo"),
+                                             levels = c("Correctivo", "Preventivo")),
+                 antiguedad_ini = mean(iv$antiguedad_ini),
+                 carga = mean(iv$carga),
+                 proceso = factor("Corte", levels = levels(iv$proceso)))
+pred <- predict(aft_w, newdata = nd, type = "quantile", p = 0.5)
+data.frame(plan = nd$plan_mantenimiento, mediana_dias = round(pred),
+           dias_ganados = c(NA, round(diff(pred))))
 
 # -----------------------------------------------------------------------------
-# [u35-aic-terminos]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.5 Inferencia y bondad de ajuste
-#       > Efectos de los predictores
+# [u35-criticidad]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.4 Interpretación: el factor de aceleración
 # -----------------------------------------------------------------------------
-# Crear el modelo actualizado
-cox_esp_opt <- update(cox_esp, . ~ . - proceso)
-
-# Combinar AIC y BIC en dos columnas
-criterios <- cbind(AIC = AIC(cox_esp, cox_esp_opt)$AIC,
-                   BIC = BIC(cox_esp, cox_esp_opt)$BIC)
-rownames(criterios) <- c("cox_esp", "cox_esp_opt")
-# Mostrar resultado
-criterios
-
-# y recalculamos la tabla de ANOVA
-car::Anova(cox_esp_opt, test.statistic = "LR")
+# ¿Aporta la criticidad algo a la explicación del TIEMPO entre fallos?
+aft_crit <- survreg(update(formula_aft, . ~ . + criticidad), dist = "weibull", data = iv)
+anova(aft_w, aft_crit)   # contraste de razón de verosimilitudes
 
 # -----------------------------------------------------------------------------
-# [u35-score-logrank]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.5 Inferencia y bondad de ajuste
-#       > Efectos de los predictores
-#         > El log-rank: comparar dos curvas (no medir un efecto)
+# [u35-forma]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.4 Interpretación: el factor de aceleración
 # -----------------------------------------------------------------------------
-# las dos vías, con el plan como único predictor
-cox_plan <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)
-sd_plan  <- survdiff(Surv(tiempo_entre, evento) ~ plan_mantenimiento, data = iv)
-
-sc <- summary(cox_plan)$sctest        # test de score del Cox: test, df, pvalue
-gl <- length(sd_plan$n) - 1           # log-rank: k - 1 grados de libertad
-
-data.frame(
-  via         = c("Cox · test de score", "Log-rank · survdiff"),
-  estadistico = round(c(sc["test"], sd_plan$chisq), 3),
-  gl          = c(sc["df"], gl),
-  p_valor     = signif(c(sc["pvalue"], pchisq(sd_plan$chisq, gl, lower.tail = FALSE)), 3),
-  row.names   = NULL)
+forma_weibull <- 1 / aft_w$scale   # forma k = 1/sigma; k>1 creciente, k<1 decreciente, k=1 constante
+round(c(sigma_escala = aft_w$scale, forma_k = forma_weibull), 3)
 
 # -----------------------------------------------------------------------------
-# [u35-frailty]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.6 Fragilidad: el diagnóstico de independencia
+# [u35-lrt-anova]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.5 Inferencia: del error estándar al contraste
 # -----------------------------------------------------------------------------
-cox_esp_opt_frag <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
-                     carga + fabricante + frailty(id_maquina), data = iv)
-cox_esp_opt_frag
+# ¿Son significativas todas las variables
+anova(aft_w)
 
 # -----------------------------------------------------------------------------
-# [u35-robust-screen]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.6 Fragilidad: el diagnóstico de independencia
+# [u35-lrt-forma]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.5 Inferencia: del error estándar al contraste
 # -----------------------------------------------------------------------------
-cox_esp_opt_clus <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
-                  carga + fabricante + cluster(id_maquina), data = iv)
-car::Anova(cox_esp_opt_clus, test.statistic = "Wald")   # Wald por término, con SE robustos por máquina
+# ¿Aporta la forma libre de la Weibull, o basta la exponencial? H0: sigma = 1 (k = 1)
+aft_exp <- survreg(formula_aft, dist = "exponential", data = iv)
+anova(aft_exp, aft_w)
 
 # -----------------------------------------------------------------------------
-# [u35-frailty-opt]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.6 Fragilidad: el diagnóstico de independencia
+# [tbl-u35-comparacion]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.6 Elección de distribución, diagnóstico y validación
 # -----------------------------------------------------------------------------
-cox_esp_final_frag <- coxph(Surv(tiempo_entre, evento) ~ plan_mantenimiento + antiguedad_ini +
-                     carga + frailty(id_maquina), data = iv)
-summary(cox_esp_final_frag)
+purrr::map_dfr(c("exponential", "weibull", "lognormal", "loglogistic"), \(dd) {
+  m <- survreg(formula_aft, dist = dd, data = iv)
+  tibble::tibble(distribucion = dd, logLik = round(as.numeric(logLik(m)), 1), AIC = round(AIC(m), 1))
+}) |>
+  dplyr::arrange(AIC)
 
 # -----------------------------------------------------------------------------
-# [u35-zph]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.7 Diagnóstico de la proporcionalidad
-#       > El diagnóstico sobre nuestro modelo
+# [fig-u35-linealizado]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.6 Elección de distribución, diagnóstico y validación
 # -----------------------------------------------------------------------------
-ph <- cox.zph(cox_esp_final_frag)
-ph
+km1 <- survfit(Surv(tiempo_entre, evento) ~ 1, data = iv)
+d <- data.frame(t = km1$time, S = km1$surv)
+d <- subset(d, t > 0 & S > 1e-6 & S < 1 - 1e-6)
+
+niveles <- c("Weibull:  log(-log S)", "Log-logística:  logit(1-S)", "Log-normal:  probit(1-S)")
+lin <- rbind(
+  data.frame(logt = log(d$t), y = log(-log(d$S)),       familia = niveles[1]),
+  data.frame(logt = log(d$t), y = log((1 - d$S) / d$S), familia = niveles[2]),
+  data.frame(logt = log(d$t), y = qnorm(1 - d$S),       familia = niveles[3]))
+lin$familia <- factor(lin$familia, levels = niveles)
+
+ggplot(lin, aes(logt, y)) +
+  geom_point(size = 0.6, alpha = 0.5, colour = "grey30") +
+  geom_smooth(method = "lm", se = FALSE, colour = "firebrick", linewidth = 0.8) +
+  facet_wrap(~ familia, scales = "free_y") +
+  labs(x = "log(tiempo entre fallos)", y = "transformada de S(t)")
 
 # -----------------------------------------------------------------------------
-# [fig-u35-zph]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.7 Diagnóstico de la proporcionalidad
-#       > El diagnóstico sobre nuestro modelo
+# [fig-u35-diag]
+#   5 · Del coste al tiempo: modelos de vida acelerada (AFT)
+#     > 5.6 Elección de distribución, diagnóstico y validación
 # -----------------------------------------------------------------------------
-par(mfrow = c(1, 3))
-for (v in c("plan_mantenimiento", "antiguedad_ini", "carga")) {
-  plot(ph, var = v)
-  abline(h = 0, lty = 3, col = "red")
-}
+# Residuo estandarizado de valor extremo; su exponencial es un residuo de Cox–Snell ~ Exp(1)
+res_cs <- exp((log(iv$tiempo_entre) - aft_w$linear.predictors) / aft_w$scale)
+km_res <- survfit(Surv(res_cs, iv$evento) ~ 1)
 
-# -----------------------------------------------------------------------------
-# [u35-datos-tv]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Contexto y datos
-# -----------------------------------------------------------------------------
-sg <- banco$seguimiento
-
-c(maquina_meses = nrow(sg),
-  meses_con_fallo = sum(sg$fallo),
-  maquinas = length(unique(sg$id_maquina)))
-
-# los ocho primeros meses de una máquina preventiva que sí se avería
-head(subset(sg, id_maquina == "M227",
-            select = c(tstart, tstop, antiguedad,intervalo_mant, dias_desde_mant, mant_reciente, fallo)), 8)
-
-# -----------------------------------------------------------------------------
-# [u35-fase-fallos]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Contexto y datos
-# -----------------------------------------------------------------------------
-sg_prev <- subset(sg, !is.na(dias_desde_mant))   # solo preventivas: las correctivas no tienen reloj
-sg_prev$tramo_fase <- cut(sg_prev$dias_desde_mant / sg_prev$intervalo_mant,
-                          breaks = seq(0, 1, by = 0.2), include.lowest = TRUE)
-
-res <- aggregate(cbind(fallos = n_fallos, exposicion) ~ tramo_fase, data = sg_prev, sum)
-res
-
-# -----------------------------------------------------------------------------
-# [fig-u35-mant-fallo]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Contexto y datos
-# -----------------------------------------------------------------------------
-ggplot(res, aes(tramo_fase, fallos)) +
-  geom_col(fill = "firebrick", alpha = 0.85) +
-  labs(x = "fracción de la fase transcurrida (días desde revisión / intervalo)",
-       y = "fallos acumulados")
-
-# -----------------------------------------------------------------------------
-# [fig-u35-relojes]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Contexto y datos
-# -----------------------------------------------------------------------------
-# Reloj 1 — edad (todas las máquinas)
-d1 <- sg
-d1$bin <- cut(d1$antiguedad, c(0, 2, 4, 6, 8, 10, 13))
-r1 <- aggregate(cbind(n_fallos, exposicion) ~ bin, data = d1, sum)
-r1$tasa <- 100 * r1$n_fallos / r1$exposicion
-r1$reloj <- "Reloj 1 · edad de la máquina (años)"
-
-# Reloj 2 — días desde el mantenimiento (preventivo)
-d2 <- subset(sg, plan_mantenimiento == "Preventivo")
-d2$bin <- cut(d2$dias_desde_mant, c(0, 15, 30, 45, 60, 90, 120))
-r2 <- aggregate(cbind(n_fallos, exposicion) ~ bin, data = d2, sum)
-r2$tasa <- 100 * r2$n_fallos / r2$exposicion
-r2$reloj <- "Reloj 2 · días desde el mantenimiento"
-
-rr <- rbind(r1[, c("bin", "tasa", "reloj")], r2[, c("bin", "tasa", "reloj")])
-ggplot(rr, aes(bin, tasa)) +
-  geom_col(fill = "firebrick", alpha = 0.85) +
-  facet_wrap(~reloj, scales = "free_x") +
-  labs(x = NULL, y = "fallos por 100 días de exposición")
-
-# -----------------------------------------------------------------------------
-# [u35-cox-ext]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > El modelo extendido
-# -----------------------------------------------------------------------------
-cox_mes_ind_frag <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad +
-                   carga + mant_reciente + frailty(id_maquina), data = sg)
-cox_mes_ind_frag
-
-# -----------------------------------------------------------------------------
-# [u35-ext-screen]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > El modelo extendido
-# -----------------------------------------------------------------------------
-cox_mes_ind_clus <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad +
-                      carga + mant_reciente + cluster(id_maquina), data = sg)
-car::Anova(cox_mes_ind_clus, test.statistic = "Wald")
-
-# -----------------------------------------------------------------------------
-# [u35-perfil-tau]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La primera arbitrariedad: dar forma en vez de poner un umbral
-# -----------------------------------------------------------------------------
-taus <- c(20, 30, 40, 50, 60, 70, 80, 100, 120)
-perfil <- sapply(taus, function(tau) {
-  sg$p <- ifelse(is.na(sg$dias_desde_mant), 0, exp(-sg$dias_desde_mant / tau))
-  m <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + p, data = sg)
-  c(AIC = AIC(m), coef_prot = coef(m)[["p"]])   # el coeficiente, para ver cómo depende de tau
-})
-data.frame(tau = taus, AIC = round(perfil["AIC", ], 1),
-           coef_prot = round(perfil["coef_prot", ], 3))
-
-# -----------------------------------------------------------------------------
-# [u35-ext-screen2]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La primera arbitrariedad: dar forma en vez de poner un umbral
-# -----------------------------------------------------------------------------
-# definimos la variable de protección por mantenimiento
-sg$prot_mant <- ifelse(is.na(sg$dias_desde_mant), 0, exp(-sg$dias_desde_mant / 60))
-# Ajustamos el modelo con ella
-cox_mes_prot_clus <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad +
-                       carga + prot_mant + cluster(id_maquina), data = sg)
-car::Anova(cox_mes_prot_clus, test.statistic = "Wald")
-
-# -----------------------------------------------------------------------------
-# [u35-cox-final]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La primera arbitrariedad: dar forma en vez de poner un umbral
-# -----------------------------------------------------------------------------
-cox_mes_opt_frag <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant +
-                   frailty(id_maquina), data = sg)
-cox_mes_opt_frag
-
-# -----------------------------------------------------------------------------
-# [u35-comparar]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > ¿Etiqueta o reloj? La comparación
-# -----------------------------------------------------------------------------
-cox_mes_plan <- coxph(Surv(tstart, tstop, fallo) ~ plan_mantenimiento + antiguedad + carga,
-                      data = sg)
-cox_mes_opt  <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_mant,
-                      data = sg)
-
-# ¿altera la fragilidad los coeficientes? (cox_mes_opt_frag = cox_mes_opt + frailty)
-data.frame(
-  efecto         = names(coef(cox_mes_opt)),
-  sin_fragilidad = round(coef(cox_mes_opt), 3),
-  con_fragilidad = round(coef(cox_mes_opt_frag)[names(coef(cox_mes_opt))], 3),
-  row.names      = NULL)
-
-# -----------------------------------------------------------------------------
-# [u35-comparar-aic]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > ¿Etiqueta o reloj? La comparación
-# -----------------------------------------------------------------------------
-data.frame(
-  modelo       = c("M_plan  (5.6 trasladado al panel)", "M_reloj (final)"),
-  k            = c(length(coef(cox_mes_plan)), length(coef(cox_mes_opt))),
-  loglik       = round(c(logLik(cox_mes_plan), logLik(cox_mes_opt)), 1),
-  AIC          = round(c(AIC(cox_mes_plan), AIC(cox_mes_opt)), 1),
-  concordancia = round(c(summary(cox_mes_plan)$concordance[1],
-                         summary(cox_mes_opt)$concordance[1]), 3))
-
-# -----------------------------------------------------------------------------
-# [u35-tt]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La segunda arbitrariedad: dejar de trocear, con tt()
-# -----------------------------------------------------------------------------
-# 1) Calendario de revisiones de cada máquina. Para evaluar la protección en un
-#    instante t cualquiera basta saber en qué día del ciclo caen las revisiones
-#    (su "fase"), que leemos del panel: día de revisión = punto medio - dias_desde_mant.
-cal <- do.call(rbind, lapply(split(sg, sg$id_maquina), function(d) {
-  med <- (d$tstart + d$tstop) / 2
-  data.frame(id_maquina     = d$id_maquina[1],
-             entry          = min(d$tstart),          # primer día observado
-             intervalo_mant = d$intervalo_mant[1],
-             fase = if (is.na(d$intervalo_mant[1])) NA_real_ else
-                      median((med - d$dias_desde_mant) %% d$intervalo_mant[1], na.rm = TRUE))
-}))
-
-# 2) Los datos, en su forma exacta: una fila por espera, en tiempo de calendario.
-# recuperados de la tabla iv=banco$intervalos
-ag <- do.call(rbind, lapply(split(iv, iv$id_maquina), function(d) {
-  d <- d[order(d$n_intervalo), ]
-  d$tstart <- cal$entry[match(d$id_maquina[1], cal$id_maquina)] +
-              cumsum(c(0, head(d$tiempo_entre, -1)))
-  d$tstop  <- d$tstart + d$tiempo_entre
-  d
-}))
-ag$idx <- match(ag$id_maquina, cal$id_maquina)   # clave para consultar `cal`
-
-# Solo para MIRARLO: los días desde la revisión al cerrarse el tramo. El modelo
-# NO usa esta columna —la recalcula `tt()` en cada instante—; la añadimos para
-# ver qué valor manejará. `NA` en las correctivas, que no tienen revisiones.
-ag$dias_desde_mant <- round((ag$tstop - cal$fase[ag$idx]) %% cal$intervalo_mant[ag$idx], 1)
-
-subset(ag, id_maquina == "M227",
-       select = c(n_intervalo, tstart, tstop, evento, antiguedad_ini, dias_desde_mant))
-
-# 3) El ajuste. `tt` se invoca en CADA instante de fallo con las filas en riesgo:
-#    x = los `idx` de esas filas, t = el instante del fallo.
-prot_tt <- function(x, t, ...) {
-  fs <- cal$fase[x]; ivm <- cal$intervalo_mant[x]
-  ifelse(is.na(ivm), 0, exp(-((t - fs) %% ivm) / 60))   # protección en el instante t
-}
-
-cox_tt_opt <- coxph(Surv(tstart, tstop, evento) ~ antiguedad_ini + carga + tt(idx),
-                data = ag, tt = prot_tt)
-round(coef(cox_tt_opt), 3)
-
-# -----------------------------------------------------------------------------
-# [fig-u35-tt-viz]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La segunda arbitrariedad: dejar de trocear, con tt()
-# -----------------------------------------------------------------------------
-fase_m <- cal$fase[cal$id_maquina == "M227"]
-prot_m <- function(t) exp(-((t - fase_m) %% 60) / 60)   # la misma función que pasamos a tt()
-
-tj      <- sort(ag$tstop[ag$evento == 1])               # instantes de fallo de TODO el banco
-tj      <- tj[tj <= 210]                                # ventana: dos primeras esperas de M227
-propios <- ag$tstop[ag$id_maquina == "M227" & ag$evento == 1 & ag$tstop <= 210]
-
-curva <- data.frame(t = seq(0, 210, by = 0.5)); curva$prot <- prot_m(curva$t)
-riesgo <- data.frame(t = tj);                   riesgo$prot <- prot_m(riesgo$t)
-panel  <- subset(sg, id_maquina == "M227" & tstop <= 210)
-
-ggplot() +
-  geom_line(data = curva, aes(t, prot), color = "grey65") +
-  geom_segment(data = panel, aes(x = tstart, xend = tstop,
-                                 y = prot_mant, yend = prot_mant),
-               color = "steelblue", linewidth = 1) +
-  geom_point(data = riesgo, aes(t, prot), color = "firebrick", size = 0.9) +
-  geom_point(data = data.frame(t = propios, prot = prot_m(propios)),
-             aes(t, prot), shape = 4, size = 3, stroke = 1.2) +
-  labs(x = "día de seguimiento (M227)", y = "protección del mantenimiento")
-
-# -----------------------------------------------------------------------------
-# [u35-tt-frailty]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La segunda arbitrariedad: dejar de trocear, con tt()
-# -----------------------------------------------------------------------------
-cox_tt_opt_frag <- coxph(Surv(tstart, tstop, evento) ~ antiguedad_ini + carga + tt(idx) +
-                     frailty(id_maquina), data = ag, tt = prot_tt)
-cox_tt_opt_frag
-
-# -----------------------------------------------------------------------------
-# [u35-tt-comparativa]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.8 Covariables que cambian con el tiempo: el Cox extendido
-#       > Dos arbitrariedades que conviene quitar
-#         > La segunda arbitrariedad: dejar de trocear, con tt()
-# -----------------------------------------------------------------------------
-modelos <- list("panel mensual · sin fragilidad" = cox_mes_opt,
-                "panel mensual · con fragilidad" = cox_mes_opt_frag,
-                "tt() exacto   · sin fragilidad" = cox_tt_opt,
-                "tt() exacto   · con fragilidad" = cox_tt_opt_frag)
-
-# la protección es el último coeficiente en los cuatro modelos
-data.frame(
-  coef_prot    = sapply(modelos, function(m) round(unname(rev(coef(m))[1]), 3)),
-  concordancia = sapply(modelos, function(m) round(unname(summary(m)$concordance[1]), 3)))
-
-# -----------------------------------------------------------------------------
-# [u35-pred-relativo]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Predicción: del modelo a la decisión
-# -----------------------------------------------------------------------------
-perfiles <- data.frame(
-  perfil     = c("recién mantenida", "sin protección",
-                 "vieja y cargada, recién mantenida", "vieja y cargada, sin protección"),
-  antiguedad = c(3, 3, 10, 10),
-  carga      = c(0.50, 0.50, 0.90, 0.90),
-  prot_mant  = c(1, 0, 1, 0))
-
-perfiles$lp <- predict(cox_mes_opt, newdata = perfiles, type = "lp")
-perfiles$riesgo_relativo <- round(exp(perfiles$lp - perfiles$lp[1]), 2)
-perfiles[, c("perfil", "antiguedad", "carga", "prot_mant", "riesgo_relativo")]
-
-# -----------------------------------------------------------------------------
-# [u35-escenarios]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Predicción: del modelo a la decisión
-# -----------------------------------------------------------------------------
-# construye la trayectoria de una máquina bajo una política de mantenimiento dada
-escenario <- function(nombre, edad0, carga, intervalo, dias = 360) {
-  t <- 0:(dias - 1)
-  prot <- if (is.na(intervalo)) 0 else exp(-(t %% intervalo) / 60)
-  data.frame(id = nombre, tstart = t, tstop = t + 1,
-             fallo = 0,          # survfit reconstruye Surv(): la respuesta debe estar
-             antiguedad = edad0 + t / 365, carga = carga, prot_mant = prot)
-}
-
-nd <- rbind(escenario("preventivo cada 60 d",  5, 0.75,  60),
-            escenario("preventivo cada 120 d", 5, 0.75, 120),
-            escenario("correctivo (sin revisiones)", 5, 0.75, NA))
-head(nd, 4)
-
-# -----------------------------------------------------------------------------
-# [fig-u35-pred]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Predicción: del modelo a la decisión
-# -----------------------------------------------------------------------------
-sf <- survfit(cox_mes_opt, newdata = nd, id = id)
-
-# survfit devuelve las tres curvas encadenadas; `sf$strata` dice cuántos
-# instantes aporta cada escenario, y con eso las separamos en formato largo
-pred <- data.frame(tiempo    = sf$time,
-                   surv      = as.vector(sf$surv),
-                   escenario = rep(names(sf$strata), sf$strata))
-
-ggplot(pred, aes(tiempo, surv, color = escenario)) +
-  geom_step(linewidth = 0.8) +
-  scale_y_continuous(limits = c(0, 1)) +
-  labs(x = "días de seguimiento", y = "P(sin avería hasta t)", color = NULL)
-
-# -----------------------------------------------------------------------------
-# [u35-pred-tabla]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Predicción: del modelo a la decisión
-# -----------------------------------------------------------------------------
-# la supervivencia al final del año: el último valor de cada curva
-aggregate(surv ~ escenario, data = pred, FUN = function(s) round(tail(s, 1), 3))
-
-# -----------------------------------------------------------------------------
-# [u35-verdad]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Validación contra el DGP
-# -----------------------------------------------------------------------------
-verdad <- attr(banco, "verdad")
-c(verdad$beta_hazard[c("antiguedad", "carga", "mant_inmediato", "tau_mant")],
-  theta_frail = verdad$theta_frail)
-
-# -----------------------------------------------------------------------------
-# [tbl-u35-dgp]
-#   5 · Cox: del tiempo al riesgo
-#     > 5.9 Cierre: comparar, predecir, validar
-#       > Validación contra el DGP
-# -----------------------------------------------------------------------------
-# Las varianzas de fragilidad van transcritas de la salida impresa de cada ajuste
-# (la línea "Variance of random effect"): el objeto coxph penalizado no ofrece un
-# accesor estable (history[[1]]$theta llegó a devolver 0.185 para el ajuste de
-# esperas, en contra de su propia salida, que dice 0.1418).
-data.frame(
-  parametro = c("antigüedad (por año)", "carga (0 a 1)", "protección mantenimiento",
-                "varianza de fragilidad"),
-  DGP     = c(verdad$beta_hazard[["antiguedad"]], verdad$beta_hazard[["carga"]],
-              verdad$beta_hazard[["mant_inmediato"]], verdad$theta_frail),
-  esperas = c(round(coef(cox_esp_final_frag)[["antiguedad_ini"]], 3),
-              round(coef(cox_esp_final_frag)[["carga"]], 3), NA, 0.142),
-  panel   = c(round(coef(cox_mes_opt_frag)[["antiguedad"]], 3),
-              round(coef(cox_mes_opt_frag)[["carga"]], 3),
-              round(coef(cox_mes_opt_frag)[["prot_mant"]], 3), 0.143),
-  exacto  = c(round(coef(cox_tt_opt_frag)[["antiguedad_ini"]], 3),
-              round(coef(cox_tt_opt_frag)[["carga"]], 3),
-              round(coef(cox_tt_opt_frag)[["tt(idx)"]], 3), 0.098))
+plot(km_res, conf.int = FALSE, xlim = c(0, 4),
+     xlab = "residuo de Cox–Snell", ylab = "supervivencia del residuo")
+curve(exp(-x), from = 0, to = 4, add = TRUE, col = "firebrick", lwd = 2)
+legend("topright", c("KM de los residuos", "exponencial estándar teórica"),
+       lty = 1, col = c("black", "firebrick"), bty = "n")
 
