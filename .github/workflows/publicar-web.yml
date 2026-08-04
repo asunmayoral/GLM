@@ -1,0 +1,80 @@
+# =============================================================================
+#  Publicación automática del sitio del curso en GitHub Pages
+# -----------------------------------------------------------------------------
+#  Se dispara con cada `push` a master (y a mano desde la pestaña Actions).
+#
+#  CÓMO FUNCIONA, y por qué así:
+#  El runner NO tiene los paquetes de R del curso (glmmTMB, lme4, survival,
+#  flexsurv, DHARMa...). No hace falta: la caché `_freeze/` está versionada, y
+#  con `execute: freeze: auto` Quarto reutiliza los resultados ya calculados en
+#  local en lugar de volver a ejecutar el código. El runner solo ensambla el
+#  HTML.
+#
+#  CONSECUENCIA IMPORTANTE — el flujo de trabajo es:
+#    1. editas el .qmd en local
+#    2. `quarto render` en local   <- aquí se ejecuta R y se actualiza _freeze/
+#    3. `git add -A && git commit && git push`
+#    4. este workflow publica
+#  Si te saltas el paso 2, el freeze queda obsoleto, el runner intentará
+#  ejecutar R y **el workflow fallará**. Es deliberado: mejor un aviso por
+#  correo que publicar una página a medias.
+#
+#  Solo se renderiza el HTML (`--to html`). Los PDF necesitarían LaTeX en el
+#  runner; si los quieres en el sitio, descomenta `tinytex: true` más abajo y
+#  quita el `--to html`.
+#
+#  AJUSTE ÚNICO NECESARIO EN GITHUB, una sola vez:
+#    Settings -> Pages -> Source: **GitHub Actions**
+# =============================================================================
+
+name: Publicar el sitio del curso
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:        # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Si haces varios push seguidos, cancela la publicación anterior en curso
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        # with:
+        #   tinytex: true        # descomenta si quieres publicar también los PDF
+
+      - name: Instalar R
+        # Sin paquetes: solo se necesita `Rscript` para el pre-render
+        # `_scripts/invalidar_freeze.R`, que se autodesactiva en CI.
+        uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Renderizar el sitio
+        run: quarto render --to html
+
+      - name: Preparar el artefacto para Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Desplegar en GitHub Pages
+        id: despliegue
+        uses: actions/deploy-pages@v4

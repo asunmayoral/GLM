@@ -18,6 +18,17 @@
 #  No necesita paquetes. No toca nada si no hay cambios.
 # =============================================================================
 
+# --- Salvaguarda para integración continua (GitHub Actions) ------------------
+# Este script decide por FECHAS DE MODIFICACIÓN. En un `git clone` limpio todos
+# los ficheros reciben la fecha del checkout, así que las comparaciones no
+# significan nada y el script borraría cachés al azar: el runner intentaría
+# re-ejecutar el código de R y fallaría, porque allí no están los paquetes del
+# curso. En CI manda el `_freeze/` versionado, que se genera en local.
+if (nzchar(Sys.getenv("CI"))) {
+  message("CI detectado: se omite la invalidación de freeze (manda el _freeze/ versionado).")
+  quit(save = "no", status = 0)
+}
+
 # Raíz del proyecto. Quarto ejecuta el pre-render desde la raíz del proyecto y
 # expone su ruta en QUARTO_PROJECT_DIR; si no estuviera, usamos el directorio
 # de trabajo actual.
