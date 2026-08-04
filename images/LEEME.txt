@@ -1,0 +1,17 @@
+LOGOTIPOS DEL SITIO
+===================
+Deja aquí los ficheros con estos nombres exactos y descomenta el bloque final de
+index.qmd (y, si lo quieres también en el pie de todas las páginas, el bloque
+correspondiente de _quarto.yml):
+
+  logo-umh.png        Universidad Miguel Hernández
+  logo-grado.png      Grado en Ciencia de Datos e IA
+  logo-instituto.png  Instituto de investigación (cuando tenga logo)
+
+Recomendación: PNG con FONDO TRANSPARENTE, unos 400 px de ancho. La hoja de
+estilo los escala a 62 px de alto y los alinea en fila centrada.
+
+Otros ficheros que puedes añadir aquí:
+  favicon.png   icono de la pestaña del navegador  -> website: favicon: images/favicon.png
+  banner.png    cabecera a todo ancho de la portada -> title-block-banner: images/banner.png
+  foto.jpg      tu retrato para la página "Sobre mí"

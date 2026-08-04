@@ -8,8 +8,7 @@ format:
   html:
     toc: true
     toc-depth: 2
-    number-sections: false
-    theme: cosmo
+    number-sections: false   # el tema lo pone _quarto.yml (simplex + theme.scss)
   pdf:
     toc: true
     number-sections: false

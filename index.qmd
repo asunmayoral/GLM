@@ -3,43 +3,159 @@ title: "Modelos Lineales Generalizados con R"
 subtitle: "Del dato al modelo, del modelo al diagnóstico, del diagnóstico a la interpretación"
 lang: es
 toc: false
+format:
+  html:
+    page-layout: full
 ---
 
-## Sobre este material
+<!-- ============================================================================
+     PORTADA del curso. Funciona como descriptor: los acordeones resumen la guía
+     docente y cada uno enlaza a su apartado completo, para no duplicar texto.
+     La barra lateral NO aparece aquí a propósito (esta página no está en
+     `sidebar.contents` de _quarto.yml).
+     PENDIENTE: los logotipos del pie esperan ficheros en images/ (bloque
+     comentado al final) y los enlaces de entrega, en entregas.qmd.
+============================================================================ -->
 
-Material docente de la asignatura **Modelos Lineales Generalizados con R**, de
-tercer curso del **Grado en Ciencia de Datos e Inteligencia Artificial** de la
-Universidad Miguel Hernández (6 ECTS, 60 horas de clase). 
+Curso de **tercer curso del Grado en Ciencia de Datos e Inteligencia Artificial** de la Universidad
+Miguel Hernández. Seis créditos, quince semanas, todo en R.
 
-El enfoque es **problema-primero**: se parte de un caso real, se elige y ajusta el modelo, se
-diagnostica y se interpreta en la escala que importa para decidir.
-
-El curso se articula en tres estudios de caso que recorren las familias de la
-exponencial y mantienen dos hilos en espiral —efectos mixtos y supervivencia—
-que se introducen pronto y reaparecen en cada bloque.
+El enfoque es **problema-primero**: cada bloque arranca con datos sobre los que el modelo lineal
+clásico falla de forma evidente, y la teoría entra a demanda para resolver ese problema concreto.
+Tres estudios de caso, veintidós unidades, y dos hilos que los recorren en espiral —efectos mixtos y
+supervivencia—.
 
 ## Los tres casos
 
-- **[Caso 1 · ¿Ocurre el evento? ¿Y cuándo?](caso1/caso1_binaria.qmd)** Respuestas binarias y tiempo hasta
-  el evento en tiempo discreto: regresión logística, evaluación de
-  clasificadores, intercepto aleatorio y enlace complementario log-log.
-- **[Caso 2 · ¿Cuántas veces y a qué ritmo?](caso2/caso2_conteos.qmd)** Conteos y
-  tasas: Poisson, *offset* e IRR, sobredispersión, exceso de ceros, GLMM de Poisson y riesgos a
-  trozos.
-- **[Caso 3 · ¿Cuánto y hasta cuándo?](caso3/caso3_continuas_positivas.qmd)** Magnitudes
-  positivas y vida útil hasta el fallo: GLM Gamma e inversa gaussiana, elección de familia y escala,
-  GLMM Gamma, modelos de vida acelerada (AFT) y el modelo de Cox como frontera del marco.
+```{=html}
+<div class="rejilla-casos">
+
+  <a href="caso1/caso1_binaria.html" class="tarjeta-caso">
+    <div class="etiqueta">Caso 1 · Semanas 1–5</div>
+    <div class="pregunta">¿Ocurre el evento? ¿Y cuándo?</div>
+    <p class="detalle">Respuestas binarias y tiempo hasta el evento: del fallo del modelo lineal al
+    marco GLM, regresión logística, evaluación de clasificadores, respuestas politómicas, efectos
+    aleatorios y la entrada a la supervivencia en tiempo discreto.</p>
+  </a>
+
+  <a href="caso2/caso2_conteos.html" class="tarjeta-caso">
+    <div class="etiqueta">Caso 2 · Semanas 6–10</div>
+    <div class="pregunta">¿Cuántas veces y a qué ritmo?</div>
+    <p class="detalle">Conteos y tasas sobre una cartera de seguro: Poisson con <em>offset</em> e
+    IRR, modelos log-lineales, sobredispersión, exceso de ceros, GLMM, riesgos a trozos y
+    regularización.</p>
+  </a>
+
+  <a href="caso3/caso3_continuas_positivas.html" class="tarjeta-caso">
+    <div class="etiqueta">Caso 3 · Semanas 11–15</div>
+    <div class="pregunta">¿Cuánto y hasta cuándo?</div>
+    <p class="detalle">Magnitudes positivas y vida útil: GLM Gamma e inversa gaussiana, la familia
+    Tweedie para el coste agregado con ceros, modelos AFT con censura y el modelo de Cox como
+    frontera del marco.</p>
+  </a>
+
+</div>
+```
+
+## Recursos del curso
+
+```{=html}
+<div class="fila-botones">
+  <a href="guia_docente_simplificada.html" class="boton-recurso">Guía docente completa</a>
+  <a href="entregas.html" class="boton-recurso">Entregas y seguimiento</a>
+  <a href="https://github.com/asunmayoral/GLM/tree/master/evaluacion/Plantillas_informes_tres_formatos" class="boton-recurso">Plantillas de informe</a>
+  <a href="https://github.com/asunmayoral/GLM/tree/master/evaluacion" class="boton-recurso">Rúbricas de evaluación</a>
+  <a href="referencias.html" class="boton-recurso">Referencias</a>
+</div>
+```
+
+## El curso, en cinco preguntas
+
+::: {.callout-note .acordeon collapse="true" icon=false}
+## ¿Qué voy a aprender, y para qué sirve?
+
+Los GLM predicen e interpretan respuestas **binarias**, de **recuento**, **categóricas** y
+**continuas asimétricas**: riesgo clínico en sanidad, siniestralidad en seguros, abandono en
+marketing, mantenimiento en industria. Al terminar sabrás **elegir** el modelo que pide cada tipo de
+respuesta, **ajustarlo**, **diagnosticarlo**, **interpretarlo en la escala correcta** y
+**comunicarlo**.
+
+Los seis objetivos del curso y los resultados de aprendizaje de cada bloque están en la
+[guía docente](guia_docente_simplificada.qmd).
+:::
+
+::: {.callout-note .acordeon collapse="true" icon=false}
+## ¿Qué necesito saber antes de empezar?
+
+Cálculo, álgebra lineal, probabilidad e inferencia básica, regresión lineal por mínimos cuadrados y
+soltura programando. **No hace falta experiencia previa en R**: se introduce de forma progresiva
+desde el primer estudio de caso.
+
+Detalle en la [guía docente](guia_docente_simplificada.qmd).
+:::
+
+::: {.callout-note .acordeon collapse="true" icon=false}
+## ¿Cómo se trabaja en clase?
+
+Cuatro horas semanales: dos de teoría y dos de laboratorio con acompañamiento docente. La teoría se
+imparte integrada en cada caso, nunca como bloque previo. Cada bloque ocupa **cinco semanas**:
+cuatro de fundamentación y una dedicada al estudio de caso y a las exposiciones.
+
+Un rasgo del material que conviene conocer desde el principio: los bancos de datos están
+**simulados con verdad conocida**. Ajustas **a ciegas** y validas **al final** contra los parámetros
+generadores. Es un control de calidad que ningún dato real permite.
+
+Detalle en la [guía docente](guia_docente_simplificada.qmd).
+:::
+
+::: {.callout-note .acordeon collapse="true" icon=false}
+## ¿Cómo se evalúa?
+
+**Evaluación continua**: tres proyectos grupales (60 %) y tres exámenes orales individuales (40 %).
+Cada proyecto se entrega en un formato distinto —informe técnico, informe ejecutivo y artículo de
+investigación— y su nota se pondera por la implicación individual, medida con bitácora y
+coevaluación 360.
+
+Se exige un mínimo de **3,5/10 en cada prueba** y una media ponderada de 5. Quien no supere la
+continua va a **evaluación final**: un examen con informe escrito (50 %) y defensa oral (50 %).
+
+Criterios, pesos y rúbricas en la [guía docente](guia_docente_simplificada.qmd).
+:::
+
+::: {.callout-note .acordeon collapse="true" icon=false}
+## ¿Qué software uso, y cómo entrego?
+
+**R** con `stats::glm`, el `tidyverse` y `broom`; para interpretación y diagnóstico,
+`marginaleffects`, `emmeans`, `ggeffects`, `car`, `DHARMa`, `performance` y `pROC`; y según el caso,
+`MASS`, `pscl`, `glmmTMB`, `lme4`, `glmnet`, `survival` y `flexsurv`. El entorno de trabajo es
+**Quarto** con **Git**.
+
+Los informes se escriben sobre las **plantillas Quarto** del curso, de modo que análisis y texto
+viven en el mismo fichero: media reproducibilidad resuelta de partida.
+
+Plazos, enlaces y formularios en [Entregas y seguimiento](entregas.qmd).
+:::
 
 ## Cómo usar estas páginas
 
-Cada caso se lee como un cuaderno reproducible: teoría al servicio del problema,
-**código R visible** (puedes desplegarlo y copiarlo para estudiar y reproducir
-los análisis) e interpretación de los resultados. Empieza por el
-[Caso 1](caso1/caso1_binaria.qmd).
+Cada caso es un **cuaderno reproducible**: la teoría al servicio del problema, el **código R
+visible** —puedes desplegarlo y copiarlo— y la interpretación de cada resultado. La barra lateral
+te lleva a cualquier unidad, y el índice de la derecha, a cualquier sección dentro de ella.
 
-## Software
+Si empiezas de cero, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
 
-R con `stats::glm`, el `tidyverse` y `broom`; para interpretación y diagnóstico,
-`marginaleffects`, `emmeans`, `ggeffects`, `car`, `DHARMa`, `performance` y
-`pROC`; y, según el caso, `MASS`, `pscl`, `glmmTMB`, `lme4`, `survival` y
-`flexsurv`.
+<!-- ============================================================================
+     LOGOTIPOS. Cuando tengas los ficheros, guárdalos en images/ con estos
+     nombres y descomenta el bloque de abajo.
+     Recomendación: PNG con fondo transparente, ~400 px de ancho.
+============================================================================ -->
+
+<!--
+```{=html}
+<div class="logos-pie">
+  <img src="images/logo-umh.png"       alt="Universidad Miguel Hernández">
+  <img src="images/logo-grado.png"     alt="Grado en Ciencia de Datos e IA">
+  <img src="images/logo-instituto.png" alt="Instituto de investigación">
+</div>
+```
+-->

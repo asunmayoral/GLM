@@ -1,0 +1,53 @@
+---
+title: "Sobre mí"
+subtitle: "Asunción M. Mayoral Cortés"
+lang: es
+toc: false
+---
+
+<!-- ============================================================================
+     PENDIENTE DE COMPLETAR: todo lo marcado [POR COMPLETAR] necesita tu texto.
+     Cuando tengas foto, guárdala en images/foto.jpg y descomenta el bloque.
+     ALTERNATIVA: Quarto trae plantillas de página "about" (jolla, trestles,
+     solana, marquee, broadside) que colocan foto, bio y enlaces con un diseño
+     ya resuelto. Se activan añadiendo un bloque `about:` a este YAML.
+     Ver https://quarto.org/docs/websites/website-about.html
+============================================================================ -->
+
+<!--
+![](images/foto.jpg){width=180 fig-align="left" .rounded}
+-->
+
+Profesora del **Grado en Ciencia de Datos e Inteligencia Artificial** de la Universidad Miguel
+Hernández de Elche.
+
+[POR COMPLETAR: dos o tres frases sobre tu trayectoria —área de investigación, instituto al que
+perteneces, qué otras asignaturas impartes—.]
+
+## Docencia
+
+[POR COMPLETAR: qué te interesa de enseñar modelización, por qué este curso está diseñado
+problema-primero, qué esperas del estudiantado.]
+
+## Investigación
+
+[POR COMPLETAR: líneas de trabajo, grupo o instituto, publicaciones destacadas o enlace a tu perfil.]
+
+## Contacto
+
+| | |
+|:--|:--|
+| Correo | asun.mayoral@umh.es |
+| Despacho | [POR COMPLETAR] |
+| Tutorías | [POR COMPLETAR] |
+| ORCID | [POR COMPLETAR] |
+
+## Sobre este material
+
+Este sitio es material docente abierto, escrito en [Quarto](https://quarto.org) y publicado desde
+[GitHub](https://github.com/asunmayoral/GLM). Todo el código es reejecutable y los bancos de datos
+están simulados con proceso generador conocido, de modo que cualquier resultado del curso puede
+comprobarse contra la verdad que lo produjo.
+
+Si detectas un error o quieres proponer una mejora, puedes
+[abrir una incidencia](https://github.com/asunmayoral/GLM/issues) en el repositorio.

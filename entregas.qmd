@@ -1,0 +1,73 @@
+---
+title: "Entregas y seguimiento"
+subtitle: "Plazos, formularios y material de apoyo de los tres proyectos"
+lang: es
+toc: true
+toc-depth: 2
+---
+
+<!-- ============================================================================
+     PENDIENTE DE COMPLETAR. Todo lo marcado con [POR COMPLETAR] necesita la URL
+     o la fecha real. La estructura ya está montada para no tener que rehacerla.
+============================================================================ -->
+
+::: {.callout-important}
+## Página en construcción
+Los enlaces a formularios y las fechas concretas se publicarán al inicio del curso. La estructura de
+entrega, en cambio, es firme: tres proyectos, tres formatos, tres defensas.
+:::
+
+## Calendario de entregas
+
+| Proyecto | Contenido | Formato del informe | Entrega | Defensas |
+|:--|:--|:--|:--:|:--:|
+| **Proyecto 1** | Estudio de caso del Caso 1 | Informe **técnico** | Semana 5 | Semana 5 |
+| **Proyecto 2** | Estudio de caso del Caso 2 | Informe **ejecutivo** | Semana 10 | Semana 10 |
+| **Proyecto 3** | Estudio de caso del Caso 3 | **Artículo de investigación** | Semana 15 | Semana 15 |
+
+Los **exámenes orales individuales** se celebran en sesión de tutoría, después de la corrección del
+proyecto y no más de una semana más tarde. Duran de 10 a 12 minutos.
+
+## Qué se entrega, en cada proyecto
+
+Con cada proyecto, el equipo entrega **tres cosas** y cada estudiante, **una más**:
+
+1. **El informe**, en el formato que toque, escrito sobre la plantilla Quarto correspondiente.
+2. **La presentación** de la exposición.
+3. **El repositorio o carpeta reproducible**: código, datos y `.qmd` reejecutables, con semilla fija.
+4. **Individual y confidencial:** la **bitácora** y la **coevaluación 360**. Sin ellas, el factor de
+   implicación queda limitado a 0,80.
+
+::: {.callout-warning}
+## El apartado de uso ético de la IA es obligatorio
+Todo informe incluye una reflexión sobre qué herramientas de IA se usaron, para qué y **cómo se
+verificaron sus respuestas**. Sin ese apartado, el informe no puede alcanzar la calificación de
+«excelente».
+:::
+
+## Formularios y enlaces
+
+| Recurso | Enlace |
+|:--|:--|
+| Formulario de entrega · Proyecto 1 | [POR COMPLETAR] |
+| Formulario de entrega · Proyecto 2 | [POR COMPLETAR] |
+| Formulario de entrega · Proyecto 3 | [POR COMPLETAR] |
+| Bitácora individual y coevaluación 360 | [POR COMPLETAR] |
+| Reserva de tutoría para el examen oral | [POR COMPLETAR] |
+| Aula virtual de la asignatura | [POR COMPLETAR] |
+
+## Plantillas y rúbricas
+
+Todo el material de apoyo está en la carpeta `evaluacion/` del repositorio:
+
+| Recurso | Fichero |
+|:--|:--|
+| Plantilla de **informe técnico** (Caso 1) | [`Plantilla_informe_tecnico.qmd`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Plantillas_informes_tres_formatos/Plantilla_informe_tecnico.qmd) |
+| Plantilla de **informe ejecutivo** (Caso 2) | [`Plantilla_informe_ejecutivo.qmd`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Plantillas_informes_tres_formatos/Plantilla_informe_ejecutivo.qmd) |
+| Plantilla de **artículo científico** (Caso 3) | [`Plantilla_articulo_cientifico.qmd`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Plantillas_informes_tres_formatos/Plantilla_articulo_cientifico.qmd) |
+| Guía de redacción de informes | [`Guia_informes_eficaces_datos_tres_formatos.docx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Guia_informes_eficaces_datos_tres_formatos.docx) |
+| Guía de presentaciones eficaces | [`Guia_presentaciones_eficaces_datos_tres_formatos.docx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Guia_presentaciones_eficaces_datos_tres_formatos.docx) |
+| Libro de rúbricas | [`Rubricas_evaluacion.xlsx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Rubricas_evaluacion.xlsx) |
+
+Los criterios y sus pesos están resumidos en la
+[guía docente](guia_docente_simplificada.qmd).

@@ -1,0 +1,160 @@
+/*-- scss:defaults --*/
+// =============================================================================
+//  Tema del curso · construido SOBRE simplex (bootswatch)
+//  En _quarto.yml:  theme: [simplex, theme.scss]
+//  Aquí solo se sobrescriben variables; simplex pone el resto.
+//  Las fuentes se cargan con <link> desde _quarto.yml (include-in-header):
+//  es más fiable que un @import dentro del SCSS.
+// =============================================================================
+
+// --- Tipografía --------------------------------------------------------------
+// Inter: diseñada para pantalla, muy legible a tamaños pequeños y sin el
+// aspecto "pixelado" que dan algunas fuentes con hinting pobre.
+$font-family-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !default;
+$font-family-monospace:  "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace !default;
+$font-size-root:   18px !default;   // simplex viene en 16 px: corto para leer largo
+$line-height-base: 1.7  !default;
+
+// --- Color -------------------------------------------------------------------
+// Conservamos el naranja de simplex como color de marca.
+$body-color: #1c1c1c !default;     // negro suave: más contraste que el gris de simplex
+
+// Verde complementario del naranja, para los acordeones de la portada.
+// Si prefieres el verde propio de simplex, sustituye el valor por  $success.
+$verde-acento: #98ce3b !default;
+
+// CONTRASTE SOBRE EL NARANJA
+// La barra de navegación usa el color de marca de fondo; forzamos texto casi
+// negro en lugar del blanco de simplex.
+$navbar-fg:            #14100e !default;
+$navbar-hover-color:   #000000 !default;
+$navbar-active-color:  #000000 !default;
+$navbar-brand-color:   #14100e !default;
+$navbar-brand-hover-color: #000000 !default;
+
+// --- Barra lateral -----------------------------------------------------------
+$sidebar-fg: #2b2b2b !default;
+
+/*-- scss:rules --*/
+
+// --- Render de la tipografía -------------------------------------------------
+// Sin esto, en macOS el texto se ve más grueso y "sucio" de lo debido.
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+code, pre { font-size: .88em; }   // la monoespaciada compensa el cuerpo mayor
+
+// --- Barra de navegación SIEMPRE VISIBLE -------------------------------------
+// Quarto usa headroom.js, que esconde la barra al bajar. La anclamos arriba.
+header#quarto-header {
+  transition: none !important;
+}
+header#quarto-header.headroom--unpinned,
+header#quarto-header.headroom--not-top,
+.headroom--unpinned {
+  transform: translateY(0) !important;
+}
+
+.navbar-title { font-weight: 700; letter-spacing: -0.01em; }
+.navbar .nav-link { font-weight: 600; }
+
+// --- Portada: tarjetas de los tres casos -------------------------------------
+.rejilla-casos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+
+.tarjeta-caso {
+  display: block;
+  padding: 1.5rem 1.5rem 1.25rem;
+  border: 1px solid rgba(0, 0, 0, .1);
+  border-top: 4px solid var(--bs-primary);
+  border-radius: .5rem;
+  background: #fff;
+  color: inherit !important;
+  text-decoration: none !important;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.tarjeta-caso:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 .6rem 1.4rem rgba(0, 0, 0, .12);
+}
+.tarjeta-caso .etiqueta {
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--bs-primary);
+}
+.tarjeta-caso .pregunta {
+  font-size: 1.22rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: .35rem 0 .6rem;
+}
+.tarjeta-caso .detalle { font-size: .93rem; color: #4a4a4a; margin: 0; }
+
+// --- Portada: botones secundarios --------------------------------------------
+.fila-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin: 1.25rem 0 2rem;
+}
+.boton-recurso {
+  display: inline-block;
+  padding: .55rem 1.1rem;
+  border: 1.5px solid var(--bs-primary);
+  border-radius: 2rem;
+  font-weight: 600;
+  font-size: .95rem;
+  color: var(--bs-primary) !important;
+  text-decoration: none !important;
+  transition: background .15s ease, color .15s ease;
+}
+.boton-recurso:hover {
+  background: var(--bs-primary);
+  color: #14100e !important;      // texto oscuro sobre el naranja, no blanco
+}
+
+// --- Portada: acordeones verdes ----------------------------------------------
+// Se aplican con  ::: {.callout-note .acordeon collapse="true" icon=false}
+.callout.acordeon {
+  border-left-color: $verde-acento !important;
+  border-radius: .4rem;
+  overflow: hidden;
+}
+.callout.acordeon .callout-header {
+  background-color: rgba(152, 206, 59, .20) !important;
+  border-bottom: 1px solid rgba(152, 206, 59, .45);
+}
+.callout.acordeon .callout-header:hover {
+  background-color: rgba(152, 206, 59, .34) !important;
+}
+.callout.acordeon .callout-title-container {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #24350a;                 // verde muy oscuro: contraste alto sobre el tinte
+}
+.callout.acordeon .callout-body { padding-top: .9rem; }
+
+// --- Legibilidad del cuerpo --------------------------------------------------
+h1, h2, h3 { letter-spacing: -0.015em; }
+.callout { border-radius: .4rem; }
+
+// --- Pie: logotipos ----------------------------------------------------------
+.logos-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  margin: 2.5rem 0 1rem;
+}
+.logos-pie img { max-height: 62px; width: auto; opacity: .85; }
+.logos-pie img:hover { opacity: 1; }
