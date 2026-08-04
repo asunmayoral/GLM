@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.335">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Modelos Lineales Generalizados con R - Referencias</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "Sin resultados",
+    "search-matching-documents-text": "documentos encontrados",
+    "search-copy-link-title": "Copiar el enlace en la búsqueda",
+    "search-hide-matches-text": "Ocultar resultados adicionales",
+    "search-more-match-text": "resultado adicional en este documento",
+    "search-more-matches-text": "resultados adicionales en este documento",
+    "search-clear-button-title": "Borrar",
+    "search-detached-cancel-button-title": "Cancelar",
+    "search-submit-button-title": "Enviar"
+  }
+}</script>
+
+
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Modelos Lineales Generalizados con R</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html">
+ <span class="menu-text">Inicio</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./caso1/caso1_binaria.html">
+ <span class="menu-text">Caso 1 · Binaria</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./caso2/caso2_conteos.html">
+ <span class="menu-text">Caso 2 · Conteos</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./caso3/caso3_continuas_positivas.html">
+ <span class="menu-text">Caso 3 · Continuas</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="./referencias.html" aria-current="page">
+ <span class="menu-text">Referencias</span></a>
+  </li>  
+</ul>
+              <div class="quarto-toggle-container">
+                  <a href="" class="quarto-reader-toggle nav-link" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+              </div>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Referencias</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<p>Bibliografía común del curso. Recoge todas las fuentes citadas en los tres casos (teoría, métodos y paquetes de R). Las citas del texto —de la forma (Autor, año)— remiten a esta lista.</p>
+<div id="refs" class="references csl-bib-body hanging-indent" data-line-spacing="2" role="doc-bibliography">
+<div id="ref-agresti2013" class="csl-entry" role="doc-biblioentry">
+Agresti, A. (2013). <em>Categorical Data Analysis</em> (3.ª ed.). Wiley.
+</div>
+<div id="ref-agresti2015" class="csl-entry" role="doc-biblioentry">
+Agresti, A. (2015). <em>Foundations of Linear and Generalized Linear Models</em>. Wiley.
+</div>
+<div id="ref-aitkin1980" class="csl-entry" role="doc-biblioentry">
+Aitkin, M., &amp; Clayton, D. (1980). The Fitting of Exponential, Weibull and Extreme Value Distributions to Complex Censored Survival Data Using <span>GLIM</span>. <em>Journal of the Royal Statistical Society. Series C (Applied Statistics)</em>, <em>29</em>(2), 156-163. <a href="https://doi.org/10.2307/2986139">https://doi.org/10.2307/2986139</a>
+</div>
+<div id="ref-akaike1974" class="csl-entry" role="doc-biblioentry">
+Akaike, H. (1974). A New Look at the Statistical Model Identification. <em>IEEE Transactions on Automatic Control</em>, <em>19</em>(6), 716-723. <a href="https://doi.org/10.1109/TAC.1974.1100705">https://doi.org/10.1109/TAC.1974.1100705</a>
+</div>
+<div id="ref-albert1984" class="csl-entry" role="doc-biblioentry">
+Albert, A., &amp; Anderson, J. A. (1984). On the Existence of Maximum Likelihood Estimates in Logistic Regression Models. <em>Biometrika</em>, <em>71</em>(1), 1-10. <a href="https://doi.org/10.1093/biomet/71.1.1">https://doi.org/10.1093/biomet/71.1.1</a>
+</div>
+<div id="ref-quarto" class="csl-entry" role="doc-biblioentry">
+Allaire, J. J., Teague, C., Scheidegger, C., Xie, Y., &amp; Dervieux, C. (2024). <em>Quarto</em>. <a href="https://doi.org/10.5281/zenodo.5960048">https://doi.org/10.5281/zenodo.5960048</a>
+</div>
+<div id="ref-allison1982" class="csl-entry" role="doc-biblioentry">
+Allison, P. D. (1982). Discrete-Time Methods for the Analysis of Event Histories. <em>Sociological Methodology</em>, <em>13</em>, 61-98. <a href="https://doi.org/10.2307/270718">https://doi.org/10.2307/270718</a>
+</div>
+<div id="ref-arelbundock2024" class="csl-entry" role="doc-biblioentry">
+Arel-Bundock, V., Greifer, N., &amp; Heiss, A. (2024). How to Interpret Statistical Models Using <span>marginaleffects</span> for <span>R</span> and <span>Python</span>. <em>Journal of Statistical Software</em>, <em>111</em>(9), 1-32. <a href="https://doi.org/10.18637/jss.v111.i09">https://doi.org/10.18637/jss.v111.i09</a>
+</div>
+<div id="ref-mumin" class="csl-entry" role="doc-biblioentry">
+Bartoń, K. (2024). <em><span>MuMIn</span>: Multi-Model Inference</em>. <a href="https://CRAN.R-project.org/package=MuMIn">https://CRAN.R-project.org/package=MuMIn</a>
+</div>
+<div id="ref-bates2015" class="csl-entry" role="doc-biblioentry">
+Bates, D., Mächler, M., Bolker, B., &amp; Walker, S. (2015). Fitting Linear Mixed-Effects Models Using <span>lme4</span>. <em>Journal of Statistical Software</em>, <em>67</em>(1), 1-48. <a href="https://doi.org/10.18637/jss.v067.i01">https://doi.org/10.18637/jss.v067.i01</a>
+</div>
+<div id="ref-gh_lme4" class="csl-entry" role="doc-biblioentry">
+Bates, D., Maechler, M., Bolker, B., &amp; Walker, S. (s.&nbsp;f.). <em>lme4 (repositorio en GitHub)</em>. Recuperado junio de 2026, de <a href="https://github.com/lme4/lme4">https://github.com/lme4/lme4</a>
+</div>
+<div id="ref-glmmfaq" class="csl-entry" role="doc-biblioentry">
+Bolker, B. M. (2024). <em><span>GLMM</span> <span>FAQ</span></em>. <a href="https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html">https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html</a>
+</div>
+<div id="ref-boxcox1964" class="csl-entry" role="doc-biblioentry">
+Box, G. E. P., &amp; Cox, D. R. (1964). An Analysis of Transformations. <em>Journal of the Royal Statistical Society. Series B (Methodological)</em>, <em>26</em>(2), 211-252. <a href="https://doi.org/10.1111/j.2517-6161.1964.tb00553.x">https://doi.org/10.1111/j.2517-6161.1964.tb00553.x</a>
+</div>
+<div id="ref-aplore3" class="csl-entry" role="doc-biblioentry">
+Braglia, L. (2016). <em>aplore3: Datasets from Hosmer, Lemeshow and Sturdivant, <span>«Applied Logistic Regression»</span> (3rd Ed.)</em>. <a href="https://CRAN.R-project.org/package=aplore3">https://CRAN.R-project.org/package=aplore3</a>
+</div>
+<div id="ref-breslow1974" class="csl-entry" role="doc-biblioentry">
+Breslow, N. (1974). Covariance analysis of censored survival data. <em>Biometrics</em>, <em>30</em>(1), 89-99. <a href="https://doi.org/10.2307/2529620">https://doi.org/10.2307/2529620</a>
+</div>
+<div id="ref-burnham2002" class="csl-entry" role="doc-biblioentry">
+Burnham, K. P., &amp; Anderson, D. R. (2002). <em>Model Selection and Multimodel Inference: A Practical Information-Theoretic Approach</em> (2.ª ed.). Springer. <a href="https://doi.org/10.1007/b97636">https://doi.org/10.1007/b97636</a>
+</div>
+<div id="ref-christensen2025" class="csl-entry" role="doc-biblioentry">
+Christensen, R. (2025). <em>Log-Linear Models and Logistic Regression</em> (3.ª ed.). Springer. <a href="https://doi.org/10.1007/978-3-031-69038-9">https://doi.org/10.1007/978-3-031-69038-9</a>
+</div>
+<div id="ref-ordinal" class="csl-entry" role="doc-biblioentry">
+Christensen, R. H. B. (2023). <em>ordinal: Regression Models for Ordinal Data</em>. <a href="https://CRAN.R-project.org/package=ordinal">https://CRAN.R-project.org/package=ordinal</a>
+</div>
+<div id="ref-cox1972" class="csl-entry" role="doc-biblioentry">
+Cox, D. R. (1972). Regression models and life-tables. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, <em>34</em>(2), 187-202. <a href="https://doi.org/10.1111/j.2517-6161.1972.tb00899.x">https://doi.org/10.1111/j.2517-6161.1972.tb00899.x</a>
+</div>
+<div id="ref-cox1975" class="csl-entry" role="doc-biblioentry">
+Cox, D. R. (1975). Partial Likelihood. <em>Biometrika</em>, <em>62</em>(2), 269-276. <a href="https://doi.org/10.1093/biomet/62.2.269">https://doi.org/10.1093/biomet/62.2.269</a>
+</div>
+<div id="ref-datacamp_glm" class="csl-entry" role="doc-biblioentry">
+DataCamp. (s.&nbsp;f.-a). <em>Generalized Linear Models in R (curso en l<span>í</span>nea)</em>. Recuperado junio de 2026, de <a href="https://www.datacamp.com/courses/generalized-linear-models-in-r">https://www.datacamp.com/courses/generalized-linear-models-in-r</a>
+</div>
+<div id="ref-datacamp_mixed" class="csl-entry" role="doc-biblioentry">
+DataCamp. (s.&nbsp;f.-b). <em>Hierarchical and Mixed Effects Models in R (curso en l<span>í</span>nea)</em>. Recuperado junio de 2026, de <a href="https://www.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r">https://www.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r</a>
+</div>
+<div id="ref-dempster1977" class="csl-entry" role="doc-biblioentry">
+Dempster, A. P., Laird, N. M., &amp; Rubin, D. B. (1977). Maximum Likelihood from Incomplete Data via the <span>EM</span> Algorithm. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, <em>39</em>(1), 1-38. <a href="https://doi.org/10.1111/j.2517-6161.1977.tb01600.x">https://doi.org/10.1111/j.2517-6161.1977.tb01600.x</a>
+</div>
+<div id="ref-dobson2018" class="csl-entry" role="doc-biblioentry">
+Dobson, A. J., &amp; Barnett, A. G. (2018). <em>An Introduction to Generalized Linear Models</em> (4.ª ed.). Chapman; Hall/CRC. <a href="https://doi.org/10.1201/9781315182780">https://doi.org/10.1201/9781315182780</a>
+</div>
+<div id="ref-duan1983" class="csl-entry" role="doc-biblioentry">
+Duan, N. (1983). Smearing Estimate: A Nonparametric Retransformation Method. <em>Journal of the American Statistical Association</em>, <em>78</em>(383), 605-610. <a href="https://doi.org/10.1080/01621459.1983.10478017">https://doi.org/10.1080/01621459.1983.10478017</a>
+</div>
+<div id="ref-dunnsmyth1996" class="csl-entry" role="doc-biblioentry">
+Dunn, P. K., &amp; Smyth, G. K. (1996). Randomized Quantile Residuals. <em>Journal of Computational and Graphical Statistics</em>, <em>5</em>(3), 236-244.
+</div>
+<div id="ref-dunnsmyth2018" class="csl-entry" role="doc-biblioentry">
+Dunn, P. K., &amp; Smyth, G. K. (2018). <em>Generalized Linear Models With Examples in R</em>. Springer.
+</div>
+<div id="ref-gh_easystats" class="csl-entry" role="doc-biblioentry">
+easystats. (s.&nbsp;f.). <em>easystats: performance, see, ... (repositorio en GitHub)</em>. Recuperado junio de 2026, de <a href="https://github.com/easystats/easystats">https://github.com/easystats/easystats</a>
+</div>
+<div id="ref-efron1977" class="csl-entry" role="doc-biblioentry">
+Efron, B. (1977). The efficiency of Cox’s likelihood function for censored data. <em>Journal of the American Statistical Association</em>, <em>72</em>(359), 557-565. <a href="https://doi.org/10.1080/01621459.1977.10480613">https://doi.org/10.1080/01621459.1977.10480613</a>
+</div>
+<div id="ref-faraway2016" class="csl-entry" role="doc-biblioentry">
+Faraway, J. J. (2016). <em>Extending the Linear Model with R: Generalized Linear, Mixed Effects and Nonparametric Regression Models</em> (2.ª ed.). Chapman; Hall/CRC.
+</div>
+<div id="ref-firth1993" class="csl-entry" role="doc-biblioentry">
+Firth, D. (1993). Bias Reduction of Maximum Likelihood Estimates. <em>Biometrika</em>, <em>80</em>(1), 27-38. <a href="https://doi.org/10.1093/biomet/80.1.27">https://doi.org/10.1093/biomet/80.1.27</a>
+</div>
+<div id="ref-fox2016" class="csl-entry" role="doc-biblioentry">
+Fox, J. (2016). <em>Applied Regression Analysis and Generalized Linear Models</em> (3.ª ed.). SAGE.
+</div>
+<div id="ref-fox2019" class="csl-entry" role="doc-biblioentry">
+Fox, J., &amp; Weisberg, S. (2019). <em>An <span>R</span> Companion to Applied Regression</em> (3.ª ed.). SAGE.
+</div>
+<div id="ref-friedman2010" class="csl-entry" role="doc-biblioentry">
+Friedman, J. H., Hastie, T., &amp; Tibshirani, R. (2010). Regularization Paths for Generalized Linear Models via Coordinate Descent. <em>Journal of Statistical Software</em>, <em>33</em>(1), 1-22. <a href="https://doi.org/10.18637/jss.v033.i01">https://doi.org/10.18637/jss.v033.i01</a>
+</div>
+<div id="ref-glmnet" class="csl-entry" role="doc-biblioentry">
+Friedman, J., Hastie, T., Tibshirani, R., Narasimhan, B., Tay, K., Simon, N., &amp; Yang, J. (2023). <em><span>glmnet</span>: Lasso and Elastic-Net Regularized Generalized Linear Models</em>. <a href="https://CRAN.R-project.org/package=glmnet">https://CRAN.R-project.org/package=glmnet</a>
+</div>
+<div id="ref-gelmanhill2007" class="csl-entry" role="doc-biblioentry">
+Gelman, A., &amp; Hill, J. (2007). <em>Data Analysis Using Regression and Multilevel/Hierarchical Models</em>. Cambridge University Press.
+</div>
+<div id="ref-arm" class="csl-entry" role="doc-biblioentry">
+Gelman, A., &amp; Su, Y.-S. (2024). <em>arm: Data Analysis Using Regression and Multilevel/Hierarchical Models</em>. <a href="https://CRAN.R-project.org/package=arm">https://CRAN.R-project.org/package=arm</a>
+</div>
+<div id="ref-grambsch1994" class="csl-entry" role="doc-biblioentry">
+Grambsch, P. M., &amp; Therneau, T. M. (1994). Proportional hazards tests and diagnostics based on weighted residuals. <em>Biometrika</em>, <em>81</em>(3), 515-526. <a href="https://doi.org/10.1093/biomet/81.3.515">https://doi.org/10.1093/biomet/81.3.515</a>
+</div>
+<div id="ref-harrell2015" class="csl-entry" role="doc-biblioentry">
+Harrell, F. E. (2015). <em>Regression Modeling Strategies: With Applications to Linear Models, Logistic and Ordinal Regression, and Survival Analysis</em> (2.ª ed.). Springer. <a href="https://doi.org/10.1007/978-3-319-19425-7">https://doi.org/10.1007/978-3-319-19425-7</a>
+</div>
+<div id="ref-gh_dharma" class="csl-entry" role="doc-biblioentry">
+Hartig, F. (s.&nbsp;f.). <em>DHARMa (repositorio en GitHub)</em>. Recuperado junio de 2026, de <a href="https://github.com/florianhartig/DHARMa">https://github.com/florianhartig/DHARMa</a>
+</div>
+<div id="ref-hartig2022" class="csl-entry" role="doc-biblioentry">
+Hartig, F. (2024). <em><span>DHARMa</span>: Residual Diagnostics for Hierarchical (Multi-Level / Mixed) Regression Models</em>. <a href="https://CRAN.R-project.org/package=DHARMa">https://CRAN.R-project.org/package=DHARMa</a>
+</div>
+<div id="ref-hastie2009" class="csl-entry" role="doc-biblioentry">
+Hastie, T., Tibshirani, R., &amp; Friedman, J. (2009). <em>The Elements of Statistical Learning: Data Mining, Inference, and Prediction</em> (2.ª ed.). Springer. <a href="https://doi.org/10.1007/978-0-387-84858-7">https://doi.org/10.1007/978-0-387-84858-7</a>
+</div>
+<div id="ref-hauckdonner1977" class="csl-entry" role="doc-biblioentry">
+Hauck, W. W., &amp; Donner, A. (1977). Wald’s Test as Applied to Hypotheses in Logit Analysis. <em>Journal of the American Statistical Association</em>, <em>72</em>(360), 851-853.
+</div>
+<div id="ref-logistf" class="csl-entry" role="doc-biblioentry">
+Heinze, G., Ploner, M., et&nbsp;al. (2023). <em>logistf: Firth’s Bias-Reduced Logistic Regression</em>. <a href="https://CRAN.R-project.org/package=logistf">https://CRAN.R-project.org/package=logistf</a>
+</div>
+<div id="ref-heinze2002" class="csl-entry" role="doc-biblioentry">
+Heinze, G., &amp; Schemper, M. (2002). A Solution to the Problem of Separation in Logistic Regression. <em>Statistics in Medicine</em>, <em>21</em>(16), 2409-2419. <a href="https://doi.org/10.1002/sim.1047">https://doi.org/10.1002/sim.1047</a>
+</div>
+<div id="ref-hoerl1970" class="csl-entry" role="doc-biblioentry">
+Hoerl, A. E., &amp; Kennard, R. W. (1970). Ridge Regression: Biased Estimation for Nonorthogonal Problems. <em>Technometrics</em>, <em>12</em>(1), 55-67. <a href="https://doi.org/10.1080/00401706.1970.10488634">https://doi.org/10.1080/00401706.1970.10488634</a>
+</div>
+<div id="ref-holford1980" class="csl-entry" role="doc-biblioentry">
+Holford, T. R. (1980). The analysis of rates and of survivorship using log-linear models. <em>Biometrics</em>, <em>36</em>(2), 299-305. <a href="https://doi.org/10.2307/2529982">https://doi.org/10.2307/2529982</a>
+</div>
+<div id="ref-hosmer1980" class="csl-entry" role="doc-biblioentry">
+Hosmer, D. W., &amp; Lemeshow, S. (1980). Goodness of Fit Tests for the Multiple Logistic Regression Model. <em>Communications in Statistics - Theory and Methods</em>, <em>9</em>(10), 1043-1069. <a href="https://doi.org/10.1080/03610928008827941">https://doi.org/10.1080/03610928008827941</a>
+</div>
+<div id="ref-hosmer2013" class="csl-entry" role="doc-biblioentry">
+Hosmer, D. W., Lemeshow, S., &amp; Sturdivant, R. X. (2013). <em>Applied Logistic Regression</em> (3.ª ed.). Wiley. <a href="https://doi.org/10.1002/9781118548387">https://doi.org/10.1002/9781118548387</a>
+</div>
+<div id="ref-james2021" class="csl-entry" role="doc-biblioentry">
+James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2021). <em>An Introduction to Statistical Learning with Applications in R</em> (2.ª ed.). Springer. <a href="https://doi.org/10.1007/978-1-0716-1418-1">https://doi.org/10.1007/978-1-0716-1418-1</a>
+</div>
+<div id="ref-islr_web" class="csl-entry" role="doc-biblioentry">
+James, G., Witten, D., Hastie, T., &amp; Tibshirani, R. (2023). <em>An Introduction to Statistical Learning (sitio web del libro)</em>. <a href="https://www.statlearning.com">https://www.statlearning.com</a>
+</div>
+<div id="ref-kaplan1958" class="csl-entry" role="doc-biblioentry">
+Kaplan, E. L., &amp; Meier, P. (1958). Nonparametric Estimation from Incomplete Observations. <em>Journal of the American Statistical Association</em>, <em>53</em>(282), 457-481. <a href="https://doi.org/10.1080/01621459.1958.10501452">https://doi.org/10.1080/01621459.1958.10501452</a>
+</div>
+<div id="ref-survminer" class="csl-entry" role="doc-biblioentry">
+Kassambara, A., Kosinski, M., &amp; Biecek, P. (2024). <em>survminer: Drawing Survival Curves using ggplot2</em>. <a href="https://CRAN.R-project.org/package=survminer">https://CRAN.R-project.org/package=survminer</a>
+</div>
+<div id="ref-brglm2" class="csl-entry" role="doc-biblioentry">
+Kosmidis, I. (2023). <em>brglm2: Bias Reduction in Generalized Linear Models</em>. <a href="https://CRAN.R-project.org/package=brglm2">https://CRAN.R-project.org/package=brglm2</a>
+</div>
+<div id="ref-detectseparation" class="csl-entry" role="doc-biblioentry">
+Kosmidis, I., Schumacher, D., &amp; Schwendinger, F. (2022). <em>detectseparation: Detect and Check for Separation and Infinite ML Estimates</em>. <a href="https://CRAN.R-project.org/package=detectseparation">https://CRAN.R-project.org/package=detectseparation</a>
+</div>
+<div id="ref-tmwr" class="csl-entry" role="doc-biblioentry">
+Kuhn, M., &amp; Silge, J. (2023). <em>Tidy Modeling with R</em>. <a href="https://www.tmwr.org">https://www.tmwr.org</a>
+</div>
+<div id="ref-yardstick" class="csl-entry" role="doc-biblioentry">
+Kuhn, M., Vaughan, D., &amp; Hvitfeldt, E. (2026). <em><span>yardstick</span>: Tidy Characterizations of Model Performance</em>. <a href="https://doi.org/10.32614/CRAN.package.yardstick">https://doi.org/10.32614/CRAN.package.yardstick</a>
+</div>
+<div id="ref-laird1981" class="csl-entry" role="doc-biblioentry">
+Laird, N., &amp; Olivier, D. (1981). Covariance analysis of censored survival data using log-linear analysis techniques. <em>Journal of the American Statistical Association</em>, <em>76</em>(374), 231-240. <a href="https://doi.org/10.1080/01621459.1981.10477634">https://doi.org/10.1080/01621459.1981.10477634</a>
+</div>
+<div id="ref-lambert1992" class="csl-entry" role="doc-biblioentry">
+Lambert, D. (1992). Zero-Inflated Poisson Regression, with an Application to Defects in Manufacturing. <em>Technometrics</em>, <em>34</em>(1), 1-14. <a href="https://doi.org/10.2307/1269547">https://doi.org/10.2307/1269547</a>
+</div>
+<div id="ref-resourceselection" class="csl-entry" role="doc-biblioentry">
+Lele, S. R., Keim, J. L., &amp; Solymos, P. (2023). <em>ResourceSelection: Resource Selection (Probability) Functions for Use-Availability Data</em>. <a href="https://CRAN.R-project.org/package=ResourceSelection">https://CRAN.R-project.org/package=ResourceSelection</a>
+</div>
+<div id="ref-ggeffects2018" class="csl-entry" role="doc-biblioentry">
+Lüdecke, D. (2018). <span>ggeffects</span>: Tidy Data Frames of Marginal Effects from Regression Models. <em>Journal of Open Source Software</em>, <em>3</em>(26), 772. <a href="https://doi.org/10.21105/joss.00772">https://doi.org/10.21105/joss.00772</a>
+</div>
+<div id="ref-see" class="csl-entry" role="doc-biblioentry">
+Lüdecke, D. et&nbsp;al. (2024). <em>see: Visualisation Toolbox for "easystats"</em>. <a href="https://CRAN.R-project.org/package=see">https://CRAN.R-project.org/package=see</a>
+</div>
+<div id="ref-ludecke2021" class="csl-entry" role="doc-biblioentry">
+Lüdecke, D., Ben-Shachar, M. S., Patil, I., Waggoner, P., &amp; Makowski, D. (2021). <span>performance</span>: An <span>R</span> Package for Assessment, Comparison and Testing of Statistical Models. <em>Journal of Open Source Software</em>, <em>6</em>(60), 3139. <a href="https://doi.org/10.21105/joss.03139">https://doi.org/10.21105/joss.03139</a>
+</div>
+<div id="ref-mantel1966" class="csl-entry" role="doc-biblioentry">
+Mantel, N. (1966). Evaluation of Survival Data and Two New Rank Order Statistics Arising in Its Consideration. <em>Cancer Chemotherapy Reports</em>, <em>50</em>(3), 163-170.
+</div>
+<div id="ref-mccullagh1989" class="csl-entry" role="doc-biblioentry">
+McCullagh, P., &amp; Nelder, J. A. (1989). <em>Generalized Linear Models</em> (2.ª ed.). Chapman; Hall/CRC.
+</div>
+<div id="ref-mullahy1986" class="csl-entry" role="doc-biblioentry">
+Mullahy, J. (1986). Specification and Testing of Some Modified Count Data Models. <em>Journal of Econometrics</em>, <em>33</em>(3), 341-365. <a href="https://doi.org/10.1016/0304-4076(86)90002-3">https://doi.org/10.1016/0304-4076(86)90002-3</a>
+</div>
+<div id="ref-nakagawa2017" class="csl-entry" role="doc-biblioentry">
+Nakagawa, S., Johnson, P. C. D., &amp; Schielzeth, H. (2017). The coefficient of determination <span>R2</span> and intra-class correlation coefficient from generalized linear mixed-effects models revisited and expanded. <em>Journal of the Royal Society Interface</em>, <em>14</em>(134), 20170213. <a href="https://doi.org/10.1098/rsif.2017.0213">https://doi.org/10.1098/rsif.2017.0213</a>
+</div>
+<div id="ref-nakagawa2013" class="csl-entry" role="doc-biblioentry">
+Nakagawa, S., &amp; Schielzeth, H. (2013). A general and simple method for obtaining <span>R2</span> from generalized linear mixed-effects models. <em>Methods in Ecology and Evolution</em>, <em>4</em>(2), 133-142. <a href="https://doi.org/10.1111/j.2041-210X.2012.00261.x">https://doi.org/10.1111/j.2041-210X.2012.00261.x</a>
+</div>
+<div id="ref-nelder1972" class="csl-entry" role="doc-biblioentry">
+Nelder, J. A., &amp; Wedderburn, R. W. M. (1972). Generalized Linear Models. <em>Journal of the Royal Statistical Society. Series A (General)</em>, <em>135</em>(3), 370-384. <a href="https://doi.org/10.2307/2344614">https://doi.org/10.2307/2344614</a>
+</div>
+<div id="ref-patchwork" class="csl-entry" role="doc-biblioentry">
+Pedersen, T. L. (2024). <em>patchwork: The Composer of Plots</em>. <a href="https://CRAN.R-project.org/package=patchwork">https://CRAN.R-project.org/package=patchwork</a>
+</div>
+<div id="ref-rstudio" class="csl-entry" role="doc-biblioentry">
+Posit Team. (2024). <em>RStudio: Integrated Development Environment for R</em>. Posit Software, PBC. <a href="https://posit.co/">https://posit.co/</a>
+</div>
+<div id="ref-prentice1978" class="csl-entry" role="doc-biblioentry">
+Prentice, R. L., &amp; Gloeckler, L. A. (1978). Regression Analysis of Grouped Survival Data with Application to Breast Cancer Data. <em>Biometrics</em>, <em>34</em>(1), 57-67. <a href="https://doi.org/10.2307/2529588">https://doi.org/10.2307/2529588</a>
+</div>
+<div id="ref-rcore" class="csl-entry" role="doc-biblioentry">
+R Core Team. (2024). <em>R: A Language and Environment for Statistical Computing</em>. R Foundation for Statistical Computing. <a href="https://www.r-project.org/">https://www.r-project.org/</a>
+</div>
+<div id="ref-nnet" class="csl-entry" role="doc-biblioentry">
+Ripley, B., &amp; Venables, W. (2023). <em>nnet: Feed-Forward Neural Networks and Multinomial Log-Linear Models</em>. <a href="https://CRAN.R-project.org/package=nnet">https://CRAN.R-project.org/package=nnet</a>
+</div>
+<div id="ref-gh_beyondmlr" class="csl-entry" role="doc-biblioentry">
+Roback, P., &amp; Legler, J. (s.&nbsp;f.). <em>BeyondMLR (repositorio del libro en GitHub)</em>. Recuperado junio de 2026, de <a href="https://github.com/proback/BeyondMLR">https://github.com/proback/BeyondMLR</a>
+</div>
+<div id="ref-roback2021" class="csl-entry" role="doc-biblioentry">
+Roback, P., &amp; Legler, J. (2021). <em>Beyond Multiple Linear Regression: Applied Generalized Linear Models and Multilevel Models in R</em>. Chapman; Hall/CRC. <a href="https://doi.org/10.1201/9780429066665">https://doi.org/10.1201/9780429066665</a>
+</div>
+<div id="ref-robin2011" class="csl-entry" role="doc-biblioentry">
+Robin, X., Turck, N., Hainard, A., Tiberti, N., Lisacek, F., Sanchez, J.-C., &amp; Müller, M. (2011). <span>pROC</span>: An Open-Source Package for <span>R</span> and <span>S+</span> to Analyze and Compare <span>ROC</span> Curves. <em>BMC Bioinformatics</em>, <em>12</em>, 77. <a href="https://doi.org/10.1186/1471-2105-12-77">https://doi.org/10.1186/1471-2105-12-77</a>
+</div>
+<div id="ref-broom" class="csl-entry" role="doc-biblioentry">
+Robinson, D., Hayes, A., &amp; Couch, S. (2024). <em>broom: Convert Statistical Objects into Tidy Tibbles</em>. <a href="https://CRAN.R-project.org/package=broom">https://CRAN.R-project.org/package=broom</a>
+</div>
+<div id="ref-ggally" class="csl-entry" role="doc-biblioentry">
+Schloerke, B. et&nbsp;al. (2024). <em>GGally: Extension to ggplot2</em>. <a href="https://CRAN.R-project.org/package=GGally">https://CRAN.R-project.org/package=GGally</a>
+</div>
+<div id="ref-schoenfeld1982" class="csl-entry" role="doc-biblioentry">
+Schoenfeld, D. (1982). Partial residuals for the proportional hazards regression model. <em>Biometrika</em>, <em>69</em>(1), 239-241. <a href="https://doi.org/10.1093/biomet/69.1.239">https://doi.org/10.1093/biomet/69.1.239</a>
+</div>
+<div id="ref-schwarz1978" class="csl-entry" role="doc-biblioentry">
+Schwarz, G. (1978). Estimating the Dimension of a Model. <em>The Annals of Statistics</em>, <em>6</em>(2), 461-464. <a href="https://doi.org/10.1214/aos/1176344136">https://doi.org/10.1214/aos/1176344136</a>
+</div>
+<div id="ref-selfliang1987" class="csl-entry" role="doc-biblioentry">
+Self, S. G., &amp; Liang, K.-Y. (1987). Asymptotic Properties of Maximum Likelihood Estimators and Likelihood Ratio Tests under Nonstandard Conditions. <em>Journal of the American Statistical Association</em>, <em>82</em>(398), 605-610. <a href="https://doi.org/10.1080/01621459.1987.10478472">https://doi.org/10.1080/01621459.1987.10478472</a>
+</div>
+<div id="ref-stone1974" class="csl-entry" role="doc-biblioentry">
+Stone, M. (1974). Cross-Validatory Choice and Assessment of Statistical Predictions. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, <em>36</em>(2), 111-147. <a href="https://doi.org/10.1111/j.2517-6161.1974.tb00994.x">https://doi.org/10.1111/j.2517-6161.1974.tb00994.x</a>
+</div>
+<div id="ref-stramlee1994" class="csl-entry" role="doc-biblioentry">
+Stram, D. O., &amp; Lee, J. W. (1994). Variance Components Testing in the Longitudinal Mixed Effects Model. <em>Biometrics</em>, <em>50</em>(4), 1171-1177. <a href="https://doi.org/10.2307/2533455">https://doi.org/10.2307/2533455</a>
+</div>
+<div id="ref-cranviews" class="csl-entry" role="doc-biblioentry">
+The R Project. (s.&nbsp;f.). <em><span>CRAN</span> Task Views</em>. Recuperado junio de 2026, de <a href="https://cran.r-project.org/web/views/">https://cran.r-project.org/web/views/</a>
+</div>
+<div id="ref-survival" class="csl-entry" role="doc-biblioentry">
+Therneau, T. M. (2024). <em>survival: A Package for Survival Analysis in R</em>. <a href="https://CRAN.R-project.org/package=survival">https://CRAN.R-project.org/package=survival</a>
+</div>
+<div id="ref-therneau2000" class="csl-entry" role="doc-biblioentry">
+Therneau, T. M., &amp; Grambsch, P. M. (2000). <em>Modeling Survival Data: Extending the <span>Cox</span> Model</em>. Springer. <a href="https://doi.org/10.1007/978-1-4757-3294-8">https://doi.org/10.1007/978-1-4757-3294-8</a>
+</div>
+<div id="ref-tibshirani1996" class="csl-entry" role="doc-biblioentry">
+Tibshirani, R. (1996). Regression Shrinkage and Selection via the Lasso. <em>Journal of the Royal Statistical Society: Series B (Methodological)</em>, <em>58</em>(1), 267-288. <a href="https://doi.org/10.1111/j.2517-6161.1996.tb02080.x">https://doi.org/10.1111/j.2517-6161.1996.tb02080.x</a>
+</div>
+<div id="ref-gh_yardstick" class="csl-entry" role="doc-biblioentry">
+tidymodels. (s.&nbsp;f.). <em>yardstick (repositorio en GitHub)</em>. Recuperado junio de 2026, de <a href="https://github.com/tidymodels/yardstick">https://github.com/tidymodels/yardstick</a>
+</div>
+<div id="ref-uclaoarc" class="csl-entry" role="doc-biblioentry">
+UCLA Office of Advanced Research Computing (OARC) Statistics. (s.&nbsp;f.). <em>Statistical Methods and Data Analytics (ejemplos en R)</em>. Recuperado junio de 2026, de <a href="https://stats.oarc.ucla.edu">https://stats.oarc.ucla.edu</a>
+</div>
+<div id="ref-renv" class="csl-entry" role="doc-biblioentry">
+Ushey, K., &amp; Wickham, H. (2024). <em>renv: Project Environments</em>. <a href="https://CRAN.R-project.org/package=renv">https://CRAN.R-project.org/package=renv</a>
+</div>
+<div id="ref-vandenbroek1995" class="csl-entry" role="doc-biblioentry">
+Van den Broek, J. (1995). A Score Test for Zero Inflation in a Poisson Distribution. <em>Biometrics</em>, <em>51</em>(2), 738-743. <a href="https://doi.org/10.2307/2532959">https://doi.org/10.2307/2532959</a>
+</div>
+<div id="ref-vaupel1979" class="csl-entry" role="doc-biblioentry">
+Vaupel, J. W., Manton, K. G., &amp; Stallard, E. (1979). The impact of heterogeneity in individual frailty on the dynamics of mortality. <em>Demography</em>, <em>16</em>(3), 439-454. <a href="https://doi.org/10.2307/2061224">https://doi.org/10.2307/2061224</a>
+</div>
+<div id="ref-venablesripley2002" class="csl-entry" role="doc-biblioentry">
+Venables, W. N., &amp; Ripley, B. D. (2002). <em>Modern Applied Statistics with S</em> (4.ª ed.). Springer.
+</div>
+<div id="ref-vuong1989" class="csl-entry" role="doc-biblioentry">
+Vuong, Q. H. (1989). Likelihood Ratio Tests for Model Selection and Non-Nested Hypotheses. <em>Econometrica</em>, <em>57</em>(2), 307-333. <a href="https://doi.org/10.2307/1912557">https://doi.org/10.2307/1912557</a>
+</div>
+<div id="ref-wickham2019" class="csl-entry" role="doc-biblioentry">
+Wickham, H. et&nbsp;al. (2019). Welcome to the <span>tidyverse</span>. <em>Journal of Open Source Software</em>, <em>4</em>(43), 1686. <a href="https://doi.org/10.21105/joss.01686">https://doi.org/10.21105/joss.01686</a>
+</div>
+<div id="ref-readr" class="csl-entry" role="doc-biblioentry">
+Wickham, H., Hester, J., &amp; Bryan, J. (2024). <em>readr: Read Rectangular Text Data</em>. <a href="https://CRAN.R-project.org/package=readr">https://CRAN.R-project.org/package=readr</a>
+</div>
+<div id="ref-wilson2015" class="csl-entry" role="doc-biblioentry">
+Wilson, P. (2015). The Misuse of the <span>Vuong</span> Test for Non-Nested Models to Test for Zero-Inflation. <em>Economics Letters</em>, <em>127</em>, 51-53. <a href="https://doi.org/10.1016/j.econlet.2014.12.029">https://doi.org/10.1016/j.econlet.2014.12.029</a>
+</div>
+<div id="ref-vgam" class="csl-entry" role="doc-biblioentry">
+Yee, T. W. (2024). <em>VGAM: Vector Generalized Linear and Additive Models</em>. <a href="https://CRAN.R-project.org/package=VGAM">https://CRAN.R-project.org/package=VGAM</a>
+</div>
+<div id="ref-zou2005" class="csl-entry" role="doc-biblioentry">
+Zou, H., &amp; Hastie, T. (2005). Regularization and Variable Selection via the Elastic Net. <em>Journal of the Royal Statistical Society: Series B (Statistical Methodology)</em>, <em>67</em>(2), 301-320. <a href="https://doi.org/10.1111/j.1467-9868.2005.00503.x">https://doi.org/10.1111/j.1467-9868.2005.00503.x</a>
+</div>
+</div>
+
+
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copiado");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copiado");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  const viewSource = window.document.getElementById('quarto-view-source') ||
+                     window.document.getElementById('quarto-code-tools-source');
+  if (viewSource) {
+    const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+    viewSource.addEventListener("click", function(e) {
+      if (sourceUrl) {
+        // rstudio viewer pane
+        if (/\bcapabilities=\b/.test(window.location)) {
+          window.open(sourceUrl);
+        } else {
+          window.location.href = sourceUrl;
+        }
+      } else {
+        const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+        modal.show();
+      }
+      return false;
+    });
+  }
+  function toggleCodeHandler(show) {
+    return function(e) {
+      const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+      for (let i=0; i<detailsSrc.length; i++) {
+        const details = detailsSrc[i].parentElement;
+        if (show) {
+          details.open = true;
+        } else {
+          details.removeAttribute("open");
+        }
+      }
+      const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+      const fromCls = show ? "hidden" : "unhidden";
+      const toCls = show ? "unhidden" : "hidden";
+      for (let i=0; i<cellCodeDivs.length; i++) {
+        const codeDiv = cellCodeDivs[i];
+        if (codeDiv.classList.contains(fromCls)) {
+          codeDiv.classList.remove(fromCls);
+          codeDiv.classList.add(toCls);
+        } 
+      }
+      return false;
+    }
+  }
+  const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+  if (hideAllCode) {
+    hideAllCode.addEventListener("click", toggleCodeHandler(false));
+  }
+  const showAllCode = window.document.getElementById("quarto-show-all-code");
+  if (showAllCode) {
+    showAllCode.addEventListener("click", toggleCodeHandler(true));
+  }
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+      <div class="nav-footer-center">Material docente · Grado en Ciencia de Datos e IA · Universidad Miguel Hernández</div>
+  </div>
+</footer>
+
+
+
+</body></html>
