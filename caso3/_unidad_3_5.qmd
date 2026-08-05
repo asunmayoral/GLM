@@ -617,37 +617,28 @@ Un guion reutilizable para cualquier modelo de vida acelerada:
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.5)
-Sobre el banco de averías del caso, con la tabla `intervalos`:
+## Tarea del estudiante (3.5) · qué te llevas al estudio de caso
+Esta unidad te da el instrumental completo de la **duración con censura**: describirla sin modelo,
+ajustar un AFT, elegir su distribución con criterio y leerla en tiempo. En la cartera de la
+[Unidad 3.8](#sec-u38) la respuesta ya no es el tiempo entre averías sino la **antigüedad de la
+póliza**, y el par correcto es `Surv(antiguedad, baja)`.
 
-1. Estimad la supervivencia entre fallos por Kaplan–Meier según el plan de mantenimiento y contrastadla
-   con log-rank. Interpretad las medianas de supervivencia en días.
-2. Ajustad un AFT Weibull e **interpretad en tiempo** (factor de aceleración) el efecto del plan, la
-   antigüedad y la carga. ¿Cuántos días de marcha entre fallos añade, aproximadamente, el plan
-   preventivo a una máquina promedio?
-3. Comparad exponencial, Weibull, log-normal y log-logística por AIC, y **respaldad** la elección con
-   diagnóstico: el **gráfico linealizado** de familia y los **residuos de Cox–Snell** (su Kaplan–Meier
-   debería seguir una $\mathrm{Exp}(1)$). Justificad la elección conectándola con la **forma del hazard**
-   que cada una implica. ¿Qué dice una forma de Weibull $\approx 1$ sobre la **memoria** del proceso de
-   fallo, y por qué es coherente con un desgaste que depende de la **edad** y no del tiempo desde el
-   último fallo?
-4. La censura es esencial: reajustad el modelo **descartando** las esperas censuradas (la última de cada
-   máquina) y comparad los coeficientes. ¿En qué dirección se sesga el resultado al tirar la información
-   parcial?
-5. Discutid una limitación del AFT ingenuo en este problema: ¿por qué los intervalos de una misma máquina
-   **no son independientes**, y qué efecto tiene eso sobre los errores estándar y la significación? Poned
-   un ejemplo con una variable que el DGP sabe **sin efecto**.
-6. (Palanca de decisión) El `intervalo_mant` es una variable prescriptiva: acortar el intervalo entre
-   mantenimientos debería retrasar el fallo. Explorad, sobre las máquinas con plan preventivo, si un
-   intervalo más corto se asocia a esperas más largas, y discutid por qué esta pregunta se responde mejor
-   con el modelo de la [Unidad 3.6](#sec-u36).
+- **[Propuesta 3 · ¿Cuánto dura un cliente?](#sec-u38-p3)** *(unidad base)*. Sus tres primeros pasos
+  son, uno a uno, las secciones de esta unidad: Kaplan–Meier con log-rank por grupos
+  ([Sección 5.2](#sec-u35-km)), AFT con la distribución **elegida por AIC y respaldada por
+  diagnóstico** —gráfico linealizado y residuos de Cox–Snell, [Sección 5.6](#sec-u35-diagnostico)—, y
+  lectura en **factores de aceleración** ([Sección 5.4](#sec-u35-interpretacion)). Ensáyalo aquí sobre
+  `intervalos` antes de trasladarlo: estima las medianas de supervivencia por plan de mantenimiento,
+  ajusta el AFT Weibull y traduce el efecto del plan a **días de marcha** ganados.
+- **La censura, en serio.** En la cartera **seis de cada diez pólizas siguen vivas** al cerrar el
+  estudio: son censuras, no bajas. Antes de fiarte del ajuste, haz aquí la comprobación que allí no
+  puedes permitirte olvidar —reajusta el AFT **descartando** las esperas censuradas y mira en qué
+  dirección se mueven los coeficientes—. Es el argumento que justifica, en el artículo, por qué la
+  verosimilitud las trata como desigualdades y no las tira.
 
-**Y en el estudio de caso (3.8).** Todo lo anterior es el ensayo de la
-**[Propuesta 3 · ¿Cuánto dura un cliente?](#sec-u38-p3)**, donde la respuesta es el tiempo hasta la
-baja de una póliza: Kaplan–Meier descriptivo, elección de la distribución del error entre las cuatro
-—allí la log-logística deja de ser una candidata más— y lectura en factores de aceleración. Dos
-avisos que esta unidad ya ha preparado: el par correcto es `Surv(antiguedad, baja)` y **nunca**
-`t_baja`, que en las pólizas censuradas contiene información del futuro; y las pólizas, a diferencia
-de nuestras máquinas, aportan **una sola** espera, así que la dependencia intra-sujeto del apartado 5
-no se plantea ahí en los mismos términos.
+**Aviso.** El par de la respuesta es `Surv(antiguedad, baja)` y **nunca** `t_baja`: en las pólizas
+censuradas, `t_baja` guarda información del futuro que nadie tendría en una cartera real, y produce un
+modelo que parece excelente y no vale nada. Y una diferencia con nuestras máquinas que conviene tener
+presente: cada póliza aporta **una sola** espera, así que la correlación intra-sujeto que aquí
+arrastramos —y que la [Unidad 3.6](#sec-u36) resuelve— no se plantea allí en los mismos términos.
 :::

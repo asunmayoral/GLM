@@ -13,7 +13,6 @@ format:
     code-tools:
       source: false
       toggle: true
-    theme: cosmo
     df-print: paged
   pdf:
     toc: true
@@ -121,18 +120,17 @@ de supervivencia: **Cox** como frontera.
 | **3.7** | *«¿Dicen lo mismo las tres lecturas del fallo?»* — **Cierre**: `cloglog` persona-periodo, **Poisson a trozos** y **Cox** sobre el mismo panel, la deuda pendiente desde el Caso 1; y un **mapa de fronteras** (hurdle, GAM, riesgos competitivos, bayesiano) con el límite de la regularización. | **RA7** (integra RA5 y RA6)<br>**Datos:** `seguimiento` |
 | **3.8** | *«¿Qué recomendamos, y es reproducible?»* — **Estudio de caso, exposición y evaluación** (artículo de investigación), sobre la cartera de la aseguradora del Caso 2. | **RA9** (integra RA1–RA8)<br>**Datos:** banco del Caso 2 |
 
-**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión (la lista
-completa, con su uso comentado, vive en cada `.qmd` y en los scripts de `caso3/scripts/`):
+**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso3/scripts/`):
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **3.1** | `glm(Gamma(link="log"))` · `broom::tidy` · `anova(…, test="F")` · `DHARMa::simulateResiduals` · `emmeans` / `marginaleffects` |
-| **3.2** | `glm(inverse.gaussian)` · `lm(log(y))` + **smearing** de Duan · `AIC` / `logLik` · `MASS` |
-| **3.3** | `glmmTMB(… + (1 + edad \| id_maquina))` · `car::Anova` · `performance::r2_nakagawa` / `icc` · `DHARMa::testDispersion` · `VarCorr` |
-| **3.4** | `glmmTMB(family = tweedie)` · `family_params` / `sigma` ($p$ y $\phi$) · `DHARMa` · `rsample::group_vfold_cv` |
-| **3.5** | `survival::survreg` (Weibull/exp/lognormal) · `Surv` · `survfit` / `survdiff` (KM, log-rank) · `survminer::ggsurvplot` |
-| **3.6** | `survival::coxph` · `frailty(id_maquina)` · `cox.zph` (Schoenfeld) · `Surv(tstart, tstop, evento)` · `tt()` |
-| **3.7** | `glm(binomial("cloglog"))` · `glm(poisson)` con *offset* · `coxph` · `glmmTMB` / `frailty` para las versiones agrupadas · `glmnet` (como límite conceptual) |
+| **3.1** | ajuste: [`glm(Gamma(link = "log"))`](#sec-u31-modelizacion) · interpretación: [`broom::tidy` · `emmeans::emmeans` · `marginaleffects::plot_predictions`](#sec-u31-interpretacion) · inferencia: [`anova(..., test = "F")` · `drop1` · `AIC`](#sec-u31-inferencia) · diagnóstico: [`DHARMa::simulateResiduals`](#sec-u31-diagnostico) |
+| **3.2** | familias positivas: [`glm(inverse.gaussian)` · `quasi(variance = "mu^2")` · `statmod::tweedie`](#sec-u32-contexto) · log-OLS: [`lm(log(y))` y el **smearing** de Duan](#sec-u32-lognormal) · modelar la dispersión: [`glm` sobre los residuos de Pearson al cuadrado](#sec-u32-dispersion) · comparar: [`AIC`/`logLik` con jacobiano](#sec-u32-elegir) |
+| **3.3** | ajuste: [`glmmTMB(... + (1 + edad \| id_maquina), Gamma("log"))`](#sec-u33-modelo) · salida: [`broom.mixed::tidy`/`glance` · `glmmTMB::VarCorr`](#sec-u33-interpretacion) · diagnóstico: [`DHARMa::simulateResiduals` · `testDispersion` · `performance::r2_nakagawa`/`icc`](#sec-u33-diagnostico) · predicción: [`predict(re.form = NA \| NULL)` · `ranef`/`fixef`](#sec-u33-prediccion) |
+| **3.4** | la potencia $p$: [`dplyr::ntile` · la nube media-varianza en log-log](#sec-u34-mapa) · Tweedie: [`glmmTMB(family = tweedie)` · `family_params` ($p$) · `sigma` ($\phi$)](#sec-u34-validacion-tw) · efectos aleatorios: [`(1 \| id_maquina)` · `VarCorr` · `drop1`/`anova`](#sec-u34-glmm-tweedie) · comparación: [`AIC`/`BIC` · calibración](#sec-u34-re-bondad) · diagnóstico: [`DHARMa::recalculateResiduals`](#sec-u34-re-diagnostico) · predicción: [`predict` con `vcov` para el intervalo](#sec-u34-re-prediccion) · CV agrupada: [`rsample::group_vfold_cv`](#sec-u34-cv) |
+| **3.5** | descripción: [`survival::Surv` · `survfit` (KM) · `survdiff` (log-rank) · `survminer::ggsurvplot`](#sec-u35-km) · AFT: [`survreg(dist = "weibull"/"exponential"/"lognormal"/"loglogistic")`](#sec-u35-modelo) · lectura: [factor de aceleración · `broom::tidy` · `predict`](#sec-u35-interpretacion) |
+| **3.6** | ajuste: [`survival::coxph(Surv(t, evento) ~ ...)`](#sec-u36-noglm) · hazard ratios: [`broom::tidy(exponentiate = TRUE)` · `relevel`](#sec-u36-interpretacion) · fragilidad: [`frailty(id)` frente a `cluster(id)`](#sec-u36-fragilidad) · proporcionalidad: [`cox.zph` (Schoenfeld) · `survminer::ggcoxzph`](#sec-u36-ph) · Cox extendido: [`Surv(tstart, tstop, evento)`](#sec-u36-extcox-modelo) · covariable exacta: [`tt()`](#sec-u36-arbitrario) · predicción: [`predict(type = "lp"/"risk")` · `survfit(cox, newdata)`](#sec-u36-prediccion) |
+| **3.7** | las tres lentes: [`glm(binomial("cloglog"))` · `glm(poisson)` con *offset* · `coxph` en *start-stop*; sus versiones agrupadas con `lme4::glmer` y `frailty`](#sec-u37-lentes) · límite de la selección automática: [`glmnet`](#sec-u37-regularizacion) |
 | **3.8** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 
 **Tres hilos atraviesan el bloque de arriba abajo**, y son lo que conviene llevarse de él.
@@ -230,9 +228,8 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 | `tiempo_entre` | Duración del intervalo **entre dos fallos** (o entre el último fallo y el cierre). | Continua · **respuesta** (tiempo) |
 | `evento` | 1 = el intervalo termina en **avería**; 0 = **censura** (llega al cierre sin fallar). | Binaria · indicador |
 | `antiguedad_ini` | Edad de la máquina al **empezar** el intervalo. | Continua · predictor |
-| `seguimiento`: <br> `tstart`,`tstop`,`exposicion`,`n_fallos`,
-<br>`fallo`,`dias_desde_mant`,`mant_reciente` | Formato **start-stop** por mes: tramo observado, exposición (offset), nº de fallos del mes, y el estado del mantenimiento en el tramo (covariable temporal). | Counting process |
-| `panel`:<br> `coste_total`,`n_averias`,`exposicion` | Por **máquina-año**: coste total de averías (**0** si no hubo ninguna), nº de averías y fracción de año observada (offset). | Tweedie (3.6) |
+| `seguimiento`: <br> `tstart`,`tstop`,`exposicion`,`n_fallos`,<br>`fallo`,`dias_desde_mant`,`mant_reciente` | Formato **start-stop** por mes: tramo observado, exposición (offset), nº de fallos del mes, y el estado del mantenimiento en el tramo (covariable temporal). | Counting process |
+| `panel`:<br> `coste_total`,`n_averias`,`exposicion` | Por **máquina-año**: coste total de averías (**0** si no hubo ninguna), nº de averías y fracción de año observada (offset). | Tweedie (3.4) |
 
 El banco incorpora, a propósito, mecanismos que se irán destapando unidad a unidad: coste **Gamma**,
 **fragilidad** de máquina que liga coste y frecuencia, **riesgo creciente con la edad**, **interacción**

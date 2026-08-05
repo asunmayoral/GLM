@@ -13,7 +13,6 @@ format:
     code-tools: 
       source: false # quita "View source"; no se expone el qmd
       toggle: true # mantiene show all/hide all code
-    theme: cosmo
     df-print: paged
   pdf:
     toc: true
@@ -91,16 +90,15 @@ datos discretos.
 | **1.5** | *«¿Y cuándo ocurre el evento?»* — Supervivencia: función de supervivencia, hazard, riesgos proporcionales (Cox como referencia, detalle en el Caso 3); el tiempo discreto como GLM (`cloglog` persona-periodo). | **RA7** (y RA3 vía hazard ratios)<br>**Datos:** `cohorte` (persona-periodo) |
 | **1.6** | *«¿Sabes ya modelizar datos discretos?»* — Estudio de caso, exposiciones y evaluación (actividades, instrucciones, rúbricas). | **RA8** (integra RA1–RA7)<br>**Datos:** banco del estudiante |
 
-**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión (uso
-comentado en cada `.qmd` y en los scripts de `caso1/scripts/`):
+**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso1/scripts/`):
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **1.1** | `glm(family = binomial)` · `predict(type = "response")` · `performance::binned_residuals` |
-| **1.2** | `glm(binomial)` · `broom::tidy` · `pROC::roc` · `performance::performance_hosmer` · `DHARMa::simulateResiduals` · `emmeans` / `marginaleffects` |
-| **1.3** | `glm(binomial, weights = )` (agrupado) · `nnet::multinom` (nominal) · `MASS::polr` (ordinal) |
-| **1.4** | `lme4::glmer` · `performance::icc` / `check_singularity` · `broom.mixed::tidy` |
-| **1.5** | `glm(binomial("cloglog"))` (persona-periodo) · `survival::Surv` / `survfit` · `coxph` (referencia) |
+| **1.1** | [`glm(family = binomial)` · `predict(type = "response")` · `broom::tidy`/`glance`/`augment` · `performance::binned_residuals`](#sec-u11-tres-componentes) |
+| **1.2** | enlace: [`binomial("logit"/"probit"/"cloglog")`](#sec-u12-enlace) · interpretación: [`broom::tidy` · `confint` · `marginaleffects::avg_slopes`/`predictions`](#sec-u12-interpretacion) · inferencia: [`anova` · `AIC`/`BIC` · `MASS::stepAIC` · `MuMIn::dredge`](#sec-u12-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::performance_hosmer` · `rms::val.prob` · `logistf` (Firth)](#sec-u12-diagnostico) · evaluación: [`caret::confusionMatrix` · `pROC::roc` · `yardstick::roc_auc`](#sec-u12-evaluacion) |
+| **1.3** | binomial agrupado: [`glm(cbind(exitos, fracasos), binomial)`](#sec-u13-binomial) · bondad de ajuste: [deviance y Pearson con `pchisq` · quasi-binomial](#sec-u13-gof-binomial) · nominal: [`nnet::multinom` · `lmtest::lrtest` · Brier multiclase](#sec-u13-nominal) · ordinal: [`MASS::polr` (odds proporcionales) · `brant::brant` · `ordinal::nominal_test` · `ggeffects::ggpredict`](#sec-u13-ordinal) |
+| **1.4** | intercepto aleatorio: [`lme4::glmer` · `performance::icc` · `ranef`](#sec-u14-intercepto) · pendiente aleatoria: [`(1 + x \| centro)` · `VarCorr` · `anova`/`AIC`](#sec-u14-pendiente) · diagnóstico: [`broom.mixed::tidy` · `DHARMa` en mixtos · `performance::check_singularity`](#sec-u14-diagnostico) · estructuras: [la sintaxis `( \| )` y `glmmTMB`](#sec-u14-extensiones) |
+| **1.5** | Kaplan–Meier: [`survival::Surv` · `survfit`](#sec-u15-prop) · tiempo discreto: [`glm(binomial("cloglog"))` persona-periodo · `lme4::glmer` con centro aleatorio](#sec-u15-lab) · [Cox en tiempo continuo (aquí solo el **concepto**: la unidad no llega a usar `coxph`; su maquinaria, en la 3.6)](#sec-u15-cox) |
 | **1.6** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 

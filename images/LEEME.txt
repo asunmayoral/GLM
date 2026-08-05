@@ -1,17 +1,49 @@
-LOGOTIPOS DEL SITIO
-===================
-Deja aquí los ficheros con estos nombres exactos y descomenta el bloque final de
-index.qmd (y, si lo quieres también en el pie de todas las páginas, el bloque
-correspondiente de _quarto.yml):
+IMÁGENES DEL SITIO
+==================
 
-  logo-umh.png        Universidad Miguel Hernández
-  logo-grado.png      Grado en Ciencia de Datos e IA
-  logo-instituto.png  Instituto de investigación (cuando tenga logo)
+LOGOTIPOS DEL PIE  (activos en la portada, bloque final de index.qmd)
+---------------------------------------------------------------------
+  logo-umh.png        Universidad Miguel Hernández      2787x756, con alfa
+  logo-grado.png      Grado en Ciencia de Datos e IA     300x255, con alfa
+  logo-instituto.png  Instituto de investigación         PENDIENTE
+
+Cuando llegue el del instituto, guárdalo con ese nombre exacto y cambia, al
+final de index.qmd, el bloque activo de dos logos por el de tres que está
+comentado justo debajo. Si los quieres también en el pie de TODAS las páginas,
+hay que llevarlos al `page-footer` de _quarto.yml.
 
 Recomendación: PNG con FONDO TRANSPARENTE, unos 400 px de ancho. La hoja de
-estilo los escala a 62 px de alto y los alinea en fila centrada.
+estilo (.logos-pie, en theme.scss) los escala a 62 px de alto y los alinea en
+fila centrada.
 
-Otros ficheros que puedes añadir aquí:
-  favicon.png   icono de la pestaña del navegador  -> website: favicon: images/favicon.png
-  banner.png    cabecera a todo ancho de la portada -> title-block-banner: images/banner.png
-  foto.jpg      tu retrato para la página "Sobre mí"
+
+PÓSTER DE LA PORTADA
+--------------------
+  banner-glm.png            1942x809   EL QUE SE PUBLICA.
+  banner-glm-cabecera.png   1942x959   En reserva. No se usa.
+
+banner-glm.png va como ILUSTRACIÓN a ancho de contenido en index.qmd, no como
+cabecera. El motivo es aritmético: su ratio es 2,03, así que a todo ancho su
+altura la fija la ventana, y en una pantalla Full HD (1920) salían 948 px de
+alto contra unos 940 px útiles. Es decir, el póster llenaba la pantalla entera
+y la franja de abajo («Fundamentos sólidos», «Con R»...) caía bajo el pliegue.
+
+Como ilustración se topa a 1100 px de ancho => 458 px de alto, y con
+`lightbox: true` (_quarto.yml) se amplía al hacer clic. El CSS está en un
+bloque <style> dentro de index.qmd: afecta SOLO a la portada.
+
+SI ALGÚN DÍA QUIERES CABECERA DE VERDAD, el póster no sirve: hace falta un
+diseño de ratio 3,6:1 a 4:1 —por ejemplo 2400x600— con los 120 px superiores
+libres de contenido, para que la barra de navegación se apoye ahí sin tapar
+nada. Por debajo de 3,5:1 el banner vuelve a comerse la pantalla.
+
+banner-glm-cabecera.png es banner-glm.png con 150 px añadidos arriba (azul
+marino opaco fundiéndose hacia los colores de la primera fila del original).
+Se generó para el intento de cabecera superpuesta y se conserva por si se
+retoma la idea; el diseño original de sus 809 px inferiores está intacto.
+
+
+OTROS FICHEROS QUE PUEDES AÑADIR AQUÍ
+-------------------------------------
+  favicon.png   icono de la pestaña del navegador -> website: favicon: images/favicon.png
+  foto.jpg      tu retrato para la página «Sobre mí»

@@ -13,7 +13,6 @@ format:
     code-tools:
       source: false
       toggle: true
-    theme: cosmo
     df-print: paged
   pdf:
     toc: true
@@ -98,18 +97,17 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 | **2.7** | *«¿Qué predictores retener, y generaliza?»* — Selección, validación cruzada y regularización (`glmnet` Poisson). | **RA8**<br>**Datos:** `cartera` |
 | **2.8** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cohorte sanitaria |
 
-**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión (uso
-comentado en cada `.qmd` y en los scripts de `caso2/scripts/`):
+**Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso2/scripts/`):
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **2.1** | `glm(family = poisson, offset = log(exposicion))` · `performance::check_overdispersion` |
-| **2.2** | `xtabs` / `as.data.frame` / `ftable` / `addmargins` · `glm(Freq ~ ..., family = poisson)` · `MASS::loglm` · `rstandard(type = "pearson")` · `vcd::mosaic(shade = TRUE)` |
-| **2.3** | `AER::dispersiontest` · `MASS::glm.nb` · `quasipoisson` · `DHARMa::simulateResiduals` · OLRE (`glmmTMB`) |
-| **2.4** | `pscl::hurdle` · `pscl::zeroinfl` (ZIP/ZINB) · `DHARMa::testZeroInflation` |
-| **2.5** | `lme4::glmer` / `glmer.nb` · `performance::icc` · `check_overdispersion` |
-| **2.6** | `glm(poisson, offset)` (riesgos a trozos) · `coxph` · fragilidad (`glmer`) |
-| **2.7** | `glmnet` / `cv.glmnet` (Poisson) · validación cruzada agrupada |
+| **2.1** | ajuste y *offset*: [`glm(family = poisson, offset = log(exposicion))`](#sec-u21-modelizacion) · interpretación: [IRR con `broom::tidy(exponentiate = TRUE)` · `predict`](#sec-u21-interpretacion) · inferencia: [`anova` · `drop1` · `AIC`/`BIC` · `update`](#sec-u21-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::check_overdispersion`](#sec-u21-diagnostico) |
+| **2.2** | tablas: [`xtabs` · `as.data.frame` · `addmargins` · `prop.table` · `glm(Freq ~ ..., poisson)` · `MASS::loglm`](#sec-u22-dosvias) · jerarquía: [`anova` · `ftable` · `margin.table` · `pchisq`](#sec-u22-orden-superior) · diagnóstico: [`rstandard(type = "pearson")` · `vcd::mosaic` · `vcdExtra::mosaic3d`](#sec-u22-diagnostico) · tablas cuadradas: [simetría, cuasi-simetría, asociación uniforme](#sec-u22-cuadradas) |
+| **2.3** | detección: [`AER::dispersiontest` · `DHARMa::testDispersion` · `countreg::rootogram`](#sec-u23-diagnostico) · quasi-Poisson: [`glm(family = quasipoisson)`](#sec-u23-quasi) · binomial negativa: [`MASS::glm.nb` · `glmmTMB` (NB1 y NB2) · `sigma`](#sec-u23-nb) · bondad de ajuste: [`performance::r2` · AIC/BIC · rootograma](#sec-u23-elegir) |
+| **2.4** | detección: [`DHARMa::testZeroInflation` · `vcdExtra::zero.test` · `countreg::zitest`](#sec-u24-ceros) · ZIP/ZINB: [`pscl::zeroinfl` · `glmmTMB(ziformula = )`](#sec-u24-zi) · hurdle: [`pscl::hurdle`](#sec-u24-hurdle) · comparación: [AIC · ceros predichos frente a observados](#sec-u24-elegir) |
+| **2.5** | GLMM Poisson: [`lme4::glmer` · anidamiento `(1 \| a/b)` · `VarCorr` · `isSingular`](#sec-u25-modelo) · bondad de ajuste: [`DHARMa` · dispersión residual · $R^2$ de Nakagawa · ICC](#sec-u25-diagnostico) · OLRE: [`(1 \| id_obs)` · `performance::compare_performance`](#sec-u25-olre) |
+| **2.6** | riesgos a trozos: [`glm(poisson, offset)` · `survival::Surv` · `survfit` · `broom::tidy`](#sec-u26-piecewise) · Cox como contraste: [`coxph` · `cox.zph` (Schoenfeld)](#sec-u26-clasicos) |
+| **2.7** | validación cruzada: [`boot::cv.glm`](#sec-u27-cv) · regularización: [`glmnet` · `cv.glmnet` · `model.matrix` · `lambda.min`/`lambda.1se`](#sec-u27-reg) · alcance: [qué familias cubre `glmnet`](#sec-u27-binomial) |
 | **2.8** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 

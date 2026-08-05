@@ -266,8 +266,8 @@ La pendiente sale **1.45**, con intervalo $(1.37,\ 1.54)$: ni la Poisson ($p=1$)
 ($p=2$) —en la @fig-u34-taylor, la recta negra queda visiblemente entre las dos de referencia:
 **de lleno en el hueco**—.
 
-::: {.callout-note}
-## En R: estimar la potencia de la relación media-varianza
+::: {.callout-tip}
+## 🔧 En R. Estimar la potencia de la relación media-varianza
 Es la técnica de la [Unidad 3.2](#sec-u32-contexto), aquí con el agrupamiento que dan las réplicas
 del panel.
 
@@ -1079,8 +1079,8 @@ verificada: el coeficiente **total** es de fiar, la **descomposición** no lo es
 planta pregunta si conviene actuar sobre la frecuencia (revisar más) o sobre la severidad (repuestos
 más baratos), este modelo no puede responderle: hacen falta los dos modelos por separado.
 
-::: {.callout-note}
-## En R: recetario de la Tweedie con `glmmTMB`
+::: {.callout-tip}
+## 🔧 En R. Recetario de la Tweedie con `glmmTMB`
 Todo lo que hemos hecho en esta sección, en orden y con las trampas señaladas.
 
 **1 · Ajustar.** Como cualquier GLM, cambiando la familia; el enlace log es el que da la lectura
@@ -1322,8 +1322,8 @@ encima de la media gasta $e^{0.749}\approx 2.1$ veces lo que una comparable situ
 una heterogeneidad considerable —del mismo orden que el efecto de la criticidad—, y es justo la que
 la exploración de las dos mitades nos había enseñado.
 
-::: {.callout-note}
-## En R: efectos aleatorios con `glmmTMB`
+::: {.callout-tip}
+## 🔧 En R. Efectos aleatorios con `glmmTMB`
 La sintaxis es la de `lme4`, y funciona igual sobre cualquier familia —Tweedie incluida—.
 
 ```r
@@ -1503,8 +1503,8 @@ round(c(ceros_observados = mean(pn$coste_total == 0) * 100,
         ceros_esperados  = mean(exp(-lam_re)) * 100), 1)
 ```
 
-::: {.callout-note}
-## En R: comparar modelos y medir el ajuste
+::: {.callout-tip}
+## 🔧 En R. Comparar modelos y medir el ajuste
 Todo sale de tres extractores y un contraste, pero cada uno tiene su letra pequeña.
 
 ```r
@@ -1733,8 +1733,8 @@ máquina**, que es justamente la pregunta que importa para nuestro presupuesto. 
 cambio el ajuste a una **máquina nueva** habría que simular re-sorteando los efectos aleatorios
 (`re.form = NA`), un diagnóstico distinto para una pregunta distinta.
 
-::: {.callout-note}
-## En R: diagnóstico de un modelo mixto con `DHARMa`
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico de un modelo mixto con `DHARMa`
 Los residuos clásicos no sirven con una respuesta mitad discreta mitad continua; `DHARMa` los
 sustituye por **residuos cuantil simulados**, que bajo un modelo correcto son uniformes.
 
@@ -1856,8 +1856,8 @@ De ahí una regla práctica que excede al ejemplo: **las medias se agregan bien 
 incertidumbre no**. Presupuestar el parque con la suma de las previsiones es razonable;
 prometer esa cifra para una máquina concreta, no.
 
-::: {.callout-note}
-## En R: predecir con efectos aleatorios, y con incertidumbre
+::: {.callout-tip}
+## 🔧 En R. Predecir con efectos aleatorios, y con incertidumbre
 Con un modelo mixto, `predict()` admite **dos** predicciones distintas, y hay que elegir a
 conciencia:
 
@@ -2062,8 +2062,8 @@ parámetros**, ninguno de estos modelos tiene margen real para sobreajustar. Esa
 datos, pocos parámetros— es justamente la que hace innecesaria la **regularización**, una
 herramienta que el Caso 2 sí necesitó y cuyos límites en este terreno veremos en la Unidad 3.7.
 
-::: {.callout-note}
-## En R: validación cruzada con datos agrupados
+::: {.callout-tip}
+## 🔧 En R. Validación cruzada con datos agrupados
 `rsample` construye los pliegues; el bucle de ajuste y evaluación es el mismo en los dos casos.
 
 ```r

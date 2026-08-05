@@ -13,11 +13,48 @@ format:
      docente y cada uno enlaza a su apartado completo, para no duplicar texto.
      La barra lateral NO aparece aquí a propósito (esta página no está en
      `sidebar.contents` de _quarto.yml).
-     PENDIENTE: los logotipos del pie esperan ficheros en images/ (bloque
-     comentado al final) y los enlaces de entrega, en entregas.qmd.
+     PENDIENTE: los enlaces de entrega, en entregas.qmd.
+
+     PÓSTER: el banner NO va de cabecera. Con su ratio 2,03 a todo ancho medía
+     948 px de alto en una pantalla Full HD —más que la propia ventana— y la
+     franja inferior caía bajo el pliegue. Va, por tanto, como ilustración a
+     ancho de contenido (tope 1100 px => 458 px de alto), con la barra naranja
+     normal encima. Al estar `lightbox: true` en _quarto.yml, se amplía al
+     hacer clic, que es lo que una infografía densa necesita.
+     El CSS de abajo vive SOLO en esta página.
 ============================================================================ -->
 
-Curso de **tercer curso del Grado en Ciencia de Datos e Inteligencia Artificial** de la Universidad
+```{=html}
+<style>
+/* --- El póster de la portada -------------------------------------------- */
+/* `page-layout: full` deja el contenido correr hasta el borde, así que la
+   anchura la topamos aquí: 1100 px son 458 px de alto, media pantalla larga. */
+.poster-glm {
+  max-width: 1100px;
+  margin: .5rem auto 2.75rem;
+}
+.poster-glm img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: .6rem;
+  box-shadow: 0 .5rem 1.5rem rgba(0, 12, 32, .16);
+}
+.poster-glm figcaption,
+.poster-glm .figure-caption {
+  text-align: center;
+  font-size: .88rem;
+  color: #5a5a5a;
+  margin-top: .7rem;
+}
+</style>
+```
+
+::: {.poster-glm}
+![Un mismo marco, cuatro tipos de respuesta y decenas de campos de aplicación. Haz clic para ampliar.](images/banner-glm.png){fig-alt="Infografía del curso. A la izquierda, el título «Modelos Lineales Generalizados» sobre fondo azul, el logotipo de R y cuatro tipos de respuesta: binaria (éxito/fracaso), politómica (múltiples categorías), conteos (eventos y frecuencia) y continuas positivas (costes, tiempos, biomasa). A la derecha, diez ámbitos de aplicación: salud y medicina, desarrollo de medicamentos, averías y mantenimiento, seguros, marketing y clientes, finanzas, ecología y especies, transporte y movilidad, energía e industria."}
+:::
+
+Asignatura de **tercer curso del Grado en Ciencia de Datos e Inteligencia Artificial** de la Universidad
 Miguel Hernández. Seis créditos, quince semanas, todo en R.
 
 El enfoque es **problema-primero**: cada bloque arranca con datos sobre los que el modelo lineal
@@ -69,86 +106,96 @@ supervivencia—.
 </div>
 ```
 
-## El curso, en cinco preguntas
+## La asignatura en cinco preguntas:
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## ¿Qué voy a aprender, y para qué sirve?
+## 1. Qué son los Modelos Lineales Generalizados y para qué sirven
 
-Los GLM predicen e interpretan respuestas **binarias**, de **recuento**, **categóricas** y
-**continuas asimétricas**: riesgo clínico en sanidad, siniestralidad en seguros, abandono en
-marketing, mantenimiento en industria. Al terminar sabrás **elegir** el modelo que pide cada tipo de
-respuesta, **ajustarlo**, **diagnosticarlo**, **interpretarlo en la escala correcta** y
-**comunicarlo**.
+Cada día se generan enormes cantidades de datos procedentes de ámbitos tan diversos como la medicina, la ingeniería, la biología, los seguros, el marketing o las ciencias ambientales. Sin embargo, muchas de las variables que queremos estudiar no son continuas ni siguen una distribución normal: un paciente puede responder o no a un tratamiento, una máquina puede sufrir un determinado número de averías, un cliente puede elegir entre varias opciones de compra o el coste de un siniestro puede ser siempre positivo y presentar una fuerte asimetría.
 
-Los seis objetivos del curso y los resultados de aprendizaje de cada bloque están en la
-[guía docente](guia_docente_simplificada.qmd).
+Los modelos lineales generalizados (MLG) constituyen una de las herramientas estadísticas más versátiles para analizar este tipo de datos. Amplían las posibilidades de la regresión lineal clásica permitiendo modelizar variables respuesta de naturaleza muy diferente, como respuestas binarias, variables con múltiples categorías, datos de conteo o variables continuas positivas y asimétricas. Gracias a ello, ofrecen un marco común para abordar una gran variedad de problemas mediante modelos adaptados a las características de los datos.
+
+Su campo de aplicación es extraordinariamente amplio. Se utilizan para predecir la aparición de enfermedades y evaluar la eficacia de nuevos medicamentos; estimar el riesgo de averías y planificar el mantenimiento de equipos industriales; calcular primas de seguros a partir de la frecuencia y el coste de los siniestros; analizar la distribución de especies y los efectos del cambio climático; estudiar el comportamiento de consumidores, detectar fraude financiero, estimar la demanda energética o modelizar accidentes de tráfico, entre muchas otras aplicaciones.
+
+
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## ¿Qué necesito saber antes de empezar?
+## 2. Qué vas a aprender
 
-Cálculo, álgebra lineal, probabilidad e inferencia básica, regresión lineal por mínimos cuadrados y
-soltura programando. **No hace falta experiencia previa en R**: se introduce de forma progresiva
-desde el primer estudio de caso.
+Estas son las cuatro preguntas en las que se ordena el curso:
 
-Detalle en la [guía docente](guia_docente_simplificada.qmd).
+| ¿Qué mides? | Distribuciones | Dónde aparece | En el curso |
+|:---|:---|:---|:--:|
+| **¿Ocurre o no?** — y, si ocurre, ¿de qué clase o en qué grado? | binomial, multinomial, ordinal | diagnóstico clínico, riesgo de impago, probabilidad de compra, pieza defectuosa, presencia de una especie, intención de voto | Caso 1 |
+| **¿Cuántas veces, y a qué ritmo?** | Poisson, binomial negativa | ingresos hospitalarios, siniestros de una cartera, accidentes de tráfico, fallos de red, incendios forestales, goles | Caso 2 |
+| **¿Cuánto?** — una magnitud estrictamente positiva | Gamma, inversa gaussiana, Tweedie | coste de una reclamación, importe de una reparación, consumo energético, rendimiento de un cultivo | Caso 3 |
+| **¿Cuándo ocurre?** — sabiendo que a muchos aún no les ha pasado | Weibull y demás AFT, Cox | supervivencia de un paciente, vida útil de un equipo, abandono de clientes, duración de una póliza | 1.5 · 2.6 · 3.5–3.6 |
+
+Trabajaremos con modelos de efectos fijos, pero también con estructuras de agrupamiento e interconexión que nos llevarán a modelos mixtos (con efectos aleatorios), e incluso trascenderemos los modelos lineales generalizados para trabajar problemas relacionados con la supervivencia o tiempos hasta fallo.
+
+
+
+Consulta la [guía docente](guia_docente_simplificada.qmd) para revisar los objetivos de aprendizaje de la asignatura y el resto de detalles.
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## ¿Cómo se trabaja en clase?
+## 3. Qué conocimientos y habilidades necesitarás y desarrollarás
 
-Cuatro horas semanales: dos de teoría y dos de laboratorio con acompañamiento docente. La teoría se
-imparte integrada en cada caso, nunca como bloque previo. Cada bloque ocupa **cinco semanas**:
-cuatro de fundamentación y una dedicada al estudio de caso y a las exposiciones.
+Te vendrán genial tus conocimientos de cálculo, álgebra lineal, probabilidad e inferencia básica, regresión lineal y
+soltura programando. No hace falta experiencia previa en R, pues se introducirá secuencialmente y con la ayuda de LLMs. Mejorarás tus habilidades para aprovechar las inteligencias artificiales para la programación, la resolución de problemas y la documentación y reproducibilidad. Aprenderás a escribir documentos e informes técnicos y científicos, y mejorarás tus habilidades de exposición oral a públicos diversos. Desarrollarás capacidades de trabajo en equipo.
+:::
 
-Un rasgo del material que conviene conocer desde el principio: los bancos de datos están
-**simulados con verdad conocida**. Ajustas **a ciegas** y validas **al final** contra los parámetros
-generadores. Es un control de calidad que ningún dato real permite.
 
-Detalle en la [guía docente](guia_docente_simplificada.qmd).
+::: {.callout-note .acordeon collapse="true" icon=false}
+## 4. Cómo se trabaja en clase
+
+Cuatro horas semanales, combinadas con teoría que inmediatamente aplicamos a un estudio de caso conductor con una problemática específica. Presentamos conceptos, aplicamos técnicas e interpretamos los resultados, planteando la siguiente pregunta a responder. Aprendemos interaccionando y cuestionando todo.
+
+Cada bloque ocupa **cinco semanas**, durante las cuales se van planteando cuestiones específicas sobre la tarea final de evaluación, con pistas para ir resolviéndola. Dicha tarea la trabajaréis en equipos y de modo colaborativo. 
+
+Trabajamos todo el curso con R+RStudio y plataformas de programación colaborativa como GitHub. En la planificación y seguimiento de proyectos usaremos Notion. Para la redacción de informes usamos Quarto Markdown y software específico para la creación de presentaciones, asistidos con IA.
+
+Contarás durante todo el curso con apoyo docente para plantear, resolver, cuestionar y exponer los resultados obtenidos. Aprovéchalo.
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## ¿Cómo se evalúa?
+## 5. Cómo se evalúa
 
-**Evaluación continua**: tres proyectos grupales (60 %) y tres exámenes orales individuales (40 %).
-Cada proyecto se entrega en un formato distinto —informe técnico, informe ejecutivo y artículo de
-investigación— y su nota se pondera por la implicación individual, medida con bitácora y
-coevaluación 360.
+Puedes optar por evaluación continua o final.
 
-Se exige un mínimo de **3,5/10 en cada prueba** y una media ponderada de 5. Quien no supere la
-continua va a **evaluación final**: un examen con informe escrito (50 %) y defensa oral (50 %).
+En la evaluación continua se plantean tres proyectos grupales sobre estudios de caso con una problemática dada. Cada proyecto se entrega en un formato distinto —informe técnico, informe ejecutivo y artículo de investigación—, y se acompaña de una exposición grupal y una entrevista individual. La implicación individual en el equipo de trabajo y el desarrollo de habilidades de liderazgo también se integra en la evaluación. 
 
-Criterios, pesos y rúbricas en la [guía docente](guia_docente_simplificada.qmd).
+En la evaluación final habrás de interpretar y defender un caso resuelto. 
+
+Los criterios, pesos y rúbricas están detalladas en la [guía docente](guia_docente_simplificada.qmd) y también integradas en la web.
 :::
 
-::: {.callout-note .acordeon collapse="true" icon=false}
-## ¿Qué software uso, y cómo entrego?
 
-**R** con `stats::glm`, el `tidyverse` y `broom`; para interpretación y diagnóstico,
-`marginaleffects`, `emmeans`, `ggeffects`, `car`, `DHARMa`, `performance` y `pROC`; y según el caso,
-`MASS`, `pscl`, `glmmTMB`, `lme4`, `glmnet`, `survival` y `flexsurv`. El entorno de trabajo es
-**Quarto** con **Git**.
+## Cómo usar este sitio web
 
-Los informes se escriben sobre las **plantillas Quarto** del curso, de modo que análisis y texto
-viven en el mismo fichero: media reproducibilidad resuelta de partida.
-
-Plazos, enlaces y formularios en [Entregas y seguimiento](entregas.qmd).
-:::
-
-## Cómo usar estas páginas
-
-Cada caso es un **cuaderno reproducible**: la teoría al servicio del problema, el **código R
-visible** —puedes desplegarlo y copiarlo— y la interpretación de cada resultado. La barra lateral
+Cada caso es un **cuaderno reproducible** programado en R-Markdown: la teoría al servicio del problema, el **código R
+visible** —puedes desplegarlo, y también descargar los scripts ejecutables con todo el código integrado— y la interpretación de cada resultado. La barra lateral
 te lleva a cualquier unidad, y el índice de la derecha, a cualquier sección dentro de ella.
+
+Dispones de acceso a la Guía Docente, así como a las rúbricas de evaluación y las plantillas para la redacción de informes, junto con una guía con recomendaciones para generar presentaciones eficaces. También el seguimiento de proyectos, las entregas de trabajos y la coevaluación 360 está accesible en la web. 
 
 Si empiezas de cero, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
 
 <!-- ============================================================================
-     LOGOTIPOS. Cuando tengas los ficheros, guárdalos en images/ con estos
-     nombres y descomenta el bloque de abajo.
-     Recomendación: PNG con fondo transparente, ~400 px de ancho.
+     LOGOTIPOS. Activos: logo-umh.png y logo-grado.png, ambos con transparencia.
+     La hoja de estilo (.logos-pie) los escala a 62 px de alto en fila centrada.
+     Cuando el instituto tenga logo, guárdalo como images/logo-instituto.png y
+     cambia el bloque activo por el que está comentado justo debajo.
 ============================================================================ -->
+
+
+```{=html}
+<div class="logos-pie">
+  <img src="images/logo-umh.png"       alt="Universidad Miguel Hernández">
+  <img src="images/logo-grado.png"     alt="Grado en Ciencia de Datos e IA">
+</div>
+```
 
 <!--
 ```{=html}
@@ -157,5 +204,4 @@ Si empiezas de cero, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
   <img src="images/logo-grado.png"     alt="Grado en Ciencia de Datos e IA">
   <img src="images/logo-instituto.png" alt="Instituto de investigación">
 </div>
-```
--->
+``` -->

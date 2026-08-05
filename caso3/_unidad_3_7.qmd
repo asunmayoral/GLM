@@ -182,8 +182,8 @@ cox_mes_opt  <- coxph(Surv(tstart, tstop, fallo) ~ antiguedad + carga + prot_man
                       data = sg)
 ```
 
-::: {.callout-note}
-## En R: las tres lentes sobre un mismo panel
+::: {.callout-tip}
+## 🔧 En R. Las tres lentes sobre un mismo panel
 Las tres se escriben casi igual; lo que cambia es la **respuesta** y el trato del riesgo de base.
 
 ```r

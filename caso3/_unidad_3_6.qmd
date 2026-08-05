@@ -298,8 +298,8 @@ $e^{\hat\beta_j}$, el **hazard ratio** por unidad; a él dedicamos la sección s
 imprime además, de propina, los **tres contrastes globales** y la **concordancia** del modelo, que
 aprovecharemos más adelante.
 
-::: {.callout-note}
-## En R: ajustar un modelo de Cox
+::: {.callout-tip}
+## 🔧 En R. Ajustar un modelo de Cox
 La función es `survival::coxph()`, y su sintaxis calca la de `glm()` salvo en la **respuesta**, que se
 construye con `Surv()`:
 
@@ -393,8 +393,8 @@ round(c(HR_implicado_por_AFT = unname(hr_implicado_aft),
         HR_estimado_por_Cox  = unname(hr_cox)), 3)
 ```
 
-::: {.callout-note}
-## En R: extraer e interpretar los hazard ratios
+::: {.callout-tip}
+## 🔧 En R. Extraer e interpretar los hazard ratios
 El ajuste vive en la escala del **log-hazard**; para leerlo hay que **exponenciar**.
 
 - **`broom::tidy(cox, exponentiate = TRUE, conf.int = TRUE)`** — la vía limpia: devuelve un `data.frame`
@@ -512,7 +512,10 @@ efecto (un HR con su intervalo) o **controlar** por otras covariables, el Cox es
 Para $H_0$: *ninguna covariable importa* (todas las $\beta=0$), el `summary(cox_esp_opt)` imprime los **tres
 estadísticos clásicos** —**razón de verosimilitudes**, **Wald** y ***score***—, todos del orden de **205
 sobre 5 g.l.** Coinciden casi (lo habitual con muestra grande) y rechazan de forma abrumadora, con
-$p<2\times10^{-16}$: **algo** en el conjunto de covariables mueve el riesgo.
+$p<2\times10^{-16}$: **algo** en el conjunto de covariables mueve el riesgo. Que coincidan no es
+casualidad: los tres son **asintóticamente equivalentes**, y por eso con muestra grande dan
+prácticamente lo mismo. La distinción importa cuando la muestra es **pequeña**, y entonces la **razón de
+verosimilitudes** es la más fiable de las tres.
 
 En Cox existe además una medida que habla de **cuán bien ordena el modelo el riesgo** —la que el propio `summary()` ya
 imprime junto a los tests—: el **índice de concordancia** (la *C* de Harrell), que representa la probabilidad de que,
@@ -727,8 +730,8 @@ Las bandas dibujan la composición del conjunto de riesgo; el efecto $\beta(t)$ 
 suavizada, que permanece plana.
 
 
-::: {.callout-note}
-## En R: diagnosticar la proporcionalidad
+::: {.callout-tip}
+## 🔧 En R. Diagnosticar la proporcionalidad
 La herramienta es `survival::cox.zph()`, que implementa la prueba de @grambsch1994 sobre los residuos de
 Schoenfeld.
 
@@ -948,8 +951,8 @@ y de 3.1 a 186.5— y en esa segunda fila caben **tres revisiones** (días 48, 1
 cambio, esa misma espera se reparte en **seis filas mensuales**, cada una con su valor.
 
 
-::: {.callout-note}
-## En R: el formato *start-stop* y el Cox extendido
+::: {.callout-tip}
+## 🔧 En R. El formato *start-stop* y el Cox extendido
 Todo el cambio cabe en la respuesta: `Surv()` pasa de **dos** argumentos a **tres**.
 
 ```r
@@ -1307,8 +1310,8 @@ permite seguir usándolo con la conciencia tranquila. La moraleja excede al ejem
 es una decisión de modelización**, no un detalle de preparación de datos; lo barato no es evitarla, sino
 **medir su efecto**.
 
-::: {.callout-note}
-## En R: `tt()` — uso y límites
+::: {.callout-tip}
+## 🔧 En R. `tt()` — uso y límites
 La covariable temporal exacta se declara en dos piezas: un término **`tt(variable)`** en la fórmula y una
 **función** en el argumento `tt =` de `coxph()`.
 
@@ -1521,8 +1524,8 @@ jefatura de mantenimiento necesita para decidir **cuántas** revisiones compensa
    sabemos que el mecanismo es causal porque lo hemos simulado; en la vida real, no.)
 :::
 
-::: {.callout-note}
-## En R: predecir con un modelo de Cox
+::: {.callout-tip}
+## 🔧 En R. Predecir con un modelo de Cox
 Dos funciones, según se quiera riesgo **relativo** o probabilidad **absoluta**.
 
 ```r
@@ -1624,53 +1627,6 @@ con una etiqueta fija** lo que el extendido incorpora tal cual —no es un error
 simple—.
 
 ::: {.callout-note}
-## En R: recetario completo de la unidad (paquete `survival`)
-**Resumen de conjunto**: reúne en siete pasos lo que las secciones han ido presentando por separado, para
-tenerlo todo a mano al abordar la tarea.
-
-**1 · Ajustar.** `coxph(Surv(tiempo, evento) ~ x1 + x2 + ...)`, por **verosimilitud parcial**. Para
-covariables **dependientes del tiempo**, la respuesta va en formato *start-stop*,
-`Surv(tstart, tstop, evento)` (el Cox extendido de la [Sección 6.8](#sec-u36-extcox)).
-
-**2 · Leer.** `summary(cox)` da los **hazard ratios**, la **concordancia** (índice C) y los **tres tests
-globales** —razón de verosimilitudes, Wald y *score/logrank*—; `broom::tidy(cox, exponentiate = TRUE,
-conf.int = TRUE)` los ordena como HR con intervalo.
-
-**3 · Inferir sobre los efectos** (más allá del Wald por coeficiente):
-
-- **`car::Anova(cox, test.statistic = "LR")`** — *`Anova` con **A mayúscula**, del paquete `car`*: **LRT
-  tipo II** por término (cada uno ajustado por los demás, sin depender del orden). **La opción
-  recomendada** para cribar todos los efectos [@fox2019]; `drop1(cox, test = "Chisq")` es equivalente.
-- **`anova(m_reducido, m_completo)`** — *`anova` en **minúscula**, de base*: LRT entre dos modelos
-  **anidados**.
-- **`anova(cox)`** — LRT **secuencial** (tipo I), dependiente del orden; **no** admite `type=` (el tipo II
-  lo da `car::Anova`, no `anova`).
-- **`survdiff(... ~ grupo)`** — el **log-rank** = test de *score* de un Cox con ese factor.
-
-Las tres estadísticas —Wald, LR y score— son asintóticamente equivalentes; con muestras finitas, la **LR**
-es la más fiable.
-
-**4 · Con datos agrupados** (varias filas por unidad): `frailty(id)` añade un **efecto aleatorio** (estima
-la **varianza**; efectos **condicionales**), `cluster(id)` solo **corrige los errores estándar** (efectos
-**marginales**). Para contrastar efectos respetando el agrupamiento, `car::Anova(cox_esp_opt_clus, test.statistic =
-"Wald")` sobre el ajuste con `cluster(id)` (el LRT a través de la `frailty()` penalizada **no** vale).
-
-**5 · Diagnosticar la proporcionalidad.** `cox.zph(cox)` (residuos de Schoenfeld); `plot()` la dibuja. Y
-`survival::concordance()` da el índice *C* por separado (vuelve en la [Unidad 3.7](#sec-u37)).
-
-**6 · Comparar modelos.** Las reglas completas, en [las reglas del juego](#sec-u36-reglas): LRT
-(`anova(m1, m2)`) entre **anidados** y `AIC()`/`BIC()` entre **no anidados**, siempre sobre **las mismas
-filas** y **sin** término de fragilidad por medio; con eventos repetidos por máquina, **Wald robusto** con
-`cluster()`; entre **respuestas distintas** (`intervalos` vs `seguimiento` vs exacto), nada de AIC ni LRT:
-solo coeficientes, concordancia y predicciones.
-
-**7 · Predecir.** `predict(cox, newdata, type = "lp" | "risk")` da el riesgo **relativo** (no necesita el
-riesgo de base); `survfit(cox, newdata)` da la **curva de supervivencia** absoluta, y con covariables
-dependientes del tiempo se le pasa una **trayectoria** por escenario, `survfit(cox, newdata, id = id)`
-([Sección 6.9](#sec-u36-prediccion)).
-:::
-
-::: {.callout-note}
 ## El puente al cierre
 Acabamos de tratar el fallo con datos **troceados por intervalos** y covariables que cambian en el
 tiempo. Ese es, exactamente, el formato sobre el que la [Unidad 3.7](#sec-u37) montará las **tres
@@ -1680,49 +1636,31 @@ cruzado aquí es, precisamente, el punto de partida de esa comparación.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.6)
-Sobre el banco de averías del caso, con las tablas `intervalos` y `seguimiento`:
+## Tarea del estudiante (3.6) · qué te llevas al estudio de caso
+Esta unidad cierra el hilo de supervivencia con dos piezas que el estudio de caso te va a pedir por
+separado: el **diagnóstico de proporcionalidad** y el montaje ***start-stop*** con covariables que
+cambian en el tiempo.
 
-1. Ajustad un modelo de Cox con las covariables basales (`plan_mantenimiento`, `antiguedad_ini`,
-   `carga`, `proceso`) e interpretad los hazard ratios del plan, la carga y la antigüedad. Comparad el HR
-   del plan con el factor de aceleración del AFT de 3.5 mediante $\text{HR}=\text{AF}^{-1/\sigma}$: ¿son
-   coherentes?
-2. Añadid el `fabricante` a un ajuste **ingenuo**: ¿sale significativo alguno de sus niveles? Reajustad
-   con `frailty(id_maquina)` y comparad: ¿basta la fragilidad, por sí sola, para desmontar el falso
-   positivo? Explicad, conectándolo con el GLMM de 3.3, qué representa la varianza de fragilidad y por
-   qué la correlación intra-máquina infla la confianza de los efectos (la cuestión 6 completa la cura
-   con los errores robustos).
-3. Aplicad `cox.zph` al **modelo que hayáis dado por bueno** en el apartado anterior y examinad los residuos
-   de Schoenfeld. ¿Alguna covariable pone en duda la proporcionalidad? (No debería.) Argumentad por qué la
-   **etiqueta fija** `plan_mantenimiento` supera el diagnóstico aunque la protección real **varíe a lo largo
-   del ciclo de mantenimiento**, y qué información se **pierde** al resumirla en una covariable constante.
-   Comentad también por qué la fila `GLOBAL` es poco informativa cuando el modelo lleva `frailty()`.
-4. **Extended Cox, paso a paso.** Partiendo del **mejor modelo** del apartado anterior, trasladadlo al panel
-   `seguimiento` y añadid `mant_reciente`; cribad **todos** los efectos con
-   `car::Anova(..., test.statistic = "Wald")` sobre el gemelo con `cluster(id_maquina)`. Sustituid después
-   el indicador por la forma continua $\exp(-\texttt{dias\_desde\_mant}/\tau)$, eligiendo $\tau$ por
-   **perfil de AIC**, y volved a cribar: ¿sigue siendo necesario `plan_mantenimiento`? Explicad **por qué
-   cambia el veredicto** y qué parámetro del DGP recupera el coeficiente final. ¿Por qué este efecto **no
-   cabe** en una tabla con una fila por espera?
-5. **Comparad y predecid.** Justificad por qué **no** es lícito comparar el AIC de este modelo con el del
-   apartado 2, y realizad la comparación de forma correcta —[las reglas del juego](#sec-u36-reglas) os
-   guían—. Después, usad `survfit()` para predecir la
-   probabilidad de que una máquina de vuestra elección **aguante un año sin avería** bajo dos políticas de
-   mantenimiento distintas, y redactad la recomendación que daríais a la jefatura de planta (dos o tres
-   frases, en lenguaje no técnico).
-6. **Inferencia y discriminación.** Comprobad que el test de *score* de un Cox con **solo** el plan
-   reproduce el **log-rank** de la [Unidad 3.5](#sec-u35). Añadid luego las **SE cluster-robustas**
-   (`cluster(id_maquina)`) al modelo con `fabricante` y comparad su $p$ con el de la fragilidad. Leed
-   además la **concordancia** del `summary`: ¿discrimina el modelo mucho mejor que el azar?
-7. Argumentad en qué sentido el modelo de Cox está **fuera** del marco GLM. ¿Qué componente del GLM
-   sustituye la verosimilitud parcial?
+- **[Propuesta 6 · Del primer parte al historial completo](#sec-u38-p6)** *(unidad base)*. Su camino
+  es el de la [Sección 6.8](#sec-u36-extcox), cambiando máquinas por pólizas: construir el panel
+  *start-stop*, ajustar el Cox extendido y compararlo con la lente de riesgos a trozos. Ensáyalo aquí:
+  traslada al panel `seguimiento` el mejor modelo sobre `intervalos`, añade la protección del
+  mantenimiento y criba **todos** los efectos con `car::Anova(..., test.statistic = "Wald")` sobre el
+  gemelo con `cluster(id_maquina)`. La extensión que allí se pide —**Andersen–Gill**— es exactamente
+  esa discusión llevada al final: **errores robustos** (`cluster`) frente a **fragilidad**
+  (`frailty`), que suponen cosas distintas sobre la dependencia entre eventos de una misma unidad.
+  Ensaya aquí las dos sobre el `fabricante`, que el DGP sabe **sin efecto**, y compara sus $p$.
+- **[Propuesta 3 · ¿Cuánto dura un cliente?](#sec-u38-p3)**. Te pide un `cox.zph` sobre un banco donde
+  el modelo verdadero **no** es de riesgos proporcionales, y contrastarlo con lo que el AFT haya
+  elegido. Practica aquí el diagnóstico y su lectura —incluido por qué la fila `GLOBAL` dice poco
+  cuando el modelo lleva `frailty()`—, y comprueba la equivalencia
+  $\text{HR}=\text{AF}^{-1/\sigma}$ con el AFT de la [Unidad 3.5](#sec-u35): esa coherencia entre
+  las dos escalas es la que allí tendrás que defender o explicar por qué se rompe.
 
-**Y en el estudio de caso (3.8).** Esta unidad alimenta dos propuestas. La
-**[6 · Del primer parte al historial completo](#sec-u38-p6)** reutiliza el montaje *start-stop* de los
-apartados 4 y 5, ahora sobre `panel.csv`, con `edad_t` y `antig_veh_t` como covariables que cambian de
-tramo a tramo, y lo extiende a **Andersen–Gill**; el apartado 6 —errores robustos frente a
-fragilidad— es justamente la discusión que allí hay que cerrar. Y la
-**[3 · ¿Cuánto dura un cliente?](#sec-u38-p3)** te pide el `cox.zph` del apartado 3 sobre un banco
-donde el modelo verdadero **no** es de riesgos proporcionales: contrástalo con lo que aquí has
-aprendido sobre lo que un diagnóstico que no rechaza demuestra y lo que no.
+**Dos avisos.** El primero, sobre la comparación: en cuanto cambies de tabla —de una fila por espera a
+una fila por tramo— **dejas de poder comparar AIC o LRT** entre modelos, porque ya no son las mismas
+filas; [las reglas del juego](#sec-u36-reglas) fijan qué vale en cada caso, y un artículo que las
+incumpla no se sostiene. El segundo: un `cox.zph` que **no rechaza** no demuestra proporcionalidad
+—aquí lo has visto con una etiqueta fija que supera el diagnóstico mientras la protección real varía a
+lo largo del ciclo—, y en la Propuesta 3 esa distinción **es** el artículo.
 :::

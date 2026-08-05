@@ -64,7 +64,7 @@ con `raterisk = Less` como referencia.
 
 El ajuste de datos binomiales es similar al de datos binarios, con la salvedad de cómo se especifica la respuesta aquí, a partir de una matriz con dos columnas: éxitos y fracasos:
 ```
-glm(cind(exitos,fracasos) ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)
+glm(cbind(exitos,fracasos) ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)
 ```
 ::::
 
