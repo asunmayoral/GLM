@@ -1,6 +1,6 @@
 ---
 title: "Modelos Lineales Generalizados con R"
-subtitle: "Del dato al modelo, del modelo al diagnóstico, del diagnóstico a la interpretación"
+subtitle: "Del dato al modelo, del modelo a la predicción."
 lang: es
 toc: false
 format:
