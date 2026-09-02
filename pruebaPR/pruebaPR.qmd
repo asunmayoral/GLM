@@ -1,1 +1,23 @@
+## 7. En qué consisten y cómo se trabaja en los proyectos grupales
 
+Se trabaja en equipos cooperativos sobre unos datos dados para responder las preguntas planteadas a partir de la modelización y análisis pertinente. A lo largo del bloque teórico del Caso, se van introduciendo las diferentes cuestiones sobre el caso, con pistas e indicaciones para resolverlo, de modo que puedes ir practicando lo aprendido y resolviendo a la vez el trabajo grupal. 
+
+En el equipo cada estudiante asume un **rol** con tareas definidas, que **rota** de un proyecto al siguiente para reforzar y mejorar todas sus habilidades para el trabajo en equipo:
+
+- **Coordinación** — planificación, supervisión, consultas, gestión de espacios en la nube, bitácora de equipo.
+- **Análisis** — tratamiento de datos, modelización, generación de código reproducible y validación técnica (diagnóstico).
+- **Comunicación** — redacción y exposición.
+
+
+Cada proyecto se entrega en un formato distinto para que domines las situaciones posibles en el mundo profesional, y se acompaña de una exposición grupal y una entrevista/examen individual.
+
+| Bloque | Formato del informe |
+|:--:|:--|
+| Caso 1 | Informe **técnico**, dirigido a técnicos |
+| Caso 2 | Informe **ejecutivo**, dirigido a directivos |
+| Caso 3 | **Artículo de investigación**, dirigido a investigadores. |
+
+**Uso ético de la IA**
+Asumimos que la utilizarás. Todo informe incluye un apartado **obligatorio** de reflexión sobre el uso de la IA: qué herramientas
+se usaron, para qué y **cómo se verificaron sus respuestas**. Sin ese apartado, el informe no puede
+alcanzar la calificación de «excelente».
