@@ -353,7 +353,7 @@ Una vez obtenida la calificación individual en el proyecto grupal, se procede c
 ## 9. Cómo construir los informes y presentaciones
 
 En ["Recursos/Plantillas"](/evaluacion/plantillas) y también en el repositorio de Github, dispones de plantillas de informe, así como de guías con recomendaciones para construir los informes y las presentaciones.
-::
+:::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 10. Cuáles son los criterios de evaluación
