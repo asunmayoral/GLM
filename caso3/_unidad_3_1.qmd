@@ -756,6 +756,7 @@ marginaleffects::predictions(
     criticidad       = "Critica", fase_proceso = "fase2",
     antiguedad_anios = mean(base$antiguedad_anios),
     carga            = mean(base$carga), fabricante = "A")) |>
+  as.data.frame() |>          # predictions() devuelve una subclase sobre la que transmute() vacía el objeto
   dplyr::transmute(tipo_averia,
                    coste_predicho = round(estimate),
                    ic95 = paste0("[", round(conf.low), ", ", round(conf.high), "]"))

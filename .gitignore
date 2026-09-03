@@ -18,6 +18,12 @@ renv/staging/
 *_files/
 *_cache/
 *.html
+# copia de las librerías del sitio en la raíz: la regenera cada render
+/site_libs/
+
+# --- LaTeX: subproductos de renderizar a PDF (solo la guía docente los genera) ---
+*.tex
+*.log
 
 # --- Bibliografía: PDFs de terceros con copyright -> NO subir a GitHub ---
 bibliografia/*.pdf

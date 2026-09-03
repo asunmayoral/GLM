@@ -10,7 +10,7 @@ quarto preview        # vista previa local con recarga en vivo (para ir viendo)
 quarto render         # genera el sitio completo en _site/
 quarto publish gh-pages   # publica solo el HTML a la rama gh-pages (repo fuente privado)
 
-(3) Publicación en Github Pages
+(3) Publicación en Github Pages (solo al principio una vez)
 Creas el repositorio privado en GitHub y conectas el repo local que ya tienes 
 (git remote add origin … + git push, o desde GitHub Desktop). 
 Luego, una sola vez, quarto publish gh-pages desde la Terminal de RStudio: 

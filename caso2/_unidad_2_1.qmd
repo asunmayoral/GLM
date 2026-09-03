@@ -89,7 +89,11 @@ momentos):
 ```{r}
 #| label: tbl-u21-cambio
 #| tbl-cap: "Tabla cuadrada del bonus-malus: nivel del año previo × nivel del año actual (con marginales)."
-addmargins(table(previo = cartera$bonus_malus_prev, actual = cartera$bonus_malus_act))
+# pasamos la `table` a data.frame ANCHO: sin esto se imprime por consola, `df-print: paged`
+# no la alcanza y Quarto no puede numerarla ni referenciarla como tabla
+addmargins(table(previo = cartera$bonus_malus_prev, actual = cartera$bonus_malus_act)) |>
+  as.data.frame.matrix() |>
+  tibble::rownames_to_column("previo")
 ```
 
 La diagonal son las pólizas que **no cambian**; fuera de ella, quién sube y quién baja. Y comparamos
@@ -99,7 +103,10 @@ las dos distribuciones marginales (nivel previo vs actual):
 #| label: tbl-u21-cambio-marg
 #| tbl-cap: "Distribuciones marginales del bonus-malus (proporciones) en el año previo y en el actual."
 rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
-      actual = prop.table(table(cartera$bonus_malus_act))) |> round(3)
+      actual = prop.table(table(cartera$bonus_malus_act))) |>
+  round(3) |>
+  as.data.frame.matrix() |>
+  tibble::rownames_to_column("año")
 ```
 
 Los marginales **no coinciden**: el nivel intermedio pierde peso hacia los extremos y sube algo la

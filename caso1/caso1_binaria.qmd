@@ -14,12 +14,8 @@ format:
       source: false # quita "View source"; no se expone el qmd
       toggle: true # mantiene show all/hide all code
     df-print: paged
-  pdf:
-    toc: true
-    number-sections: false
 bibliography: ../references.bib
-suppress-bibliography: true
-csl: https://www.zotero.org/styles/apa 
+csl: https://www.zotero.org/styles/apa
 execute:
   warning: false
   message: false
@@ -386,3 +382,11 @@ cohorte_eda |>
 sessionInfo()
 # renv::snapshot()   # fijar el estado del entorno al cerrar el caso
 ```
+
+# Referencias del Caso 1 {#sec-refs1}
+
+Las obras citadas en este caso. La bibliografía completa del curso está en
+[Referencias](../referencias.qmd).
+
+::: {#refs}
+:::

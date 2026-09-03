@@ -14,11 +14,7 @@ format:
       source: false
       toggle: true
     df-print: paged
-  pdf:
-    toc: true
-    number-sections: false
 bibliography: ../references.bib
-suppress-bibliography: true
 csl: https://www.zotero.org/styles/apa
 execute:
   warning: false
@@ -325,5 +321,13 @@ p_coste + p_gap
 {{< include _unidad_3_6.qmd >}}
 {{< include _unidad_3_7.qmd >}}
 {{< include _unidad_3_8.qmd >}}
+
+# Referencias del Caso 3 {#sec-refs3}
+
+Las obras citadas en este caso. La bibliografía completa del curso está en
+[Referencias](../referencias.qmd).
+
+::: {#refs}
+:::
 
 
