@@ -203,6 +203,7 @@ Quince semanas y **60 horas de clase**, dos sesiones de dos horas por semana. La
 
 ::: {.poster-glm}
 ![Puedes optar por evaluación continua o final. Haz clic para ampliar.](images/organigrama_evaluacion.png){fig-alt="Evaluación. Evaluación continua. Requiere compromiso y seguimiento sostenido. Es sumativa y se construye sobre tres proyectos grupales equitativos —uno por bloque—, en equipos cooperativos de un máximo de tres personas con roles rotativos, coevaluación 360 sobre implicación en el trabajo y cumplimentación de una bitácora de aprendizaje. El proyecto grupal pesa un 60% (ponderado por la coevaluación) y la defensa oral individual un 40%. Para superar la evaluación continua se exige un mínimo de 3.5/10 en cada prueba (grupal e individual) y una media ponderada $\geq 5$. Evaluación final, para quien no participe o no supere la evaluación continua, en convocatoria ordinaria o extraordinaria: un examen final que aporta el 100 % de la calificación, planteado a partir de uno o varios estudios de caso resueltos total o parcialmente, sobre los que se ha de desarrollar un informe escrito (50 %) -justificando e interpretando los resultados- y su defensa oral (50 %). No se permitirán recursos de consulta."}
+:::
 
 Amplía información en la [Guía Docente](https://www.umh.es/contenido/Estudios/:asi_g_8370_O1/datos_es.html) de la asignatura.
 :::

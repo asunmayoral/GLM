@@ -7,9 +7,7 @@ project:
   pre-render: _scripts/invalidar_freeze.R
   render:
     - index.qmd
-    - guia_docente_simplificada.qmd
     - entregas.qmd
-    - sobre-mi.qmd
     - caso1/caso1_binaria.qmd
     - caso2/caso2_conteos.qmd
     - caso3/caso3_continuas_positivas.qmd
@@ -44,6 +42,10 @@ website:
             href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/plantillas
           - text: "Rúbricas de evaluación"
             href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/Rubricas_evaluacion.xlsx
+          - text: "Datos proyecto 1-equipos"
+            href: https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos
+          - text: "Datos proyecto 2-3"
+            href: https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto
           - href: referencias.qmd
             text: "Referencias"
     right:

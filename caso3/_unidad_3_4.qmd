@@ -23,7 +23,7 @@
        - CV 5 pliegues: condicional 284.1 (ee 6.9) vs marginal 329.2 (ee 13.8).
        - verdad: sd(logZ) 0.357, pero el coste anual es propto Z^2 -> 2*sd = 0.714.
          p del mecanismo (alfa+2)/(alfa+1) = 1.143 con alfa = 1/phi_coste = 6.
-     PENDIENTE de confirmar en el próximo render: tbl-u34-cv-grupos (esperado ~323). -->
+       - CV agrupada (máquinas enteras fuera): máquina nueva 336.6 (ee 21.9). -->
 
 # 4 · El coste agregado: la familia Tweedie {#sec-u34}
 
@@ -2024,7 +2024,7 @@ el ajuste. El cálculo es el mismo de antes con dos cambios:
 
 ```{r}
 #| label: tbl-u34-cv-grupos
-#| tbl-cap: "Validación cruzada dejando fuera máquinas enteras: error de predicción ante una máquina nunca vista, necesariamente marginal. Se acompaña, como referencia, del error de las dos predicciones sobre máquinas conocidas (tabla anterior)."
+#| tbl-cap: "Validación cruzada dejando fuera máquinas enteras: error de predicción ante una máquina nunca vista, necesariamente marginal. Se lee junto a las dos predicciones sobre máquinas conocidas de la tabla anterior."
 set.seed(SEMILLA_CURSO)
 pliegues_maq <- rsample::group_vfold_cv(pn, group = id_maquina, v = 5)
 
@@ -2040,17 +2040,18 @@ tibble::tibble(maquina_nueva_media = round(mean(d_nuevas), 1),
                maquina_nueva_ee    = round(sd(d_nuevas) / sqrt(length(d_nuevas)), 1))
 ```
 
-Puestas junto a las de la @tbl-u34-cv, las tres cifras de la @tbl-u34-cv-grupos ordenan el
-problema de menor a mayor dificultad, y esa es la lectura que conviene llevarse:
+Puesta junto a las dos de la @tbl-u34-cv, la cifra de la @tbl-u34-cv-grupos completa un cuadro de
+tres que ordena el problema de menor a mayor dificultad, y esa es la lectura que conviene llevarse:
 
 - **Máquina conocida, usando su historial** (≈ 284): la situación de nuestro presupuesto. Es la más
   fácil, porque el modelo sabe *quién* es cada máquina.
 - **Máquina conocida, ignorando su historial** (≈ 329): peor, y la diferencia con la anterior mide
   lo que vale ese conocimiento.
-- **Máquina nueva** (≈ 323): predecir a ciegas sobre una unidad jamás vista. Que salga en la misma
-  zona que la anterior tiene sentido —en ambas se predice sin $u_i$—, y la pequeña diferencia entre
-  las dos es justamente el optimismo que anticipábamos: en la segunda, los parámetros comunes sí se
-  habían estimado con años de esa misma máquina.
+- **Máquina nueva** (≈ 337): predecir a ciegas sobre una unidad jamás vista. Es la peor de las tres,
+  y queda en la misma zona que la anterior —en ambas se predice sin $u_i$—. La diferencia entre las
+  dos, unos 7 puntos, va en la dirección que anticipábamos —el optimismo de la segunda, cuyos
+  parámetros comunes sí se estimaron con años de esa misma máquina—, pero es **pequeña frente a sus
+  errores típicos** (13.8 y 21.9): confirma el signo, no da para cuantificar el sesgo.
 
 De ahí la regla, que no es «usa siempre la partición agrupada» sino: **la partición debe imitar
 el uso real del modelo**. Para presupuestar el parque actual, la validación por filas con
