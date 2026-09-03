@@ -28,8 +28,6 @@ website:
     left:
       - href: index.qmd
         text: Inicio
-      - href: guia_docente_simplificada.qmd
-        text: "Guía docente"
       - text: "Casos"
         menu:
           - href: caso1/caso1_binaria.qmd
@@ -42,12 +40,12 @@ website:
         menu:
           - href: entregas.qmd
             text: "Entregas y seguimiento"
-          - text: "Plantillas y rúbricas"
-            href: https://github.com/asunmayoral/GLM/tree/master/evaluacion
+          - text: "Plantillas"
+            href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/plantillas
+          - text: "Rúbricas de evaluación"
+            href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/Rubricas_evaluacion.xlsx
           - href: referencias.qmd
             text: "Referencias"
-      - href: sobre-mi.qmd
-        text: "Sobre mí"
     right:
       - icon: github
         href: https://github.com/asunmayoral/GLM

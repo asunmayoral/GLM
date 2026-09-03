@@ -47,8 +47,7 @@ editor:
 ## Sobre este documento
 Versión **simplificada y de trabajo** de la guía docente, alineada con el material del curso. La
 guía oficial (`guia_docente_GLM_R.docx`) conserva los campos administrativos y sus versiones en
-valenciano e inglés, y prevalece en caso de discrepancia formal. Aquí se recoge lo que el equipo
-docente y el estudiantado necesitan para trabajar.
+valenciano e inglés, y prevalece en caso de discrepancia formal. Aquí se recoge lo que el profesorado y el estudiantado necesitan para trabajar.
 :::
 
 # 1. Contexto de la asignatura y requisitos
@@ -58,8 +57,8 @@ docente y el estudiantado necesitan para trabajar.
 | **Titulación** | Grado en Ciencia de Datos e Inteligencia Artificial |
 | **Curso y carga** | Tercer curso · 6 ECTS · 15 semanas · 60 h de clase |
 | **Lenguaje de trabajo** | R (con Quarto y Git) |
-| **Enfoque** | Portafolio de tres estudios de caso, problema-primero |
-| **Formato de sesión** | 4 h semanales: 2 h de teoría + 2 h de laboratorio |
+| **Enfoque** | Portafolio de tres estudios de caso, resolución de problemas |
+| **Formato de sesión** | 4 h semanales: teoría + práctica integradas |
 
 ## Por qué esta asignatura
 
@@ -68,12 +67,12 @@ predicen e interpretan respuestas **binarias**, de **recuento**, **categóricas*
 asimétricas** en sanidad (riesgo clínico), banca y seguros (impago, siniestralidad), marketing
 (conversión, abandono) o industria (calidad y mantenimiento). Saber ajustarlos y diagnosticarlos en
 R, interpretarlos en la escala correcta y comunicarlos en distintos formatos es una base
-imprescindible en la formación de un científico de datos.
+imprescindible en la formación de un científico de datos, que lo diferencia sustancialmente del resto de profesionales vinculados al tratamiento de datos.
 
 La asignatura capacita para **elegir, ajustar, diagnosticar e interpretar** el GLM adecuado a cada
 tipo de respuesta, y para reconocer los datos **censurados de tiempo-a-evento** como casos
-especiales del propio marco. El hilo conductor es el ciclo completo de modelización: del dato al
-modelo, del modelo al diagnóstico, y del diagnóstico a la interpretación y la comunicación.
+especiales del propio marco, . El hilo conductor es el ciclo completo de modelización: del dato al
+modelo, del modelo al diagnóstico, y del diagnóstico a la interpretación y finalmente la comunicación.
 
 ## Enfoque problema-primero
 

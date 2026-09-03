@@ -34,7 +34,7 @@ Hernández de Elche. Doctora en Ciencias Matemáticas, especialidad de Estadíst
 
 ## Sobre este material
 
-Este sitio es material docente en abierto, con licenciamiento CC BY-SA, producido con acompañamiento de Claude 4.8 y 5.0, escrito en [Quarto](https://quarto.org) y publicado desde
+Este sitio es material docente en abierto, con licenciamiento CC BY-SA, producido con acompañamiento de Claude Opus 4.8 y 5.0, escrito en [Quarto](https://quarto.org) y publicado desde
 [GitHub](https://github.com/asunmayoral/GLM). Todo el código es reejecutable y los bancos de datos
 están simulados con proceso generador conocido, de modo que cualquier resultado del curso puede
 comprobarse contra la verdad que lo produjo.

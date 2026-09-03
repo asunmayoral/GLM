@@ -5,11 +5,23 @@ author: "[Equipo]"
 date: today
 lang: es
 format:
-  docx:
+  html:
+    embed-resources: true   # IMPORTANTE: empaqueta imágenes/CSS/JS en un único .html
+                             # (no se genera la carpeta "nombre_files/"; el archivo es
+                             # autocontenido y fácil de compartir o subir a GitHub)
     toc: true
     toc-depth: 3
+    toc-location: left
     number-sections: true
-    # reference-doc: plantilla-estilos.docx   # opcional: descomenta para aplicar estilos propios
+    theme: cosmo
+    code-fold: true          # el código queda plegado por defecto (más legible)
+    code-tools: true         # botón para mostrar/copiar/descargar el código
+    code-summary: "Mostrar código"
+    df-print: paged          # tablas de datos paginadas, no volcadas en bruto
+    fig-width: 7
+    fig-height: 5
+    smooth-scroll: true
+# reference-doc: plantilla-estilos.docx   # opcional (solo aplica si añades format: docx)
 # Descomenta para citar con Zotero/BibTeX en formato APA 7:
 # bibliography: references.bib
 # csl: https://www.zotero.org/styles/apa
@@ -18,6 +30,27 @@ format:
 #   warning: false
 #   message: false
 ---
+
+<!--
+  ────────────────────────────────────────────────────────────────
+  CÓMO PUBLICAR Y ENTREGAR EL INFORME EN GITHUB
+  ────────────────────────────────────────────────────────────────
+
+  1) Renderiza el informe a HTML (genera un único archivo .html
+     autocontenido gracias a "embed-resources: true"):
+
+       quarto render Plantilla_informe_tecnico.qmd --to html
+
+  2) Sube el .html resultante a tu repositorio de GitHub (commit + push)
+     como cualquier otro archivo del proyecto.
+
+  3) Para que el profesorado pueda ABRIRLO Y LEERLO COMO PÁGINA WEB,
+     comparte el enlace con este formato:
+     https://htmlpreview.github.io/?https://github.com/asunmayoral/repo/blob/main/informe.html
+     (sustituye "usuario", "repo" y "informe.html" por los datos reales)
+
+  ────────────────────────────────────────────────────────────────
+-->
 
 ```{r}
 #| label: setup
@@ -366,4 +399,4 @@ auditar o ampliar el análisis sin que la argumentación principal dependa de ma
 | Las limitaciones, riesgos e incertidumbres están reconocidos. | ☐ | ☐ |
 | Las referencias están citadas en el texto y completas al final. | ☐ | ☐ |
 | Los anexos permiten auditar o reproducir el análisis. | ☐ | ☐ |
-| El uso de IA está declarado de forma transparente, si procede. | ☐ | ☐ |
+| El uso de IA está declarado. | ☐ | ☐ |
