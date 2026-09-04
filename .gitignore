@@ -28,6 +28,14 @@ renv/staging/
 # --- Bibliografía: PDFs de terceros con copyright -> NO subir a GitHub ---
 bibliografia/*.pdf
 
+# --- Ficheros de bloqueo de las suites ofimáticas ---
+# Los crea Excel (~$fichero.xlsx) o LibreOffice (.~lock.fichero#) MIENTRAS el
+# documento está abierto, y los borran al cerrarlo. Si el programa se cierra mal
+# se quedan huérfanos. No aportan nada al repositorio y contienen el nombre de
+# usuario y el equipo de quien lo tenía abierto.
+~$*
+.~lock.*#
+
 # --- Sistema ---
 .DS_Store
 Thumbs.db
