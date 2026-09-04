@@ -1,0 +1,124 @@
+---
+title: "Recursos"
+subtitle: "Todo lo que necesitas para trabajar y entregar los tres proyectos"
+lang: es
+toc: true
+toc-depth: 2
+---
+
+<!-- ============================================================================
+     PÁGINA HUB. Reúne los seis apartados operativos del curso. La rejilla de
+     tarjetas de arriba es un índice visual: cada tarjeta salta al apartado
+     correspondiente de esta misma página (anclas #sec-*).
+     Los enlaces a GitHub apuntan a la rama `master` del repositorio del curso.
+     OJO con las mayúsculas de las rutas: la carpeta es `evaluacion/GitHub/`.
+============================================================================ -->
+
+```{=html}
+<div class="rejilla-recursos">
+
+  <a href="#sec-registro" class="tarjeta-recurso">
+    <div class="numero">1</div>
+    <div class="titulo">Registro en GitHub y equipos</div>
+    <p class="detalle">El formulario con el que te das de alta y constituyes tu equipo.</p>
+  </a>
+
+  <a href="#sec-informes" class="tarjeta-recurso">
+    <div class="numero">2</div>
+    <div class="titulo">Informes y presentaciones</div>
+    <p class="detalle">Plantillas de los tres formatos y guías para escribir y exponer.</p>
+  </a>
+
+  <a href="#sec-planificacion" class="tarjeta-recurso">
+    <div class="numero">3</div>
+    <div class="titulo">Planificación y entregas</div>
+    <p class="detalle">Datos de cada proyecto y fechas de entrega, exposición y defensa.</p>
+  </a>
+
+  <a href="#sec-entrega" class="tarjeta-recurso">
+    <div class="numero">4</div>
+    <div class="titulo">Qué se entrega</div>
+    <p class="detalle">Coevaluación, <em>issue</em>, bitácora y ejecutables reproducibles.</p>
+  </a>
+
+  <a href="#sec-rubricas" class="tarjeta-recurso">
+    <div class="numero">5</div>
+    <div class="titulo">Rúbricas de evaluación</div>
+    <p class="detalle">Con qué criterios y pesos se corrige cada prueba.</p>
+  </a>
+
+  <a href="#sec-consultas" class="tarjeta-recurso">
+    <div class="numero">6</div>
+    <div class="titulo">Consultas</div>
+    <p class="detalle">Chat y correo de Google para dudas y tutorías.</p>
+  </a>
+
+</div>
+```
+
+## 1 · Registro en GitHub y equipos {#sec-registro}
+
+Antes de empezar el primer proyecto, cada estudiante se registra y declara la composición de su
+equipo. De este formulario salen los repositorios de trabajo que el profesorado crea y comparte.
+
+```{=html}
+<div class="fila-boton-grande">
+  <a href="https://forms.gle/vPAAqR8GVGkcopLd6" class="boton-grande">FORMULARIO DE REGISTRO</a>
+</div>
+```
+
+## 2 · Informes y presentaciones {#sec-informes}
+
+### Plantillas
+
+Cada proyecto se escribe sobre la plantilla Quarto de su formato: informe técnico, informe ejecutivo
+y artículo de investigación.
+
+→ [`evaluacion/plantillas`](https://github.com/asunmayoral/GLM/tree/master/evaluacion/plantillas)
+
+### Guías
+
+Recomendaciones para redactar los tres formatos de informe y para construir presentaciones eficaces.
+
+→ [`evaluacion/guias`](https://github.com/asunmayoral/GLM/tree/master/evaluacion/guias)
+
+## 3 · Planificación y entregas {#sec-planificacion}
+
+| Proyecto | Formato informe | Datos | Entrega | Exposiciones | Defensas |
+|:--|:--|:--|:--:|:--:|:--:|
+| **Proyecto 1** | Informe técnico | [datos_equipos](https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos) | 02/10/2026 | 05–07/10/2026 | 12–26/10/2026 |
+| **Proyecto 2** | Informe ejecutivo | [datos_equipos_auto](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 06/11/2026 | 09–11/11/2026 | 16–30/11/2026 |
+| **Proyecto 3** | Artículo de investigación | [datos_equipos_auto](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 11/12/2026 | 14–16/12/2026 | 21/12/2026–12/01/2027 |
+
+: Fechas de entrega del informe, de las exposiciones grupales y del periodo de defensas individuales. {.striped .hover tbl-colwidths="[14,20,18,14,16,18]"}
+
+Las **defensas** son individuales, se celebran en sesión de tutoría dentro del periodo indicado y
+duran de 10 a 12 minutos.
+
+## 4 · Qué se entrega en cada proyecto {#sec-entrega}
+
+1. **Registro de la coevaluación 360**, individual y confidencial, a través del formulario:
+   [https://forms.gle/94sH2AjH3RzFpmN57](https://forms.gle/94sH2AjH3RzFpmN57)
+
+2. ***Issue* desde GitHub**, que abre el coordinador con los enlaces al informe y a la presentación.
+   El formato exacto del issue, los archivos que hay que subir y cómo obtener cada enlace están
+   especificados en la **Guía GitHub del Estudiante**, apartado 9.3 →
+   [`README_github_estudiante.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/README_github_estudiante.md)
+
+3. **Bitácora**, cumplimentada semanalmente por el líder del equipo en el repositorio del equipo y
+   cerrada con el bloque de entrega (ver muestra) →
+   [`bitacora.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/bitacora.md)
+
+4. **Ejecutables `.qmd` reproducibles y comentados, con semilla fija**, y en particular el
+   `informe.qmd` con el que se confecciona el informe.
+
+## 5 · Rúbricas de evaluación {#sec-rubricas}
+
+Los criterios y pesos con los que se corrigen el informe, la exposición, la defensa individual y el
+examen final.
+
+→ [`Rubricas_evaluacion.xlsx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Rubricas_evaluacion.xlsx)
+
+## 6 · Consultas {#sec-consultas}
+
+Vía chat y correo de Google: [asun.mayoral@umh.es](mailto:asun.mayoral@umh.es)

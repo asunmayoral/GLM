@@ -41,11 +41,26 @@ WebPA [@loddington2009].
 **1. Cada evaluador reparte, no califica.** Se normaliza lo que cada quien emite, de modo que su
 severidad o generosidad deja de influir en el resultado:
 
-$$\omega_{ij} \;=\; \frac{s_{ij}}{\sum_{k} s_{ik}}\,n$$
+$$\omega_{ij} \;=\; \frac{s_{ij}}{\sum_{k} s_{ik}}\,n \;=\; \frac{s_{ij}}{\bar{s}_i}
+\qquad\text{con } \bar{s}_i \text{ la media de las puntuaciones que emite } i$$
 
-El índice vale 1 cuando $i$ considera que $j$ aportó lo que le correspondía, y se aparta de 1 hacia
-arriba o hacia abajo según lo aportara en mayor o menor medida. Quien valora igual a todo el equipo
-emite $\omega = 1$ para todos: no establece diferencias, luego no aporta información.
+El índice **no dice si $j$ hizo lo que debía, sino cuánto se separa de la media de su equipo según
+$i$**: vale 1 cuando $i$ lo puntúa exactamente en su propia media, y se aleja de 1 según lo sitúe por
+encima o por debajo de sus compañeros. Es, por tanto, una **posición relativa dentro del equipo**, no
+un juicio sobre el trabajo.
+
+Que el nivel absoluto desaparezca es deliberado, y es lo que hace justo el reparto. Un evaluador que
+puntúa a todo su equipo con 3 y otro que lo puntúa todo con 1 emiten exactamente los mismos índices
+—$\omega = 1$ para todos—, porque ambos afirman lo mismo: que allí nadie destacó ni se descolgó. La
+calidad del trabajo ya la califican las rúbricas del informe y de la exposición; volver a puntuarla
+aquí la contaría dos veces.
+
+De la construcción se siguen dos propiedades. Cada papeleta suma $n$, de modo que **ningún evaluador
+puede subir o bajar al equipo entero**: solo repartir entre sus miembros. Y quien puntúa a todos por
+igual emite $\omega = 1$ para cada uno —no porque se le descarte, sino porque es lo que dice su
+papeleta—; esos votos **cuentan en la mediana**, y de hecho son los que neutralizan una valoración
+hostil aislada. La única estipulación añadida es el caso $0/0$: a quien puntúa a todo el equipo con
+cero se le asignan también índices 1, como a cualquier otro reparto uniforme.
 
 **2. Se agregan las valoraciones recibidas** mediante la mediana,
 $R_j = \operatorname{mediana}_i(\omega_{ij})$. Al incluir la autoevaluación, cada estudiante recibe

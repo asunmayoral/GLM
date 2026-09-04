@@ -9,7 +9,8 @@ format:
     toc: true
     toc-depth: 3
     number-sections: false      # numeración MANUAL (2.1, 2.2, ...) en los títulos
-    code-fold: show
+    code-fold: true            # plegado por defecto; el botón «Código» de
+    code-summary: "Mostrar código"   # arriba a la derecha despliega toda la página
     code-tools:
       source: false
       toggle: true

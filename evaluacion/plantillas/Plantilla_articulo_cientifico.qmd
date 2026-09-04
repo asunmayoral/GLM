@@ -21,6 +21,36 @@ format:
     fig-width: 7
     fig-height: 5
     smooth-scroll: true
+
+  # ---------------------------------------------------------------------------
+  # PDF OPCIONAL. Descomenta este bloque si quieres que Quarto genere también el
+  # informe.pdf al renderizar, en lugar de imprimirlo desde el navegador.
+  #
+  # Requiere una distribución de LaTeX. Si no la tienes, instálala UNA vez con:
+  #     quarto install tinytex
+  #
+  # Ojo: el PDF de LaTeX no reproduce todo lo que hace el HTML. Se pierden el
+  # plegado del código (code-fold) y las tablas paginadas (df-print: paged), que
+  # salen volcadas; y las figuras pueden recolocarse. Si eso te importa, imprime
+  # el PDF desde el navegador, que conserva el aspecto exacto del HTML.
+  #
+  # pdf:
+  #   documentclass: scrartcl   # clase KOMA: márgenes y tipografía sensatos
+  #   papersize: a4
+  #   toc: true
+  #   toc-depth: 3
+  #   number-sections: true
+  #   colorlinks: true
+  #   fig-width: 7
+  #   fig-height: 5
+  #   df-print: kable           # `paged` no existe en PDF: kable es el sustituto
+  #   geometry:
+  #     - top=25mm
+  #     - bottom=25mm
+  #     - left=25mm
+  #     - right=25mm
+  # ---------------------------------------------------------------------------
+
 # reference-doc: plantilla-estilos.docx   # opcional (solo aplica si añades format: docx)
 # Descomenta para citar con Zotero/BibTeX en formato APA 7:
 # bibliography: references.bib
@@ -36,18 +66,46 @@ format:
   CÓMO PUBLICAR Y ENTREGAR EL INFORME EN GITHUB
   ────────────────────────────────────────────────────────────────
 
-  1) Renderiza el informe a HTML (genera un único archivo .html
-     autocontenido gracias a "embed-resources: true"):
+  1) Renombra este fichero como informe.qmd y renderízalo a HTML
+     (genera un único archivo autocontenido gracias a
+     "embed-resources: true", sin carpeta informe_files/):
 
-       quarto render Plantilla_informe_tecnico.qmd --to html
+       quarto render informe.qmd --to html
 
-  2) Sube el .html resultante a tu repositorio de GitHub (commit + push)
-     como cualquier otro archivo del proyecto.
+  2) Genera además informe.pdf. Dos vías, ambas válidas:
 
-  3) Para que el profesorado pueda ABRIRLO Y LEERLO COMO PÁGINA WEB,
-     comparte el enlace con este formato:
-     https://htmlpreview.github.io/?https://github.com/asunmayoral/repo/blob/main/informe.html
-     (sustituye "usuario", "repo" y "informe.html" por los datos reales)
+     a) DESDE EL NAVEGADOR (recomendada). Abre informe.html y usa
+        Archivo > Imprimir > Guardar como PDF. No necesitas instalar
+        nada y el PDF conserva el aspecto exacto del HTML.
+
+     b) CON QUARTO (opcional). Descomenta el bloque "pdf:" de la
+        cabecera YAML y renderiza los dos formatos de una vez:
+
+          quarto render informe.qmd
+
+        Requiere LaTeX: instálalo una sola vez con
+        "quarto install tinytex". Da un PDF de aspecto más académico,
+        pero pierde el plegado del código y las tablas paginadas.
+
+     ¿Por qué los dos formatos? Los repositorios del curso son PRIVADOS,
+     y ahí GitHub abre y pinta los .pdf en el navegador, pero muestra los
+     .html como código fuente. El PDF permite al profesorado leer y
+     comentar de un vistazo; el HTML es el documento auténtico, con su
+     tabla de contenidos, su código plegable y sus tablas paginadas.
+
+  3) Sube AMBOS (informe.html e informe.pdf) al repositorio del equipo
+     con commit + push, como cualquier otro archivo del proyecto.
+
+  4) En el issue de entrega, enlaza LOS DOS. No escribas las URLs: entra
+     en el repositorio en github.com, pulsa sobre cada archivo y copia la
+     dirección de la barra del navegador. Tienen esta forma:
+
+       https://github.com/GLM2026/REPOSITORIO-DE-TU-EQUIPO/blob/main/informe.pdf
+       https://github.com/GLM2026/REPOSITORIO-DE-TU-EQUIPO/blob/main/informe.html
+
+     NO uses htmlpreview.github.io: solo funciona con repositorios
+     públicos. Plantilla completa del issue y detalle de los enlaces, en
+     el apartado 9.3 de la Guía GitHub del Estudiante.
 
   ────────────────────────────────────────────────────────────────
 -->
@@ -359,10 +417,68 @@ Si usas `bibliography: references.bib` en el encabezado, las referencias se gene
 | Anexo D. Tablas y resultados complementarios | [Resultados secundarios o pruebas adicionales] |
 | Anexo E. Prompts relevantes de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
 
+# Anexo · Reproducibilidad y entorno de ejecución
+
+> **Apartado obligatorio.** El criterio «Datos, método y reproducibilidad» pesa un 20 % de la nota
+> del informe, y la prueba que aplico es literal: **descargo `informe.qmd`, lo renderizo en mi
+> ordenador y tiene que salir vuestro informe, idéntico y sin errores.**
+
+**Antes de entregar, haced la prueba vosotros.** Reiniciad R (*Session → Restart R*,
+`Ctrl/Cmd+Shift+F10`), borrad las carpetas de caché (`_freeze/`, `informe_files/`) y renderizad el
+documento entero de cero. Si falla, no es reproducible, aunque a vosotros os funcionara antes.
+
+Los cuatro fallos que rompen el render en otra máquina:
+
+1. **Rutas absolutas.** Nada de `setwd("C:/Users/...")` ni `read.csv("C:/Users/marta/datos.csv")`.
+   Los datos se leen desde su URL en bruto (`raw.githubusercontent.com`), como indica la guía de
+   GitHub; y cualquier ruta local se escribe con `here::here()`, relativa a la raíz del proyecto.
+2. **Paquetes sin cargar.** Todas las librerías que use el documento van declaradas en el chunk
+   `setup` del principio. Si funciona en vuestro RStudio solo porque quedaron cargadas de otra
+   sesión, aquí fallará.
+3. **Objetos heredados.** Nada de depender de variables creadas en otro `.qmd` o en la consola.
+   El documento se basta a sí mismo.
+4. **Aleatoriedad sin semilla.** Toda simulación, partición, validación cruzada o *bootstrap* va
+   precedida de `set.seed()`. Sin ella, las cifras del texto no coinciden con las del render.
+
+## Semilla utilizada
+
+Indicad aquí la semilla —o las semillas, si usáis varias— y dónde se fija:
+
+`set.seed([número])`, fijada en el chunk `[nombre del chunk]`.
+
+## Entorno de ejecución
+
+La salida de este chunk deja constancia de la versión de R, el sistema operativo y la versión
+**exacta** de cada paquete con el que se produjeron los resultados. No lo toquéis: se ejecuta solo
+al renderizar.
+
+```{r}
+#| label: entorno-ejecucion
+#| echo: true
+#| code-fold: true
+#| code-summary: "Ver el entorno de ejecución"
+
+sessionInfo()
+```
+
+::: {.callout-tip collapse="true"}
+## Una versión más completa, si queréis afinar
+
+`sessionInfo()` es de R base y no necesita instalar nada. Si preferís una salida más legible, que
+además indica **de dónde** salió cada paquete (CRAN, GitHub…) y **cuándo** se instaló —lo que hace
+falta para reinstalar exactamente lo mismo—, sustituid la llamada anterior por:
+
+```r
+# install.packages("sessioninfo")
+sessioninfo::session_info()
+```
+:::
+
 # Checklist final antes de entregar
 
 | Comprobación | Sí | A revisar |
 |---|:--:|:--:|
+| **El documento está íntegramente personalizado**: título, subtítulo, autoría y fecha son los del equipo; cabeceras y pies no conservan texto de la plantilla; no queda ningún `[texto entre corchetes]`, ninguna instrucción de la plantilla ni ninguna sección de ejemplo sin sustituir por contenido propio; se han eliminado los apartados que no apliquen. | ☐ | ☐ |
 | El título refleja claramente el tema, contexto o método del estudio. | ☐ | ☐ |
 | El resumen sintetiza objetivo, datos, método, resultados y conclusión. | ☐ | ☐ |
 | La introducción justifica la pregunta con contexto y fuentes citadas. | ☐ | ☐ |
@@ -375,3 +491,5 @@ Si usas `bibliography: references.bib` en el encabezado, las referencias se gene
 | Las limitaciones y líneas futuras están reconocidas. | ☐ | ☐ |
 | Todas las citas tienen su referencia final en formato APA 7. | ☐ | ☐ |
 | El uso de IA está declarado. | ☐ | ☐ |
+| **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
+| **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |

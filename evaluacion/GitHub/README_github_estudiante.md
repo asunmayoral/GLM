@@ -10,15 +10,15 @@
 
 ## **Índice**
 
-1. [Crear tu cuenta en GitHub y comunicar tu nombre de usuario](#1.-crear-tu-cuenta-en-github-y-comunicar-tu-nombre-de-usuario)  
+1. [Crear tu cuenta en GitHub y comunicar tu nombre de usuario](#1-crear-tu-cuenta-en-github-y-comunicar-tu-nombre-de-usuario)  
 2. [Aceptar la invitación al repositorio de tu equipo](#2-aceptar-la-invitación-al-repositorio-de-tu-equipo)  
-3. [Instalar GitHub Desktop y vincularlo con tu cuenta](#3.-instalar-github-desktop-y-vincularlo-con-tu-cuenta)  
-4. [Descargar el repositorio a tu ordenador (clonar)](#4.-descargar-el-repositorio-a-tu-ordenador-\(clonar\))  
-5. [Crear el proyecto de RStudio y organizar el trabajo del equipo](#5.-crear-el-proyecto-de-rstudio-y-organizar-el-trabajo-del-equipo)  
-6. [La rutina de trabajo: *pull* antes de empezar, *push* al terminar](#6.-la-rutina-de-trabajo:-pull-antes-de-empezar,-push-al-terminar)  
-7. [Normas de convivencia del equipo](#7.-normas-de-convivencia-del-equipo)  
+3. [Instalar GitHub Desktop y vincularlo con tu cuenta](#3-instalar-github-desktop-y-vincularlo-con-tu-cuenta)  
+4. [Descargar el repositorio a tu ordenador (clonar)](#4-descargar-el-repositorio-a-tu-ordenador-clonar)  
+5. [Crear el proyecto de RStudio y organizar el trabajo del equipo](#5-crear-el-proyecto-de-rstudio-y-organizar-el-trabajo-del-equipo)  
+6. [La rutina de trabajo: *pull* antes de empezar, *push* al terminar](#6-la-rutina-de-trabajo-pull-antes-de-empezar-push-al-terminar)  
+7. [Normas de convivencia del equipo](#7-normas-de-convivencia-del-equipo)  
 8. [Qué hacer si algo sale mal](#8-qué-hacer-si-algo-sale-mal)  
-9. [Avisar de la entrega abriendo un *issue*](#9.-avisar-de-la-entrega-abriendo-un-issue)  
+9. [Avisar de la entrega abriendo un *issue*](#9-avisar-de-la-entrega-abriendo-un-issue)  
 10. [Consultar los comentarios de la revisión](#10-consultar-los-comentarios-de-la-revisión)
 
 ---
@@ -83,12 +83,12 @@ Después de aceptar, GitHub te lleva directamente al repositorio. Deberías ver 
 
 Verifica dos cosas:
 
-- Arriba del todo aparece el nombre del repositorio, con el formato `usuario-del-profesor / nombre-del-repositorio`.  
+- Arriba del todo aparece el nombre del repositorio, con el formato `GLM2026 / nombre-del-repositorio` — `GLM2026` es la organización del curso.  
 - Bajo ese nombre hay una fila de pestañas: **Code**, **Issues**, **Pull requests**... Y a la derecha, si eres colaborador, verás también **Settings**. Si ves *Settings*, tienes permiso de escritura, que es lo que necesitas.
 
 ### **2.4. Guarda la dirección**
 
-Copia la dirección web del repositorio (lo que aparece en la barra del navegador, del tipo `https://github.com/profesor/proy1-equipo3`) y guárdala. La usarás en el siguiente paso y volverás a ella muchas veces.
+Copia la dirección web del repositorio (lo que aparece en la barra del navegador, del tipo `https://github.com/GLM2026/glm-proy1-equipo3`) y guárdala. La usarás en el siguiente paso y volverás a ella muchas veces.
 
 Otra forma rápida de llegar en el futuro: entra en github.com y pulsa tu foto de perfil → **Your repositories**. El repositorio del equipo aparecerá en esa lista.
 
@@ -305,6 +305,8 @@ No es burocracia. Cumple tres funciones: permite al equipo saber quién hace qu�
 
 Cambia lo que necesites, pero **conserva la tabla**: es lo que hace que la información sea consultable de un vistazo.
 
+**Y una última entrada, al cerrar el proyecto.** Cuando abras el issue de entrega (paso 9), **copia su cuerpo íntegro en la bitácora**, en un bloque final marcado como tal. El fichero `bitacora.md` que os doy ya lleva ese bloque preparado al pie, con el formato exacto: solo tenéis que rellenarlo. Así la bitácora queda cerrada con la constancia de qué se entregó, quién hizo qué y dónde está cada documento, sin tener que ir a buscarlo al issue.
+
 **Cómo se edita:** es un archivo de texto normal. Puedes abrirlo desde RStudio como cualquier otro y escribir en él. Los símbolos `##`, `|` y `-` son marcas de formato de Markdown; en GitHub se verán como títulos y tablas bien presentadas.
 
 ### **5.7. Un archivo de código por persona y por tarea**
@@ -364,22 +366,41 @@ Cuando el equipo haya decidido qué resultados merecen entrar, **una sola person
 
 Insisto en lo de "una sola persona": este es el único archivo realmente compartido, y donde sí podrían surgir conflictos. Que lo edite una, mientras el resto revisa y propone cambios por el canal que uséis.
 
-Al terminar, **Render** para generar `informe.html`. **Ese HTML también hay que subirlo** al repositorio: es la versión que consultaré yo.
+Al terminar, **Render** para generar `informe.html`. **Ese HTML también hay que subirlo** al repositorio: es la versión que consultaré yo. La plantilla lleva `embed-resources: true`, así que el HTML es un único archivo autocontenido, sin carpeta `informe_files/`.
+
+Y una cosa más, que explico en detalle en 9.3: sube **junto a él** un `informe.pdf`. El motivo es que nuestros repositorios son **privados**, y GitHub muestra los `.html` como código fuente, no como página; los `.pdf`, en cambio, los abre y los pinta en el navegador. Con los dos archivos puedo leer y comentar de inmediato en el PDF, y conservo el HTML auténtico —tabla de contenidos, código plegable, tablas paginadas— para verlo cuando haga falta.
+
+Para conseguir el PDF tenéis dos vías, y las dos valen:
+
+**a) Desde el navegador — la recomendada.** Abre `informe.html`, **Archivo → Imprimir → Guardar como PDF**, y guárdalo como `informe.pdf` en la carpeta del proyecto. No hay que instalar nada, no hay que tocar la plantilla, y el PDF conserva el aspecto exacto del HTML.
+
+**b) Con Quarto — opcional.** La plantilla trae un bloque `pdf:` comentado en la cabecera YAML. Si lo descomentáis, `quarto render informe.qmd` genera los dos formatos de una vez. Requiere una distribución de LaTeX, que se instala una sola vez con `quarto install tinytex`. Da un PDF de aspecto más académico —numeración, márgenes, tipografía de artículo—, pero **pierde el plegado del código y las tablas paginadas**, que salen volcadas enteras.
+
+Elegid según lo que os importe: fidelidad al HTML (a) o acabado tipográfico (b). Lo que no cambia es que **se entregan los dos archivos: `informe.html` e `informe.pdf`**.
+
+### **5.9.1. La prueba de reproducibilidad**
+
+Esto vale un 20 % de la nota del informe («Datos, método y reproducibilidad»), y la prueba que aplico es literal: **me descargo vuestro `informe.qmd`, lo renderizo en mi ordenador, y tiene que salir vuestro informe, idéntico y sin errores.**
+
+Hacedla vosotros antes de entregar: reiniciad R (*Session → Restart R*, `Ctrl/Cmd+Shift+F10`), borrad las carpetas de caché (`_freeze/`, `informe_files/`) y renderizad de cero. Si falla, no es reproducible, por mucho que a vosotros os funcionara hace un rato.
+
+Los cuatro fallos que rompen el render en otra máquina:
+
+1. **Rutas absolutas.** Nada de `setwd()` ni `read.csv("C:/Users/marta/datos.csv")`. Los datos se leen desde su URL en bruto (5.5) y cualquier ruta local se escribe con `here::here()`.  
+2. **Paquetes sin cargar.** Todas las librerías declaradas en el chunk `setup`. Si funciona solo porque quedaron cargadas de otra sesión, en mi ordenador falla.  
+3. **Objetos heredados.** El `informe.qmd` no depende de variables creadas en otro `.qmd` ni tecleadas en la consola.  
+4. **Aleatoriedad sin semilla.** `set.seed()` antes de toda simulación, partición, validación cruzada o *bootstrap*.
+
+La plantilla de informe incluye un **Anexo · Reproducibilidad y entorno de ejecución** ya montado, con un chunk que imprime `sessionInfo()`: versión de R, sistema operativo y versión exacta de cada paquete con el que se produjeron los resultados. **No lo quitéis**, y rellenad ahí la semilla que habéis usado. Es lo que me permite reproducir vuestro entorno si algo no cuadra, y lo que os obliga a comprobar que el documento se sostiene solo.
 
 ### **5.10. La presentación**
 
-El formato es libre (PowerPoint, Google Slides, Canva, Quarto...), pero debe quedar accesible desde el repositorio:
+Puedes prepararla con la herramienta que quieras (PowerPoint, Google Slides, Canva, Quarto...). Lo que se entrega es:
 
-- Si es un **archivo** (`.pptx`, `.pdf`): colócalo directamente en la carpeta del proyecto. Que no pase de 100 MB.  
-- Si está **en la nube**: crea un archivo de texto llamado **`presentacion.md`** en la carpeta, con el enlace y una línea de contexto:
+- **Siempre, un `presentacion.pdf`** en la carpeta del proyecto. Todas las herramientas exportan a PDF: *Archivo → Descargar → PDF* en Slides, *Exportar* en Canva, *Guardar como PDF* en PowerPoint. Que no pase de 100 MB; si se pasa, comprime las imágenes al exportar.  
+- **Además, el enlace al original si está en la nube**, que es lo que conserva animaciones, vídeos y cualquier elemento interactivo que el PDF aplana. Ese enlace va en el issue de entrega (9.3).
 
-```
-# Presentación del equipo 3
-Enlace: https://docs.google.com/presentation/d/...
-Formato: Google Slides
-```
-
-Si eliges esta vía, **comprueba que el enlace es accesible para cualquiera que tenga la URL**. Un enlace restringido equivale a no haber entregado.
+Si eliges la vía del enlace, **compruébalo desde una ventana de incógnito**: tiene que ser accesible para cualquiera que tenga la URL. Un enlace restringido equivale a no haber entregado, y por eso el PDF va siempre, como red de seguridad.
 
 ### **5.11. Lo que no debe subirse**
 
@@ -678,10 +699,14 @@ Repasadla entera. Un issue abierto con material incompleto retrasa la correcció
 
 - [ ] Todos los archivos de análisis están subidos y renderizan sin error.  
 - [ ] `informe.qmd` está terminado.  
+- [ ] **`informe.qmd` renderiza de cero**, con R reiniciado y la caché borrada (5.9.1).  
+- [ ] El **anexo de reproducibilidad** está completo: semilla declarada y `sessionInfo()` en el HTML.  
 - [ ] `informe.html` está **generado y subido**. Este es el que más se olvida: renderizar en vuestro ordenador no lo sube a GitHub.  
-- [ ] La presentación está en el repositorio (como archivo) o enlazada en `presentacion.md`.  
-- [ ] Si es un enlace, **lo habéis abierto desde una ventana de incógnito** para confirmar que es accesible sin permisos.  
-- [ ] `bitacora.md` está al día, con todas las semanas y el reparto de tareas.  
+- [ ] `informe.pdf` está subido (ver 5.9: es la versión que puedo abrir directamente en GitHub).  
+- [ ] `presentacion.pdf` está subida.  
+- [ ] Si la presentación está en la nube, habéis abierto su enlace **en una ventana de incógnito** para confirmar que es accesible sin permisos.  
+- [ ] Habéis **pulsado todos los enlaces** que vais a poner en el issue, desde GitHub y no desde vuestro disco, y ninguno da 404.  
+- [ ] `bitacora.md` está al día, con todas las semanas y el reparto de tareas, **y cerrada con el bloque de entrega** (5.6).  
 - [ ] Todo el mundo ha hecho **push**. Que cada miembro lo confirme: si alguien tiene trabajo sin subir, no está entregado.  
 - [ ] **Habéis celebrado la reunión final de puesta en común**, en la que cada uno ha explicado su parte al resto y todos habéis podido preguntar. Si alguien no sabría defender el informe completo, esta reunión no está hecha.
 
@@ -701,40 +726,80 @@ Yo recibo aviso automáticamente. No hace falta que me escribáis además por co
 
 ### **9.3. Qué escribir**
 
-Por supuesto, tienes que adaptar el número del proyecto, el nombre del equipo, el título del informe y la presentación, el nombre del repositorio
-y todos los datos relativos a los miembros del equipo.
+Adapta el número del proyecto, el nombre del equipo, los miembros y **los enlaces de visualización**. 
+Esos enlaces son la parte crítica del issue: si no funcionan, no puedo corregir. Es conveniente que este mensaje se
+añada también en la bitácora.qmd, con el mismo formato -EXACTO- que se muestra a continuación, adaptando obviamente, los datos y enlaces que contiene:
 
-**Título** — con este formato exacto, para que localice las entregas de un vistazo:
-
-```
-Entrega Proyecto X — Equipo XXXX
-```
-
-**Cuerpo** — copia y adapta esto:
+**Título**
 
 ```
-## Entrega Proyecto X — Equipo XXXX
+Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
+```
 
-**Coordinador:** Marta Sánchez (@martasanchez) 
+**Cuerpo**
 
-**Miembros y tareas:** (actualizados con sus nombres)
-- @martasanchez — Cuestión 1 (analisis_c1_marta.qmd) y redacción del informe
-- @javierlopez — Cuestión 2 (analisis_c2_javier.qmd)
-- @luciaperez — Cuestión 3 (analisis_c3_lucia.qmd)
+```
+## Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
 
-**Informe:** informe.qmd / informe.html 
-**Visualización web del informe:** https://htmlpreview.github.io/?https://github.com/asunmayoral/repo/blob/main/informe.html
-**Presentación:** presentacion.md (enlace a Google Slides)
+**Coordinador:** Marta Sánchez (@martasanchez)
+
+**Miembros y tareas:**
+- @martasanchez: Marta Sanchez Lopez — Cuestión 1 (analisis_c1_marta.qmd) y redacción del informe
+- @javierlopez: Javier Lopez Martinez — Cuestión 2 (analisis_c2_javier.qmd)
+- @luciaperez: Lucía Pérez García — Cuestión 3 (analisis_c3_lucia.qmd)
+
+**Informe (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.pdf
+**Informe (html):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.html
+**Presentación (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/presentacion.pdf
+**Presentación (html -si en la nube-):** https://.....
 
 **Comentarios para el profesor:**
 Los comentarios que procedan y sean pertinentes para la corrección.
 ```
 
-Dos detalles:
+#### **Los enlaces de visualización, con detalle**
+
+**Por qué se piden los dos formatos, PDF y HTML.** Nuestros repositorios son **privados**, y ahí GitHub se comporta de dos maneras distintas:
+
+- **Los `.pdf` los abre y los pinta** en el navegador, dentro de la propia página de GitHub. Un clic y estoy leyendo.  
+- **Los `.html` los muestra como código fuente**, no como página. Para verlos hay que descargarlos y abrirlos en el navegador.
+
+Así que el PDF es el que me permite leer y comentar de un vistazo, y el HTML es el documento auténtico, con su tabla de contenidos, su código plegable y sus tablas paginadas. Quiero los dos: subid ambos y enlazad ambos.
+
+> **No uses `htmlpreview.github.io`.** Es el servicio que se cita en muchos tutoriales para ver HTML alojado en GitHub, pero **solo funciona con repositorios públicos**: con los nuestros devuelve una página en blanco o un error. Tampoco sirve `raw.githubusercontent.com`, que descarga el archivo en lugar de mostrarlo.
+
+**Los tres enlaces alojados en GitHub** (informe PDF, informe HTML y presentación PDF) tienen **exactamente la misma forma**, que es la dirección normal de un archivo dentro del repositorio:
+
+```
+https://github.com/GLM2026/REPOSITORIO-DE-TU-EQUIPO/blob/main/ARCHIVO
+                   └───────── idéntico en los tres ─────────┘  └─ lo único que cambia ─┘
+```
+
+El cuarto enlace, el de la presentación en la nube, es distinto por naturaleza: es la URL de Google Slides, Canva o lo que hayáis usado. **Solo lo ponéis si la presentación está en la nube**; si la habéis hecho en PowerPoint y solo existe el PDF, borrad esa línea del cuerpo del issue.
+
+**Cómo conseguir cada URL de GitHub sin equivocarte de un solo carácter.** No la escribas a mano: cópiala.
+
+1. Entra en el repositorio de tu equipo en **github.com**.  
+2. En la lista de archivos, **pulsa sobre `informe.pdf`**. GitHub lo abrirá y verás el documento paginado en pantalla.  
+3. **Copia la dirección de la barra del navegador.** Esa es la URL exacta, con la organización, el repositorio, la rama y el nombre del archivo ya correctos.  
+4. Pégala en el issue detrás de `**Informe (pdf):**`.  
+5. **Repite los pasos 2 a 4 con `informe.html` y con `presentacion.pdf`.** Con el HTML verás código en pantalla en lugar del documento: es lo esperado, la URL es igual de válida.
+
+**Comprueba antes de enviar.** Pega los enlaces, pulsa la pestaña **Preview** del editor del issue y ábrelos uno a uno:
+
+- `informe.pdf` y `presentacion.pdf` deben mostrar el documento paginado.  
+- `informe.html` debe mostrar el código fuente del HTML. Si da **404**, no está subido: os falta el *push*.  
+- El enlace de la presentación en la nube, si lo hay, **ábrelo en una ventana de incógnito**. Un enlace restringido equivale a no haber entregado.
+
+Arreglad lo que falle **antes** de pulsar *Submit new issue*.
+
+Y tres detalles del resto del cuerpo:
 
 - **Escribe los nombres de usuario con `@` delante.** GitHub los convierte en enlaces y notifica a esas personas, de modo que todo el equipo sigue el hilo.  
-- El apartado de comentarios no es relleno. Es donde justificáis decisiones que de otro modo yo interpretaría como errores.
-- Para que yo visualice correctamente el informe, necesito que actualices, en la url de visualización, el nombre del repositorio (repo) y el del informe (informe.html).
+- El apartado de comentarios no es relleno. Es donde justificáis decisiones que de otro modo yo interpretaría como errores.  
+- La rama es `main` salvo que os diga lo contrario; en cualquier caso, si copias la URL desde el navegador como indico arriba, la rama ya viene puesta y no tienes que pensar en ella.
+
+> **Este mismo bloque va también en la bitácora**, como última entrada, con el formato exacto que acabas de copiar. Lo explico en 5.6: la bitácora queda así cerrada con la constancia de qué se entregó y dónde.
 
 ### **9.4. Después de abrirlo: no toquéis nada**
 

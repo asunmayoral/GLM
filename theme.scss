@@ -99,28 +99,86 @@ header#quarto-header.headroom--not-top,
 }
 .tarjeta-caso .detalle { font-size: .93rem; color: #4a4a4a; margin: 0; }
 
-// --- Portada: botones secundarios --------------------------------------------
-.fila-botones {
+// --- Portada: botón único de RECURSOS ----------------------------------------
+// Sustituye a la antigua fila de botones pequeños: una sola llamada a la acción,
+// centrada y ancha, que lleva a la página que reúne todo el material de apoyo.
+.fila-boton-grande {
   display: flex;
-  flex-wrap: wrap;
-  gap: .75rem;
-  margin: 1.25rem 0 2rem;
+  justify-content: center;
+  margin: 2.25rem 0 2.75rem;
 }
-.boton-recurso {
-  display: inline-block;
-  padding: .55rem 1.1rem;
-  border: 1.5px solid var(--bs-primary);
-  border-radius: 2rem;
-  font-weight: 600;
-  font-size: .95rem;
-  color: var(--bs-primary) !important;
-  text-decoration: none !important;
-  transition: background .15s ease, color .15s ease;
-}
-.boton-recurso:hover {
+.boton-grande {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  padding: 1.05rem 2rem;
+  text-align: center;
   background: var(--bs-primary);
+  border: none;
+  border-radius: .6rem;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: .12em;
   color: #14100e !important;      // texto oscuro sobre el naranja, no blanco
+  text-decoration: none !important;
+  box-shadow: 0 .35rem 1rem rgba(0, 12, 32, .18);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
 }
+.boton-grande:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 .6rem 1.4rem rgba(0, 12, 32, .24);
+}
+
+// --- Recursos: rejilla de apartados ------------------------------------------
+// Índice visual de la página `recursos.qmd`. Cada tarjeta salta a un ancla de la
+// propia página, así que son más compactas que las tarjetas de los tres casos.
+.rejilla-recursos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1.75rem 0 2.75rem;
+}
+
+.tarjeta-recurso {
+  display: block;
+  position: relative;
+  padding: 1.15rem 1.25rem 1rem 3.4rem;
+  border: 1px solid rgba(0, 0, 0, .1);
+  border-left: 4px solid var(--bs-primary);
+  border-radius: .5rem;
+  background: #fff;
+  color: inherit !important;
+  text-decoration: none !important;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.tarjeta-recurso:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 .6rem 1.4rem rgba(0, 0, 0, .12);
+}
+.tarjeta-recurso .numero {
+  position: absolute;
+  top: 1.1rem;
+  left: 1.15rem;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bs-primary);
+  color: #14100e;
+  font-weight: 700;
+  font-size: .95rem;
+  line-height: 1;
+}
+.tarjeta-recurso .titulo {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: .35rem;
+}
+.tarjeta-recurso .detalle { font-size: .88rem; color: #4a4a4a; margin: 0; }
 
 // --- Portada: acordeones verdes ----------------------------------------------
 // Se aplican con  ::: {.callout-note .acordeon collapse="true" icon=false}
@@ -142,6 +200,34 @@ header#quarto-header.headroom--not-top,
   color: #24350a;                 // verde muy oscuro: contraste alto sobre el tinte
 }
 .callout.acordeon .callout-body { padding-top: .9rem; }
+
+// --- Botón global de código ---------------------------------------------------
+// `code-tools.toggle` coloca este botón arriba a la derecha del documento, con
+// "Show All Code" / "Hide All Code". Por defecto es un enlace discreto que pasa
+// desapercibido; como ahora TODO el código nace plegado, tiene que verse.
+.code-tools-button {
+  border: 1.5px solid var(--bs-primary) !important;
+  border-radius: 2rem;
+  padding: .2rem .85rem !important;
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--bs-primary) !important;
+  background: #fff;
+  transition: background .15s ease, color .15s ease;
+}
+.code-tools-button:hover {
+  background: var(--bs-primary);
+  color: #14100e !important;
+}
+
+// El resumen del bloque plegado ("Mostrar código"): que se lea como algo
+// pulsable y no como texto suelto encima del resultado.
+details.code-fold > summary {
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--bs-primary);
+  cursor: pointer;
+}
 
 // --- Legibilidad del cuerpo --------------------------------------------------
 h1, h2, h3 { letter-spacing: -0.015em; }

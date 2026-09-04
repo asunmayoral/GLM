@@ -7,7 +7,10 @@ project:
   pre-render: _scripts/invalidar_freeze.R
   render:
     - index.qmd
-    - entregas.qmd
+    - recursos.qmd
+    # Estaba ausente de esta lista, así que Quarto la copiaba tal cual a _site/
+    # en lugar de renderizarla: el enlace de la barra lateral no llevaba a nada.
+    - guia_docente_simplificada.qmd
     - caso1/caso1_binaria.qmd
     - caso2/caso2_conteos.qmd
     - caso3/caso3_continuas_positivas.qmd
@@ -34,20 +37,10 @@ website:
             text: "Caso 2 · ¿Cuántas veces y a qué ritmo?"
           - href: caso3/caso3_continuas_positivas.qmd
             text: "Caso 3 · ¿Cuánto y hasta cuándo?"
-      - text: "Recursos"
-        menu:
-          - href: entregas.qmd
-            text: "Entregas y seguimiento"
-          - text: "Plantillas"
-            href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/plantillas
-          - text: "Rúbricas de evaluación"
-            href: https://github.com/asunmayoral/GLM/tree/master/evaluacion/Rubricas_evaluacion.xlsx
-          - text: "Datos proyecto 1-equipos"
-            href: https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos
-          - text: "Datos proyecto 2-3"
-            href: https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto
-          - href: referencias.qmd
-            text: "Referencias"
+      - href: recursos.qmd
+        text: "Recursos"
+      - href: referencias.qmd
+        text: "Referencias"
     right:
       - icon: github
         href: https://github.com/asunmayoral/GLM
@@ -116,8 +109,8 @@ website:
             href: caso3/caso3_continuas_positivas.qmd#sec-u37
           - text: "3.8 · Estudio de caso"
             href: caso3/caso3_continuas_positivas.qmd#sec-u38
-      - href: entregas.qmd
-        text: "Entregas y seguimiento"
+      - href: recursos.qmd
+        text: "Recursos"
       - href: referencias.qmd
         text: "Referencias"
 
@@ -146,7 +139,11 @@ format:
     toc-depth: 3
     toc-title: "En esta página"
     back-to-top-navigation: true   # opción de FORMATO, no de `website:`
-    code-fold: show      # código visible pero plegable: los estudiantes lo leen y copian
+    # Código PLEGADO por defecto: la narrativa manda y el código se abre a demanda.
+    # `code-tools.toggle` añade el botón "</> Código" arriba a la derecha de cada
+    # página, con "Show All Code" / "Hide All Code" para toda la página de golpe.
+    code-fold: true
+    code-summary: "Mostrar código"
     code-tools:
       source: false # quita "View source"; no se expone el qmd
       toggle: true # mantiene show all/hide all code

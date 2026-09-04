@@ -3,6 +3,14 @@ title: "Modelos Lineales Generalizados con R"
 subtitle: "Del dato al modelo, del modelo a la predicción."
 lang: es
 toc: false
+bibliography: references.bib
+csl: https://www.zotero.org/styles/apa
+link-citations: true
+# Las citas se renderizan en el texto, pero NO se lista la bibliografía al pie:
+# esta es la portada, y las referencias completas viven en referencias.qmd.
+# Sin esta opción, citeproc añadiría la lista al final del documento aunque se
+# borre el div #refs.
+suppress-bibliography: true
 format:
   html:
     page-layout: full
@@ -13,7 +21,7 @@ format:
      docente y cada uno enlaza a su apartado completo, para no duplicar texto.
      La barra lateral NO aparece aquí a propósito (esta página no está en
      `sidebar.contents` de _quarto.yml).
-     PENDIENTE: los enlaces de entrega, en entregas.qmd.
+     PENDIENTE: los enlaces de entrega, en recursos.qmd.
 
      PÓSTER: el banner NO va de cabecera. Con su ratio 2,03 a todo ancho medía
      948 px de alto en una pantalla Full HD —más que la propia ventana— y la
@@ -92,19 +100,13 @@ clásico falla de forma evidente. La teoría entra a demanda para resolver ese p
 </div>
 ```
 
-## Recursos del curso
-
 ```{=html}
-<div class="fila-botones">
-  <a href="guia_docente_simplificada.html" class="boton-recurso">Guía docente completa</a>
-  <a href="entregas.html" class="boton-recurso">Entregas y seguimiento</a>
-  <a href="https://github.com/asunmayoral/GLM/tree/master/evaluacion/Plantillas_informes_tres_formatos" class="boton-recurso">Plantillas de informe</a>
-  <a href="https://github.com/asunmayoral/GLM/tree/master/evaluacion" class="boton-recurso">Rúbricas de evaluación</a>
-  <a href="referencias.html" class="boton-recurso">Referencias</a>
+<div class="fila-boton-grande">
+  <a href="recursos.html" class="boton-grande">RECURSOS</a>
 </div>
 ```
 
-## La asignatura en cinco preguntas:
+## La asignatura en preguntas:
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 1. Qué son los Modelos Lineales Generalizados y para qué sirven
@@ -167,7 +169,7 @@ Se espera de ti que mejores tu razonamiento crítico, así como tus habilidades 
 
 **Herramientas.** Trabajamos todo el curso con R+RStudio y [Github](https://github.com) como plataforma de programación colaborativa. También pruedes trabajar con otras plataformas colaborativas y comunicativas de la suite de Google, y por supuesto, con LLMs. La generación de código y redacción de informes la realizamos con cuadernos de Quarto Markdown. Para la creación de presentaciones puedes utilizar otras herramientas específicas asistidas con IA como NotebookLM, Gamma, ... u otros LLMs.
 
-**El papel de la IA.** La IA es una herramienta de trabajo legítima, con la condición de que "eres responsable de todo lo que entregas tú y tu equipo, y en consecuencia tienes que poder defenderlo con soltura; si no sabes explicar por qué vuestro código hace lo que hace, el trabajo realizado no tendrá valor".
+**El papel de la IA.** Es una herramienta de trabajo legítima y esperamos que la uses. Las condiciones —saber qué hace tu código, justificar el uso y verificar las respuestas— están en el apartado 9.
 
 :::
 
@@ -231,51 +233,48 @@ Cada proyecto se desarrolla en un formato distinto para que domines las situacio
 **Infraestructura**
 
 Para la generación de los proyectos el profesorado compartirá contigo un repositorio de trabajo para el equipo en GitHub, donde tienes un documento con todas las instrucciones. Alojarás allí todos los documentos generados con el proyecto y el coordinador del equipo mantendrá la bitácora. La entrega de la tarea se detalla en dichas instrucciones, así como el acceso a la revisión del profesorado.
-
-**Uso ético de la IA**
-Asumimos que la utilizarás. Todo informe incluye un apartado **obligatorio** de reflexión sobre el uso de la IA: qué herramientas
-se usaron y para qué, prompts relevantes si es pertinente, y **cómo se verificaron sus respuestas**. Sin ese apartado, el informe no puede
-alcanzar la calificación de «excelente».
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 8. Cómo se evalúa la individualidad
 
-Una coevaluación 360 sobre el trabajo realizado por cada miembro del equipo pondera la calificación del proyecto grupal (contribución 60%). El examen/entrevista individual aporta el 40% de la calificación de cada proyecto, y en ella habrás de demostrar que conoces a la perfección todo el desarrollo del proyecto. El proyecto grupal (60% de la calificación) acaba ponderado por un factor corrector *Coi* que se obtiene de la **coevaluación 360** en cada proyecto, contrastada con la **bitácora** y con la evidencia de contribución (*commits*, versiones, actas).
+### En el proyecto grupal
+Una coevaluación 360 del equipo, contrastable y ratificable por el profesorado con la **bitácora**, el equipo y la evidencia de contribución (*commits*, versiones, actas), pondera la calificación del proyecto grupal (contribución 60%) a través de un factor entre 0 y 1 -*Coi*-.
 
-### **Coevaluación 360**
+**Coevaluación 360** consistente en autoevaluación y evaluación a todos/as los/as compañeros/as de equipo. 
 
-Cada estudiante valora a **cada uno de sus compañeros y también a sí mismo** en dos preguntas, que
-separan lo que hizo *por su cuenta* de lo que hizo *hacia los demás*:
+| | Pregunta | Dimensiones que recoge | Peso | Escala |
+|:--:|:--|:--|:--:|:--:|
+| $P_1$ | CUMPLIMIENTO Y CONTRIBUCIÓN. ¿Sacó adelante el trabajo que le correspondía, y en las fechas acordadas? | Cumplimiento y contribución | 2 | 0,1,2,3|
+| $P_2$ | COLABORACIÓN. ¿Facilitó el trabajo de sus compañeros? | Colaboración | 1 | 0,1,2,3|
 
-| | Pregunta | Dimensiones que recoge | Peso |
-|:--:|:--|:--|:--:|
-| $P_1$ | ¿Sacó adelante el trabajo que le correspondía, y en las fechas acordadas? | Cumplimiento y contribución | 2 |
-| $P_2$ | ¿Facilitó el trabajo de sus compañeros? | Colaboración | 1 |
 
-La escala es la misma **0–3** que emplean las rúbricas del curso, sin punto medio neutro, y su
-referencia es siempre quién acabó haciendo el trabajo:
- | | Nivel | Significado |
-|:--:|:--|:--|
-| **3** | Plenamente | Asumió por completo lo que le correspondía; nadie tuvo que suplirle |
-| **2** | En gran parte | Cumplió en lo esencial, pero hubo que reclamarle o rehacer alguna parte |
-| **1** | A medias | Una parte apreciable de lo suyo la acabaron asumiendo otros |
-| **0** | Apenas o nada | Su aportación fue testimonial o inexistente |
-
-### Cálculo del Coi
+**Cálculo del Coi** -contrastable y ratificable con indicios-
 
 Sea $s_{ij} = (2P_1 + P_2)/3$ la **media ponderada** de las puntuaciones que el estudiante $i$ otorga
 a su compañero $j$, y $n$ el tamaño del equipo. El procedimiento adapta el algoritmo del sistema
 WebPA [@loddington2009].
 
-**1. Cada evaluador reparte, no califica.** Se normaliza lo que cada quien emite, de modo que su
+- **1. Cada evaluador reparte, no califica.** Se normaliza lo que cada quien emite, de modo que su
 severidad o generosidad deja de influir en el resultado:
 
-$$\omega_{ij} \;=\; \frac{s_{ij}}{\sum_{k} s_{ik}}\,n$$
+$$\omega_{ij} \;=\; \frac{s_{ij}}{\sum_{k} s_{ik}}\,n \;=\; \frac{s_{ij}}{\bar{s}_i}
+\qquad\text{con } \bar{s}_i \text{ la media de las puntuaciones que emite } i$$
 
-El índice vale 1 cuando $i$ considera que $j$ aportó lo que le correspondía, y se aparta de 1 hacia
-arriba o hacia abajo según lo aportara en mayor o menor medida. Quien valora igual a todo el equipo
-emite $\omega = 1$ para todos: no establece diferencias, luego no aporta información.
+El índice **no dice si $j$ hizo lo que debía, sino cuánto se separa de la media de su equipo según
+$i$**: vale 1 cuando $i$ lo puntúa exactamente en su propia media, y se aleja de 1 según lo sitúe por
+encima o por debajo de sus compañeros. Es una **posición relativa dentro del equipo**, no un juicio
+sobre el trabajo.
+
+Que el nivel absoluto desaparezca es deliberado. Quien puntúa a todo su equipo con 3 y quien lo
+puntúa todo con 1 emiten exactamente los mismos índices —$\omega = 1$ para todos—, porque ambos
+afirman lo mismo: que allí nadie destacó ni se descolgó. La calidad del trabajo ya la califican las
+rúbricas del informe y de la exposición; volver a puntuarla aquí la contaría dos veces.
+
+De ahí se siguen dos propiedades. Cada papeleta suma $n$, de modo que **ningún evaluador puede subir
+o bajar al equipo entero**: solo repartir entre sus miembros. Y quien puntúa a todos por igual emite
+$\omega = 1$ para cada uno —no porque se le descarte, sino porque es lo que dice su papeleta—; esos
+votos **cuentan en la mediana**, y son justamente los que neutralizan una valoración hostil aislada.
 
 **2. Se agregan las valoraciones recibidas** mediante la mediana,
 $R_j = \operatorname{mediana}_i(\omega_{ij})$. Al incluir la autoevaluación, cada estudiante recibe
@@ -338,87 +337,201 @@ la nota, y puede aportar evidencia adicional en el examen oral individual.
 percepción del aprendizaje y valoración global.
 
 
-### Examen oral individual
+### En el examen/entrevista personal (oral)
 
-Una vez obtenida la calificación individual en el proyecto grupal, se procede con una entrevista/defensa individual, en sesión de tutoría, en fecha posterior a la corrección del proyecto y no más de dos semanas después. Duración de **10 a 12 minutos**, sin apoyos salvo la propia presentación y el informe corregido. Tres bloques:
-
-| Bloque | Contenido | Peso |
-|:--:|:--|:--:|
-| 1 | Justificación de respuestas e interpretación de algún resultado | 40 % |
-| 2 | Solución a algún punto débil señalado en la corrección | 35 % |
-| 3 | Extensión o nuevo reto sobre el problema ya resuelto | 25 % |
+El examen/entrevista individual aporta el 40% de la calificación de cada proyecto, y en ella habrás de demostrar que conoces a la perfección todo el desarrollo del proyecto. La entrevista/defensa individual se realiza en una sesión de tutoría, en fecha posterior a la corrección del proyecto y no más de dos semanas después. Duración de **10 a 12 minutos**, sin apoyos salvo la propia presentación y el informe corregido. 
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## 9. Cómo construir los informes y presentaciones
+## 9. Qué uso de la IA está permitido, y bajo qué condiciones
 
-En ["Recursos/Plantillas"](/evaluacion/plantillas) y también en el repositorio de Github, dispones de plantillas de informe, así como de guías con recomendaciones para construir los informes y las presentaciones.
+**Asumimos que la vas a utilizar.** No es una concesión ni una tolerancia: forma parte de la competencia profesional que este curso desarrolla. Lo que se evalúa no es si la usas, sino **si sabes usarla y si puedes responder de lo que produce**.
+
+La condición es una sola, y no admite matices:
+
+> **Eres responsable de todo lo que entregáis tú y tu equipo, y en consecuencia tienes que poder defenderlo con soltura.**
+
+De ahí se derivan tres exigencias concretas.
+
+### 1. Saber qué hace tu código, línea a línea
+
+Si en la entrevista individual te pregunto por qué una línea de tu análisis hace lo que hace y la respuesta es **«no sé, lo hizo la IA»**, esa parte del trabajo vale cero. No porque haya trampa, sino porque **no hay aprendizaje que evaluar**: un análisis que nadie del equipo sabe explicar no es un análisis del equipo.
+
+Lo mismo vale para las decisiones metodológicas. Si la IA te propuso una familia, un enlace o un contraste, tú tienes que saber **por qué ese y no otro**, y qué habrías hecho si los datos fueran distintos. Recuerda además que puedo preguntar a cualquier miembro por cualquier parte del proyecto, no solo por la que firmó.
+
+### 2. Justificar y documentar el uso
+
+Todo informe incluye un apartado **obligatorio** de reflexión sobre el uso de la IA, que pesa un **10 %** de la nota del informe. No es un trámite ni una declaración genérica: se espera que recoja
+
+- **Qué herramientas** usasteis y **para qué tarea concreta** —redacción, generación de código, depuración de un error, búsqueda bibliográfica, traducción, revisión de estilo—. No es lo mismo pedirle que escriba el análisis que pedirle que te explique un mensaje de error.
+- **Los prompts relevantes**, cuando sean informativos. No hace falta el historial completo: interesan los que produjeron una decisión importante del trabajo, o aquellos en los que la respuesta os obligó a cambiar de enfoque. Un prompt bien planteado dice mucho de cómo entendéis el problema.
+- **Qué salió mal**, si salió. Una alucinación detectada, una referencia inventada, un método propuesto que no encajaba con vuestros datos. Contarlo suma; ocultarlo, cuando se nota en el resultado, resta.
+
+Sin este apartado, el informe **no puede alcanzar la calificación de «excelente»**.
+
+### 3. Verificar, y contar cómo verificaste
+
+Esta es la parte que más se descuida y la que más valoro. Que la IA afirme algo no lo convierte en cierto, y en estadística las respuestas plausibles pero equivocadas son la norma, no la excepción.
+
+Explicad **el procedimiento de verificación** que aplicasteis en cada caso. Algunos que sirven:
+
+- **Contra el proceso generador.** Los bancos de datos del curso están simulados con un DGP conocido: si el modelo estima un parámetro, sabéis contra qué contrastarlo.
+- **Contra la fuente original.** Toda afirmación teórica o referencia bibliográfica se comprueba en el libro o el artículo citado. Las referencias inventadas son el fallo más frecuente y el más fácil de detectar.
+- **Contra los datos crudos.** Antes de dar por buena una cifra, recalculadla por otra vía o comprobadla directamente sobre los datos.
+- **Contra otro método.** Si dos aproximaciones distintas dan lo mismo, la confianza sube; si no, hay algo que entender.
+
+::: {.callout-important appearance="minimal"}
+**En resumen.** La IA es una herramienta legítima y potente, y no usarla sería absurdo. Pero el trabajo lo firmáis vosotros: si no sabéis explicar por qué vuestro código hace lo que hace, el trabajo realizado no tendrá valor.
+:::
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
-## 10. Cuáles son los criterios de evaluación
+## 10. Cómo asegurar la reproducibilidad de tu código
 
-En ["Recursos/Rúbricas"](/evaluacion/rubricas) dispones de las rúbricas y checklists que usaré en la evaluación de informes, presentaciones y entrevistas, así como las relativas al examen final, con sus criterios y ponderaciones, que se presentan a continuación. Todas las rúbricas usan la escala **0–3**. 
+Un análisis es **reproducible** cuando otra persona —o tú dentro de seis meses— obtiene exactamente los mismos resultados a partir de los mismos datos y el mismo código. En este curso es un criterio de evaluación explícito («Datos, método y reproducibilidad», 20 % del informe), no un adorno. Lo que sigue es el mínimo exigible.
 
-### Rúbricas de la evaluación continua
+### 1. El proyecto es la unidad de trabajo
 
-**Informe grupal**
+Trabaja siempre dentro de un **proyecto de RStudio** (`.Rproj`) y refiere las rutas al directorio raíz del proyecto, nunca a tu disco:
 
-| Criterio | Peso |
-|:--|:--:|
-| Problema, audiencia y objetivos | 20 % |
-| Datos, método y reproducibilidad | 20 % |
-| Resultados, visualización e interpretación | 30 % |
-| Redacción, formato y referencias (APA 7) | 20 % |
-| Uso ético de la IA | 10 % |
+``` r
+library(here)
+datos <- readr::read_csv(here("datos", "siniestros.csv"))
+here()   # muestra la raíz del proyecto que here() ha detectado
+```
 
-**Exposición y defensa grupal**
+Con esto queda prohibido `setwd("C:/Users/...")`: una ruta absoluta rompe el código en cualquier otro ordenador. Tampoco uses `rm(list = ls())` para «limpiar»: no descarga paquetes ni reinicia opciones, así que da una falsa sensación de sesión limpia. La comprobación honesta es reiniciar R (**Session → Restart R**, `Ctrl/Cmd+Shift+F10`) y renderizar el documento entero de nuevo.
 
-| Criterio | Peso |
-|:--|:--:|
-| Narrativa: hilo entre audiencia, contexto, resultados, implicaciones y cierre | 12,5 % |
-| Soporte visual: estética y estructura de las diapositivas | 7,5 % |
-| Foco: ideas clave, resultados y justificaciones | 12,5 % |
-| Desempeño: oralidad, tiempos y decoro | 7,5 % |
-| Defensa (Q&A): corrección y justificación de la respuesta | 10 % |
+En **Tools → Global Options → General**, desactiva «Restore .RData into workspace at startup» y pon «Save workspace to .RData on exit» en *Never*. Si el resultado depende de objetos heredados de una sesión anterior, el documento no es reproducible aunque a ti te funcione.
 
-**Examen oral individual**
+### 2. Aleatoriedad: fija la semilla
 
-| Criterio | Peso |
-|:--:|:--|:--:|
-| **Justificaciones técnicas e interpretación**: la justificación de las respuestas dadas y la interpretación solicitada de resultados | 40 % |
-|  **Solución a un punto débil**:| la solución a uno de los puntos débiles detectados en la corrección | 35 % |
-| **Extensión / nuevos retos**: una extensión o un nuevo reto sobre el problema ya resuelto | 25 % |
+Todo lo que use el generador de números aleatorios —simulación de los bancos de datos, particiones de entrenamiento y prueba, validación cruzada, *bootstrap*, arranques de un optimizador— debe ir precedido de una semilla:
 
+``` r
+set.seed(12345)
+```
 
-## Rúbricas de la evaluación final
+Dos avisos importantes:
 
-Aplicables **solo** en la evaluación final. No incluyen uso de IA ni referencias: el foco es técnico
-y comunicativo.
+- La semilla afecta a lo que viene **después** de ella y en el **orden** en que se ejecuta. Si reordenas los chunks, los números cambian. Por eso conviene sembrar justo antes de cada bloque aleatorio, no una sola vez al principio del documento.
+- El algoritmo por defecto de `sample()` cambió en **R 3.6.0** (el muestreo pasó a `sample.kind = "Rejection"`). Un código escrito antes de esa versión no reproduce hoy los mismos índices. Si necesitas replicar resultados antiguos, `RNGversion("3.5.0")` restaura el comportamiento previo; documenta siempre que lo has hecho.
 
-| Informe (50 %) | Peso | | Defensa oral (50 %) | Peso |
-|:--|:--:|:--:|:--|:--:|
-| Justificaciones técnicas e interpretación | 35 % | | Justificación y corrección técnica de las respuestas a las preguntas | 40 % |
-| Soluciones e implicaciones derivadas | 25 % | | Interpretación de resultados y en el contexto del problema | 35 % |
-| Comunicación escrita: claridad, orden y precisión de la redacción | 20 % | | Comunicación oral: claridad, orden y precisión al exponer y responder | 25 % |
-| Ajuste al formato estandarizado | 20 % | | | |
+Si prefieres no alterar el estado global del generador, `withr::with_seed()` fija la semilla solo dentro de la expresión que le pasas.
+
+### 3. Trazabilidad: deja constancia de con qué se ejecutó
+
+Esto es lo que convierte «me funciona» en «se puede comprobar». **Todo informe del curso cierra con un apartado que registra el entorno de ejecución.**
+
+La función de base es `sessionInfo()`, que informa de la versión de R, la plataforma, el sistema operativo, la configuración regional, los paquetes adjuntos con `library()` y los espacios de nombres cargados:
+
+``` r
+sessionInfo()
+```
+
+Mejor aún, `sessioninfo::session_info()` presenta la misma información en dos tablas legibles y añade dos columnas que `sessionInfo()` no da: la **fecha** de instalación de cada paquete y su **procedencia** (CRAN, Bioconductor, un repositorio de GitHub…), que es justo lo que hace falta para reinstalar la misma versión:
+
+``` r
+# install.packages("sessioninfo")
+sessioninfo::session_info()
+```
+
+Para consultas puntuales sobre un paquete concreto:
+
+``` r
+packageVersion("glmmTMB")            # versión instalada
+packageDescription("DHARMa")         # metadatos completos (versión, fecha, autoría)
+sessioninfo::package_info("survival") # versión, fecha y origen
+R.version.string                      # versión de R en una línea
+```
+
+Y para **citar** correctamente R y sus paquetes en el informe, sin transcribir a mano:
+
+``` r
+citation()              # cómo citar R
+citation("lme4")        # cómo citar un paquete concreto
+toBibtex(citation("survival"))  # la entrada BibTeX, lista para references.bib
+```
+
+Recuerda que la cita de un paquete forma parte de las referencias en APA 7.ª, igual que un libro o un artículo.
+
+### 4. Congelar versiones: `renv`
+
+`sessionInfo()` **documenta** el entorno; `renv` [@renv] lo **reconstruye**. Es el paso que separa un informe reproducible en el papel de uno reproducible de hecho:
+
+``` r
+# install.packages("renv")
+renv::init()       # crea una biblioteca privada del proyecto y el fichero renv.lock
+renv::snapshot()   # registra en renv.lock la versión exacta de cada paquete en uso
+renv::status()     # ¿coincide lo instalado con lo declarado en el lockfile?
+renv::restore()    # reinstala exactamente las versiones del lockfile
+```
+
+El fichero `renv.lock` va **al repositorio**; la biblioteca `renv/library/` no (el `.gitignore` que crea `renv::init()` ya se encarga). Quien clone el proyecto ejecuta `renv::restore()` y obtiene tu entorno, no el suyo.
+
+### 5. El documento se rinde solo
+
+El informe se escribe en Quarto [@quarto] y **todos** los resultados —cifras, tablas y figuras— se generan desde chunks. Ninguna cifra se teclea a mano en la prosa: para citar un valor en el texto, usa **código en línea** (una expresión de R entre acentos graves precedida de `r`, como `round(coef(mod)[2], 3)`), de modo que si el modelo cambia, el texto cambia con él.
+
+::: {.callout-tip appearance="minimal"}
+**La prueba definitiva.** Reinicia R, borra las carpetas de caché (`_freeze/`, `*_files/`), renderiza el documento completo desde cero y comprueba que el resultado es el mismo. Si falla, no es reproducible. Ojo con la opción `freeze` de Quarto: sirve para no reejecutar lo que no ha cambiado, pero puede enmascarar un documento roto, así que la comprobación final se hace siempre con la caché limpia.
 :::
 
+Para ampliar: el capítulo *Workflow: scripts and projects* de [R for Data Science (2.ª ed.)](https://r4ds.hadley.nz/workflow-scripts) y la documentación de [renv](https://rstudio.github.io/renv/).
+:::
 
-## Cómo usar este sitio web
+::: {.callout-note .acordeon collapse="true" icon=false}
+## 11. Con qué recursos cuentas, y cómo se usan
 
-Cada caso es un **cuaderno reproducible** programado en R-Markdown: la teoría al servicio del problema, el **código R
-visible** —puedes desplegarlo, y también descargarlo al finalizar el bloque— y la interpretación de cada resultado. La barra lateral
-te lleva a cualquier unidad, y el índice de la derecha, a cualquier sección dentro de ella.
+### El material de apoyo: la página Recursos
 
-Dispones de acceso a la [Guía Docente](guia_docente_simplificada.qmd). Desde la pestaña Recursos también puedes a las rúbricas de evaluación y las plantillas para la redacción de informes, junto con guías con recomendaciones para generar presentaciones eficaces. También el seguimiento de proyectos, las entregas de trabajos y la coevaluación 360 está accesible en la web. 
+Todo lo operativo está reunido en la página [**Recursos**](recursos.qmd), accesible desde el menú de navegación y desde el botón de la portada. Seis apartados:
 
-Si empiezas de cero, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
+| | Qué contiene |
+|:--|:--|
+| **1 · Registro en GitHub y equipos** | El formulario con el que te das de alta y constituyes tu equipo. Es el primer paso del curso: de ahí salen los repositorios de trabajo. |
+| **2 · Informes y presentaciones** | Las **plantillas** Quarto de los tres formatos —técnico, ejecutivo y artículo— y las **guías** con recomendaciones para redactar y para exponer. |
+| **3 · Planificación y entregas** | Los **datos** que le corresponden a cada proyecto y el calendario completo: fechas de entrega del informe, de las exposiciones y del periodo de defensas individuales. |
+| **4 · Qué se entrega** | El formulario de **coevaluación 360**, el formato del ***issue*** de entrega, la **bitácora** semanal y la exigencia de ejecutables reproducibles. Con enlace a la Guía GitHub del Estudiante, que lo detalla todo. |
+| **5 · Rúbricas de evaluación** | El libro de rúbricas con los descriptores de cada nivel, para informe, exposición, entrevista individual y examen final. Los criterios y sus pesos están resumidos en la [Guía Docente](guia_docente_simplificada.qmd), apartado 7. Léelas **antes** de empezar, no después de entregar. |
+| **6 · Consultas** | Chat y correo de Google para dudas y tutorías. |
+
+### El contenido del curso: los tres casos
+
+Los tres casos están **desarrollados y completos** en esta web, cada uno como un cuaderno reproducible: la teoría al servicio del problema, el código R que la ejecuta y la interpretación de cada resultado. Al final de cada unidad encontrarás, en un recuadro, las **cuestiones del proyecto** que esa unidad te permite resolver.
+
+| Caso | Unidades |
+|:--|:--|
+| [**Caso 1 · ¿Ocurre el evento? ¿Y cuándo?**](caso1/caso1_binaria.qmd) | 1.1 Cuando la recta no llega · 1.2 Logística: ajuste e interpretación · 1.3 Más de dos categorías · 1.4 Sujetos agrupados (GLMM) · 1.5 ¿Y cuándo ocurre? Supervivencia · 1.6 Estudio de caso |
+| [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Selección y regularización · 2.8 Estudio de caso |
+| [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 Tweedie: el coste agregado · 3.5 AFT: del coste al tiempo · 3.6 Cox como frontera · 3.7 Más allá: las tres lentes · 3.8 Estudio de caso |
+
+La **barra lateral** te lleva a cualquier unidad, y el **índice de la derecha**, a cualquier sección dentro de ella.
+
+### Cómo ver el código
+
+**El código viene plegado**, para que la narrativa se lea sin interrupciones. Tienes dos formas de desplegarlo:
+
+- **Un bloque concreto:** pulsa `Mostrar código` justo encima del resultado que te interese.
+- **Toda la página de golpe:** el botón **`</> Código`**, arriba a la derecha de cada página, despliega o repliega todos los bloques a la vez (*Show All Code* / *Hide All Code*).
+
+Cada bloque lleva además su botón de copiado, y el código completo de cada unidad está reunido en la carpeta `scripts/` del repositorio, listo para ejecutar de una vez.
+
+### Y además
+
+- La [**Guía Docente**](guia_docente_simplificada.qmd) completa: objetivos, contenidos, cronograma y sistema de evaluación.
+- Las [**Referencias**](referencias.qmd) bibliográficas del curso.
+- El [**repositorio en GitHub**](https://github.com/asunmayoral/GLM), con los datos, los scripts de cada unidad y el material de evaluación.
+
+::: {.callout-tip appearance="minimal"}
+**Si empiezas de cero**, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
+:::
+:::
 
 ## Profesorado
 
 Soy Asun Martínez Mayoral, profesora del Departamento de Estadística, Matemáticas e Informática en la Universidad Miguel
-Hernández de Elche. Doctora en Ciencias Matemáticas, especialidad de Estadística e Investigación Operativa, por la Universitat de València (1998). Profesora titular de universidad desde 2008 (costó llegar). Aprendo y trabajo en Estadística, frecuentista, bayesiana y aprendizaje automático, aprovechando las IAs, pero también curioseo con la tecnología educativa y la divulgación científica. Imparto docencia actualmente en los Grados en Estadística Empresarial y Ciencia de Datos e Inteligencia Artificial, y en varios másteres, programas de doctorado y programas de formación de profesorado, enseñando variaditos sobre estadística, metodologías educativas, competencia digital, aprovechamiento de IAs y divulgación científica, para profesionales de distintos ámbitos.
+Hernández de Elche. Doctora en Ciencias Matemáticas, especialidad de Estadística e Investigación Operativa, por la Universitat de València (1998). Profesora titular de universidad desde 2008 (costó llegar). Aprendo y trabajo en Estadística, frecuentista, bayesiana y aprendizaje automático, pero también curioseo con la tecnología educativa y la divulgación científica, siempre aprovechando las IAs. Imparto docencia actualmente en los Grados en Estadística Empresarial y Ciencia de Datos e Inteligencia Artificial, y en varios másteres, programas de doctorado y programas de formación de profesorado, enseñando variaditos sobre estadística, metodologías educativas, competencia digital, aprovechamiento de IAs y divulgación científica, para profesionales de distintos ámbitos.
 
 ### Contacto
 

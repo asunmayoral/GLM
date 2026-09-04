@@ -301,26 +301,13 @@ se usaron, para qué y **cómo se verificaron sus respuestas**. Sin ese apartado
 alcanzar la calificación de «excelente».
 :::
 
-## Factor individual de implicación ($w$)
+<!-- El apartado del factor w se mantiene en UN solo sitio, el parcial
+     evaluacion/_coevaluacion_guia.qmd, y se incluye desde aquí. Antes estaba
+     duplicado y con un esquema distinto (bandas 0-4), superado por el
+     procedimiento WebPA que se describe abajo.
+     El parcial NO es una página del sitio: el estudiante lo lee aquí. -->
 
-Se obtiene de la **bitácora individual** y de la **coevaluación 360** que se entregan con cada
-proyecto, a partir de la **mediana** de las puntuaciones de implicación recibidas (escala 0–4)
-—robusta a un voto atípico—:
-
-| Banda | Mediana | $w$ |
-|:--|:--:|:--:|
-| Implicación plena | $\geq 3$ | 1,00 |
-| Implicación parcial | 1,5 – 2,9 | 0,80 |
-| Implicación insuficiente | $< 1{,}5$ | $\leq 0{,}50$ |
-
-**Salvaguardas.** Las coevaluaciones emitidas por quien queda en la banda insuficiente no computan al
-evaluar a los demás; no entregar la bitácora o la coevaluación limita $w$ a un máximo de 0,80; y el
-profesorado revisa, con la bitácora y la evidencia de contribución (*commits*), cualquier
-discrepancia antes de fijar $w$.
-
-La **bitácora** recoge rol asumido, tareas realizadas, incidencias, uso de recursos (apuntes/IA),
-percepción del aprendizaje y valoración global. La **coevaluación 360** puntúa a cada compañero de 0
-a 4 en **cumplimiento**, **contribución** y **colaboración**.
+{{< include evaluacion/_coevaluacion_guia.qmd >}}
 
 ## Examen oral individual
 
@@ -337,8 +324,8 @@ bloques, cada uno con una cuestión:
 # 7. Rúbricas y plantillas
 
 Todas las rúbricas usan la escala **0–3**. Aquí figuran los criterios y sus pesos; los descriptores
-de cada nivel están en el libro de rúbricas, `evaluacion/Rubricas_evaluacion.xlsx`, y desarrollados
-en `evaluacion/Rubricas_evaluacion_desarrolladas.docx`.
+de cada nivel están en el libro de rúbricas, `evaluacion/Rubricas_evaluacion.xlsx`, que incluye
+una hoja por prueba y la hoja «Coevaluación 360» con el cálculo del factor $w$.
 
 ## Rúbricas de la evaluación continua
 
@@ -382,12 +369,13 @@ En la carpeta `evaluacion/` del material del curso:
 
 | Recurso | Fichero |
 |:--|:--|
-| Guía de redacción de informes (los tres formatos) | `Guia_informes_eficaces_datos_tres_formatos.docx` |
-| Guía de presentaciones eficaces | `Guia_presentaciones_eficaces_datos_tres_formatos.docx` |
-| Plantilla de **informe técnico** (Caso 1) | `Plantillas_informes_tres_formatos/Plantilla_informe_tecnico.qmd` |
-| Plantilla de **informe ejecutivo** (Caso 2) | `Plantillas_informes_tres_formatos/Plantilla_informe_ejecutivo.qmd` |
-| Plantilla de **artículo científico** (Caso 3) | `Plantillas_informes_tres_formatos/Plantilla_articulo_cientifico.qmd` |
-| Libro de rúbricas | `Rubricas_evaluacion.xlsx` · `Rubricas_evaluacion_desarrolladas.docx` |
+| Guía de redacción de informes (los tres formatos) | `guias/GUIA_informes.pdf` |
+| Guía de presentaciones eficaces | `guias/GUIA_presentaciones.pdf` |
+| Plantilla de **informe técnico** (Caso 1) | `plantillas/Plantilla_informe_tecnico.qmd` |
+| Plantilla de **informe ejecutivo** (Caso 2) | `plantillas/Plantilla_informe_ejecutivo.qmd` |
+| Plantilla de **artículo científico** (Caso 3) | `plantillas/Plantilla_articulo_cientifico.qmd` |
+| Libro de rúbricas | `Rubricas_evaluacion.xlsx` |
+| Guía de trabajo con GitHub (estudiantes) | `GitHub/README_github_estudiante.md` |
 
 Las plantillas están en Quarto: se escribe encima y el análisis y el texto quedan en el mismo
 fichero, lo que resuelve buena parte del requisito de reproducibilidad.

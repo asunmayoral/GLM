@@ -8,30 +8,93 @@
 
 Te recomiendo **crear una organización** en lugar de trabajar desde tu cuenta personal. Es gratuita y te ahorra bastante trabajo:
 
-- Los repositorios quedan agrupados bajo un mismo nombre (`estadistica-2026/proy1-equipo3`), no mezclados con los tuyos.
+- Los repositorios quedan agrupados bajo un mismo nombre (`GLM2026/glm-proy1-equipo3`), no mezclados con los tuyos.
 - Puedes crear **Teams** (equipos): defines una vez el Equipo 3 con sus cuatro miembros, y luego das acceso al equipo entero a cada repositorio de un clic, en lugar de invitar a cuatro personas tres veces cada una.
 - Cuando acabe el curso, archivas la organización entera.
 
-**Cómo crearla:** en github.com, tu foto de perfil → **Your organizations** → **New organization** → plan **Free**. Ponle un nombre reconocible (`estadistica-uni-2026`).
+**Cómo crearla:** en github.com, tu foto de perfil → **Your organizations** → **New organization**. Elige plan **Free**: es el que recomienda el propio Quickstart docente de GitHub y ya incluye repositorios privados ilimitados y Teams (punto 1.2). Ponle un nombre reconocible; en este curso es **`GLM2026`**.
 
-Con 3 proyectos × N equipos, la diferencia entre invitar individualmente y usar Teams es sustancial. Si tienes 6 equipos, hablamos de 72 invitaciones frente a 18 asignaciones de equipo.
+Con 3 proyectos × N equipos, la diferencia entre invitar individualmente y usar Teams es sustancial. Si tienes 6 equipos, hablamos de 54 invitaciones frente a 18 asignaciones de equipo — y las 6 creaciones de team se hacen una sola vez, siempre que mantengas **una única organización para todo el curso** (punto 1.4).
 
 ---
 
-## 1. GitHub Education: lo que aporta y lo que no
+## 1. GitHub Education y el montaje de la organización
 
-Merece la pena solicitarlo, pero **no lo esperes para empezar**: la verificación puede tardar días.
+**Cuenta docente ya verificada.** Lo que sigue parte de ahí.
 
-**Qué se solicita:** en `education.github.com`, la opción **Teacher** (GitHub Global Campus). Te pedirán una prueba de tu vinculación docente (correo institucional, credencial, o una foto de tu documento de profesor).
+### 1.1. Por qué no encuentras dónde «solicitar Team para la organización»
 
-**Lo que aporta que te interese:**
+Porque, tal como está documentado hoy, **ese trámite separado no existe**, y en tu caso probablemente **no lo necesitas**. Conviene desmontarlo con calma, porque es fácil perder una tarde buscando un botón que no está.
 
-- **GitHub Classroom**, que automatiza justamente lo que vas a hacer a mano: crea un repositorio por equipo a partir de una plantilla, asigna los miembros y te da un panel con el estado de todas las entregas.
-- Organizaciones con funciones de pago gratis para el ámbito educativo.
+Lo que dice la documentación de GitHub, literalmente:
 
-**Lo que NO necesitas de ahí:** los repositorios privados con colaboradores ilimitados ya son gratuitos para todo el mundo. No dependas de Education para eso.
+- El beneficio docente se describe como «Apply for free **GitHub Team**, which allows unlimited users and private repositories».
+- Pero **el único formulario documentado es el personal**, el que ya has completado: *Settings → [Billing settings](https://github.com/settings/billing/summary) → «GitHub Education» → **Start an application***. También accesible en [github.com/settings/education/benefits](https://github.com/settings/education/benefits).
+- Y el **Quickstart para docentes** de GitHub, cuando te dice cómo montar el curso, indica textualmente crear una organización **gratuita** («Follow the prompts to create a **free** organization»). No menciona ningún paso posterior de solicitud para esa organización.
 
-**Mi recomendación práctica:** monta el Proyecto 1 a mano siguiendo esta guía. Es media hora de trabajo y entiendes exactamente qué está pasando. Si para el Proyecto 2 ya tienes Classroom aprobado, valora si te compensa migrar — sabiendo que Classroom añade su propia curva de aprendizaje y que a esas alturas ya tendrás el proceso manual rodado.
+### 1.2. Y sobre todo: GitHub Free para organizaciones ya te da todo lo que usas
+
+Esta es la parte que resuelve el problema. Comparando las dos fichas de plan en la documentación:
+
+| Lo que necesita el curso | ¿Está en **GitHub Free para organizaciones**? |
+|---|---|
+| Repositorios privados ilimitados | Sí |
+| Colaboradores ilimitados | Sí |
+| **Teams** (grupos con permisos) | Sí — «Team access controls for managing groups» |
+| Issues y comentarios sobre líneas de código | Sí |
+
+Y lo que **añade Team** sobre Free para organizaciones es: soporte por email, 3.000 minutos de Actions en vez de 2.000, 2 GB de Packages, revisores obligatorios de pull request, ramas protegidas, *code owners*, wikis y Pages en repositorios privados.
+
+**Nada de eso interviene en nuestro flujo.** Los equipos hacen *push* directo a `main`, no usamos pull requests ni ramas protegidas, no ejecutamos Actions, y Pages ya quedó descartado en 5.1 porque publicaría el sitio en internet.
+
+**Conclusión operativa:** monta la organización en plan **Free** y sigue adelante. No estás renunciando a nada que uses.
+
+> [VERIFICAR] Si aun así quieres intentar el ascenso a Team, el camino a probar es Organización → **Settings** → **Billing and plans** → **Upgrade**, a ver si GitHub reconoce ahí la cuenta docente verificada. No he podido comprobarlo, y la documentación no lo describe. Si no aparece, pregunta en la [Education Community](https://github.com/orgs/community/discussions/categories/github-education), que es donde GitHub atiende estos casos.
+
+### 1.3. ¿Se pueden agrupar los repositorios en carpetas por proyecto?
+
+**No: GitHub no tiene carpetas ni subgrupos de repositorios dentro de una organización.** La lista es plana. (Es una diferencia real con GitLab, que sí tiene subgrupos anidados; si vienes de ahí, la ausencia despista.)
+
+Pero el objetivo —no mezclar proyectos— se consigue igual, y mejor, con tres mecanismos que sí existen:
+
+**a) El prefijo en el nombre.** Ya lo estás haciendo con `glm-proy1-equipo3`. La lista de repositorios se ordena alfabéticamente, así que los tres bloques salen agrupados solos, y el buscador de la organización filtra escribiendo `proy1`.
+
+**b) Los *topics*.** A cada repositorio le pones la etiqueta `proyecto-1` (pestaña **Code** del repositorio → engranaje junto a «About» → *Topics*). Después, en la pestaña **Repositories** de la organización tienes un filtro por topic, y la URL
+
+```
+https://github.com/orgs/GLM2026/repositories?q=topic%3Aproyecto-1
+```
+
+te deja una vista con **solo** los repositorios de ese proyecto. Guárdala en marcadores y funciona exactamente como la carpeta que buscas.
+
+**c) Archivar al cerrar el bloque.** Esta es la que más te va a servir, porque los tres proyectos son **consecutivos en el tiempo**. Cuando termines de corregir el Proyecto 1: *Settings → Danger Zone → **Archive this repository***. El repositorio pasa a solo lectura —se conserva todo, comentarios incluidos— y **desaparece de la lista por defecto** de la organización. Al empezar el Proyecto 2, la vista de repositorios muestra únicamente lo vivo.
+
+Combinando (a) y (c) tienes el efecto de las carpetas sin necesitar carpetas: la lista siempre enseña el proyecto en curso, y los anteriores están a un filtro de distancia.
+
+### 1.4. Entonces, ¿una organización o tres?
+
+Con lo anterior, **una sola organización para todo el curso** —`GLM2026`, que es la adoptada— es la opción clara:
+
+- Los **Teams se definen una única vez** y se reutilizan en los tres proyectos. Con tres organizaciones los recreas tres veces.
+- Los estudiantes aceptan **una** invitación de organización, no tres.
+- El aislamiento entre proyectos lo dan el prefijo, los topics y el archivado, no la organización.
+
+La alternativa sería una organización por proyecto (`GLM-PROYECTO1`, `GLM-PROYECTO2`…). Funciona, pero obliga a recrear los Teams en cada bloque y a que los estudiantes acepten tres invitaciones de organización. Toda la documentación del curso —guía del estudiante, bitácora y plantillas de informe— asume ya `GLM2026`.
+
+### 1.5. Los Teams: definirlos una vez, usarlos tres
+
+Este es el ahorro real de trabajar con organización, y **está disponible en el plan Free**. Ver el punto 3 para el detalle operativo, pero la idea es:
+
+1. **Una vez por curso:** creas `equipo-1`, `equipo-2`… con sus miembros.
+2. **Una vez por repositorio:** *Settings → Collaborators and teams → Add teams →* el equipo, con rol **Write**.
+
+Con 6 equipos y 3 proyectos, eso son 6 creaciones de team y 18 asignaciones, frente a las 54 invitaciones individuales del camino manual.
+
+### 1.6. Sobre GitHub Classroom
+
+Classroom automatiza justamente lo que hace el punto 2 de esta guía: crea un repositorio por equipo a partir de una plantilla, asigna los miembros y te da un panel con el estado de todas las entregas.
+
+**Mi recomendación sigue siendo montar el Proyecto 1 a mano.** Es media hora de trabajo y entiendes exactamente qué está pasando en cada paso, lo que te deja en condiciones de arreglar cualquier cosa que se tuerza. Si para el Proyecto 2 quieres migrar a Classroom, valora que añade su propia curva de aprendizaje y que a esas alturas ya tendrás el proceso manual rodado.
 
 ---
 
@@ -130,15 +193,73 @@ No hace falta que entres a diario. Tres formas de mirar, de menos a más detalle
 
 ---
 
-## 5. Ver el informe renderizado
+## 5. Ver el informe y la presentación
 
-Aquí hay una pega de GitHub que conviene conocer: **un archivo `.html` alojado en el repositorio no se muestra como página web**. Al abrirlo verás el código fuente.
+### 5.1. La restricción de partida
 
-**Si los repositorios son privados** (lo recomendable): tendrás que descargar el archivo. Entra al `informe.html` → botón **Download raw file** (icono de flecha, arriba a la derecha de la vista del archivo) → ábrelo desde tu ordenador con el navegador.
+Conviene tenerla clara, porque condiciona todo lo demás:
 
-Con `embed-resources: true` en la plantilla, ese único archivo se abre perfectamente. Sin esa opción, tendrías que descargar también la carpeta de recursos y sería un engorro.
+- **GitHub no renderiza el HTML alojado.** La vista de archivo muestra el código fuente y la vía `raw` lo entrega como texto plano, deliberadamente, para que nadie sirva páginas ejecutables desde sus dominios. Ser propietaria del repositorio no lo cambia: no es un permiso que puedas levantar.
+- **`htmlpreview.github.io` solo funciona con repositorios públicos.** Con los nuestros devuelve página en blanco o error. No es una opción.
+- **GitHub Pages sí renderiza**, y funciona desde repositorios privados con GitHub Pro, Team o Enterprise Cloud. Pero **publicar el sitio *en privado*** —accesible solo a quien tenga lectura del repositorio— **requiere Enterprise Cloud**. Ni con Free ni con Team —que es lo máximo que da el beneficio docente— el sitio publicado sería privado: quedaría **público en internet**. Descartado para trabajos de estudiantes.
+- **Los `.pdf` sí los abre y los pinta** dentro de GitHub, también en repositorios privados, para quien tenga acceso.
 
-**Si fueran públicos**: bastaría con anteponer `https://htmlpreview.github.io/?` a la URL del archivo para verlo renderizado en el navegador, sin descargar nada. Es cómodo, pero no lo consideraría razón suficiente para hacer públicos los trabajos de tus estudiantes.
+> [VERIFICAR] Si la UMH llegara a ser **GitHub Campus Program**, la organización podría disponer de Enterprise Cloud y entonces sí tendrías Pages con control de acceso: enlace privado y HTML íntegro, que sería la solución ideal. Merece una consulta al servicio de informática.
+
+### 5.2. La estrategia adoptada: los dos formatos
+
+Los equipos entregan **ambos**, y enlazan ambos en el issue (9.3 de su guía):
+
+| Archivo | Para qué sirve | Cómo lo abres |
+|---|---|---|
+| `informe.pdf` | Lectura y corrección rápida | Un clic en GitHub. Se ve paginado en el navegador. |
+| `informe.html` | El documento auténtico: TOC, código plegable, tablas paginadas | Descarga local (5.3) |
+| `presentacion.pdf` | Siempre presente, como red de seguridad | Un clic en GitHub |
+| Enlace a la nube | Solo si la presentación está en Slides, Canva… Conserva animaciones e interactividad | El enlace del issue |
+
+Los tres enlaces alojados en GitHub tienen la misma forma, y el coordinador los copia de la barra del navegador para que no haya erratas:
+
+```
+https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.pdf
+https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.html
+https://github.com/GLM2026/glm-proy1-equipo3/blob/main/presentacion.pdf
+```
+
+El PDF cubre el 90 % de la corrección. El HTML lo abres cuando quieras ver el documento como lo construyeron: código plegado, tablas navegables, cualquier gráfico interactivo que el PDF aplana.
+
+### 5.3. Abrir el HTML: a mano
+
+Entra al `informe.html` en GitHub → botón **Download raw file** (icono de flecha, arriba a la derecha de la vista del archivo) → ábrelo desde tu ordenador con el navegador.
+
+Con `embed-resources: true` en la plantilla, ese único archivo se abre perfectamente, sin carpeta de recursos que arrastrar. Son dos clics por informe: con 6 equipos y 3 proyectos, unas 18 descargas en todo el curso. Perfectamente asumible si prefieres no tocar la terminal.
+
+### 5.4. Abrir el HTML: todos de una vez, con `gh`
+
+Si vas a corregir una ronda entera, compensa traértelos todos a una carpeta local de un tirón. Necesitas la **CLI de GitHub** ([cli.github.com](https://cli.github.com)), instalada y autenticada una sola vez:
+
+```bash
+gh auth login          # una vez, elige GitHub.com y autenticación por navegador
+```
+
+Y después, por cada ronda de corrección:
+
+```bash
+ORG=GLM2026                       # la organización del curso
+mkdir -p ~/correccion/$ORG && cd ~/correccion/$ORG
+
+gh repo list "$ORG" --limit 100 --json name -q '.[].name' | while read -r repo; do
+  gh api "repos/$ORG/$repo/contents/informe.html" \
+     -H "Accept: application/vnd.github.raw" > "$repo.html" \
+     && echo "OK    $repo" \
+     || echo "FALTA $repo"
+done
+```
+
+Te deja un `.html` por equipo, con el nombre del repositorio, listo para abrir con doble clic. Y como efecto secundario útil, la columna `FALTA` te dice **qué equipos no han subido el informe**, que es justo lo que quieres saber antes de empezar a corregir.
+
+> [VERIFICAR] No he podido ejecutar este bloque contra un repositorio real. Pruébalo con un solo equipo antes de fiarte de él en una ronda completa.
+
+Para llevarte también los PDF, cambia `informe.html` por `informe.pdf` y la extensión del fichero de salida. Y si prefieres tener los repositorios enteros —código incluido— en lugar de solo los informes, `gh repo clone "$ORG/$repo"` dentro del mismo bucle hace eso.
 
 ---
 
@@ -234,17 +355,35 @@ Y ten presente que un comentario negativo dirigido a una persona lo leen sus tre
 
 ---
 
-## 7. Checklist de montaje, por proyecto
+## 7. Checklist de montaje
+
+### Una sola vez, al empezar el curso
+
+- [ ] Crear la organización del curso (punto 0)
+- [ ] Dejarla en plan **Free**: cubre todo lo que usa el curso (punto 1.2)
+- [ ] Crear un **Team** por equipo, con sus miembros (punto 1.5)
+- [ ] Decidir el criterio de agrupación: prefijo en el nombre y *topic* por proyecto (punto 1.3)
+- [ ] Instalar y autenticar la **CLI de `gh`** si vas a usar la descarga masiva de informes (punto 5.4)
+
+### Por proyecto
 
 Para cada uno de los tres proyectos:
 
 - [ ] Crear `plantilla-proyN` con README, `plantilla_informe.qmd` y `bitacora.md`
 - [ ] Settings → marcar **Template repository**
 - [ ] Verificar que `plantilla_informe.qmd` lleva `embed-resources: true`
+- [ ] Verificar que `bitacora.md` lleva al pie el bloque de cierre con la plantilla del issue
 - [ ] Generar `proyN-equipoX` con **Use this template**, uno por equipo
+- [ ] Ponerle a cada uno el *topic* `proyecto-N` (punto 1.3)
 - [ ] Dar acceso **Write** al team (o a los colaboradores) de cada equipo
 - [ ] Avisar por el campus virtual de que la invitación caduca en 7 días
 - [ ] Confirmar el coordinador de turno de cada equipo (rota en cada proyecto)
 - [ ] Comprobar en la semana 1 que todos han aceptado y que el `.Rproj` está subido
 
 Ese último punto es el mejor indicador temprano: si en la semana 1 el `.Rproj` no aparece, ese equipo aún no ha arrancado.
+
+### Al cerrar cada proyecto
+
+- [ ] Descargar los informes de todos los equipos (punto 5.4) antes de tocar nada
+- [ ] Cerrar los issues de entrega tras la entrevista de revisión
+- [ ] **Archivar** los repositorios del proyecto, para que desaparezcan de la lista viva (punto 1.3)
