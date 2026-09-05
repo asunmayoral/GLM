@@ -34,21 +34,21 @@ format:
   # salen volcadas; y las figuras pueden recolocarse. Si eso te importa, imprime
   # el PDF desde el navegador, que conserva el aspecto exacto del HTML.
   #
-  # pdf:
-  #   documentclass: scrartcl   # clase KOMA: márgenes y tipografía sensatos
-  #   papersize: a4
-  #   toc: true
-  #   toc-depth: 3
-  #   number-sections: true
-  #   colorlinks: true
-  #   fig-width: 7
-  #   fig-height: 5
-  #   df-print: kable           # `paged` no existe en PDF: kable es el sustituto
-  #   geometry:
-  #     - top=25mm
-  #     - bottom=25mm
-  #     - left=25mm
-  #     - right=25mm
+  pdf:
+    documentclass: scrartcl   # clase KOMA: márgenes y tipografía sensatos
+    papersize: a4
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    colorlinks: true
+    fig-width: 7
+    fig-height: 5
+    df-print: kable           # `paged` no existe en PDF: kable es el sustituto
+    geometry:
+      - top=25mm
+      - bottom=25mm
+      - left=25mm
+      - right=25mm
   # ---------------------------------------------------------------------------
 
 # reference-doc: plantilla-estilos.docx   # opcional (solo aplica si añades format: docx)
