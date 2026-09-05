@@ -23,16 +23,20 @@ format:
     smooth-scroll: true
 
   # ---------------------------------------------------------------------------
-  # PDF OPCIONAL. Descomenta este bloque si quieres que Quarto genere también el
-  # informe.pdf al renderizar, en lugar de imprimirlo desde el navegador.
+  # PDF. Bloque ACTIVO: un solo `quarto render informe.qmd` produce los dos
+  # archivos que se entregan, informe.html e informe.pdf.
   #
-  # Requiere una distribución de LaTeX. Si no la tienes, instálala UNA vez con:
+  # Requiere una distribución de LaTeX, que se instala UNA sola vez (igual en
+  # Windows, macOS y Linux) desde el Terminal de RStudio:
   #     quarto install tinytex
+  # y se comprueba con `quarto check`, sección LaTeX. Detalle en el apartado
+  # 5.9.1 de la Guía GitHub del Estudiante. Si al renderizar ves un error de
+  # LaTeX, el informe.html YA se ha generado: lo que falta es la instalación.
   #
   # Ojo: el PDF de LaTeX no reproduce todo lo que hace el HTML. Se pierden el
   # plegado del código (code-fold) y las tablas paginadas (df-print: paged), que
-  # salen volcadas; y las figuras pueden recolocarse. Si eso te importa, imprime
-  # el PDF desde el navegador, que conserva el aspecto exacto del HTML.
+  # salen volcadas; y las figuras pueden recolocarse. Es lo esperado: el HTML es
+  # el documento auténtico y el PDF, la versión legible de un vistazo en GitHub.
   #
   pdf:
     documentclass: scrartcl   # clase KOMA: márgenes y tipografía sensatos
@@ -66,26 +70,24 @@ format:
   CÓMO PUBLICAR Y ENTREGAR EL INFORME EN GITHUB
   ────────────────────────────────────────────────────────────────
 
-  1) Renombra este fichero como informe.qmd y renderízalo a HTML
-     (genera un único archivo autocontenido gracias a
-     "embed-resources: true", sin carpeta informe_files/):
+  1) Renombra este fichero como informe.qmd y renderízalo:
 
-       quarto render informe.qmd --to html
+       quarto render informe.qmd
 
-  2) Genera además informe.pdf. Dos vías, ambas válidas:
+     La cabecera YAML declara los DOS formatos, así que ese único
+     comando genera informe.html e informe.pdf, que son exactamente
+     los dos archivos que se entregan. El HTML es autocontenido
+     ("embed-resources: true"), sin carpeta informe_files/.
 
-     a) DESDE EL NAVEGADOR (recomendada). Abre informe.html y usa
-        Archivo > Imprimir > Guardar como PDF. No necesitas instalar
-        nada y el PDF conserva el aspecto exacto del HTML.
+     Para el PDF hace falta LaTeX, que se instala UNA sola vez con
+     "quarto install tinytex" (ver apartado 5.9.1 de la Guía GitHub
+     del Estudiante). Si aún no lo tienes, el render deja hecho el
+     informe.html y falla al llegar al PDF: no has perdido nada,
+     instala LaTeX y vuelve a renderizar.
 
-     b) CON QUARTO (opcional). Descomenta el bloque "pdf:" de la
-        cabecera YAML y renderiza los dos formatos de una vez:
-
-          quarto render informe.qmd
-
-        Requiere LaTeX: instálalo una sola vez con
-        "quarto install tinytex". Da un PDF de aspecto más académico,
-        pero pierde el plegado del código y las tablas paginadas.
+     Plan B si la instalación se resiste: abre informe.html y usa
+     Archivo > Imprimir > Guardar como PDF. Sale un PDF con el
+     aspecto exacto del HTML, y también vale.
 
      ¿Por qué los dos formatos? Los repositorios del curso son PRIVADOS,
      y ahí GitHub abre y pinta los .pdf en el navegador, pero muestra los

@@ -8,9 +8,6 @@ project:
   render:
     - index.qmd
     - recursos.qmd
-    # Estaba ausente de esta lista, así que Quarto la copiaba tal cual a _site/
-    # en lugar de renderizarla: el enlace de la barra lateral no llevaba a nada.
-    - guia_docente_simplificada.qmd
     - caso1/caso1_binaria.qmd
     - caso2/caso2_conteos.qmd
     - caso3/caso3_continuas_positivas.qmd
@@ -42,9 +39,12 @@ website:
       - href: referencias.qmd
         text: "Referencias"
     right:
+      # El icono apunta a la ORGANIZACIÓN del curso, no al repositorio del
+      # material: desde ahí cuelgan la plantilla de proyecto y los repositorios
+      # de los equipos. El repo del material sigue enlazado en el pie.
       - icon: github
-        href: https://github.com/asunmayoral/GLM
-        aria-label: "Repositorio del curso en GitHub"
+        href: https://github.com/GLM-2026
+        aria-label: "Organización del curso en GitHub"
 
   # Barra lateral acoplada. Aparece en las páginas listadas aquí; la PORTADA no
   # está incluida a propósito, para que se vea a todo ancho.
@@ -54,8 +54,6 @@ website:
     search: false
     collapse-level: 1
     contents:
-      - href: guia_docente_simplificada.qmd
-        text: "Guía docente"
       - section: "Caso 1 · Respuestas binarias"
         href: caso1/caso1_binaria.qmd
         contents:

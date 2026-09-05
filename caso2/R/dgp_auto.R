@@ -227,9 +227,15 @@ simular_cartera_auto <- function(
   # ---- 8 · Panel póliza-año (counting process, offset variable) -------------
   panel <- do.call(rbind, lapply(seq_len(N), function(i) {
     Y <- max(1L, as.integer(ceiling(antiguedad[i]))); tab <- partes_anuales(i)
-    tstart <- 0:(Y - 1L); tstop <- pmin(seq_len(Y), antiguedad[i])
+    tstart <- 0:(Y - 1L)
+    # El último tramo puede ser un resto minúsculo que, redondeado a 3 decimales, daría
+    # expo_anual = 0 y offset(log(expo_anual)) = -Inf. Suelo de 0.001 años (~9 horas)
+    # aplicado a tstop, de modo que se conserva la identidad expo_anual = tstop - tstart
+    # del proceso de conteo. El tramo sigue siendo diminuto: la exposición casi nula
+    # continúa siendo un problema real de modelización, pero ya no es un valor imposible.
+    tstop  <- pmax(round(pmin(seq_len(Y), antiguedad[i]), 3), tstart + 0.001)
     data.frame(
-      id_poliza = i, anio = seq_len(Y), tstart = tstart, tstop = round(tstop, 3),
+      id_poliza = i, anio = seq_len(Y), tstart = tstart, tstop = tstop,
       expo_anual = round(tstop - tstart, 3), n_partes_anual = tab,
       edad_t = edad[i] + (seq_len(Y) - 1L), antig_veh_t = antv[i] + (seq_len(Y) - 1L),
       en_riesgo = 1L, row.names = NULL)

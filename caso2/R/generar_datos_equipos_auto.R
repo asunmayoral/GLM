@@ -1,7 +1,7 @@
 # =============================================================================
 #  generar_datos_equipos_auto.R · Caso 2/3 (estudio de caso, cartera de AUTO)
 # -----------------------------------------------------------------------------
-#  Genera 10 carteras de auto distintas (una por equipo) con dgp_auto.R, con
+#  Genera 20 carteras de auto distintas (una por equipo) con dgp_auto.R, con
 #  configuraciones COHERENTES (mismos signos) pero DIFERENTES (magnitudes,
 #  semillas) -> cada grupo obtiene resultados propios.
 #  Se puede ejecutar desde cualquier wd (raíz, caso2/ o caso2/scripts/): localiza
@@ -31,11 +31,13 @@ if (is.na(.dgp))
 caso2_dir <- dirname(dirname(.dgp))                 # .../caso2  (no se cambia el wd)
 source(.dgp)
 
-K_eq    <- 10L
+K_eq    <- 20L
 out_dir <- file.path(caso2_dir, "datos_equipos_auto")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-# --- 10 configuraciones EXPLÍCITAS (coherentes y distintas) -------------------
+# --- 20 configuraciones EXPLÍCITAS (coherentes y distintas) -------------------
+#  Los equipos 01-10 conservan semillas y parámetros originales (se regeneran
+#  idénticos); los 11-20 son nuevos, dentro de los mismos rangos.
 #  mult_tasa  escala las tasas base (lambda0 y las de asistencia/fraude/gestiones)
 #  mult_efecto escala la FUERZA de todos los efectos (betas), sin cambiar signos
 #  theta_frail fragilidad (sobredispersión) · weib_shape forma del hazard base
@@ -43,17 +45,29 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 #  persistencia inercia del bonus-malus
 par_eq <- data.frame(
   equipo       = sprintf("equipo_%02d", 1:K_eq),
-  semilla      = 260101L:260110L,
-  mult_tasa    = c(0.80,1.20,1.00,0.90,1.30,0.70,1.10,0.95,1.25,0.85),
-  mult_efecto  = c(0.90,1.20,1.00,0.85,1.30,0.75,1.10,0.95,1.25,0.80),
-  theta_frail  = c(0.80,1.30,1.20,1.60,0.90,1.40,1.00,1.50,1.10,0.70),
-  weib_shape   = c(1.05,1.25,1.15,1.30,1.00,1.35,1.10,1.20,1.05,1.15),
-  sigma_ag     = c(0.45,0.65,0.50,0.75,0.55,0.60,0.70,0.40,0.60,0.50),
-  nu_gamma     = c(1.60,2.00,1.80,2.20,1.50,1.90,1.70,2.10,1.60,1.40),
-  mult_coste   = c(0.90,1.15,1.00,1.20,0.95,1.10,1.05,1.25,0.90,0.85),
-  persistencia = c(0.55,0.60,0.58,0.62,0.52,0.60,0.56,0.64,0.54,0.58),
+  semilla      = 260101L:260120L,
+  mult_tasa    = c(0.80,1.20,1.00,0.90,1.30,0.70,1.10,0.95,1.25,0.85,
+                   0.82,1.22,1.02,0.92,1.28,0.72,1.12,0.98,1.18,0.88),
+  mult_efecto  = c(0.90,1.20,1.00,0.85,1.30,0.75,1.10,0.95,1.25,0.80,
+                   0.92,1.22,1.02,0.88,1.28,0.78,1.12,0.98,1.18,0.82),
+  theta_frail  = c(0.80,1.30,1.20,1.60,0.90,1.40,1.00,1.50,1.10,0.70,
+                   0.85,1.35,1.25,1.55,0.95,1.45,1.05,1.15,1.50,0.75),
+  weib_shape   = c(1.05,1.25,1.15,1.30,1.00,1.35,1.10,1.20,1.05,1.15,
+                   1.08,1.22,1.18,1.28,1.02,1.32,1.12,1.25,1.06,1.16),
+  sigma_ag     = c(0.45,0.65,0.50,0.75,0.55,0.60,0.70,0.40,0.60,0.50,
+                   0.48,0.68,0.52,0.72,0.58,0.62,0.66,0.42,0.74,0.46),
+  nu_gamma     = c(1.60,2.00,1.80,2.20,1.50,1.90,1.70,2.10,1.60,1.40,
+                   1.65,2.05,1.85,2.15,1.55,1.95,1.75,2.18,1.45,1.90),
+  mult_coste   = c(0.90,1.15,1.00,1.20,0.95,1.10,1.05,1.25,0.90,0.85,
+                   0.92,1.18,1.02,1.24,0.98,1.12,1.08,1.20,0.88,0.95),
+  persistencia = c(0.55,0.60,0.58,0.62,0.52,0.60,0.56,0.64,0.54,0.58,
+                   0.56,0.63,0.59,0.61,0.53,0.65,0.57,0.51,0.66,0.50),
   stringsAsFactors = FALSE
 )
+stopifnot(nrow(par_eq) == K_eq, !anyDuplicated(par_eq$semilla),
+          all(par_eq$mult_tasa > 0), all(par_eq$mult_efecto > 0),
+          all(par_eq$theta_frail > 0), all(par_eq$weib_shape > 0),
+          all(par_eq$persistencia > 0 & par_eq$persistencia < 1))
 
 # Escala TODOS los vectores de betas por 'me' (mantiene signos y nombres) -------
 escala_betas <- function(betas, me) lapply(betas, function(v) v * me)
@@ -111,7 +125,7 @@ ok <- with(resumen, disp_sin >= 1.2 & p_evento >= 15 & p_evento <= 60 &
                      p0_fraude >= 40 & p0_fraude <= 97 & p_baja >= 15 & p_baja <= 60)
 ok[is.na(ok)] <- FALSE
 malos <- resumen$equipo[!ok]
-if (length(malos) == 0) message("Coherencia OK: las 10 carteras muestran sus fenómenos en rango razonable.")
+if (length(malos) == 0) message("Coherencia OK: las 20 carteras muestran sus fenómenos en rango razonable.")
 if (length(malos) >  0) warning("Revisar equipos (indicadores extremos o NA): ", paste(malos, collapse = ", "))
 
 write.csv(par_eq,  file.path(out_dir, "configuraciones_equipos.csv"), row.names = FALSE)

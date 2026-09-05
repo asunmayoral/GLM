@@ -83,12 +83,12 @@ Después de aceptar, GitHub te lleva directamente al repositorio. Deberías ver 
 
 Verifica dos cosas:
 
-- Arriba del todo aparece el nombre del repositorio, con el formato `GLM2026 / nombre-del-repositorio` — `GLM2026` es la organización del curso.  
+- Arriba del todo aparece el nombre del repositorio, con el formato `GLM-2026 / nombre-del-repositorio` — `GLM-2026` es la organización del curso.  
 - Bajo ese nombre hay una fila de pestañas: **Code**, **Issues**, **Pull requests**... Y a la derecha, si eres colaborador, verás también **Settings**. Si ves *Settings*, tienes permiso de escritura, que es lo que necesitas.
 
 ### **2.4. Guarda la dirección**
 
-Copia la dirección web del repositorio (lo que aparece en la barra del navegador, del tipo `https://github.com/GLM2026/glm-proy1-equipo3`) y guárdala. La usarás en el siguiente paso y volverás a ella muchas veces.
+Copia la dirección web del repositorio (lo que aparece en la barra del navegador, del tipo `https://github.com/GLM-2026/proy1_01_Akaike`) y guárdala. La usarás en el siguiente paso y volverás a ella muchas veces.
 
 Otra forma rápida de llegar en el futuro: entra en github.com y pulsa tu foto de perfil → **Your repositories**. El repositorio del equipo aparecerá en esa lista.
 
@@ -366,19 +366,37 @@ Cuando el equipo haya decidido qué resultados merecen entrar, **una sola person
 
 Insisto en lo de "una sola persona": este es el único archivo realmente compartido, y donde sí podrían surgir conflictos. Que lo edite una, mientras el resto revisa y propone cambios por el canal que uséis.
 
-Al terminar, **Render** para generar `informe.html`. **Ese HTML también hay que subirlo** al repositorio: es la versión que consultaré yo. La plantilla lleva `embed-resources: true`, así que el HTML es un único archivo autocontenido, sin carpeta `informe_files/`.
+**Se entregan dos archivos: `informe.html` e `informe.pdf`.** Los dos salen de un mismo **Render**, porque la plantilla trae los dos formatos declarados en la cabecera YAML. No hay que hacer nada especial: renderizáis una vez y aparecen ambos en la carpeta del proyecto.
 
-Y una cosa más, que explico en detalle en 9.3: sube **junto a él** un `informe.pdf`. El motivo es que nuestros repositorios son **privados**, y GitHub muestra los `.html` como código fuente, no como página; los `.pdf`, en cambio, los abre y los pinta en el navegador. Con los dos archivos puedo leer y comentar de inmediato en el PDF, y conservo el HTML auténtico —tabla de contenidos, código plegable, tablas paginadas— para verlo cuando haga falta.
+El motivo de pedir los dos, que explico en detalle en 9.3: nuestros repositorios son **privados**, y GitHub muestra los `.html` como código fuente, no como página; los `.pdf`, en cambio, los abre y los pinta en el navegador. Con los dos archivos puedo leer y comentar de inmediato en el PDF, y conservo el HTML auténtico —tabla de contenidos, código plegable, tablas paginadas— para verlo cuando haga falta.
 
-Para conseguir el PDF tenéis dos vías, y las dos valen:
+Y no os extrañe que no sean idénticos: **el PDF pierde el plegado del código y las tablas paginadas**, que salen volcadas enteras, y las figuras pueden recolocarse. Es lo esperado. El HTML es el documento auténtico; el PDF, la versión que se lee de un vistazo en GitHub.
 
-**a) Desde el navegador — la recomendada.** Abre `informe.html`, **Archivo → Imprimir → Guardar como PDF**, y guárdalo como `informe.pdf` en la carpeta del proyecto. No hay que instalar nada, no hay que tocar la plantilla, y el PDF conserva el aspecto exacto del HTML.
+El HTML lleva `embed-resources: true`, así que es un único archivo autocontenido, sin carpeta `informe_files/`.
 
-**b) Con Quarto — opcional.** La plantilla trae un bloque `pdf:` comentado en la cabecera YAML. Si lo descomentáis, `quarto render informe.qmd` genera los dos formatos de una vez. Requiere una distribución de LaTeX, que se instala una sola vez con `quarto install tinytex`. Da un PDF de aspecto más académico —numeración, márgenes, tipografía de artículo—, pero **pierde el plegado del código y las tablas paginadas**, que salen volcadas enteras.
+### **5.9.1. Instalar LaTeX, una sola vez**
 
-Elegid según lo que os importe: fidelidad al HTML (a) o acabado tipográfico (b). Lo que no cambia es que **se entregan los dos archivos: `informe.html` e `informe.pdf`**.
+El PDF lo genera Quarto a través de **LaTeX**, y eso hay que instalarlo una vez en vuestro ordenador. Hacedlo **al principio del proyecto, no la noche de la entrega**.
 
-### **5.9.1. La prueba de reproducibilidad**
+Abrid el **Terminal de RStudio** (la pestaña *Terminal*, junto a *Console*) y escribid:
+
+```
+quarto install tinytex
+```
+
+El comando es **el mismo en Windows, macOS y Linux**. Tarda unos minutos: descarga una distribución de LaTeX ligera y la instala en vuestra carpeta de usuario, sin tocar el resto del sistema. Al terminar, comprobadlo con:
+
+```
+quarto check
+```
+
+En la sección **LaTeX** tiene que aparecer una versión de TinyTeX. Si aparece, ya está: `informe.qmd` os dará los dos archivos.
+
+> **Si al renderizar veis un error de LaTeX en rojo, no cunda el pánico: el `informe.html` ya se ha generado.** Quarto produce primero el HTML y después el PDF, así que un fallo en esta segunda parte no se lleva por delante la primera. Lo que falta es la instalación de arriba.
+
+**Plan B, si la instalación se resiste.** Abrid `informe.html`, **Archivo → Imprimir → Guardar como PDF**, y guardadlo como `informe.pdf` en la carpeta del proyecto. No hay que instalar nada y el PDF conserva el aspecto exacto del HTML. Es igual de válido como entrega: lo que no admite excepción es que estén **los dos archivos**.
+
+### **5.9.2. La prueba de reproducibilidad**
 
 Esto vale un 20 % de la nota del informe («Datos, método y reproducibilidad»), y la prueba que aplico es literal: **me descargo vuestro `informe.qmd`, lo renderizo en mi ordenador, y tiene que salir vuestro informe, idéntico y sin errores.**
 
@@ -552,7 +570,7 @@ El error más común, y el más caro. El informe no es "juntar los archivos al t
 
 Fijad una fecha interna, al menos una semana antes de la entrega, en la que el análisis se da por cerrado y empieza la redacción. Anotadla en la bitácora.
 
-Y no dejéis para el último día ni el **Render** del informe ni la **subida del `informe.html`**: si algo falla al renderizar, querrás margen para arreglarlo.
+Y no dejéis para el último día ni el **Render** del informe ni la **subida de `informe.html` e `informe.pdf`**: si algo falla al renderizar —o si aún no habéis instalado LaTeX (5.9.1)—, querréis margen para arreglarlo.
 
 ### **7.8. Si te atascas, que se note**
 
@@ -672,6 +690,7 @@ Y recuerda 4.1: no la metas en OneDrive, Drive ni Dropbox.
 Esto es un problema de R, no de GitHub. Un par de cosas antes de pedir ayuda:
 
 - Lee el mensaje de error: suele indicar la línea.  
+- **Si el error habla de LaTeX o de `pdflatex`, no es tu documento: os falta la instalación del 5.9.1.** El `informe.html` ya se habrá generado.  
 - Comprueba que has hecho *pull*, por si el fallo está en un archivo que ha cambiado.  
 - Prueba a renderizar tu archivo de análisis por separado, para aislar dónde está el error.
 
@@ -699,7 +718,7 @@ Repasadla entera. Un issue abierto con material incompleto retrasa la correcció
 
 - [ ] Todos los archivos de análisis están subidos y renderizan sin error.  
 - [ ] `informe.qmd` está terminado.  
-- [ ] **`informe.qmd` renderiza de cero**, con R reiniciado y la caché borrada (5.9.1).  
+- [ ] **`informe.qmd` renderiza de cero**, con R reiniciado y la caché borrada (5.9.2).  
 - [ ] El **anexo de reproducibilidad** está completo: semilla declarada y `sessionInfo()` en el HTML.  
 - [ ] `informe.html` está **generado y subido**. Este es el que más se olvida: renderizar en vuestro ordenador no lo sube a GitHub.  
 - [ ] `informe.pdf` está subido (ver 5.9: es la versión que puedo abrir directamente en GitHub).  
@@ -739,7 +758,7 @@ Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
 **Cuerpo**
 
 ```
-## Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
+## Entrega Proyecto [num_proyecto] — Equipo [numeral_equipo - nombre_equipo]
 
 **Coordinador:** Marta Sánchez (@martasanchez)
 
@@ -748,9 +767,9 @@ Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
 - @javierlopez: Javier Lopez Martinez — Cuestión 2 (analisis_c2_javier.qmd)
 - @luciaperez: Lucía Pérez García — Cuestión 3 (analisis_c3_lucia.qmd)
 
-**Informe (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.pdf
-**Informe (html):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.html
-**Presentación (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/presentacion.pdf
+**Informe (pdf):** https://github.com/GLM-2026/proy*-**-*****/blob/main/informe***.pdf
+**Informe (html):** https://github.com/GLM-2026/proy*-**-*****/blob/main/informe***.html
+**Presentación (pdf):** https://github.com/GLM-2026/proy*-**-*****/blob/main/presen***.pdf
 **Presentación (html -si en la nube-):** https://.....
 
 **Comentarios para el profesor:**
@@ -771,7 +790,7 @@ Así que el PDF es el que me permite leer y comentar de un vistazo, y el HTML es
 **Los tres enlaces alojados en GitHub** (informe PDF, informe HTML y presentación PDF) tienen **exactamente la misma forma**, que es la dirección normal de un archivo dentro del repositorio:
 
 ```
-https://github.com/GLM2026/REPOSITORIO-DE-TU-EQUIPO/blob/main/ARCHIVO
+https://github.com/GLM-2026/REPOSITORIO-DE-TU-EQUIPO/blob/main/ARCHIVO
                    └───────── idéntico en los tres ─────────┘  └─ lo único que cambia ─┘
 ```
 

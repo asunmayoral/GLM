@@ -95,7 +95,7 @@ datos** (`cohorte` y su expansión persona-periodo).
 
 
 ::: {.callout-important}
-Además, el líder del equipo ha de completar y presentar, en un documento adicional:
+Además, el coordinador del equipo ha de completar y presentar, en un documento adicional:
 - La **planificación y reparto** de tareas asumidas en el equipo (roles, tareas, cómo os organizasteis en el tiempo,  qué revisiones o hitos hubo y cómo resolvisteis los bloqueos.
 - La evaluación de los compañeros, anotando el grado de implicación (del 0 al 100%) en el trabajo.
 - El checklist de tareas realizadas (según la propuesta especificada abajo) cumplimentado.
@@ -120,12 +120,26 @@ Reflexión.
 ::: {.callout-tip}
 ## Cada equipo, una base de datos distinta
 Cada equipo trabaja sobre **su propia cohorte**, generada con una configuración diferente —pero
-coherente— de los parámetros del DGP. Las diez configuraciones y los datos por equipo los produce el
+coherente— de los parámetros del DGP. Las veinte configuraciones y los datos por equipo los produce el
 script `R/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` la cohorte
 (`cohorte.rds` / `.csv`) y su expansión persona-periodo (`pp.rds` / `.csv`). El enunciado y las
 preguntas del cliente son los mismos para todos; lo que cambia de un equipo a otro son las
-**conclusiones numéricas** (efectos, riesgos, plazos). La clave con los parámetros verdaderos
-(`configuraciones_equipos.csv`) la guarda el/la docente.
+**conclusiones numéricas** (efectos, riesgos, plazos).
+
+Los parámetros verdaderos de las veinte configuraciones están en el propio repositorio
+(`configuraciones_equipos.csv`), igual que la «verdad» que guarda cada `.rds`. **Que estén a la vista
+no es un descuido: es la misma confianza que se te pide en el control de calidad de arriba.** Ajustar
+mirando la respuesta no te enseña nada, y en la defensa individual se nota; lo que se evalúa es el
+razonamiento con el que llegas a tus estimaciones, no lo cerca que quedan de un número que podías
+haber copiado.
+
+```{=html}
+<a class="boton-datos"
+   href="https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos"
+   target="_blank" rel="noopener">
+  📂 Descarga aquí los datos de tu equipo · <code>caso1/datos_equipos</code>
+</a>
+```
 :::
 
 ## 6.2 Checklist de tareas {#sec-u16-checklist}

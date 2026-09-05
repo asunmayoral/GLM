@@ -176,6 +176,14 @@ Cada equipo trabaja **su propia cartera**, generada con una configuración difer
 DGP (`R/generar_datos_equipos_auto.R`, en `datos_equipos_auto/equipo_XX/`). El enunciado es común;
 las conclusiones numéricas cambian de un equipo a otro. La cartera de teoría se carga con
 `cargar_cartera_auto()`; la de tu equipo, desde su carpeta.
+
+```{=html}
+<a class="boton-datos"
+   href="https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto"
+   target="_blank" rel="noopener">
+  📂 Descarga aquí los datos de tu equipo · <code>caso2/datos_equipos_auto</code>
+</a>
+```
 :::
 
 ## 8.2 Checklist de tareas {#sec-u28-checklist}

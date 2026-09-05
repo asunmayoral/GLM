@@ -7,10 +7,13 @@ toc-depth: 2
 ---
 
 <!-- ============================================================================
-     PÁGINA HUB. Reúne los seis apartados operativos del curso. La rejilla de
-     tarjetas de arriba es un índice visual: cada tarjeta salta al apartado
-     correspondiente de esta misma página (anclas #sec-*).
-     Los enlaces a GitHub apuntan a la rama `master` del repositorio del curso.
+     PÁGINA HUB. Reúne los nueve apartados operativos del curso, incluido el
+     canal de consultas (apartado 9). La rejilla de tarjetas de arriba es un
+     índice visual: cada tarjeta salta al apartado correspondiente de esta
+     misma página (anclas #sec-*).
+     Los enlaces a GitHub apuntan a la rama `master` del repositorio del curso,
+     salvo el del apartado 8, que va al repositorio PLANTILLA de los equipos
+     (organización GLM-2026, repo aparte).
      OJO con las mayúsculas de las rutas: la carpeta es `evaluacion/GitHub/`.
 ============================================================================ -->
 
@@ -47,10 +50,28 @@ toc-depth: 2
     <p class="detalle">Con qué criterios y pesos se corrige cada prueba.</p>
   </a>
 
-  <a href="#sec-consultas" class="tarjeta-recurso">
+  <a href="#sec-scripts" class="tarjeta-recurso">
     <div class="numero">6</div>
+    <div class="titulo">Scripts de los Casos</div>
+    <p class="detalle">Todo el código R de cada unidad, en ficheros <code>.R</code> listos para ejecutar.</p>
+  </a>
+
+  <a href="#sec-referencias" class="tarjeta-recurso">
+    <div class="numero">7</div>
+    <div class="titulo">Referencias</div>
+    <p class="detalle">La bibliografía de cada caso y la lista global del curso.</p>
+  </a>
+
+  <a href="#sec-repo-equipo" class="tarjeta-recurso">
+    <div class="numero">8</div>
+    <div class="titulo">Repositorio de tu equipo</div>
+    <p class="detalle">La plantilla de GitHub desde la que se crea el repositorio de cada proyecto.</p>
+  </a>
+
+  <a href="#sec-consultas" class="tarjeta-recurso">
+    <div class="numero">9</div>
     <div class="titulo">Consultas</div>
-    <p class="detalle">Chat y correo de Google para dudas y tutorías.</p>
+    <p class="detalle">El canal abierto para dudas y tutorías: chat y correo de Google.</p>
   </a>
 
 </div>
@@ -86,11 +107,14 @@ Recomendaciones para redactar los tres formatos de informe y para construir pres
 
 | Proyecto | Formato informe | Datos | Entrega | Exposiciones | Defensas |
 |:--|:--|:--|:--:|:--:|:--:|
-| **Proyecto 1** | Informe técnico | [datos_equipos](https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos) | 02/10/2026 | 05–07/10/2026 | 12–26/10/2026 |
-| **Proyecto 2** | Informe ejecutivo | [datos_equipos_auto](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 06/11/2026 | 09–11/11/2026 | 16–30/11/2026 |
-| **Proyecto 3** | Artículo de investigación | [datos_equipos_auto](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 11/12/2026 | 14–16/12/2026 | 21/12/2026–12/01/2027 |
+| **Proyecto 1** | Informe técnico | [`caso1/datos_equipos`](https://github.com/asunmayoral/GLM/tree/master/caso1/datos_equipos) | 02/10/2026 | 05–07/10/2026 | 12–26/10/2026 |
+| **Proyecto 2** | Informe ejecutivo | [`caso2/datos_equipos_auto`](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 06/11/2026 | 09–11/11/2026 | 16–30/11/2026 |
+| **Proyecto 3** | Artículo de investigación | [`caso2/datos_equipos_auto`](https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto) | 11/12/2026 | 14–16/12/2026 | 21/12/2026–12/01/2027 |
 
 : Fechas de entrega del informe, de las exposiciones grupales y del periodo de defensas individuales. {.striped .hover tbl-colwidths="[14,20,18,14,16,18]"}
+
+Los proyectos 2 y 3 comparten carpeta de datos: es **la misma cartera de auto**, mirada con lentes
+distintas (frecuencia en el 2, coste y duración en el 3).
 
 Las **defensas** son individuales, se celebran en sesión de tutoría dentro del periodo indicado y
 duran de 10 a 12 minutos.
@@ -105,7 +129,7 @@ duran de 10 a 12 minutos.
    especificados en la **Guía GitHub del Estudiante**, apartado 9.3 →
    [`README_github_estudiante.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/README_github_estudiante.md)
 
-3. **Bitácora**, cumplimentada semanalmente por el líder del equipo en el repositorio del equipo y
+3. **Bitácora**, cumplimentada semanalmente por el coordinador del equipo en el repositorio del equipo y
    cerrada con el bloque de entrega (ver muestra) →
    [`bitacora.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/bitacora.md)
 
@@ -119,6 +143,90 @@ examen final.
 
 → [`Rubricas_evaluacion.xlsx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Rubricas_evaluacion.xlsx)
 
-## 6 · Consultas {#sec-consultas}
+## 6 · Scripts de los Casos {#sec-scripts}
 
-Vía chat y correo de Google: [asun.mayoral@umh.es](mailto:asun.mayoral@umh.es)
+Todo el código R que se ejecuta en las unidades de la web está también volcado en ficheros `.R`, uno
+por unidad, con la carga de los bancos de datos incluida. Sirven para reejecutar los análisis de la
+teoría fuera del cuaderno, para partir de ellos en tu propio proyecto y para consultar el código
+completo de un tirón, sin ir desplegando bloque a bloque.
+
+| Caso | Carpeta de scripts | Qué contiene |
+|:--|:--|:--|
+| **Caso 1 · Respuestas binarias** | [`caso1/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso1/scripts) | Un `.R` por unidad (1.1 a 1.6) y el del documento completo |
+| **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) | Un `.R` por unidad (2.1 a 2.8) y el del documento completo |
+| **Caso 3 · Continuas positivas** | [`caso3/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso3/scripts) | Un `.R` por unidad (3.1 a 3.8) y el del documento completo |
+
+: Código R de la teoría de cada caso, por unidades. {.striped .hover tbl-colwidths="[28,26,46]"}
+
+Y antes de bajar al código: al **inicio de cada caso**, en el *Mapa del caso*, hay una **caja de
+herramientas de R** —una tabla con los paquetes y funciones que se usan en el caso, unidad por
+unidad, y **enlazados a la sección donde se explican**—. Es el atajo para localizar dónde se
+introduce cada función:
+
+→ [Caso 1](caso1/caso1_binaria.qmd#mapa-del-caso) · [Caso 2](caso2/caso2_conteos.qmd#mapa-del-caso) ·
+[Caso 3](caso3/caso3_continuas_positivas.qmd#mapa-del-caso)
+
+Ojo: estos scripts ejecutan los **datos de la teoría**, no los de tu equipo. Para el proyecto
+trabajas con la carpeta de tu equipo (apartado 3).
+
+## 7 · Referencias {#sec-referencias}
+
+La bibliografía del curso funciona en dos niveles. **Cada caso cierra con sus propias referencias**,
+las de la teoría y los métodos que allí se trabajan; y **la página de Referencias reúne la lista
+global**, con todas las fuentes citadas en los tres casos —teoría, métodos y paquetes de R—, en
+formato APA 7.ª.
+
+| Dónde | Qué recoge |
+|:--|:--|
+| [**Referencias del Caso 1**](caso1/caso1_binaria.qmd#sec-refs1) | Respuestas binarias y politómicas, evaluación de clasificadores, supervivencia en tiempo discreto |
+| [**Referencias del Caso 2**](caso2/caso2_conteos.qmd#sec-refs2) | Conteos y tasas, log-lineales, sobredispersión, exceso de ceros, GLMM |
+| [**Referencias del Caso 3**](caso3/caso3_continuas_positivas.qmd#sec-refs3) | Continuas positivas, Gamma e inversa gaussiana, Tweedie, AFT y Cox |
+| [**Referencias del curso**](referencias.qmd) | La lista completa, común a los tres casos |
+
+: Bibliografía por caso y lista global. {.striped .hover tbl-colwidths="[34,66]"}
+
+Las citas del texto, de la forma (Autor, año), remiten siempre a esa lista global. Úsala también como
+punto de partida para las referencias de tus informes: se te pide APA 7.ª, el mismo formato.
+
+## 8 · Repositorio de tu equipo {#sec-repo-equipo}
+
+El trabajo de cada proyecto vive en un repositorio de GitHub propio del equipo, creado a partir de
+esta **plantilla**:
+
+```{=html}
+<div class="fila-boton-grande">
+  <a href="https://github.com/GLM-2026/proy-plantilla" class="boton-grande"
+     target="_blank" rel="noopener">REPOSITORIO PLANTILLA</a>
+</div>
+```
+
+La plantilla trae dos ficheros, y conviene leer el primero **antes** de empezar:
+
+- [**`README_github_estudiante.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/README_github_estudiante.md)
+  — la guía completa: cómo se usa GitHub en la asignatura, cómo se organiza el desarrollo del
+  proyecto, qué se sube y cómo se entrega (el formato del *issue* de entrega está en su apartado 9.3).
+- [**`bitacora.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/bitacora.md)
+  — el registro semanal del trabajo del equipo, que **cumplimenta el coordinador** y se cierra con el
+  bloque de entrega.
+
+::: {.callout-important}
+## Un repositorio distinto por proyecto
+La **coordinación rota**: cada proyecto tiene un coordinador diferente, así que **se crea un
+repositorio nuevo para cada uno de los tres proyectos** a partir de esta misma plantilla. No
+reutilicéis el del proyecto anterior: la bitácora, el informe y el *issue* de entrega son los de ese
+proyecto y los firma su coordinador.
+:::
+
+## 9 · Consultas {#sec-consultas}
+
+Para dudas sobre la teoría, el código o el proyecto, y para concertar tutoría, el canal es el chat y
+el correo de Google:
+
+```{=html}
+<div class="fila-boton-grande">
+  <a href="mailto:asun.mayoral@umh.es" class="boton-grande tenue">
+    asun.mayoral@umh.es
+    <span class="sub">Chat y correo de Google para dudas y tutorías</span>
+  </a>
+</div>
+```

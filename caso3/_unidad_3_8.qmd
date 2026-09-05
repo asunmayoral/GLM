@@ -7,15 +7,24 @@
      La 2.8 la usó para FRECUENCIA; aquí se usan las lentes que allí quedaron reservadas:
      COSTE (Gamma/IG/Tweedie) y DURACIÓN de la póliza (AFT/Cox).
 
-     CIFRAS VERIFICADAS sobre caso2/datos_equipos_auto (10 equipos, agosto 2026):
-       - 10 carpetas equipo_01..equipo_10; cada una con cartera.csv, panel.csv, siniestros.csv
+     CIFRAS VERIFICADAS sobre caso2/datos_equipos_auto (20 equipos, septiembre 2026):
+       - 20 carpetas equipo_01..equipo_20; cada una con cartera.csv, panel.csv, siniestros.csv
          y cartera.rds (esta última CONSERVA attr "verdad"/"siniestros"/"panel"; los .csv NO).
-       - cartera.csv: 2941-3093 pólizas (40 columnas) · 30 agencias · 6 regiones ·
-         antiguedad observada 0.1-9.97 años · exposicion 0.01-1.
-       - siniestros.csv: 1158-2393 filas · mediana de coste_k por equipo 1314-2213 EUR.
-       - panel.csv: 13783-14524 filas (9 columnas) · expo_anual 0.001-1 · en_riesgo siempre 1.
-       - coste_total = 0 en el 62.2-75.3 % de las pólizas; a nivel PÓLIZA-AÑO, 90.5-92.8 %.
-       - baja observada en el 38.6-41.4 % de las pólizas.
+         Los equipos 01-10 son los mismos de agosto 2026 (semillas y parámetros sin tocar).
+       - cartera.csv: 2924-3099 pólizas (40 columnas) · 30 agencias · 6 regiones ·
+         antiguedad observada 0.1-10.0 años · exposicion 0.01-1.
+       - siniestros.csv: 1158-2393 filas · mediana de coste_k por equipo 1314-2268 EUR.
+       - panel.csv: 13705-14583 filas (9 columnas) · en_riesgo siempre 1 · expo_anual 0.001-1,
+         redondeada a 3 decimales y con suelo de 0.001 años en el último tramo (dgp_auto.R,
+         bloque 8) para que offset(log(expo_anual)) nunca sea -Inf; antes de ese suelo, 30 filas
+         de 283554 valían exactamente 0. La identidad expo_anual = tstop - tstart se cumple en
+         las 283554 filas. La trampa persiste: 586 filas por debajo de 0.01 años, 89 de ellas en
+         el propio suelo (log(0.001) = -6.91 frente a log(1) = 0), es decir, exposición casi nula
+         con un apalancamiento enorme en el offset.
+       - coste_total = 0 en el 62.2-75.3 % de las pólizas; a nivel PÓLIZA-AÑO (n_partes_anual = 0),
+         86.4-92.8 % (el 90.5-92.8 % que figuraba aquí en agosto era incorrecto: sobre los mismos
+         10 equipos el rango ya era 86.4-92.8, mínimo en equipo_02).
+       - baja observada en el 38.0-41.4 % de las pólizas.
        - agregar siniestros por (id_poliza, anio) casa con panel sin filas huérfanas (verificado).
 
      TRAMPAS REALES DEL BANCO, comprobadas en el código y en los datos (no son erratas del texto):
@@ -161,6 +170,17 @@ Como en el Caso 2, cada equipo trabaja con una **cartera propia**, generada con 
 valores de algunos parámetros —la tasa base, el tamaño de la fragilidad, la forma del hazard, la
 dispersión de la severidad, el efecto de agencia—. La estructura es idéntica; **las cifras no**. No
 copies conclusiones numéricas de otro equipo: no serán las tuyas.
+
+Es **la misma carpeta del Caso 2**: si ya la descargaste entonces, tu equipo trabaja aquí sobre esos
+mismos ficheros, ahora mirando `coste_k`, `coste_total` y `antiguedad`/`baja`.
+
+```{=html}
+<a class="boton-datos"
+   href="https://github.com/asunmayoral/GLM/tree/master/caso2/datos_equipos_auto"
+   target="_blank" rel="noopener">
+  📂 Descarga aquí los datos de tu equipo · <code>caso2/datos_equipos_auto</code>
+</a>
+```
 
 ## 8.2 El encargo: un artículo de investigación {#sec-u38-encargo}
 

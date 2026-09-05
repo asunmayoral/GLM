@@ -1,52 +1,49 @@
-> A rellenar exclusivamente por el coordinador.
-## EQUIPO DE TRABAJO
-- nombre1 - @usuario1 - Rol - Funciones
-- nombre2 - @usuario2 - Rol - Funciones
-- nombre3 - @usuario3 - Rol - Funciones
-  
-## Semana 1 - 7 al 13 de septiembre de 2026
+> A rellenar exclusivamente por el coordinador. 
 
-**Estado general:** [en plazo / con retraso / bloqueados].
-[Con actividad / Sin actividad].
+## EQUIPO DE TRABAJO \[nombre del equipo\]
+
+- nombre1 - @usuario1 - Rol - Funciones 
+- nombre2 - @usuario2 - Rol - Funciones 
+- nombre3 - @usuario3 - Rol - Funciones
+- nombre4 - @usuario4 - Rol - Funciones
+
+## Semana [x] -[Fecha inicio - Fecha fin]
+
+**Estado general:** \[en plazo / con retraso / bloqueados\]. \[Con actividad / Sin actividad\].
 
 | Tarea | Responsable | Archivo | Estado |
-|---|---|---|---|
-| Cuestión 1: descriptivos | Marta | analisis_c1_marta.qmd | Terminada |
-| Cuestión 2: contraste de medias | Javier | analisis_c2_javier.qmd | En curso |
-| Cuestión 3: regresión | Lucía | analisis_c3_lucia.qmd | Sin empezar |
-| Redacción del informe | Marta | informe.qmd | Sin empezar |
+|------------------|------------------|------------------|------------------|
+| Tarea 1 | @usuario1 | tarea1_usuario1.qmd | Terminada |
+| Tarea 2 | @usuario2 | tarea2_usuario2.qmd | En curso |
+| Tarea 3 | @usuario3 | - | Sin empezar |
+| ... | ... |... |... |
 
-**Reunión semanal:** celebrada el 8 de septiembre. Puntos tratados: ...
+**Reunión semanal:** 
 
-**Acuerdos de la semana:**
+Celebrada el día ..... 
+Puntos tratados: ...
+
+**Acuerdos de la semana:** 
+
 - Decidimos excluir los casos con edad no declarada.
 
-**Dificultades / dudas para el profesor:**
+**Dificultades / dudas para el profesor:** 
+
 - No sabemos si aplicar test paramétrico con n=18.
 
-<!-- ===========================================================================
-     A PARTIR DE AQUÍ, NADA HASTA EL FINAL DEL PROYECTO.
-     El bloque de abajo se rellena UNA SOLA VEZ, el día de la entrega, cuando el
-     coordinador abre el issue (apartado 9.3 de la Guía GitHub del Estudiante).
-     Es una copia literal del cuerpo del issue: mismo formato, mismos enlaces.
-     Las entradas semanales siguen yendo ARRIBA, lo más reciente primero.
-=========================================================================== -->
 
----
----
+# 🏁 CIERRE DEL PROYECTO — ENTREGA 
 
-# 🏁 CIERRE DEL PROYECTO — ENTREGA
+> **No rellenes este bloque hasta el día de la entrega.** 
+Es la copia literal del cuerpo del issue que abre el coordinador (apartado 9.3 de la Guía GitHub del Estudiante). 
+Mismo formato exacto, mismos enlaces. Debe quedar idéntico en los dos sitios: aquí y en el issue.
 
-> **No rellenes este bloque hasta el día de la entrega.**
-> Es la copia literal del cuerpo del issue que abre el coordinador (apartado 9.3
-> de la Guía GitHub del Estudiante). Mismo formato exacto, mismos enlaces.
-> Debe quedar idéntico en los dos sitios: aquí y en el issue.
+**Fecha de la entrega:** \[dd/mm/aaaa\] 
 
-**Fecha de la entrega:** [dd/mm/aaaa]
-**Enlace al issue:** [pégalo aquí una vez creado]
+**Enlace al issue:** \[pégalo aquí una vez creado\]
 
-```
-## Entrega Proyecto [num_proyecto] — Equipo [nombre_equipo]
+```         
+## Entrega Proyecto [num_proyecto] — Equipo [numeral_equipo - nombre_equipo]
 
 **Coordinador:** Marta Sánchez (@martasanchez)
 
@@ -55,14 +52,16 @@
 - @javierlopez: Javier Lopez Martinez — Cuestión 2 (analisis_c2_javier.qmd)
 - @luciaperez: Lucía Pérez García — Cuestión 3 (analisis_c3_lucia.qmd)
 
-**Informe (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.pdf
-**Informe (html):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/informe.html
-**Presentación (pdf):** https://github.com/GLM2026/glm-proy1-equipo3/blob/main/presentacion.pdf
+**Informe (pdf):** https://github.com/GLM-2026/proy*-**-*****/blob/main/informe***.pdf
+**Informe (html):** https://github.com/GLM-2026/proy*-**-*****/blob/main/informe***.html
+**Presentación (pdf):** https://github.com/GLM-2026/proy*-**-*****/blob/main/presen***.pdf
 **Presentación (html -si en la nube-):** https://.....
 
 **Comentarios para el profesor:**
 Los comentarios que procedan y sean pertinentes para la corrección.
 ```
 
-**Reunión final de puesta en común:** celebrada el [fecha]. Cada miembro expuso su parte
-al resto y se resolvieron las dudas. [Requisito de la checklist 9.1.]
+**Reunión final de puesta en común:** \[Requisito de la checklist 9.1.\]
+
+Celebrada el día ..... 
+Puntos tratados: ...

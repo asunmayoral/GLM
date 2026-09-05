@@ -100,12 +100,6 @@ clásico falla de forma evidente. La teoría entra a demanda para resolver ese p
 </div>
 ```
 
-```{=html}
-<div class="fila-boton-grande">
-  <a href="recursos.html" class="boton-grande">RECURSOS</a>
-</div>
-```
-
 ## La asignatura en preguntas:
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
@@ -232,7 +226,31 @@ Cada proyecto se desarrolla en un formato distinto para que domines las situacio
 
 **Infraestructura**
 
-Para la generación de los proyectos el profesorado compartirá contigo un repositorio de trabajo para el equipo en GitHub, donde tienes un documento con todas las instrucciones. Alojarás allí todos los documentos generados con el proyecto y el coordinador del equipo mantendrá la bitácora. La entrega de la tarea se detalla en dichas instrucciones, así como el acceso a la revisión del profesorado.
+El trabajo de cada proyecto vive en un **repositorio de GitHub propio del equipo**, que se crea a
+partir de esta plantilla: [`GLM-2026/proy-plantilla`](https://github.com/GLM-2026/proy-plantilla).
+Allí alojáis todo lo que genera el proyecto —datos, `.qmd` ejecutables, informe y presentación—, y
+desde allí se entrega y se revisa.
+
+La plantilla trae dos documentos, y conviene leer el primero **antes** de empezar:
+
+- [**`README_github_estudiante.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/README_github_estudiante.md)
+  — la guía completa: cómo se usa GitHub en la asignatura, cómo se organiza el desarrollo del
+  proyecto, qué se sube y cómo se entrega. El formato exacto del *issue* de entrega, con los enlaces
+  al informe y a la presentación, está en su apartado 9.3.
+- [**`bitacora.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/bitacora.md)
+  — el registro del trabajo del equipo, que se cierra con el bloque de entrega.
+
+**La bitácora es responsabilidad del coordinador**: la cumplimenta **semanalmente** —qué se ha
+hecho, quién lo ha hecho, qué queda pendiente— y la cierra al entregar. No es un trámite: es la
+evidencia con la que se contrasta la coevaluación 360 (apartado 8), junto con los *commits* y las
+versiones del repositorio.
+
+Como **la coordinación rota**, cada proyecto tiene un coordinador distinto y se crea un **repositorio
+nuevo** a partir de la misma plantilla: la bitácora, el informe y el *issue* de entrega son los de
+ese proyecto y los firma su coordinador.
+
+Todo esto, con las fechas y las plantillas de informe, está reunido en la página de
+[Recursos](recursos.qmd).
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
@@ -485,7 +503,7 @@ Para ampliar: el capítulo *Workflow: scripts and projects* de [R for Data Scien
 
 ### El material de apoyo: la página Recursos
 
-Todo lo operativo está reunido en la página [**Recursos**](recursos.qmd), accesible desde el menú de navegación y desde el botón de la portada. Seis apartados:
+Todo lo operativo está reunido en la página [**Recursos**](recursos.qmd), accesible desde el menú de navegación y desde la barra lateral. Nueve apartados:
 
 | | Qué contiene |
 |:--|:--|
@@ -493,8 +511,11 @@ Todo lo operativo está reunido en la página [**Recursos**](recursos.qmd), acce
 | **2 · Informes y presentaciones** | Las **plantillas** Quarto de los tres formatos —técnico, ejecutivo y artículo— y las **guías** con recomendaciones para redactar y para exponer. |
 | **3 · Planificación y entregas** | Los **datos** que le corresponden a cada proyecto y el calendario completo: fechas de entrega del informe, de las exposiciones y del periodo de defensas individuales. |
 | **4 · Qué se entrega** | El formulario de **coevaluación 360**, el formato del ***issue*** de entrega, la **bitácora** semanal y la exigencia de ejecutables reproducibles. Con enlace a la Guía GitHub del Estudiante, que lo detalla todo. |
-| **5 · Rúbricas de evaluación** | El libro de rúbricas con los descriptores de cada nivel, para informe, exposición, entrevista individual y examen final. Los criterios y sus pesos están resumidos en la [Guía Docente](guia_docente_simplificada.qmd), apartado 7. Léelas **antes** de empezar, no después de entregar. |
-| **6 · Consultas** | Chat y correo de Google para dudas y tutorías. |
+| **5 · Rúbricas de evaluación** | El libro de rúbricas con los descriptores de cada nivel, para informe, exposición, entrevista individual y examen final. Los criterios y sus pesos están resumidos en la [Guía Docente](https://www.umh.es/contenido/Estudios/:asi_g_8370_O1/datos_es.html), apartado 7. Léelas **antes** de empezar, no después de entregar. |
+| **6 · Scripts de los Casos** | El código R de la teoría de cada caso, volcado en ficheros `.R` por unidad, con enlace a la carpeta `scripts/` de cada uno, y a la caja de herramientas de paquetes y funciones de cada caso. |
+| **7 · Referencias** | La bibliografía de cada caso por separado y la lista global del curso, en APA 7.ª |
+| **8 · Repositorio de tu equipo** | La **plantilla** de GitHub desde la que se crea el repositorio de trabajo del equipo. Trae dos ficheros: `README_github_estudiante.md`, con toda la información sobre el uso de GitHub, el desarrollo del proyecto y la entrega; y `bitacora.md`, el registro semanal **que cumplimenta el coordinador**. Como la coordinación **rota**, se crea un repositorio **distinto para cada proyecto**. |
+| **9 · Consultas** | El canal abierto para dudas y tutorías: chat y correo de Google. |
 
 ### El contenido del curso: los tres casos
 
@@ -515,13 +536,19 @@ La **barra lateral** te lleva a cualquier unidad, y el **índice de la derecha**
 - **Un bloque concreto:** pulsa `Mostrar código` justo encima del resultado que te interese.
 - **Toda la página de golpe:** el botón **`</> Código`**, arriba a la derecha de cada página, despliega o repliega todos los bloques a la vez (*Show All Code* / *Hide All Code*).
 
-Cada bloque lleva además su botón de copiado, y el código completo de cada unidad está reunido en la carpeta `scripts/` del repositorio, listo para ejecutar de una vez.
+Cada bloque lleva además su botón de copiado.
 
-### Y además
+### Los scripts de R: todo el código, fuera del cuaderno
 
-- La [**Guía Docente**](guia_docente_simplificada.qmd) completa: objetivos, contenidos, cronograma y sistema de evaluación.
-- Las [**Referencias**](referencias.qmd) bibliográficas del curso.
-- El [**repositorio en GitHub**](https://github.com/asunmayoral/GLM), con los datos, los scripts de cada unidad y el material de evaluación.
+Además de verlo en la web, **todo el código R programado para ilustrar la teoría de los tres casos está disponible en ficheros `.R`**, uno por unidad, con la carga de los bancos de datos incluida y en el orden en que se ejecuta en el cuaderno. Los tienes en la carpeta `scripts/` de cada caso del repositorio, enlazados desde el apartado **6 · Scripts de los Casos** de la página [Recursos](recursos.qmd):
+
+| Caso | Carpeta |
+|:--|:--|
+| **Caso 1 · Respuestas binarias** | [`caso1/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso1/scripts) |
+| **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) |
+| **Caso 3 · Continuas positivas** | [`caso3/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso3/scripts) |
+
+Úsalos para reejecutar los análisis de la teoría de una vez, para experimentar cambiando lo que quieras y para partir de ellos en tu propio proyecto. Ejecutan los **datos de la teoría**: los de tu equipo se descargan aparte, desde la unidad de estudio de caso de cada bloque.
 
 ::: {.callout-tip appearance="minimal"}
 **Si empiezas de cero**, empieza por el [Caso 1](caso1/caso1_binaria.qmd).

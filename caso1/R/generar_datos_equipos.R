@@ -1,6 +1,6 @@
 # =============================================================================
 #  generar_datos_equipos.R  ·  Caso 1
-#  Genera 10 bases de datos distintas (una por equipo) a partir del mismo DGP,
+#  Genera 20 bases de datos distintas (una por equipo) a partir del mismo DGP,
 #  con configuraciones de parámetros coherentes pero diferentes.
 # -----------------------------------------------------------------------------
 #  - Ejecutar con el directorio de trabajo en 'caso1/'  (source de R/dgp_cohorte.R).
@@ -9,7 +9,7 @@
 #    los .csv van sin la "verdad" (para trabajar a ciegas).
 #  - 'configuraciones_equipos.csv' es la CLAVE del docente (parámetros verdaderos).
 #
-#  Coherencia garantizada en las 10 configuraciones:
+#  Coherencia garantizada en las 20 configuraciones:
 #    beta_x1 > 0 (fragilidad = factor de riesgo);  beta_x2 < 0 (tratamiento protector);
 #    riesgo base creciente (paso > 0);  sigma_u, sigma_w > 0;
 #    ordinal: bord_x1 > 0, bord_x2 < 0, umbrales theta1 < theta2.
@@ -24,33 +24,57 @@ if (!file.exists("R/dgp_cohorte.R")) {
 }
 source("R/dgp_cohorte.R")
 
-K       <- 10L
+K       <- 20L
 out_dir <- "datos_equipos"
 dir.create(out_dir, showWarnings = FALSE)
 
-# --- 10 configuraciones EXPLÍCITAS (coherentes y distintas) -------------------
+# --- 20 configuraciones EXPLÍCITAS (coherentes y distintas) -------------------
+#  Los equipos 01-10 conservan EXACTAMENTE sus semillas y parámetros originales:
+#  sus bancos de datos se regeneran idénticos. Los equipos 11-20 son nuevos y sus
+#  valores caen dentro de los mismos rangos (mismos signos, mismas magnitudes).
 par_eq <- data.frame(
   equipo  = sprintf("equipo_%02d", 1:K),
   semilla = c(240101L,240102L,240103L,240104L,240105L,
-              240106L,240107L,240108L,240109L,240110L),
-  beta_x1 = c(0.70,0.85,1.00,0.60,0.90,0.75,1.05,0.65,0.95,0.80),   # > 0
-  beta_x2 = c(-0.55,-0.65,-0.45,-0.75,-0.50,-0.60,-0.40,-0.70,-0.55,-0.65), # < 0
-  sigma_u = c(0.55,0.70,0.45,0.80,0.60,0.50,0.75,0.65,0.85,0.40),
-  a0      = c(-3.00,-2.90,-3.15,-2.80,-3.10,-2.95,-3.20,-2.85,-3.05,-2.75), # riesgo base (periodo 1)
-  paso    = c(0.14,0.16,0.20,0.12,0.18,0.15,0.22,0.13,0.19,0.10),   # incremento por periodo > 0
-  gB_int  = c(-0.30,-0.20,-0.40,-0.10,-0.35,-0.25,-0.45,-0.15,-0.50,-0.05),
-  gB_x1   = c(0.60,0.70,0.80,0.50,0.75,0.65,0.85,0.55,0.90,0.45),
-  gB_x2   = c(-0.35,-0.40,-0.30,-0.50,-0.25,-0.45,-0.20,-0.55,-0.30,-0.40),
-  gC_int  = c(-0.70,-0.80,-0.60,-0.90,-0.75,-1.00,-0.55,-0.85,-0.65,-0.95),
-  gC_x1   = c(1.00,1.10,1.20,0.90,1.15,1.05,1.25,0.95,1.30,0.85),
-  gC_x2   = c(0.40,0.50,0.30,0.60,0.45,0.55,0.35,0.65,0.25,0.50),
-  theta1  = c(-0.60,-0.55,-0.70,-0.45,-0.65,-0.50,-0.80,-0.40,-0.75,-0.60),
-  theta2  = c(0.90,0.95,0.80,1.05,0.85,1.00,0.75,1.10,0.90,0.95),
-  bord_x1 = c(0.70,0.80,0.90,0.65,0.85,0.75,0.95,0.60,1.00,0.70),   # > 0
-  bord_x2 = c(-0.45,-0.50,-0.40,-0.60,-0.55,-0.35,-0.50,-0.65,-0.45,-0.70), # < 0
-  sigma_w = c(0.50,0.60,0.40,0.70,0.55,0.45,0.65,0.75,0.35,0.60),
+              240106L,240107L,240108L,240109L,240110L,
+              240111L,240112L,240113L,240114L,240115L,
+              240116L,240117L,240118L,240119L,240120L),
+  beta_x1 = c(0.70,0.85,1.00,0.60,0.90,0.75,1.05,0.65,0.95,0.80,
+              0.72,0.88,0.62,0.98,0.78,0.68,1.02,0.82,0.92,0.73),   # > 0
+  beta_x2 = c(-0.55,-0.65,-0.45,-0.75,-0.50,-0.60,-0.40,-0.70,-0.55,-0.65,
+              -0.58,-0.68,-0.48,-0.72,-0.52,-0.63,-0.43,-0.67,-0.53,-0.62), # < 0
+  sigma_u = c(0.55,0.70,0.45,0.80,0.60,0.50,0.75,0.65,0.85,0.40,
+              0.58,0.72,0.48,0.78,0.62,0.52,0.68,0.82,0.44,0.66),
+  a0      = c(-3.00,-2.90,-3.15,-2.80,-3.10,-2.95,-3.20,-2.85,-3.05,-2.75,
+              -2.98,-2.88,-3.12,-2.82,-3.08,-2.92,-3.18,-2.78,-3.02,-2.86), # riesgo base (periodo 1)
+  paso    = c(0.14,0.16,0.20,0.12,0.18,0.15,0.22,0.13,0.19,0.10,
+              0.155,0.175,0.205,0.115,0.185,0.135,0.215,0.145,0.195,0.125), # incremento por periodo > 0
+  gB_int  = c(-0.30,-0.20,-0.40,-0.10,-0.35,-0.25,-0.45,-0.15,-0.50,-0.05,
+              -0.28,-0.18,-0.38,-0.12,-0.33,-0.23,-0.43,-0.08,-0.48,-0.36),
+  gB_x1   = c(0.60,0.70,0.80,0.50,0.75,0.65,0.85,0.55,0.90,0.45,
+              0.62,0.72,0.82,0.52,0.77,0.67,0.87,0.57,0.88,0.47),
+  gB_x2   = c(-0.35,-0.40,-0.30,-0.50,-0.25,-0.45,-0.20,-0.55,-0.30,-0.40,
+              -0.33,-0.38,-0.28,-0.48,-0.23,-0.43,-0.22,-0.53,-0.32,-0.42),
+  gC_int  = c(-0.70,-0.80,-0.60,-0.90,-0.75,-1.00,-0.55,-0.85,-0.65,-0.95,
+              -0.72,-0.82,-0.62,-0.92,-0.77,-0.98,-0.57,-0.87,-0.67,-0.93),
+  gC_x1   = c(1.00,1.10,1.20,0.90,1.15,1.05,1.25,0.95,1.30,0.85,
+              1.02,1.12,1.22,0.92,1.17,1.07,1.27,0.97,1.28,0.87),
+  gC_x2   = c(0.40,0.50,0.30,0.60,0.45,0.55,0.35,0.65,0.25,0.50,
+              0.42,0.52,0.32,0.62,0.47,0.57,0.37,0.63,0.27,0.48),
+  theta1  = c(-0.60,-0.55,-0.70,-0.45,-0.65,-0.50,-0.80,-0.40,-0.75,-0.60,
+              -0.58,-0.53,-0.68,-0.43,-0.63,-0.48,-0.78,-0.42,-0.73,-0.62),
+  theta2  = c(0.90,0.95,0.80,1.05,0.85,1.00,0.75,1.10,0.90,0.95,
+              0.92,0.97,0.82,1.07,0.87,1.02,0.77,1.08,0.93,0.98),
+  bord_x1 = c(0.70,0.80,0.90,0.65,0.85,0.75,0.95,0.60,1.00,0.70,
+              0.72,0.82,0.92,0.67,0.87,0.77,0.97,0.62,0.98,0.68),   # > 0
+  bord_x2 = c(-0.45,-0.50,-0.40,-0.60,-0.55,-0.35,-0.50,-0.65,-0.45,-0.70,
+              -0.47,-0.52,-0.42,-0.62,-0.57,-0.37,-0.48,-0.67,-0.43,-0.68), # < 0
+  sigma_w = c(0.50,0.60,0.40,0.70,0.55,0.45,0.65,0.75,0.35,0.60,
+              0.52,0.62,0.42,0.72,0.57,0.47,0.67,0.73,0.37,0.58),
   stringsAsFactors = FALSE
 )
+stopifnot(nrow(par_eq) == K, all(par_eq$theta1 < par_eq$theta2),
+          all(par_eq$beta_x1 > 0), all(par_eq$beta_x2 < 0),
+          all(par_eq$paso > 0), !anyDuplicated(par_eq$semilla))
 
 # --- Traductor fila -> argumentos de simular_cohorte() -----------------------
 config_de <- function(r) list(
@@ -110,7 +134,7 @@ if (any(avisos)) {
   warning("Revisar configuraciones con distribuciones extremas: ",
           paste(resumen$equipo[avisos], collapse = ", "))
 } else {
-  message("Coherencia OK: las 10 cohortes tienen tasas y categorías en rango razonable.")
+  message("Coherencia OK: las 20 cohortes tienen tasas y categorías en rango razonable.")
 }
 
 # --- Clave del docente (parámetros verdaderos) y resumen ----------------------
