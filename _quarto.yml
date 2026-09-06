@@ -126,6 +126,8 @@ website:
 format:
   html:
     theme: [simplex, theme.scss]
+    link-external-newwindow: true
+    link-external-icon: true
     # Tipografía: se carga aquí con <link> (más fiable que un @import en el SCSS)
     include-in-header:
       - text: |

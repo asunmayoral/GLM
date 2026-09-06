@@ -118,16 +118,7 @@ Su campo de aplicación es extraordinariamente amplio. Se utilizan para predecir
 ## 2. Qué vas a aprender
 
 El hilo conductor es el ciclo completo de modelización lineal, más allá del modelo normal de regresión, esto es, con respuesta no necesariamente normal: procedemos del dato al
-modelo, del modelo al diagnóstico, y del diagnóstico a la interpretación y finalmente la comunicación. Trabajamos el **modelo lineal generalizado** (GLM) con efectos fijos, pero también con estructuras de agrupamiento e interconexión que nos llevan a modelos mixtos (con efectos aleatorios); y finalmente conectamos y trascendemos estos modelos -en cada tipo de respuesta- para trabajar problemas relacionados con la supervivencia o tiempos hasta evento.
-
-Los objetivos de aprendizaje de este curso son: 
-
-- **O1** . **Reconocer el marco común de los GLM.** Estructura común (familia exponencial, predictor lineal, función de enlace) y justificación de cuándo un dato exige un GLM frente a OLS. 
-- **O2**  **Respuestas binarias y politómicas.** Logística y binomial agrupada, politómica nominal y ordinal: *odds ratios* y probabilidades, separación y calibración, selección por *deviance* y AIC/BIC. 
-- **O3** . **Conteos y tasas.** Poisson y binomial negativa con *offset*: razones de tasas, sobredispersión, exceso de ceros, y selección por AIC/BIC, validación cruzada y regularización. 
-- **O4**. **Magnitudes positivas y vida útil.** Gamma y log-normal con enlace log, **Tweedie** para importes agregados con ceros, y modelos **AFT**: interpretación multiplicativa y diagnóstico del ajuste. 
-- **O5** . **Extender a mixtos y supervivencia.** GLMM sobre datos agrupados y tiempo-a-evento censurado (tiempo discreto, riesgos a trozos, AFT), con **Cox** como frontera del marco. Dos hilos en espiral. 
-- **O6** . **Comunicar y reproducir.** Desarrollar, presentar y defender estudios de caso reproducibles ante audiencias técnicas y profesionales, en distintos formatos. 
+modelo, del modelo al diagnóstico, y del diagnóstico a la interpretación y finalmente la comunicación. Trabajamos el **modelo lineal generalizado** (GLM) con efectos fijos, pero también con estructuras de agrupamiento e interconexión que nos llevan a **modelos mixtos (con efectos aleatorios)**; y finalmente conectamos y trascendemos estos modelos -en cada tipo de respuesta- para trabajar problemas relacionados con la **supervivencia o tiempos hasta evento**.
 
 Y cuatro son las preguntas en torno a las cuales se ordena el curso:
 
@@ -147,17 +138,16 @@ Amplía información en la [Guía Docente](https://www.umh.es/contenido/Estudios
 
 Te vendrán genial tus conocimientos de cálculo, álgebra lineal, probabilidad e inferencia básica, regresión lineal y soltura programando. No hace falta experiencia previa en R, pues se introducirá secuencialmente y podrás contar con la ayuda de LLMs para la generación de código. 
 
-La asignatura capacita para **elegir, ajustar, diagnosticar e interpretar** el GLM adecuado a cada
-tipo de respuesta, con respuesta individualizada o agrupada, y para reconocer los datos **censurados de tiempo-a-evento** como casos especiales del propio marco. Esta asignatura te proporciona una formación diferencial a la del resto de profesionales vinculados al tratamiento (ciencia) de datos. 
+La asignatura capacita para **elegir, ajustar, diagnosticar e interpretar el GLM adecuado** a cada tipo de respuesta, con **respuesta individualizada o agrupada**, y para reconocer los **datos censurados de tiempo-a-evento** como casos especiales. 
 
-Se espera de ti que mejores tu razonamiento crítico, así como tus habilidades para aprovechar las inteligencias artificiales en la programación, la resolución de problemas, la documentación y el trabajo riguroso bajo criterios de validación y reproducibilidad. Aprenderás a escribir documentos e informes técnicos, ejecutivos y científicos, y mejorarás tus habilidades de exposición oral a públicos diversos. Desarrollarás capacidades de trabajo en equipo.
+Se espera de ti que mejores tu razonamiento crítico, tu intuición ante los datos, así como tus habilidades para aprovechar las inteligencias artificiales en la programación, la resolución de problemas, la documentación y el trabajo riguroso bajo criterios de validación y reproducibilidad. Aprenderás a escribir documentos e informes técnicos, ejecutivos y científicos, y mejorarás tus habilidades de exposición oral a públicos diversos. Desarrollarás también capacidades de trabajo en equipo.
 :::
 
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 4. Cómo se trabaja en clase
 
-**Cuatro horas semanales en dos sesiones de dos horas.** Estructuramos el curso en 3 bloques, cada uno de los cuales parte de un problema específico para un caso con datos simulados, y ciertas preguntas a responder. Justificamos la teoría, modelo o técnica que lo resuelve, e inmediatamente la aplicamos al estudio de caso conductor. Programamos juntos, predecimos qué va a salir antes de ejecutar, y discutimos por qué la salida dice lo que dice. Vamos comprendiendo, planteando/resolviendo dudas y detectando/corrigiendo errores. Al final de cada sección trabajáis en equipo sobre el estudio de caso para evaluación, utilizando las pistas dadas y el acompañamiento docente. Aprendemos interaccionando y cuestionando todo.
+**Cuatro horas semanales en dos sesiones de dos horas.** Estructuramos el curso en 3 bloques, cada uno de los cuales parte de un problema específico para un caso con datos simulados, y ciertas preguntas a responder. Justificamos la teoría, modelo o técnica que lo resuelve, e inmediatamente la aplicamos al estudio de caso conductor. Programamos juntos, predecimos qué va a salir antes de ejecutar, y discutimos por qué la salida dice lo que dice. Vamos comprendiendo, planteando/resolviendo dudas y detectando/corrigiendo errores. Al final de cada sección trabajáis en equipo sobre el estudio de caso para evaluación, utilizando las indicaciones y el acompañamiento docente. Aprendemos interaccionando y cuestionando todo.
 
 **Qué se espera de ti.** Este curso funcionará de modo óptimo si eres proactivo/a y tienes ganas sinceras de aprender. No funcionará si esperas que tu equipo trabaje por ti y no motivas tu curiosidad para cuestionarte todo lo que vamos abarcando. Durante el curso irás asumiendo distintos roles en el equipo, para promover tu capacidad de adaptación al trabajo en equipo y el desarrollo de ditintas habilidades (coordinador, revisor, portavoz, programador, escéptico, escriba, ...); aprovecha las oportunidades.
 
@@ -171,7 +161,7 @@ Se espera de ti que mejores tu razonamiento crítico, así como tus habilidades 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 5. ¿Cuál es la planificación del curso?
 
-Quince semanas y **60 horas de clase**, dos sesiones de dos horas por semana. La asignatura se compone de tres bloques -cada uno basado en un caso desarrollado y un trabajo grupal que se propone para evaluación- y tras cada bloque se destina una semana para las defensas del trabajo en equipo.
+Quince semanas y **60 horas de clase**, generalmente con dos sesiones de dos horas por semana. La asignatura se compone de tres bloques -cada uno basado en un caso desarrollado y un trabajo grupal que se propone para evaluación- y tras cada bloque se destina una semana para las defensas del trabajo en equipo.
 
 | Sem. | Bloque | Teoría (2 h) | Laboratorio (2 h) | Unidades |
 |:--:|:--:|:--|:--|:--:|
@@ -201,22 +191,24 @@ Quince semanas y **60 horas de clase**, dos sesiones de dos horas por semana. La
 ![Puedes optar por evaluación continua o final. Haz clic para ampliar.](images/organigrama_evaluacion.png){fig-alt="Evaluación. Evaluación continua. Requiere compromiso y seguimiento sostenido. Es sumativa y se construye sobre tres proyectos grupales equitativos —uno por bloque—, en equipos cooperativos de un máximo de tres personas con roles rotativos, coevaluación 360 sobre implicación en el trabajo y cumplimentación de una bitácora de aprendizaje. El proyecto grupal pesa un 60% (ponderado por la coevaluación) y la defensa oral individual un 40%. Para superar la evaluación continua se exige un mínimo de 3.5/10 en cada prueba (grupal e individual) y una media ponderada $\geq 5$. Evaluación final, para quien no participe o no supere la evaluación continua, en convocatoria ordinaria o extraordinaria: un examen final que aporta el 100 % de la calificación, planteado a partir de uno o varios estudios de caso resueltos total o parcialmente, sobre los que se ha de desarrollar un informe escrito (50 %) -justificando e interpretando los resultados- y su defensa oral (50 %). No se permitirán recursos de consulta."}
 :::
 
+En evaluación continua el proyecto grupal, defendido por el equipo, se acompaña de una entrevista/examen individual -tras la corrección del informe- en la que cada miembro ha de demostrar que domina todo el análisis realizado y puede dar respuesta, matices o proyecciones a las correcciones/comentarios realizados por el profesorado sobre el informe.
+
 Amplía información en la [Guía Docente](https://www.umh.es/contenido/Estudios/:asi_g_8370_O1/datos_es.html) de la asignatura.
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 7. En qué consisten y cómo se trabaja en los proyectos grupales
 
-Se trabaja en equipos cooperativos sobre unos datos dados (cada equipo recibe datos distintos) para responder las preguntas planteadas a partir de la modelización y análisis pertinente. A lo largo del bloque teórico del Caso, se van introduciendo las diferentes cuestiones sobre el caso, con pistas e indicaciones para resolverlo, de modo que puedes ir practicando lo aprendido y resolviendo a la vez el trabajo grupal. 
+Se trabaja en [equipos cooperativos](https://www.ucm.es/data/cont/docs/1626-2019-03-15-JOHNSON%20El%20aprendizaje%20cooperativo%20en%20el%20aula.pdf) sobre unos datos dados (cada equipo recibe datos distintos) para aplicar los modelos revisados y responder las preguntas planteadas. A lo largo del bloque teórico, se van introduciendo las diferentes cuestiones sobre el caso de evaluación, con indicaciones para resolverlo, de modo que puedes ir practicando lo aprendido y resolviendo a la vez el trabajo grupal. 
 
-En el equipo cada estudiante asume un **rol** con tareas definidas, que **rota** de un proyecto al siguiente para reforzar y mejorar todas sus habilidades para el trabajo en equipo:
+En cada equipo (3/4 estudiantes) cada miembro asume un **rol** con funciones concretas, que **rota** de un proyecto al siguiente para reforzar y mejorar todas sus habilidades para el trabajo en equipo. Los roles básicos son:
 
 - **Coordinación** — planificación, supervisión, consultas, gestión de repositorios/bitácora, exposición.
 - **Análisis** — tratamiento de datos, modelización, generación de código reproducible y validación técnica (diagnóstico).
 - **Redacción** — redacción informe y presentación.
 
 
-Cada proyecto se desarrolla en un formato distinto para que domines las situaciones posibles en el mundo profesional, y se acompaña de una exposición grupal (sobre una presentación) y una entrevista/examen individual -tras la corrección del informe- en la que has de demostrar que dominas todo el análisis realizado y puedes dar respuesta, matices o proyecciones a las correcciones/comentarios realizados por el profesorado sobre el informe.
+Cada proyecto se desarrolla en un formato distinto para que domines las situaciones posibles en el mundo profesional, y se acompaña de una exposición grupal (sobre una presentación).
 
 | Bloque | Formato del informe |
 |:--:|:--|
@@ -226,37 +218,22 @@ Cada proyecto se desarrolla en un formato distinto para que domines las situacio
 
 **Infraestructura**
 
-El trabajo de cada proyecto vive en un **repositorio de GitHub propio del equipo**, que se crea a
+El trabajo de cada proyecto se desarroolará en un **repositorio de GitHub del equipo**, creado a
 partir de esta plantilla: [`GLM-2026/proy-plantilla`](https://github.com/GLM-2026/proy-plantilla).
 Allí alojáis todo lo que genera el proyecto —datos, `.qmd` ejecutables, informe y presentación—, y
 desde allí se entrega y se revisa.
 
-La plantilla trae dos documentos, y conviene leer el primero **antes** de empezar:
+La plantilla trae dos documentos básicos (README y bitacora) y tres plantillas .qmd (una por cada tipo de informe). Es importante leer el [**`README_github_estudiante.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/README_github_estudiante.md) antes de empezar, pues es una guía completa sobre cómo usar GitHub en la asignatura y cómo entregar los proyectos. La [**`bitacora.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/bitacora.md) será responsabilidad del/a coordinador/a del equipo y habrá de ir registrando el trabajo realizado semanalmente, para evidenciar la planificación y las distintas aportaciones.
 
-- [**`README_github_estudiante.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/README_github_estudiante.md)
-  — la guía completa: cómo se usa GitHub en la asignatura, cómo se organiza el desarrollo del
-  proyecto, qué se sube y cómo se entrega. El formato exacto del *issue* de entrega, con los enlaces
-  al informe y a la presentación, está en su apartado 9.3.
-- [**`bitacora.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/bitacora.md)
-  — el registro del trabajo del equipo, que se cierra con el bloque de entrega.
-
-**La bitácora es responsabilidad del coordinador**: la cumplimenta **semanalmente** —qué se ha
-hecho, quién lo ha hecho, qué queda pendiente— y la cierra al entregar. No es un trámite: es la
-evidencia con la que se contrasta la coevaluación 360 (apartado 8), junto con los *commits* y las
-versiones del repositorio.
-
-Como **la coordinación rota**, cada proyecto tiene un coordinador distinto y se crea un **repositorio
-nuevo** a partir de la misma plantilla: la bitácora, el informe y el *issue* de entrega son los de
-ese proyecto y los firma su coordinador.
-
-Todo esto, con las fechas y las plantillas de informe, está reunido en la página de
-[Recursos](recursos.qmd).
+Tienes la información completa y todas las plantillas en la página de [Recursos](recursos.qmd).
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 8. Cómo se evalúa la individualidad
 
-### En el proyecto grupal
+Se evalúa la individualidad en el proyecto grupal, a través de un peso individualizado, y también mediante el examen/entrevista individual. 
+
+#### En el proyecto grupal
 Una coevaluación 360 del equipo, contrastable y ratificable por el profesorado con la **bitácora**, el equipo y la evidencia de contribución (*commits*, versiones, actas), pondera la calificación del proyecto grupal (contribución 60%) a través de un factor entre 0 y 1 -*Coi*-.
 
 **Coevaluación 360** consistente en autoevaluación y evaluación a todos/as los/as compañeros/as de equipo. 
@@ -302,7 +279,7 @@ salvarse con su propio voto.
 
 **3. Se convierte en factor:**
 
-$$w_j \;=\; \min\!\left(1,\; \frac{R_j}{0{,}80}\right)$$
+$$\text{Coi}_j \;=\; \min\!\left(1,\; \frac{R_j}{0{,}80}\right)$$
 
 Es una función continua y acotada en $[0, 1]$: no hay bandas ni escalones, y una diferencia mínima en
 las puntuaciones no puede producir una caída brusca de la nota. El umbral 0,80 actúa como **franja de
@@ -314,7 +291,7 @@ trabajo en partes exactamente iguales.
 En un equipo de tres, la tabla recoge el factor que resulta para quien recibe las valoraciones
 indicadas, cuando el equipo coincide y los otros dos son valorados *plenamente* en ambas preguntas:
 
-| $P_1$ · su parte | $P_2$ · la de los demás | $s$ | $w$ |
+| $P_1$ · su parte | $P_2$ · la de los demás | $s$ | *Coi* |
 |:--|:--|:--:|:--:|
 | Plenamente | Plenamente | 3,00 | 1,00 |
 | Plenamente | En gran parte | 2,67 | 1,00 |
@@ -333,26 +310,7 @@ indicadas, cuando el equipo coincide y los otros dos son valorados *plenamente* 
 Un nivel de diferencia respecto a los compañeros no descuenta nada; hacen falta dos niveles
 sostenidos para que el factor se active de forma apreciable. El doble peso de $P_1$ impide que la
 buena disposición compense la ausencia de trabajo: quien no sacó adelante nada de lo suyo no pasa de
-$w = 0{,}54$ por muy bien que se llevara con el equipo.
-
-**Salvaguardas**
-
-- **La coevaluación activa la penalización; la evidencia la confirma.** Ningún $w < 1$ se aplica solo
-con los votos de los compañeros: el profesorado lo contrasta con la bitácora y el historial de
-contribución antes de fijarlo, atendiendo en particular a la discrepancia entre las valoraciones
-recibidas. Una discrepancia amplia entre evaluadores no se promedia sin más: se resuelve.
-
-- **No entregar la coevaluación** de algún miembro del equipo pospone la revisión hasta disponer de ella. 
-
-- **Equipos de dos.** Cada persona recibe solo dos valoraciones y la mediana degenera en media: la
-propiedad de las dos coincidencias se pierde y un único voto discrepante mueve el factor. Cualquier
-$w < 1$ en un equipo de dos pasa automáticamente a revisión con la bitácora antes de aplicarse.
-
-- **Reclamación.** El estudiante conoce su $w$ y las razones que lo sustentan antes de la publicación de
-la nota, y puede aportar evidencia adicional en el examen oral individual.
-
-- La **bitácora** recoge rol asumido, tareas realizadas, incidencias, uso de recursos (apuntes/IA),
-percepción del aprendizaje y valoración global.
+$\text{Coi} = 0{,}54$ por muy bien que se llevara con el equipo.
 
 
 ### En el examen/entrevista personal (oral)
@@ -371,13 +329,13 @@ La condición es una sola, y no admite matices:
 
 De ahí se derivan tres exigencias concretas.
 
-### 1. Saber qué hace tu código, línea a línea
+#### 1. Saber qué hace tu código, línea a línea
 
 Si en la entrevista individual te pregunto por qué una línea de tu análisis hace lo que hace y la respuesta es **«no sé, lo hizo la IA»**, esa parte del trabajo vale cero. No porque haya trampa, sino porque **no hay aprendizaje que evaluar**: un análisis que nadie del equipo sabe explicar no es un análisis del equipo.
 
 Lo mismo vale para las decisiones metodológicas. Si la IA te propuso una familia, un enlace o un contraste, tú tienes que saber **por qué ese y no otro**, y qué habrías hecho si los datos fueran distintos. Recuerda además que puedo preguntar a cualquier miembro por cualquier parte del proyecto, no solo por la que firmó.
 
-### 2. Justificar y documentar el uso
+#### 2. Justificar y documentar el uso
 
 Todo informe incluye un apartado **obligatorio** de reflexión sobre el uso de la IA, que pesa un **10 %** de la nota del informe. No es un trámite ni una declaración genérica: se espera que recoja
 
@@ -387,7 +345,7 @@ Todo informe incluye un apartado **obligatorio** de reflexión sobre el uso de l
 
 Sin este apartado, el informe **no puede alcanzar la calificación de «excelente»**.
 
-### 3. Verificar, y contar cómo verificaste
+#### 3. Verificar, y contar cómo verificaste
 
 Esta es la parte que más se descuida y la que más valoro. Que la IA afirme algo no lo convierte en cierto, y en estadística las respuestas plausibles pero equivocadas son la norma, no la excepción.
 
@@ -408,7 +366,7 @@ Explicad **el procedimiento de verificación** que aplicasteis en cada caso. Alg
 
 Un análisis es **reproducible** cuando otra persona —o tú dentro de seis meses— obtiene exactamente los mismos resultados a partir de los mismos datos y el mismo código. En este curso es un criterio de evaluación explícito («Datos, método y reproducibilidad», 20 % del informe), no un adorno. Lo que sigue es el mínimo exigible.
 
-### 1. El proyecto es la unidad de trabajo
+#### 1. El proyecto es la unidad de trabajo
 
 Trabaja siempre dentro de un **proyecto de RStudio** (`.Rproj`) y refiere las rutas al directorio raíz del proyecto, nunca a tu disco:
 
@@ -422,7 +380,7 @@ Con esto queda prohibido `setwd("C:/Users/...")`: una ruta absoluta rompe el có
 
 En **Tools → Global Options → General**, desactiva «Restore .RData into workspace at startup» y pon «Save workspace to .RData on exit» en *Never*. Si el resultado depende de objetos heredados de una sesión anterior, el documento no es reproducible aunque a ti te funcione.
 
-### 2. Aleatoriedad: fija la semilla
+#### 2. Aleatoriedad: fija la semilla
 
 Todo lo que use el generador de números aleatorios —simulación de los bancos de datos, particiones de entrenamiento y prueba, validación cruzada, *bootstrap*, arranques de un optimizador— debe ir precedido de una semilla:
 
@@ -437,7 +395,7 @@ Dos avisos importantes:
 
 Si prefieres no alterar el estado global del generador, `withr::with_seed()` fija la semilla solo dentro de la expresión que le pasas.
 
-### 3. Trazabilidad: deja constancia de con qué se ejecutó
+#### 3. Trazabilidad: deja constancia de con qué se ejecutó
 
 Esto es lo que convierte «me funciona» en «se puede comprobar». **Todo informe del curso cierra con un apartado que registra el entorno de ejecución.**
 
@@ -473,7 +431,7 @@ toBibtex(citation("survival"))  # la entrada BibTeX, lista para references.bib
 
 Recuerda que la cita de un paquete forma parte de las referencias en APA 7.ª, igual que un libro o un artículo.
 
-### 4. Congelar versiones: `renv`
+#### 4. Congelar versiones: `renv`
 
 `sessionInfo()` **documenta** el entorno; `renv` [@renv] lo **reconstruye**. Es el paso que separa un informe reproducible en el papel de uno reproducible de hecho:
 
@@ -487,7 +445,7 @@ renv::restore()    # reinstala exactamente las versiones del lockfile
 
 El fichero `renv.lock` va **al repositorio**; la biblioteca `renv/library/` no (el `.gitignore` que crea `renv::init()` ya se encarga). Quien clone el proyecto ejecuta `renv::restore()` y obtiene tu entorno, no el suyo.
 
-### 5. El documento se rinde solo
+#### 5. El documento se renderiza solo
 
 El informe se escribe en Quarto [@quarto] y **todos** los resultados —cifras, tablas y figuras— se generan desde chunks. Ninguna cifra se teclea a mano en la prosa: para citar un valor en el texto, usa **código en línea** (una expresión de R entre acentos graves precedida de `r`, como `round(coef(mod)[2], 3)`), de modo que si el modelo cambia, el texto cambia con él.
 
@@ -501,24 +459,6 @@ Para ampliar: el capítulo *Workflow: scripts and projects* de [R for Data Scien
 ::: {.callout-note .acordeon collapse="true" icon=false}
 ## 11. Con qué recursos cuentas, y cómo se usan
 
-### El material de apoyo: la página Recursos
-
-Todo lo operativo está reunido en la página [**Recursos**](recursos.qmd), accesible desde el menú de navegación y desde la barra lateral. Nueve apartados:
-
-| | Qué contiene |
-|:--|:--|
-| **1 · Registro en GitHub y equipos** | El formulario con el que te das de alta y constituyes tu equipo. Es el primer paso del curso: de ahí salen los repositorios de trabajo. |
-| **2 · Informes y presentaciones** | Las **plantillas** Quarto de los tres formatos —técnico, ejecutivo y artículo— y las **guías** con recomendaciones para redactar y para exponer. |
-| **3 · Planificación y entregas** | Los **datos** que le corresponden a cada proyecto y el calendario completo: fechas de entrega del informe, de las exposiciones y del periodo de defensas individuales. |
-| **4 · Qué se entrega** | El formulario de **coevaluación 360**, el formato del ***issue*** de entrega, la **bitácora** semanal y la exigencia de ejecutables reproducibles. Con enlace a la Guía GitHub del Estudiante, que lo detalla todo. |
-| **5 · Rúbricas de evaluación** | El libro de rúbricas con los descriptores de cada nivel, para informe, exposición, entrevista individual y examen final. Los criterios y sus pesos están resumidos en la [Guía Docente](https://www.umh.es/contenido/Estudios/:asi_g_8370_O1/datos_es.html), apartado 7. Léelas **antes** de empezar, no después de entregar. |
-| **6 · Scripts de los Casos** | El código R de la teoría de cada caso, volcado en ficheros `.R` por unidad, con enlace a la carpeta `scripts/` de cada uno, y a la caja de herramientas de paquetes y funciones de cada caso. |
-| **7 · Referencias** | La bibliografía de cada caso por separado y la lista global del curso, en APA 7.ª |
-| **8 · Repositorio de tu equipo** | La **plantilla** de GitHub desde la que se crea el repositorio de trabajo del equipo. Trae dos ficheros: `README_github_estudiante.md`, con toda la información sobre el uso de GitHub, el desarrollo del proyecto y la entrega; y `bitacora.md`, el registro semanal **que cumplimenta el coordinador**. Como la coordinación **rota**, se crea un repositorio **distinto para cada proyecto**. |
-| **9 · Consultas** | El canal abierto para dudas y tutorías: chat y correo de Google. |
-
-### El contenido del curso: los tres casos
-
 Los tres casos están **desarrollados y completos** en esta web, cada uno como un cuaderno reproducible: la teoría al servicio del problema, el código R que la ejecuta y la interpretación de cada resultado. Al final de cada unidad encontrarás, en un recuadro, las **cuestiones del proyecto** que esa unidad te permite resolver.
 
 | Caso | Unidades |
@@ -527,10 +467,6 @@ Los tres casos están **desarrollados y completos** en esta web, cada uno como u
 | [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Selección y regularización · 2.8 Estudio de caso |
 | [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 Tweedie: el coste agregado · 3.5 AFT: del coste al tiempo · 3.6 Cox como frontera · 3.7 Más allá: las tres lentes · 3.8 Estudio de caso |
 
-La **barra lateral** te lleva a cualquier unidad, y el **índice de la derecha**, a cualquier sección dentro de ella.
-
-### Cómo ver el código
-
 **El código viene plegado**, para que la narrativa se lea sin interrupciones. Tienes dos formas de desplegarlo:
 
 - **Un bloque concreto:** pulsa `Mostrar código` justo encima del resultado que te interese.
@@ -538,36 +474,22 @@ La **barra lateral** te lleva a cualquier unidad, y el **índice de la derecha**
 
 Cada bloque lleva además su botón de copiado.
 
-### Los scripts de R: todo el código, fuera del cuaderno
+Además de verlo en la web, **todo el código R programado para ilustrar la teoría de los tres casos está disponible en ficheros `.R`** en la página [**Recursos**](recursos.qmd), donde también encontrarás los datos de trabajo, documentos de seguimiento, plantillas, rúbricas de evaluación y otros.
 
-Además de verlo en la web, **todo el código R programado para ilustrar la teoría de los tres casos está disponible en ficheros `.R`**, uno por unidad, con la carga de los bancos de datos incluida y en el orden en que se ejecuta en el cuaderno. Los tienes en la carpeta `scripts/` de cada caso del repositorio, enlazados desde el apartado **6 · Scripts de los Casos** de la página [Recursos](recursos.qmd):
+La **barra lateral** te lleva a cualquier unidad, y el **índice de la derecha**, a cualquier sección dentro de ella.
 
-| Caso | Carpeta |
-|:--|:--|
-| **Caso 1 · Respuestas binarias** | [`caso1/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso1/scripts) |
-| **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) |
-| **Caso 3 · Continuas positivas** | [`caso3/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso3/scripts) |
-
-Úsalos para reejecutar los análisis de la teoría de una vez, para experimentar cambiando lo que quieras y para partir de ellos en tu propio proyecto. Ejecutan los **datos de la teoría**: los de tu equipo se descargan aparte, desde la unidad de estudio de caso de cada bloque.
-
-::: {.callout-tip appearance="minimal"}
-**Si empiezas de cero**, empieza por el [Caso 1](caso1/caso1_binaria.qmd).
-:::
 :::
 
 ## Profesorado
 
 Soy Asun Martínez Mayoral, profesora del Departamento de Estadística, Matemáticas e Informática en la Universidad Miguel
-Hernández de Elche. Doctora en Ciencias Matemáticas, especialidad de Estadística e Investigación Operativa, por la Universitat de València (1998). Profesora titular de universidad desde 2008 (costó llegar). Aprendo y trabajo en Estadística, frecuentista, bayesiana y aprendizaje automático, pero también curioseo con la tecnología educativa y la divulgación científica, siempre aprovechando las IAs. Imparto docencia actualmente en los Grados en Estadística Empresarial y Ciencia de Datos e Inteligencia Artificial, y en varios másteres, programas de doctorado y programas de formación de profesorado, enseñando variaditos sobre estadística, metodologías educativas, competencia digital, aprovechamiento de IAs y divulgación científica, para profesionales de distintos ámbitos.
+Hernández de Elche. Obtuve el doctorado en Ciencias Matemáticas, en la especialidad de Estadística e Investigación Operativa y por la Universitat de València en 1998. Soy profesora titular de universidad desde 2008. Aprendo y trabajo en Estadística, frecuentista, bayesiana y aprendizaje automático, pero también curioseo con la tecnología educativa y la divulgación científica, siempre aprovechando las IAs. Imparto docencia actualmente en los Grados en Estadística Empresarial y Ciencia de Datos e Inteligencia Artificial, y en varios másteres, programas de doctorado y programas de formación de profesorado, enseñando "variaditos" sobre estadística, metodologías educativas, competencia digital, aprovechamiento de IAs y divulgación científica, para profesionales de distintos ámbitos.
 
-### Contacto
-
-| | |
+|||
 |:--|:--|
 | Correo y Chat (Google) | asun.mayoral@umh.es |
 | Web personal |  [asunmayoral.umh.es](https://asunmayoral.umh.es)|
 | Despacho | Edificio Torrepinet, planta 2. Campus de Elche. Avda. Universidad s/n, 03202 Elche|
-| Tutorías | A convenir bajo demanda |
 | ORCID | [0000-0001-6944-7335](https://orcid.org/0000-0001-6944-7335) |
 
 ## Sobre este material

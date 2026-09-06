@@ -23,7 +23,7 @@ toc-depth: 2
   <a href="#sec-registro" class="tarjeta-recurso">
     <div class="numero">1</div>
     <div class="titulo">Registro en GitHub y equipos</div>
-    <p class="detalle">El formulario con el que te das de alta y constituyes tu equipo.</p>
+    <p class="detalle">Nombres de equipo a elegir y formulario para constituir tu equipo e informar sobre tu usuario GitHub.</p>
   </a>
 
   <a href="#sec-informes" class="tarjeta-recurso">
@@ -34,14 +34,14 @@ toc-depth: 2
 
   <a href="#sec-planificacion" class="tarjeta-recurso">
     <div class="numero">3</div>
-    <div class="titulo">Planificación y entregas</div>
-    <p class="detalle">Datos de cada proyecto y fechas de entrega, exposición y defensa.</p>
+    <div class="titulo">Planificación y seguimiento</div>
+    <p class="detalle">Fechas de entrega, exposición y defensa y documentos de seguimiento.</p>
   </a>
 
   <a href="#sec-entrega" class="tarjeta-recurso">
     <div class="numero">4</div>
-    <div class="titulo">Qué se entrega</div>
-    <p class="detalle">Coevaluación, <em>issue</em>, bitácora y ejecutables reproducibles.</p>
+    <div class="titulo">Entrega de proyectos</div>
+    <p class="detalle">Coevaluación, documentos, bitácoray procedimiento.</p>
   </a>
 
   <a href="#sec-rubricas" class="tarjeta-recurso">
@@ -56,20 +56,14 @@ toc-depth: 2
     <p class="detalle">Todo el código R de cada unidad, en ficheros <code>.R</code> listos para ejecutar.</p>
   </a>
 
-  <a href="#sec-referencias" class="tarjeta-recurso">
-    <div class="numero">7</div>
-    <div class="titulo">Referencias</div>
-    <p class="detalle">La bibliografía de cada caso y la lista global del curso.</p>
-  </a>
-
   <a href="#sec-repo-equipo" class="tarjeta-recurso">
-    <div class="numero">8</div>
+    <div class="numero">7</div>
     <div class="titulo">Repositorio de tu equipo</div>
     <p class="detalle">La plantilla de GitHub desde la que se crea el repositorio de cada proyecto.</p>
   </a>
 
   <a href="#sec-consultas" class="tarjeta-recurso">
-    <div class="numero">9</div>
+    <div class="numero">8</div>
     <div class="titulo">Consultas</div>
     <p class="detalle">El canal abierto para dudas y tutorías: chat y correo de Google.</p>
   </a>
@@ -79,8 +73,39 @@ toc-depth: 2
 
 ## 1 · Registro en GitHub y equipos {#sec-registro}
 
-Antes de empezar el primer proyecto, cada estudiante se registra y declara la composición de su
-equipo. De este formulario salen los repositorios de trabajo que el profesorado crea y comparte.
+Durante la primera semana de clase has de hacer dos tareas:
+
+1. Registrarte en GitHub (si no lo hiciste antes).
+2. Constituir tu equipo y darle nombre, eligiendo de entre los nombres de la tabla, sin repetir: el primero que lo comunique se lo queda.
+
+El nombre no es solo decorativo. **El numeral que lo precede indica qué banco de datos os corresponde** en las tareas de evaluación: el equipo `07-Cox` trabajará con el banco de datos 07, el equipo `13-Lambert` con el 13, y así sucesivamente. Ese nombre identificará también vuestro repositorio e informes/presentaciones entregables. 
+
+Cada epónimo corresponde a una persona o aportación que ha dejado huella en los modelos lineales generalizados y el análisis de supervivencia. Merece la pena leer la columna de la derecha antes de elegir: muchos de estos nombres reaparecerán a lo largo del curso.
+
+| Equipo | Epónimo |
+|:---|:-------------------------|
+| 01-Akaike | Hirotugu Akaike: el AIC (1974), que penaliza la verosimilitud por el número de parámetros. |
+| 02-Anscombe | Francis Anscombe: sus residuos son los que normalizan el diagnóstico cuando la respuesta no es normal. |
+| 03-Berkson | Joseph Berkson acuñó «logit» en 1944, por analogía explícita con el probit de Bliss. |
+| 04-Bliss | Chester Bliss acuñó «probit» en 1934, estudiando el porcentaje de plaga eliminada por un insecticida. |
+| 05-Bortkiewicz | Las coces de caballo del ejército prusiano (1898): la primera comprobación empírica seria de la Poisson. |
+| 06-Cornfield | Jerome Cornfield conectó la odds ratio de un estudio de casos y controles con el riesgo relativo. |
+| 07-Cox | David Cox: el análisis de datos binarios (1970) y los riesgos proporcionales (1972). |
+| 08-Firth | David Firth: la corrección por sesgo que resuelve la separación perfecta en regresión logística. |
+| 09-Fisher | Ronald Fisher: familia exponencial, máxima verosimilitud y el scoring que ejecuta `glm()` por dentro. |
+| 10-Greenwood–Yule | Mostraron en 1920 que si cada persona tiene su propia tasa Poisson, el colectivo sigue una binomial negativa. |
+| 11-Kaplan–Meier | El estimador producto-límite (1958): cómo estimar supervivencia cuando hay observaciones censuradas. |
+| 12-Laird–Ware | Nan Laird y James Ware formularon en 1982 el modelo de efectos aleatorios para datos longitudinales. |
+| 13-Lambert | Diane Lambert introdujo el Poisson inflado de ceros (1992), estudiando defectos de fabricación. |
+| 14-Liang–Zeger | Las ecuaciones de estimación generalizadas: correlación intraindividuo sin modelarla del todo. |
+| 15-McCullagh | Peter McCullagh, coautor con Nelder del libro que fijó el lenguaje del área (2.ª ed., 1989). |
+| 16-Nelder | John Nelder, coautor del artículo que unificó la familia (Nelder y Wedderburn, 1972). |
+| 17-Tibshirani | Robert Tibshirani: el lasso (1996) y, con Hastie y Friedman, `glmnet`. |
+| 18-Wald | Abraham Wald: el contraste que `summary(glm)` imprime junto a cada coeficiente. |
+| 19-Wedderburn | Robert Wedderburn, el otro coautor de 1972 y autor de la cuasiverosimilitud (1974). Murió a los 28 años. |
+| 20-Youden | El índice J de Youden resume sensibilidad y especificidad, y fija el punto de corte de una curva ROC. |
+
+Si ya lo tienes todo, registra la información en el siguiente FORMULARIO:
 
 ```{=html}
 <div class="fila-boton-grande">
@@ -103,7 +128,9 @@ Recomendaciones para redactar los tres formatos de informe y para construir pres
 
 → [`evaluacion/guias`](https://github.com/asunmayoral/GLM/tree/master/evaluacion/guias)
 
-## 3 · Planificación y entregas {#sec-planificacion}
+## 3 · Seguimiento y Planificación {#sec-planificacion}
+
+El **seguimiento de la evaluación** continua lo puedes consultar en este [documento](https://docs.google.com/spreadsheets/d/1Zp9MysAQuILsoYom_RS0VimDu6P5vZiZrqrXPhgvRhQ/edit?usp=sharing). La **planificación** del curso viene dada en la siguiente tabla, junto con el acceso a los bancos de datos a utilizar en cada proyecto por los equipos (utilizar el numeral del equipo):
 
 | Proyecto | Formato informe | Datos | Entrega | Exposiciones | Defensas |
 |:--|:--|:--|:--:|:--:|:--:|
@@ -119,27 +146,46 @@ distintas (frecuencia en el 2, coste y duración en el 3).
 Las **defensas** son individuales, se celebran en sesión de tutoría dentro del periodo indicado y
 duran de 10 a 12 minutos.
 
-## 4 · Qué se entrega en cada proyecto {#sec-entrega}
+## 4 · Entrega de proyectos {#sec-entrega}
 
-1. **Registro de la coevaluación 360**, individual y confidencial, a través del formulario:
-   [https://forms.gle/94sH2AjH3RzFpmN57](https://forms.gle/94sH2AjH3RzFpmN57)
+La entrega son **cuatro pasos, en este orden**. Los tres primeros los puede asumir el coordinador; el
+cuarto ha de hacerlo cada miembro por separado.
 
-2. ***Issue* desde GitHub**, que abre el coordinador con los enlaces al informe y a la presentación.
-   El formato exacto del issue, los archivos que hay que subir y cómo obtener cada enlace están
-   especificados en la **Guía GitHub del Estudiante**, apartado 9.3 →
-   [`README_github_estudiante.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/README_github_estudiante.md)
+1. **Renderizar informe y presentación.** Del `informe.qmd` —reproducible, comentado y con semilla
+   fija— se obtiene el informe en **HTML y PDF**. La presentación, en **PDF**; si es interactiva, se
+   añade la **URL original**, porque el PDF no conserva la interacción.
 
-3. **Bitácora**, cumplimentada semanalmente por el coordinador del equipo en el repositorio del equipo y
-   cerrada con el bloque de entrega (ver muestra) →
+2. **Cerrar la bitácora.** El coordinador rellena su último tramo con los entregables, **en el mismo
+   formato que el *issue*** del paso 3, para poder componerlo copiando lo ya escrito. →
    [`bitacora.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/bitacora.md)
 
-4. **Ejecutables `.qmd` reproducibles y comentados, con semilla fija**, y en particular el
-   `informe.qmd` con el que se confecciona el informe.
+3. **Abrir el *issue* de entrega** en el repositorio del equipo, con los enlaces al informe y a la
+   presentación. Formato exacto y cómo obtener cada enlace: **Guía GitHub del Estudiante, apartado
+   9.3** →
+   [`README_github_estudiante.md`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/GitHub/README_github_estudiante.md)
+
+4. **Registrar la coevaluación 360**, individual y confidencial: autoevaluación más evaluación del
+   resto del equipo. No lo centraliza el coordinador.
+
+```{=html}
+<div class="fila-boton-grande">
+  <a href="https://forms.gle/94sH2AjH3RzFpmN57" class="boton-grande"
+     target="_blank" rel="noopener">FORMULARIO DE COEVALUACIÓN 360</a>
+</div>
+```
+
+La entrega está completa cuando existan el *issue* **y todos** los registros individuales de
+coevaluación.
+
+::: {.callout-important}
+## Evidencias de trabajo
+Es importante que dentro del repositorio queden evidencias del trabajo desarrollado por cada integrante del equipo, aunque ya lo haya consignado el/la coordinador/a en la bitácora. Los *commits* en los documentos tienen información valiosa a la hora de poder reclamar mejores valoraciones en la coevaluación, por lo que es importante trabajar en Github siguiendo las indicaciones en el documento README del repositorio.
+:::
 
 ## 5 · Rúbricas de evaluación {#sec-rubricas}
 
 Los criterios y pesos con los que se corrigen el informe, la exposición, la defensa individual y el
-examen final.
+examen final están publicados en 
 
 → [`Rubricas_evaluacion.xlsx`](https://github.com/asunmayoral/GLM/blob/master/evaluacion/Rubricas_evaluacion.xlsx)
 
@@ -169,26 +215,7 @@ introduce cada función:
 Ojo: estos scripts ejecutan los **datos de la teoría**, no los de tu equipo. Para el proyecto
 trabajas con la carpeta de tu equipo (apartado 3).
 
-## 7 · Referencias {#sec-referencias}
-
-La bibliografía del curso funciona en dos niveles. **Cada caso cierra con sus propias referencias**,
-las de la teoría y los métodos que allí se trabajan; y **la página de Referencias reúne la lista
-global**, con todas las fuentes citadas en los tres casos —teoría, métodos y paquetes de R—, en
-formato APA 7.ª.
-
-| Dónde | Qué recoge |
-|:--|:--|
-| [**Referencias del Caso 1**](caso1/caso1_binaria.qmd#sec-refs1) | Respuestas binarias y politómicas, evaluación de clasificadores, supervivencia en tiempo discreto |
-| [**Referencias del Caso 2**](caso2/caso2_conteos.qmd#sec-refs2) | Conteos y tasas, log-lineales, sobredispersión, exceso de ceros, GLMM |
-| [**Referencias del Caso 3**](caso3/caso3_continuas_positivas.qmd#sec-refs3) | Continuas positivas, Gamma e inversa gaussiana, Tweedie, AFT y Cox |
-| [**Referencias del curso**](referencias.qmd) | La lista completa, común a los tres casos |
-
-: Bibliografía por caso y lista global. {.striped .hover tbl-colwidths="[34,66]"}
-
-Las citas del texto, de la forma (Autor, año), remiten siempre a esa lista global. Úsala también como
-punto de partida para las referencias de tus informes: se te pide APA 7.ª, el mismo formato.
-
-## 8 · Repositorio de tu equipo {#sec-repo-equipo}
+## 7 · Repositorio de tu equipo {#sec-repo-equipo}
 
 El trabajo de cada proyecto vive en un repositorio de GitHub propio del equipo, creado a partir de
 esta **plantilla**:
@@ -200,7 +227,7 @@ esta **plantilla**:
 </div>
 ```
 
-La plantilla trae dos ficheros, y conviene leer el primero **antes** de empezar:
+La plantilla trae dos ficheros, además de las plantillas de informe, y conviene leer el primero **antes** de empezar:
 
 - [**`README_github_estudiante.md`**](https://github.com/GLM-2026/proy-plantilla/blob/main/README_github_estudiante.md)
   — la guía completa: cómo se usa GitHub en la asignatura, cómo se organiza el desarrollo del
@@ -211,13 +238,13 @@ La plantilla trae dos ficheros, y conviene leer el primero **antes** de empezar:
 
 ::: {.callout-important}
 ## Un repositorio distinto por proyecto
-La **coordinación rota**: cada proyecto tiene un coordinador diferente, así que **se crea un
+Cada proyecto tiene un coordinador diferente, así que **se crea un
 repositorio nuevo para cada uno de los tres proyectos** a partir de esta misma plantilla. No
 reutilicéis el del proyecto anterior: la bitácora, el informe y el *issue* de entrega son los de ese
 proyecto y los firma su coordinador.
 :::
 
-## 9 · Consultas {#sec-consultas}
+## 8 · Consultas {#sec-consultas}
 
 Para dudas sobre la teoría, el código o el proyecto, y para concertar tutoría, el canal es el chat y
 el correo de Google:
