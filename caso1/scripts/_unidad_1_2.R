@@ -37,7 +37,7 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", GGally = "2.4.0", MASS = "7.3.65", MuMIn = "1.48.19",
   aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13", car = "3.1.5",
-  dplyr = "1.2.1", emmeans = "2.0.3", ggeffects = "2.3.2", logistf = "1.26.1",
+  dplyr = "1.2.1", logistf = "1.26.1",
   marginaleffects = "0.32.0", pROC = "1.19.0.1", patchwork = "1.3.2",
   performance = "0.17.0", readr = "2.2.0", scales = "1.4.0", see = "0.14.0",
   sessioninfo = "1.2.4", tidyverse = "2.0.0", yardstick = "1.4.0")
@@ -100,8 +100,6 @@ head(cohorte)
 library(marginaleffects)   # efectos marginales / predicciones (Arel-Bundock et al., 2024)
 library(car)               # Anova tipo II/III (Fox & Weisberg, 2019)
 library(pROC)              # curva ROC y AUC (Robin et al., 2011)
-library(emmeans)           # medias marginales estimadas
-library(ggeffects)         # predicciones para graficar
 library(MASS)              # confint por perfil, stepAIC (recommended package)
 
 # Recuperamos el ajuste de 1.1 por si esta unidad se compila aislada:
@@ -249,6 +247,17 @@ g_no  <- transform(glow, priorfrac = factor("No",  levels = levels(glow$priorfra
 
 mean(predict(fit_glm, g_yes, type = "response") -
      predict(fit_glm, g_no,  type = "response"))   # = AME de priorfrac
+
+# -----------------------------------------------------------------------------
+# [u12-ame-factor-mfx]  ·  Odds ratio y riesgo relativo > Interpretación en la escala de la probabilidad: efectos marginales
+# -----------------------------------------------------------------------------
+# Probabilidad media en cada mundo contrafactual
+avg_predictions(fit_glm, by = "priorfrac",
+                newdata = datagrid(priorfrac = c("No", "Yes"),
+                                   grid_type = "counterfactual"))
+
+# Su diferencia es el AME, ahora con error estándar e intervalo
+avg_comparisons(fit_glm, variables = "priorfrac")
 
 # -----------------------------------------------------------------------------
 # [fig-u12-dos-escalas]  ·  Odds ratio y riesgo relativo > Interpretación en la escala de la probabilidad: efectos marginales

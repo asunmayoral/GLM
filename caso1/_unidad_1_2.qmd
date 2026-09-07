@@ -2,7 +2,7 @@
      Chunks prefijados u12-. Hereda de la madre: glow, fractura01, fit_glm
      (glm(fracture ~ age + priorfrac, binomial)), y la pila base (tidyverse,
      broom, performance, DHARMa, arm, see, patchwork). Esta unidad carga además
-     marginaleffects, car, pROC, emmeans, ggeffects, MASS. -->
+     marginaleffects, car, pROC, MASS. -->
 
 # 2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación {#sec-u12}
 
@@ -38,8 +38,6 @@ RA implicados:
 library(marginaleffects)   # efectos marginales / predicciones (Arel-Bundock et al., 2024)
 library(car)               # Anova tipo II/III (Fox & Weisberg, 2019)
 library(pROC)              # curva ROC y AUC (Robin et al., 2011)
-library(emmeans)           # medias marginales estimadas
-library(ggeffects)         # predicciones para graficar
 library(MASS)              # confint por perfil, stepAIC (recommended package)
 
 # Recuperamos el ajuste de 1.1 por si esta unidad se compila aislada:
@@ -465,7 +463,7 @@ En GLOW, el AME de `age` es ≈ **0,007**: unos **0,7 puntos porcentuales de rie
 
 **¿De dónde sale ese número?** 
 
-Para calcular el AME o efecto medio marginal asociado a un predictor continuo $x_k$ (con coeficiente $\beta_k$ en el predictor lineal), se considera el efecto de cada individuo a través de la pendiente de su propia curva, y dado que la derivada del logit es $\mu(1-\mu)$, esta pendiente es:
+Para calcular el AME o efecto medio marginal asociado a un predictor continuo $x_k$ (con coeficiente $\beta_k$ en el predictor lineal), se considera el efecto de cada individuo a través de la pendiente de su propia curva, y dado que la derivada de la función logística —el enlace inverso— es $d\mu/d\eta=\mu(1-\mu)$, esta pendiente es:
 $$\frac{\partial\mu_i}{\partial x_k}=\hat\pi_i(1-\hat\pi_i)\,\beta_k.$$
 El AME es el promedio sobre las pendientes para las $n$ personas observadas: literalmente, el
 coeficiente por la pendiente media de la sigmoide.
@@ -500,8 +498,25 @@ mean(predict(fit_glm, g_yes, type = "response") -
      predict(fit_glm, g_no,  type = "response"))   # = AME de priorfrac
 ```
 
+`marginaleffects` empaqueta esa misma operación. La rejilla `grid_type = "counterfactual"` es la
+versión automática de `g_yes` y `g_no`: replica el banco completo en cada nivel de `priorfrac`
+dejando `age` en el valor observado de cada sujeto, de modo que **cada individuo se compara
+consigo mismo**.
+
+```{r}
+#| label: u12-ame-factor-mfx
+# Probabilidad media en cada mundo contrafactual
+avg_predictions(fit_glm, by = "priorfrac",
+                newdata = datagrid(priorfrac = c("No", "Yes"),
+                                   grid_type = "counterfactual"))
+
+# Su diferencia es el AME, ahora con error estándar e intervalo
+avg_comparisons(fit_glm, variables = "priorfrac")
+```
+
 El AME en probabilidad es, además, **casi invariante al enlace** (los tres ajustes lo dan
-parecido pese a coeficientes distintos) y se prefiere frente a otros indicadore por promediar sobre la población observada [@arelbundock2024]. En una frase: 
+parecido pese a coeficientes distintos) y se prefiere frente a otros indicadores por promediar sobre la población observada [@arelbundock2024]. En una frase: 
+
 >El **OR** comunica la fuerza del efecto; el **AME**, su impacto absoluto en probabilidad.
 
 
@@ -570,9 +585,14 @@ Tres escalas de lectura, cada una con su herramienta:
 - **Probabilidades predichas** — `predict(m, newdata, type = "response")` da $\hat\pi$; con
   `type = "link", se.fit = TRUE` se obtiene $\hat\eta$ y su error, y el IC se construye en la escala del
   enlace y **se pasa por la sigmoide** (`plogis`) —nunca sumando ± en probabilidad—.
-- **Efecto marginal medio (AME)** — `marginaleffects::avg_slopes(m)`: el efecto en **puntos de
-  probabilidad**, casi invariante al enlace. `marginaleffects::predictions()` / `emmeans` dan
-  probabilidades por perfil. El **OR** comunica la fuerza del efecto; el **AME**, su impacto absoluto.
+- **Efecto marginal medio (AME)** — el efecto en **puntos de probabilidad**, casi invariante al
+  enlace. Dos funciones según lo que se promedie: `marginaleffects::avg_slopes(m)` promedia
+  **pendientes** $\partial\hat\pi_i/\partial x_k$ (covariables continuas) y
+  `marginaleffects::avg_comparisons(m)` promedia **diferencias contrafactuales** entre niveles
+  (factores). Para ver por separado la probabilidad media de cada mundo contrafactual:
+  `avg_predictions(m, by = "f", newdata = datagrid(f = c(...), grid_type = "counterfactual"))`,
+  que replica el banco entero en cada nivel de `f` sin tocar el resto de covariables.
+  El **OR** comunica la fuerza del efecto; el **AME**, su impacto absoluto.
 ::::
 
 ## 2.4 Estimación: máxima verosimilitud e IWLS {#sec-u12-iwls}
