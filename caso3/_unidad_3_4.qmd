@@ -1829,7 +1829,7 @@ round(c(prevision      = sum(cond),
 
 Que la media simulada reproduzca la previsión es la comprobación de que la simulación es fiel
 al modelo. Lo nuevo es lo demás: el gasto real del parque caerá, con un 90 % de confianza, en
-una banda de en torno al **±9 %** alrededor de la previsión. Y si la dirección quiere una
+una banda de algo menos del **±10 %** alrededor de la previsión. Y si la dirección quiere una
 partida que se quede corta solo uno de cada diez años, la cifra a dotar no es la previsión sino
 el **percentil 90**.
 
