@@ -79,6 +79,13 @@ format:
      los dos archivos que se entregan. El HTML es autocontenido
      ("embed-resources: true"), sin carpeta informe_files/.
 
+     OJO: el botón "Render" de RStudio genera SOLO el primer formato
+     declarado en el YAML, que aquí es el HTML. Si lo usas, el PDF no
+     aparece y no es que algo falle. Para obtener los dos, ejecuta el
+     comando anterior en la pestaña Terminal de RStudio (junto a
+     Console), o despliega la flecha que hay al lado de "Render" y
+     elige el formato.
+
      Para el PDF hace falta LaTeX, que se instala UNA sola vez con
      "quarto install tinytex" (ver apartado 5.9.1 de la Guía GitHub
      del Estudiante). Si aún no lo tienes, el render deja hecho el
@@ -121,6 +128,11 @@ format:
 # library(broom)          # tidy() de modelos
 # library(marginaleffects); library(emmeans); library(ggeffects)
 # library(car); library(DHARMa); library(performance); library(pROC)
+
+# ¿Te falta alguno? Instálalo UNA vez (descomenta y ejecuta en la consola,
+# no al renderizar):
+# install.packages(c("tidyverse", "broom", "marginaleffects", "emmeans",
+#                    "ggeffects", "car", "DHARMa", "performance", "pROC", "here"))
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 

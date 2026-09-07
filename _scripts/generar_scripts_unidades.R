@@ -18,8 +18,8 @@
 #    · localiza el documento maestro (el .qmd que no empieza por `_unidad_`);
 #    · toma como PREÁMBULO todos los chunks del maestro anteriores al primer
 #      `{{< include ... >}}` —es decir, setup de librerías y carga de datos—,
-#      reescribiendo las rutas relativas `source("R/x.R")` para que funcionen
-#      desde cualquier carpeta;
+#      traduciendo el acceso local a datos (`source("R/x.R")`, `cargar_*()`) a
+#      descargas del repositorio, para que el script funcione esté donde esté;
 #    · respeta la convención de nombres ya existente en `casoC/scripts/`
 #      (con o sin guion bajo inicial), para no crear duplicados.
 #
@@ -33,7 +33,9 @@ generar_scripts <- function(casos = NULL,
                             excluir = character(0),
                             simular = FALSE,
                             maestro_tambien = TRUE,
-                            raiz = NULL) {
+                            raiz = NULL,
+                            GLM_REPO = "https://raw.githubusercontent.com/asunmayoral/GLM",
+                            GLM_REF  = "master") {
 
   # ---- 1 · Raíz del proyecto (independiente del directorio de trabajo) ------
   if (is.null(raiz)) {
@@ -57,18 +59,154 @@ generar_scripts <- function(casos = NULL,
     trimws(x)
   }
 
-  # ---- Utilidades compartidas ----------------------------------------------
-  # Reescribe source("R/x.R") -> source(file.path(.raiz, "casoC", "R", "x.R"))
-  reescribe_rutas <- function(lineas, cs) {
-    vapply(lineas, function(x) {
-      m <- regmatches(x, regexec('source\\("R/([^"]+)"\\)', x))[[1]]
-      if (length(m) == 2L) {
-        partes <- strsplit(m[2], "/", fixed = TRUE)[[1]]
-        sub(m[1], sprintf('source(file.path(.raiz, "caso%s", "R", %s))',
-                          cs, paste0('"', partes, '"', collapse = ", ")),
-            x, fixed = TRUE)
-      } else x
+  # ---- Cabecera de acceso al repositorio (idéntica en todos los scripts) -----
+  # Los scripts .R no dependen de dónde estén guardados ni de que el proyecto
+  # esté abierto: descargan datos y DGP del repositorio. Antes localizaban la
+  # raíz con getwd(), y al abrir el fichero fuera del proyecto el bucle subía
+  # hasta "/" y las rutas quedaban como "//caso1/R/...".
+  cabecera_github <- c(
+    "# --- Datos y funciones del curso, servidos desde GitHub ----------------------",
+    "# El script es autónomo: no hace falta clonar el repositorio ni abrir GLM.Rproj,",
+    "# y no depende de en qué carpeta del ordenador esté guardado. Solo necesita",
+    "# conexión a internet. GLM_REF es la rama o etiqueta del repositorio que se lee.",
+    sprintf('GLM_REPO <- "%s"', GLM_REPO),
+    sprintf('GLM_REF  <- "%s"', GLM_REF),
+    "",
+    "#' URL de un fichero del repositorio, a partir de su ruta dentro del proyecto.",
+    'url_glm <- function(ruta) paste(GLM_REPO, GLM_REF, ruta, sep = "/")',
+    "",
+    "#' Lee un .rds del repositorio. gzcon() descomprime al vuelo lo que saveRDS()",
+    "#' comprimió: sin él, readRDS() no reconoce el flujo que llega por http.",
+    "leer_datos_glm <- function(ruta) {",
+    '  con <- gzcon(url(url_glm(ruta), open = "rb"))',
+    "  on.exit(close(con))",
+    "  readRDS(con)",
+    "}")
+
+  # ---- Reproducibilidad (index.qmd §10) -------------------------------------
+  # Entorno con el que se preparó el material. Se rellena a mano ejecutando
+  # R.version.string y packageVersion() sobre la máquina de referencia: son
+  # cifras medidas, no supuestas. Al actualizar paquetes, actualizar aquí.
+  PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
+  VERSIONES <- c(
+    AER = "1.2.17", aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13",
+    broom.mixed = "0.2.9.7", car = "3.1.5", DHARMa = "0.5.0", dplyr = "1.2.1",
+    emmeans = "2.0.3", flexsurv = "2.3.2", forcats = "1.0.1", GGally = "2.4.0",
+    ggeffects = "2.3.2", ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
+    lme4 = "2.0.1", logistf = "1.26.1", marginaleffects = "0.32.0",
+    MASS = "7.3.65", MuMIn = "1.48.19", nnet = "7.3.20", patchwork = "1.3.2",
+    performance = "0.17.0", pROC = "1.19.0.1", pscl = "1.5.9", purrr = "1.2.2",
+    readr = "2.2.0", rsample = "1.3.2", scales = "1.4.0", see = "0.14.0",
+    sessioninfo = "1.2.4",
+    survival = "3.8.6", survminer = "0.5.2", tibble = "3.3.1", tidyr = "1.3.2",
+    tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6", yardstick = "1.4.0")
+
+  # Quita los comentarios respetando las comillas, para no confundir un paquete
+  # citado en un comentario (`# o brglm2::brglm_fit`) con una dependencia real.
+  sin_comentarios <- function(lineas) {
+    vapply(lineas, function(l) {
+      ch <- strsplit(l, "", fixed = TRUE)[[1]]
+      q <- ""; fin <- length(ch)
+      for (k in seq_along(ch)) {
+        if (nzchar(q)) { if (ch[k] == q) q <- "" }
+        else if (ch[k] %in% c('"', "'")) q <- ch[k]
+        else if (ch[k] == "#") { fin <- k - 1L; break }
+      }
+      if (fin < 1L) "" else paste(ch[seq_len(fin)], collapse = "")
     }, character(1), USE.NAMES = FALSE)
+  }
+
+  paquetes_de <- function(lineas) {
+    txt <- sin_comentarios(lineas)
+    m1 <- unlist(regmatches(txt, gregexpr(
+      '(?:library|require|requireNamespace)\\(\\s*"?[A-Za-z][A-Za-z0-9._]*', txt, perl = TRUE)))
+    m1 <- sub('^[A-Za-z]+\\(\\s*"?', "", m1)
+    m2 <- unlist(regmatches(txt, gregexpr(
+      '[A-Za-z][A-Za-z0-9._]*(?=::)', txt, perl = TRUE)))
+    base_r <- c("stats", "utils", "graphics", "grDevices", "methods", "datasets",
+                "base", "tools", "parallel", "compiler", "splines", "grid")
+    # radix: orden independiente de la configuración regional, para que el
+    # fichero generado no cambie según la locale de quien ejecuta el generador.
+    sort(setdiff(unique(c(m1, m2)), base_r), method = "radix")
+  }
+
+  # Empaqueta los pares `nombre = "version"` en líneas de ancho legible.
+  envuelve <- function(pares, sangria) {
+    out <- character(0); linea <- ""
+    for (p in pares) {
+      cand <- if (nzchar(linea)) paste0(linea, " ", p) else paste0(sangria, p)
+      if (nchar(cand) > 78 && nzchar(linea)) { out <- c(out, linea); linea <- paste0(sangria, p) }
+      else linea <- cand
+    }
+    c(out, linea)
+  }
+
+  bloque_reproducibilidad <- function(codigo, unidad) {
+    # sessioninfo no aparece en el código de la unidad: lo usa el cierre del
+    # script, así que entra en la lista para que la comprobación lo cubra.
+    paq <- sort(unique(c(paquetes_de(codigo), "sessioninfo")), method = "radix")
+    fuera <- setdiff(paq, names(VERSIONES))
+    if (length(fuera))
+      warning(unidad, ": paquetes sin versión registrada en VERSIONES -> ",
+              paste(fuera, collapse = ", "), ". Añádelos y vuelve a generar.")
+    paq <- intersect(paq, names(VERSIONES))
+    pares <- sprintf('%s = "%s",', paq, VERSIONES[paq])
+    pares[length(pares)] <- sub(",$", ")", pares[length(pares)])
+    c("# --- Reproducibilidad (ver index.qmd §10) -----------------------------------",
+      "# Paquetes que usa esta unidad, con la versión con la que se preparó el",
+      "# material. Si te falta alguno el script lo dice ahora, en vez de fallar a",
+      "# mitad de un ajuste; si tu versión difiere, avisa y sigue.",
+      sprintf('PROBADO_R <- "%s"', PROBADO_R),
+      "PAQUETES  <- c(",
+      envuelve(pares, "  "),
+      'message("Material preparado con ", PROBADO_R)',
+      "",
+      '.falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]',
+      "if (length(.falta))",
+      '  stop("Faltan paquetes: ", paste(.falta, collapse = ", "),',
+      '       ". Instálalos con install.packages() y vuelve a ejecutar.")',
+      "",
+      '.instalada <- vapply(names(PAQUETES), function(p) as.character(packageVersion(p)), character(1))',
+      ".otra <- names(PAQUETES)[.instalada != PAQUETES]",
+      "if (length(.otra))",
+      '  message("Versiones distintas a las probadas:\\n  ",',
+      '          paste(sprintf("%s: tienes %s, probado %s", .otra, .instalada[.otra], PAQUETES[.otra]),',
+      '                collapse = "\\n  "))',
+      "rm(.falta, .instalada, .otra)")
+  }
+
+  bloque_entorno <- c(
+    "# --- Entorno de ejecución (index.qmd §10.3) ---------------------------------",
+    "# Todo trabajo del curso cierra dejando constancia de con qué se ejecutó.",
+    "# session_info() añade a sessionInfo() la fecha y la procedencia de cada",
+    "# paquete, que es lo que hace falta para reinstalar exactamente estas versiones.",
+    "sessioninfo::session_info()")
+
+  # ---- Utilidades compartidas ----------------------------------------------
+  # De rutas locales a URLs del repositorio. Los .qmd leen de la carpeta local
+  # (render rápido y sin red); los .R son autónomos y descargan. `ruta` debe
+  # coincidir con el .rds versionado en caso*/datos/.
+  datos_caso <- list(
+    `1` = c(patron = "cargar_cohorte\\(\\)",
+            ruta   = "caso1/datos/cohorte_20252026.rds",
+            nota   = "cohorte simulada del curso"),
+    `2` = c(patron = "cargar_cartera\\(\"auto\"\\)",
+            ruta   = "caso2/datos/cartera_auto_20252026.rds",
+            nota   = "cartera de auto del curso"),
+    `3` = c(patron = "cargar_averias\\(\\)",
+            ruta   = "caso3/datos/banco_averias_20252026.rds",
+            nota   = "banco de averías del curso"))
+
+  reescribe_rutas <- function(lineas, cs) {
+    lineas <- sub('source\\("R/([^"]+)"\\)\\s*(#.*)?$',
+                  sprintf('source(url_glm("caso%s/R/\\1"))   # funciones del proceso generador', cs),
+                  lineas)
+    d <- datos_caso[[as.character(cs)]]
+    if (!is.null(d))
+      lineas <- sub(paste0(d[["patron"]], "\\s*(#.*)?$"),
+                    sprintf('leer_datos_glm("%s")   # %s', d[["ruta"]], d[["nota"]]),
+                    lineas)
+    lineas
   }
 
   recorta <- function(x) {                     # quita blancos al principio y al final
@@ -198,11 +336,13 @@ generar_scripts <- function(casos = NULL,
                  "# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:",
                  "# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.",
                  paste0("# ", strrep("=", 77)), "",
-                 ".raiz <- getwd()",
-                 'while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)',
-                 'if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")',
+                 cabecera_github,
                  "",
-                 ex$bloques)
+                 bloque_reproducibilidad(ex$bloques, sprintf("caso%s maestro", cs)),
+                 "",
+                 ex$bloques,
+                 "",
+                 bloque_entorno)
         accion <- if (file.exists(dest_m)) "sobrescrito" else "creado"
         if (!simular) writeLines(out, dest_m)
         resumen <- rbind(resumen, data.frame(caso = cs, unidad = "maestro", chunks = ex$n,
@@ -241,12 +381,12 @@ generar_scripts <- function(casos = NULL,
                "# GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:",
                "# no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.",
                "#",
-               "# EJECUCIÓN: funciona desde CUALQUIER carpeta dentro del proyecto GLM;",
-               "# localiza la raíz por _quarto.yml y resuelve solo las rutas de datos.",
+               "# EJECUCIÓN: autónomo. Guárdalo donde quieras y ejecútalo; los datos y los",
+               "# ficheros del proceso generador se descargan del repositorio del curso.",
                paste0("# ", strrep("=", 77)), "",
-               ".raiz <- getwd()",
-               'while (!file.exists(file.path(.raiz, "_quarto.yml")) && dirname(.raiz) != .raiz) .raiz <- dirname(.raiz)',
-               'if (!file.exists(file.path(.raiz, "_quarto.yml"))) stop("Abre el proyecto GLM: no encuentro _quarto.yml.")',
+               cabecera_github,
+               "",
+               bloque_reproducibilidad(c(pre, ex$bloques), sprintf("unidad %s.%s", cs, u)),
                "",
                "# --- Preámbulo del caso (librerías y datos, como en el documento) ------------",
                pre, "",
@@ -254,6 +394,8 @@ generar_scripts <- function(casos = NULL,
 
       if (ex$n == 0L)
         out <- c(out, "# (Esta unidad no contiene chunks de código: es de encargo y evaluación.)")
+
+      out <- c(out, "", bloque_entorno)
 
       accion <- if (file.exists(dest)) "sobrescrito" else "creado"
       if (!simular) writeLines(out, dest)

@@ -1839,6 +1839,8 @@ de todo el apartado:
 ```{r}
 #| label: u34-re-predictiva-maquina
 i <- order(cond)[length(cond) %/% 2]                    # una máquina de previsión mediana
+
+set.seed(SEMILLA_CURSO)
 una <- rgamma(4000, shape = rpois(4000, lambda_i[i]) * alfa_re, scale = theta_i[i])
 
 round(c(prevision = cond[i], prob_cero_pct = mean(una == 0) * 100,
