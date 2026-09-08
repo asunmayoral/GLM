@@ -61,6 +61,80 @@ funciones conocidas [@mccullagh1989; @dobson2018]. Esta forma no es un capricho
 notacional: de ella se derivan, derivando la cumulante, los dos momentos que
 gobiernan todo el marco.
 
+### De la Bernoulli a la forma canónica
+
+Conviene ver el mecanismo en la distribución que nos ocupa. Para una respuesta
+binaria $Y\in\{0,1\}$ con $\mathbb{P}(Y=1)=\pi$ —en GLOW, $Y=1$ si hay fractura—
+la función de masa se escribe de forma compacta como
+
+$$
+f(y;\pi)=\pi^{\,y}(1-\pi)^{\,1-y},\qquad y\in\{0,1\},\ \pi\in(0,1),
+$$
+
+una expresión que vale a la vez para los dos casos posibles: sustituyendo $y=1$
+queda $\pi$ y sustituyendo $y=0$ queda $1-\pi$.
+
+Esta forma **no se parece** a la canónica: no hay exponencial, ni un parámetro
+natural a la vista. El camino para llevarla allí es mecánico y consta de tres pasos.
+
+**Paso 1. Pasar a la escala exponencial.** Todo producto de potencias es la
+exponencial de una suma de logaritmos:
+
+$$
+f(y;\pi)=\exp\Big\{\log\big(\pi^{\,y}(1-\pi)^{\,1-y}\big)\Big\}
+        =\exp\big\{y\log\pi+(1-y)\log(1-\pi)\big\}.
+$$
+
+**Paso 2. Aislar el término lineal en $y$.** La forma canónica exige que $y$
+aparezca multiplicando a un único parámetro. Agrupamos, pues, los términos en $y$:
+
+$$
+y\log\pi+(1-y)\log(1-\pi)
+= y\big[\log\pi-\log(1-\pi)\big]+\log(1-\pi)
+= y\,\underbrace{\log\frac{\pi}{1-\pi}}_{\textstyle \theta}+\log(1-\pi).
+$$
+
+Aquí aparece el primer resultado destacable: **el parámetro natural de la Bernoulli
+es el logit de $\pi$**, $\theta=\log\{\pi/(1-\pi)\}$. No lo hemos elegido; lo ha
+producido el álgebra al exigir que $y$ entre linealmente.
+
+**Paso 3. Reescribir el resto en términos de $\theta$.** El término $\log(1-\pi)$
+todavía está en la escala de $\pi$. Invertimos la relación anterior,
+
+$$
+\theta=\log\frac{\pi}{1-\pi}
+\;\Longleftrightarrow\;
+\pi=\frac{e^{\theta}}{1+e^{\theta}},
+\qquad\text{de donde}\qquad
+1-\pi=\frac{1}{1+e^{\theta}},
+$$
+
+y por tanto $\log(1-\pi)=-\log(1+e^{\theta})$. Sustituyendo:
+
+$$
+f(y;\theta)=\exp\Big\{y\,\theta-\log\big(1+e^{\theta}\big)\Big\}.
+$$
+
+Comparando término a término con la forma canónica quedan identificadas las cuatro
+piezas:
+
+| Pieza | Bernoulli |
+|:--|:--|
+| Parámetro natural $\theta$ | $\log\dfrac{\pi}{1-\pi}$  (el **logit**) |
+| Cumulante $b(\theta)$ | $\log\big(1+e^{\theta}\big)$ |
+| Dispersión $a(\phi)$ | $1$  (esto es, $\phi=1$: no hay escala libre) |
+| Término $c(y,\phi)$ | $0$ |
+
+: Piezas de la forma canónica para la Bernoulli {#tbl-bern-canonica}
+
+Dos lecturas que conviene retener. La primera: $a(\phi)=1$ dice que la Bernoulli
+**no tiene parámetro de dispersión que estimar** —volveremos sobre ello en el
+recuadro «¿Uno o dos parámetros?»—. La segunda, y más importante para lo que sigue:
+el parámetro natural resultó ser el logit, de modo que modelizar $\theta$ como
+combinación lineal de las covariables **es** ajustar una regresión logística. El
+enlace logit de la Unidad 1.1 no fue una elección afortunada, sino el enlace que la
+propia familia trae de fábrica; @sec-u12-enlace explota esa idea en general.
+
 ::: {.callout-note}
 ## Quién vive en esta familia (y para qué sirve)
 La misma forma canónica agrupa distribuciones muy distintas; cada una es la
@@ -98,6 +172,12 @@ media define la **función de varianza** $V(\mu)=b''(\theta(\mu))$. Esa $V(\mu)$
 la **huella digital** de cada familia: es lo que distingue una Bernoulli de una
 Poisson o una Gamma, y lo que en 1.1 «absorbía los problemas 2 y 3» de OLS
 (varianza no constante y error no normal).
+
+En la Bernoulli, con $b(\theta)=\log(1+e^{\theta})$, derivar dos veces devuelve
+$b'(\theta)=e^{\theta}/(1+e^{\theta})=\pi=\mu$ y
+$b''(\theta)=e^{\theta}/(1+e^{\theta})^{2}=\pi(1-\pi)$; es decir,
+$V(\mu)=\mu(1-\mu)$. Reaparece así, ahora **deducida**, la relación
+media–varianza que en 1.1 tuvimos que dar por buena.
 
 ::: {.callout-note}
 ## El otro factor de la varianza: $a(\phi)$ y los pesos a priori
@@ -215,7 +295,7 @@ $$
 
 :::: {.callout-tip}
 ## 🔧 En R. Especificar el enlace (logit, probit, cloglog)
-En R, la forma de especificar los distintos logit se hace a través del argumento `link={'logit','probit','cloglog'}`, o bien directamente como un argumento de la familia, `family={binomial("logit"), binomial("probit"), binomial("cloglog")}`.
+En R, la forma de especificar los distintos enlaces se hace a través del argumento `link={'logit','probit','cloglog'}`, o bien directamente como un argumento de la familia, `family={binomial("logit"), binomial("probit"), binomial("cloglog")}`.
 ::::
 
 ```{r}
@@ -300,7 +380,7 @@ los datos, lo que respalda quedarnos con el logit por interpretabilidad.
 
 **El enlace rompió la línea recta.** En OLS, $\beta$ era el cambio en la respuesta
 por cada unidad de $x$: una lectura directa. Aquí ya no. El modelo es lineal en el
-**predictor** $\eta=\beta_0+\beta x$, pero la respuesta es $\mu=g^{-1}(\eta)$, una
+**predictor** $\eta=\beta_0+\beta x$, pero la respuesta media es $\mu\equiv\pi=g^{-1}(\eta)$, una
 transformación **no lineal** de $\eta$. Por eso $\beta$ ya **no** mide el cambio en
 la probabilidad, sino el cambio en $\eta$: la misma diferencia en $x$ mueve mucho la
 probabilidad en el centro de la curva y casi nada en las colas. Para interpretar,
@@ -312,7 +392,7 @@ la escala del predictor lineal:
 
 Recordemos el modelo que estamos ajustando sobre GLOW:
 
-$$\pi = P(Y=1) \ \rightarrow \ logit(\pi)=\theta + \beta \cdot \text{age} + \gamma \cdot \mathbf{1}(\text{priorfrac}=\text{Yes})$$  
+$$\pi = P(Y=1) \ \rightarrow \ logit(\pi)=\beta_0 + \beta_1 \cdot \text{age} + \beta_2 \cdot \mathbf{I}_{\text{priorfrac}}$$
 
 
 ```{r}
@@ -328,30 +408,104 @@ escala?
 
 Aparecen en la ecuación los **odds y log-odds**, que provienen del enlace canónico de la Bernoulli. 
 
-- El *odds* de un suceso es su **ventaja**, la probabilidad de que ocurra frente a la de que no: un odds de 2 dice que el evento es el doble de probable que su ausencia.
+- El **odds** de un suceso es su **ventaja**, la probabilidad de que ocurra frente a la de que no: un odds de 2 dice que el evento es el doble de probable que su ausencia.
 $$\text{odds}(x)=\frac{\pi(x)}{1-\pi(x)}$$
-- Su logaritmo —el **log-odds** o *logit*— es precisamente el enlace canónico, y por tanto
-**es** el predictor lineal:
-$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\log.\text{odds}(x).$$
-La escala de los log.odds es donde viven los coeficientes y donde el modelo es una recta.
-$$ \log.\text{odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
+- Su logaritmo —el **log-odds** o **logit**— es precisamente el enlace canónico, y por tanto
+es el predictor lineal:
+$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\text{log-odds}(x).$$
+La escala de los log-odds es donde viven los coeficientes y donde el modelo es una recta.
+$$ \text{log-odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
+
 
 **Qué dice $\beta$ ahí, y el odds ratio:** 
 
-- Subir $x$ una unidad **suma** $\beta$ al log-odds: el efecto es **aditivo**
-$$\beta=\eta(x+1)-\eta(x) \rightarrow \log.odds(x+1)= \beta +\log.odds(x)$$
-- Al deshacer el logaritmo surge el **odds ratio** ($OR$), como un cociente de odds: 
-$$\beta=\log\frac{\text{odds}(x+1)}{\text{odds}(x)} = log(OR) \rightarrow OR=e^{\beta}$$
-de modo que el efecto en los **odds** es multiplicativo, y cada unidad de $x$ multiplica los odds por el odds ratio:
-$$\text{odds}(x+1)=e^{\eta(x)+\beta} = \text{odds}(x) \cdot e^{\beta}= \text{odds}(x) \cdot OR$$
+- Subir $x$ una unidad **suma** $\beta$ al log-odds: el efecto es **aditivo en los log-odds**.
+$$\beta=\eta(x+1)-\eta(x) \rightarrow \text{log-odds}(x+1)= \beta +\text{log-odds}(x)$$
+- Al deshacer el logaritmo surge la relación entre los *odds*:
+
+$$\beta=\log\frac{\text{odds}(x+1)}{\text{odds}(x)} \rightarrow \text{odds}(x+1)= \text{odds}(x) \cdot e^{\beta} $$
+de modo que el **efecto en los odds es multiplicativo**. El cociente de odds, **odds-ratio** resulta pues interpretado por el coeficiente exponenciado, 
+$$OR =\frac{\text{odds}(x+1)}{\text{odds}(x)} = e^{\beta}$$
+y así cada unidad adicional de $x$ multiplica los odds por el odds ratio:
+$$\text{odds}(x+1)= \text{odds}(x) \cdot OR$$
 
 
-Por eso, si bien el log-odds depende de $x$, el OR es un factor **constante** que aplica a toda la curva, y de ahí su interpretabilidad: cada movimiento de una unidad en $x$, sea cual sea el $x$, multiplica los odds por el mismo factor $e^{\beta}$. La relación entre el signo de los coeficientes, el OR y el efecto que genera en las probabilidades, es ahora más patente:
+Por eso, si bien el log-odds depende de $x$, el *odds-ratio* OR es un factor **constante** que aplica a toda la curva, y de ahí su interpretabilidad: cada movimiento de una unidad en $x$, sea cual sea el $x$, multiplica los odds por el mismo factor $e^{\beta}$. La relación entre el signo de los coeficientes, el OR y el efecto que genera en las probabilidades, es ahora más patente:
 
 - $\beta>0\Leftrightarrow\text{OR}>1$: aumenta la ventaja del evento;
-- $\beta<0\Leftrightarrow\text{OR}<1$: reduce la ventaja del evento. 
+- $\beta<0\Leftrightarrow\text{OR}<1$: reduce la ventaja del evento;
+- $\beta \approx 0\Leftrightarrow\text{OR}\approx 1$: ni aumenta ni reduce la ventaja del evento.
 
-La @fig-u12-tres-escalas lo resume. Utiliza los valores $\beta=1$ (en azul) y $\beta=-1$ (en rojo), y muestra el efecto de variar el predictor $x$ (en el eje X) sobre el log-odds, el odds y la probabilidad del evento. A la izquierda, el log-odds η = β₀ + βx identifica una recta cuya pendiente es β (efecto aditivo, constante). En el centro, se aprecia la curva exponencial del odds = e^η: cada unidad de x multiplica las odds por e^β. A la derecha, la relación entre el predictor x y la probabilidad = 1/(1+e^(−η)) viene representada en forma de S, creciente o decreciente, con efecto máximo en el centro y casi nulo en las colas. Esa no linealidad de la derecha es justo lo que impide leer β como un cambio de probabilidad.
+**Las tres escalas, sobre nuestro modelo.** Todo lo anterior se ve de golpe si
+escribimos las tres relaciones para el modelo de GLOW. Fijemos el antecedente de
+fractura previa en un valor, $\mathbf{I}_{\text{priorfrac}}=i$ con $i\in\{0,1\}$, y
+llamemos $a_i=\beta_0+\beta_2\,i$ al intercepto que le corresponde. Dejando variar
+solo la edad:
+
+$$
+\underbrace{\eta(\text{age})=a_i+\beta_1\,\text{age}}_{\textbf{log-odds}}
+\;\longrightarrow\;
+\underbrace{\text{odds}(\text{age})=e^{a_i}\big(e^{\beta_1}\big)^{\text{age}}}_{\textbf{odds}}
+\;\longrightarrow\;
+\underbrace{\pi(\text{age})=\frac{1}{1+e^{-(a_i+\beta_1\,\text{age})}}}_{\textbf{probabilidad}}
+$$
+
+Son **la misma información** escrita tres veces; lo que cambia es la forma que toma
+la relación con la edad, y de ahí los tres paneles de la @fig-u12-tres-escalas.
+
+**Panel izquierdo: una recta.** $\eta$ es lineal en la edad por construcción —es lo
+que impone el enlace—, con pendiente constante
+$$
+\frac{\mathrm{d}\eta}{\mathrm{d}\,\text{age}}=\beta_1 ,
+$$
+la misma a los 55 que a los 90 años. Cada año suma $\beta_1$ al log-odds, y el
+antecedente de fractura previa solo cambia el intercepto ($a_1-a_0=\beta_2$): dos
+rectas **paralelas**, nunca convergentes ni secantes.
+
+**Panel central: una exponencial.** Al deshacer el logaritmo, lo que era una suma
+pasa a ser un producto, y la edad entra como **exponente**:
+$$
+\frac{\text{odds}(\text{age}+1)}{\text{odds}(\text{age})}=e^{\beta_1},
+\qquad
+\frac{\mathrm{d}\,\text{odds}}{\mathrm{d}\,\text{age}}=\beta_1\;\text{odds}(\text{age}).
+$$
+El crecimiento es **proporcional al nivel ya alcanzado** —esa es la ecuación que
+define una exponencial—, de modo que la curva arranca casi plana y se dispara
+después. Nótese que $\text{odds}>0$ siempre: la exponencial nunca cruza el eje, y
+por eso el modelo no puede producir ventajas negativas. El antecedente actúa aquí
+como un **factor de escala** $e^{\beta_2}$, que estira la curva verticalmente.
+
+**Panel derecho: una S.** La probabilidad se obtiene comprimiendo los odds en
+$(0,1)$ mediante $\pi=\text{odds}/(1+\text{odds})$, y el resultado ya no es
+monótono en su *velocidad*:
+$$
+\frac{\mathrm{d}\pi}{\mathrm{d}\,\text{age}}=\beta_1\,\pi(\text{age})\big[1-\pi(\text{age})\big].
+$$
+Esta expresión explica por sí sola la forma en S. El efecto de un año de edad **no
+es constante**: es proporcional a $\pi(1-\pi)$, que vale casi cero cuando $\pi$ está
+cerca de 0 o de 1 —las colas— y alcanza su máximo, $\beta_1/4$, en $\pi=1/2$. Ese
+punto medio es el **punto de inflexión** de la S, y ocurre exactamente donde el
+predictor lineal se anula:
+$$
+\pi(\text{age})=\tfrac12
+\iff \eta(\text{age})=0
+\iff \text{age}=-\frac{a_i}{\beta_1}.
+$$
+El antecedente de fractura previa desplaza ese punto **horizontalmente**, en
+$\beta_2/\beta_1$ años: la misma curva, alcanzada antes. Es lo que se verá en la
+@fig-u12-dos-escalas.
+
+Y aquí está la moraleja de la sección: $\beta_1$ es un número limpio y constante en la
+primera escala, un factor constante en la segunda, y en la tercera —la única que le
+importa a la paciente— **deja de ser constante**. Por eso los coeficientes se leen
+en log-odds, se comunican en odds ratios, y se traducen a probabilidad mediante
+efectos marginales.
+
+La @fig-u12-tres-escalas dibuja esas tres formas —recta, exponencial y S— sobre un
+predictor genérico $x$, y añade el contraste de signo: en azul un coeficiente positivo
+($\beta=1$) y en rojo uno negativo ($\beta=-1$), que invierte las tres curvas sin
+cambiar su naturaleza. Esa no linealidad del panel derecho es justo lo que impide leer
+$\beta$ como un cambio de probabilidad.
 
 ```{r}
 #| label: fig-u12-tres-escalas
@@ -387,8 +541,8 @@ p3 <- escala("prob",     "P(evento)",    "probabilidad  ·  forma en S",        
 
 ::: {.callout-warning}
 ## Odds ratio y riesgo relativo
-Puntualizar que odds-ratio OR no es lo mismo que riesgo relativo RR. El riesgo relativo es útil para comparar probabilidades, luego en el contexto del modelo lineal cabría valorar el efecto, sobre la probabilidad, de añadir una unidad a la $x$
-$$\text{RR}=\pi(x+1)/\pi(x)$$
+Puntualizar que **odds-ratio OR** no es lo mismo que **riesgo relativo RR**. El riesgo relativo es útil para comparar probabilidades, luego en el contexto del modelo lineal cabría valorar el efecto, sobre la probabilidad, de añadir una unidad a la $x$
+$$\text{RR}=\frac{\pi(x+1)}{\pi(x)}$$
 En general $\text{OR}\neq\text{RR}$, si bien ambos se
 relacionan por
 $$
@@ -399,12 +553,13 @@ evento es frecuente. Solo si el evento es **raro** ($\pi$ pequeña) se cumple
 $1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$. 
 
 Por eso decir «el riesgo
-se triplica» al leer un $\text{OR}=3$ es una aproximación cómoda pero informal: la
-lectura exacta es en términos de *odds* (ventaja), o bien en probabilidad mediante
-los efectos marginales (más abajo).
+se triplica» al leer un $\text{OR}=3$ es una aproximación cómoda pero informal y no veraz. La
+lectura exacta es en términos de *odds* (ventaja): al subir el predictor una unidad (o al pasar de la categoría de referencia a la otra), la ventaja del evento —P(sí)/P(no)— queda multiplicada por 3. Si queremos una interpretación en términos de probabilidades, habremos de echar mano de los efectos marginales, sobre los que hablamos más adelante.
 :::
 
-**Intervalos de confianza.** Como $\text{OR}=e^{\beta}$ y la exponencial es
+### Intervalos de confianza
+
+Como $\text{OR}=e^{\beta}$ y la exponencial es
 **monótona creciente**, el IC del OR es la **exponencial de los extremos** del IC del
 coeficiente, sin recalcular nada:
 $$\text{IC}_{95\%}(\text{OR})=\big[e^{\beta_{\text{inf}}},\,e^{\beta_{\text{sup}}}\big].$$
@@ -434,14 +589,16 @@ tres enlaces; cambia qué *representa* y, con ello, cómo se lee el coeficiente:
 
 : Relación entre el predictor lineal $\eta$ —donde actúan los coeficientes— y la media $\mu$ en los tres enlaces. En el logit, $\eta$ es exactamente el log-odds; cada enlace «lee» $\eta$ en una escala distinta. {#tbl-enlaces-eta-mu}
 
-De ahí que el mismo $\beta$ signifique cosas distintas aunque el ajuste apenas varíe:
+De ahí que el mismo $\beta$ signifique cosas distintas aunque el ajuste apenas varíe: con
+**logit** se lee como un **odds ratio**, $e^{\beta}$ (la lectura habitual en clínica y
+epidemiología); con **probit**, como un **desplazamiento en la escala $z$**, sin lectura de
+odds; y con **cloglog**, como una **razón de riesgos** (*hazard ratio*), la lectura natural en
+supervivencia ([Unidad 5](#sec-u15)).
 
-- **logit:** $e^{\beta}$ = **odds ratio** (multiplica las odds); la lectura habitual
-  en clínica y epidemiología.
-- **probit:** $\beta$ **desplaza la escala latente normal** ($z$), sin lectura de odds;
-  como guía, $\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$.
-- **cloglog:** $e^{\beta}$ = **razón de riesgos** (*hazard ratio*); lectura natural en
-  supervivencia ([Unidad 5](#sec-u15)).
+Logit y probit, además, son casi la misma curva reescalada, de modo que sus coeficientes
+guardan una **proporción estable**: como regla práctica,
+$\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$. Es lo que recoge la
+última columna de la tabla siguiente.
 
 ```{r}
 #| label: u12-coef-enlaces
@@ -450,6 +607,51 @@ map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
   pivot_wider(names_from = enlace, values_from = estimate) |>
   mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
 ```
+
+**Tres coeficientes distintos para el mismo efecto.** La tabla anterior da, para
+`priorfrac`, tres números que no se parecen: $0{,}84$ con logit, $0{,}51$ con probit
+y $0{,}68$ con cloglog. Conviene ver qué dice cada uno tomando una **mujer concreta**:
+70 años, sin fractura previa, y comparándola con otra igual salvo por el antecedente.
+
+```{r}
+#| label: u12-misma-mujer
+# La misma mujer de 70 años, con y sin fractura previa, vista por los tres enlaces
+mujer <- tibble(age = 70,
+                priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
+
+map_dfr(ajustes,
+        \(m) mutate(mujer, p = predict(m, mujer, type = "response")),
+        .id = "enlace") |>
+  pivot_wider(names_from = priorfrac, values_from = p)
+```
+
+- **logit: $\beta_2=0{,}84$ multiplica la ventaja.** Sin antecedente, la probabilidad de
+  fractura es del 21 %, es decir, unas **26 ventajas a favor por cada 100 en contra**
+  ($0{,}209/0{,}791=0{,}26$). Con antecedente, esa ventaja se multiplica por
+  $e^{0{,}84}=2{,}31$ y pasa a $0{,}61$, que corresponde a una probabilidad del 38 %.
+  El coeficiente **no** multiplica la probabilidad —que sube de 21 % a 38 %, un factor
+  1,8—, sino la ventaja.
+
+- **probit: $\beta_2=0{,}51$ desplaza medio punto en la escala $z$.** Aquí el modelo
+  coloca a cada mujer en un punto de la campana de Gauss. La de referencia está en
+  $z=-0{,}81$, y a la izquierda de ese punto queda el 21 % del área: esa es su
+  probabilidad. El antecedente la **empuja $0{,}51$ hacia la derecha**, hasta
+  $z=-0{,}30$, donde el área acumulada es el 38 %. No hay ventajas ni factores
+  multiplicativos: solo un desplazamiento a lo largo de una escala.
+
+- **cloglog: $\beta_2=0{,}68$ multiplica el riesgo acumulado.** Este enlace lee $\eta$
+  como el logaritmo del riesgo que se ha ido acumulando durante el seguimiento. Para la
+  mujer de referencia ese riesgo acumulado vale $e^{-1{,}45}=0{,}23$; el antecedente lo
+  multiplica por $e^{0{,}68}=1{,}97$ y lo lleva a $0{,}46$, lo que se traduce en una
+  probabilidad del 37 %. Es la lectura de la supervivencia: no «cuánta ventaja», sino
+  «cuánto riesgo se ha ido sumando» ([Unidad 5](#sec-u15)).
+
+**Y aquí está el detalle importante:** los tres coeficientes son distintos, pero las tres
+probabilidades predichas son prácticamente la misma —21 % sin antecedente, 37–38 % con
+él—. Los modelos no discrepan sobre la mujer; discrepan sobre **en qué escala se cuenta
+el efecto**. Por eso un $\beta$ no se compara entre enlaces, y por eso la comparación
+justa entre modelos se hace en la escala de la probabilidad, como en la
+@fig-u12-enlaces-prob.
 
 ### Interpretación en la escala de la probabilidad: efectos marginales
 
@@ -485,7 +687,7 @@ $$
 $$
 donde $\hat\pi(\texttt{nivel},x_i)$ se evalúa para todos los sujetos en la muestra en todos los niveles (en `priorfrac`, Yes y No).
 $$
-\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\theta+\hat\beta\,\text{age}_i+\hat\delta_{\text{pf}}^{\,\text{nivel}}\big),\qquad \hat\delta_{\text{pf}}^{\,\text{ref}}=0.
+\hat\pi(\text{nivel},x_i)=\operatorname{logit}^{-1}\!\big(\hat\beta_0+\hat\beta_1\,\text{age}_i+\hat\beta_2\,\mathbf{I}^{\,\text{nivel}}_{\text{priorfrac}}\big),\qquad \mathbf{I}^{\,\text{No}}_{\text{priorfrac}}=0,\quad \mathbf{I}^{\,\text{Yes}}_{\text{priorfrac}}=1.
 $$
 
 ```{r}

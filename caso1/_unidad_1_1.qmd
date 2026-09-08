@@ -225,11 +225,10 @@ En esta unidad trabajaremos con:
 
 Para modelizar con un modelo lineal generalizado la predicción de `fracture`, mantenemos el carácter dicotómico de la respuesta, y su modelización con una variable Bernouilli, con $p$ su valor esperado y la probabilidad de fractura. Buscamos pues, un modelo a través del que relacionar esta probabilidad con un predictor lineal construido en función de las variables `age` y `priorfrac`. Como hemos visto antes, la función `logit` nos permite manejar este cambio de escala de una probabilidad a toda la recta real, y por otro lado, la familia binomial integra a la distribución Bernouilli, por lo que planteamos lo que popularmente se conoce como **el modelo logit**, que aplicado a GLOW para predecir la fractura en función de la edad y el haber tenido una fractura previa, se formularía así:
 
-$$Y=\begin{cases} 1 \ \text{fractura, con probabilidad } \pi \\
+Si $Y=\begin{cases} 1 \ \text{fractura, con probabilidad } \pi \\
 0 \ \text{ no fractura, con probabilidad } 1-\pi
-\end{cases} \ \rightarrow \ logit(\pi)=\theta + \beta \cdot \text{age} + \gamma \cdot \mathbf{1}(\text{priorfrac}=\text{Yes})
-$$  
-
+\end{cases}$ y $\mathbf{I}_{\text{priorfrac}}= 1/0 \text{ si priorfrac=Yes/No}$, el modelo se plantea:
+$$ logit(\pi)=\beta_0 + \beta_1 \cdot \text{age} + \beta_2 \cdot \mathbf{I}_{\text{priorfrac}}.$$
 
 :::: {.callout-tip}
 ## 🔧 En R. El `glm()` con datos binarios
@@ -241,13 +240,13 @@ La función `glm(y ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)` ajus
 - **Enlace:** `link = "logit"` conecta la media —la probabilidad— con el predictor y mantiene $\hat\pi$ en $(0,1)$.
 
 Los principales descriptivos los obtenemos con:
+
 - `summary(fit_glm)`, el resultado del ajuste
 - `tidy(fit_glm)` formatea el resultado
 -`glance()` da la **deviance** y el **AIC**, con las que evaluamos la calidad del ajuste.
 - `fitted(fit_glm)` da la predicción de probabilidades en los registros observados.
 - `broom::augment(fit_glm, type.predict = "response")` da los ajustes ordenados en `[0,1]`
-- `predict()` devuelve la predicción en la **escala del predictor** (log-odds) para cualquier valor de los predictores. Para
-obtenerla en **probabilidad** hay que pedir la escala de respuesta:
+- `predict()` devuelve la predicción en la **escala del predictor** (log-odds) para cualquier valor de los predictores. Para obtenerla en **probabilidad** hay que pedir la escala de respuesta:
 
 ```r
 predict(fit_glm, newdata = ..., type = "response")    # probabilidad en [0,1]

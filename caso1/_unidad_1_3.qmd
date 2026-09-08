@@ -53,7 +53,7 @@ donde $Y_i$ es el número de fracturas entre las $m_i$ mujeres del perfil y $\pi
 
 La parte sistemática es común a todos los perfiles, así que la escribimos sin índice —con la respuesta $(\text{éxitos},\text{fracasos})=(Y,\,m-Y)$—, y así el modelo binomial plantea estimar:
 
-$$\operatorname{logit}(\pi)=\theta+\beta\,\text{priorfrac}+\gamma\,\text{momfrac}+\delta_{\text{Same}}\mathbf 1(\text{raterisk}=\text{Same})+\delta_{\text{Greater}}\mathbf 1(\text{raterisk}=\text{Greater}),$$
+$$\operatorname{logit}(\pi)=\beta_0+\beta_1\,\mathbf{I}_{\text{priorfrac}}+\beta_2\,\mathbf{I}_{\text{momfrac}}+\beta_3\,\mathbf 1(\text{raterisk}=\text{Same})+\beta_4\,\mathbf 1(\text{raterisk}=\text{Greater}),$$
 
 
 con `raterisk = Less` como referencia. 
@@ -424,20 +424,20 @@ Para ilustrar este modelo con GLOW, usamos `raterisk` —el riesgo de fractura *
 
 
 $$
- \log\frac{\Pr(Y=k)}{\Pr(Y=\text{Same})}=\eta_{k}= \theta_{k} + \beta_{k} \cdot \text{age} + \gamma_{k} \cdot \mathbf{1}(\text{priorfrac}=\text{Yes}), \qquad k\in\{\text{Less},\text{Greater}\}
+ \log\frac{\Pr(Y=k)}{\Pr(Y=\text{Same})}=\eta_{k}= \beta_{0k} + \beta_{1k} \cdot \text{age} + \beta_{2k} \cdot \mathbf{I}_{\text{priorfrac}}, \qquad k\in\{\text{Less},\text{Greater}\}
  $$
 
 
 Conviene leerla como **dos rectas, una por cada categoría no-referencia**. Fijada `Same` como base, a cada nivel $k\in\{\text{Less},\text{Greater}\}$ le asignamos su **propio predictor lineal** $\eta_{k}$, con **su propia** interceptación y **sus propias** pendientes: una recta describe cómo varían, con la edad y la fractura previa, los log-odds de percibirse en **menor** riesgo frente a «igual» (`Less` vs `Same`); la otra, los de percibirse en **mayor** riesgo frente a «igual» (`Greater` vs `Same`). La categoría base no necesita recta propia: hace de **vara de medir**, con $\eta_{\text{Same}}=0$ por convención. 
 
-Ajustar el modelo nominal equivale, pues, a estimar **a la vez** $K−1=2$ regresiones —`Less|Same` y `Greater|Same`—, cada una con su intercepto $\theta_k+\gamma_k\mathbf{1}(\text{priorfrac}=\text{Yes})$ y su pendiente $\beta_k$. Que cada categoría tenga **su propia recta** es lo que da al modelo nominal su flexibilidad —cada nivel puede responder a la edad o a la fractura previa de manera distinta, incluso en **direcciones opuestas**—, frente al ordinal de la [Sección 3.4](#sec-u13-ordinal), que impondrá una **pendiente común** a todos los cortes.
+Ajustar el modelo nominal equivale, pues, a estimar **a la vez** $K−1=2$ regresiones —`Less|Same` y `Greater|Same`—, cada una con su intercepto $\beta_{0k}+\beta_{2k}\mathbf{I}_{\text{priorfrac}}$ y su pendiente $\beta_{1k}$. Que cada categoría tenga **su propia recta** es lo que da al modelo nominal su flexibilidad —cada nivel puede responder a la edad o a la fractura previa de manera distinta, incluso en **direcciones opuestas**—, frente al ordinal de la [Sección 3.4](#sec-u13-ordinal), que impondrá una **pendiente común** a todos los cortes.
 
-Al exponenciar, $e^{\beta_k}$ es un **odds ratio relativo**: el factor por el que se
+Al exponenciar, $e^{\beta_{1k}}$ es un **odds ratio relativo**: el factor por el que se
 multiplican las **odds de pertenecer a la categoría $k$ en lugar de a `Same`** cuando `age`
-aumenta una unidad, manteniendo el resto constante. Por ejemplo, $e^{\beta_{\text{Greater}}}$
+aumenta una unidad, manteniendo el resto constante. Por ejemplo, $e^{\beta_{1,\text{Greater}}}$
 es cuánto cambia la ventaja de percibirse en **mayor** riesgo (`Greater`) frente a **igual**
 (`Same`) por cada año más de edad. Cuando se estiman los coeficientes del modelo, su
-**signo** ya orienta: $\beta_{k}>0$ aumenta el riesgo de $k$ sobre `Same` al aumentar la edad,  y $\beta_{k}<0$, disminuye el riesgo en $k$ respecto de `Same`.
+**signo** ya orienta: $\beta_{1k}>0$ aumenta el riesgo de $k$ sobre `Same` al aumentar la edad,  y $\beta_{1k}<0$, disminuye el riesgo en $k$ respecto de `Same`.
 
 Es siempre una comparación **por pares contra la referencia**: el odds de `Less` frente a `Greater` no
 aparece directamente —se obtiene combinando ambos juegos ($e^{\eta_{\text{Less}}-\eta_{\text{Greater}}}$) o
@@ -651,7 +651,7 @@ Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcion
 (*cumulative logit*), que modela los **logits acumulados** con umbrales ordenados y **un único**
 vector de efectos:
 $$
-\operatorname{logit}\Pr(Y\le k)= \operatorname{log}\frac{Pr(Y\le k)}{Pr(Y> k)}=\theta_k-\bigl(\beta \cdot\text{age}+\gamma \cdot \mathbf1(\text{priorfrac}=\text{Yes})\bigr),
+\operatorname{logit}\Pr(Y\le k)= \operatorname{log}\frac{Pr(Y\le k)}{Pr(Y> k)}=\theta_k-\bigl(\beta_1 \cdot\text{age}+\beta_2 \cdot \mathbf{I}_{\text{priorfrac}}\bigr),
 $$
 con $k\in\{\text{Less},\,\text{Same}\},\quad \theta_{\text{Less}}<\theta_{\text{Same}}$.
 
@@ -667,28 +667,28 @@ categoría**— aquí hay dos piezas bien diferenciadas:
   ordenados $\theta_{\text{Less}}<\theta_{\text{Same}}$ para garantizar que las probabilidades
   acumuladas crezcan y, con ellas, que las de cada categoría sean no negativas—;
   
-- un **único vector de efectos** $(\beta,\gamma)$ **compartido por
+- un **único vector de efectos** $(\beta_1,\beta_2)$ **compartido por
   los dos cortes** —de ahí «odds proporcionales»—: las covariables **desplazan en bloque** toda la
   distribución sobre la escala ordenada, sin alterar la separación entre umbrales.
 
 **El signo y su lectura.** 
 
-El predictor lineal entra **restado**, $\theta_k-\eta$, con $\eta=\beta \cdot\text{age}+\gamma \cdot \mathbf1(\text{priorfrac}=\text{Yes})$ -que es la
+El predictor lineal entra **restado**, $\theta_k-\eta$, con $\eta=\beta_1 \cdot\text{age}+\beta_2 \cdot \mathbf{I}_{\text{priorfrac}}$ -que es la
 convención de `MASS::polr`-. No es un capricho: hace que un coeficiente **positivo** empuje hacia las
-categorías **altas**. Si $\beta>0$, sube $\eta$, baja $\theta_k-\eta$ y baja $\Pr(Y\le k)$ en
+categorías **altas**. Si $\beta_1>0$, sube $\eta$, baja $\theta_k-\eta$ y baja $\Pr(Y\le k)$ en
 **todos** los cortes —es decir, sube $\Pr(Y>k)$—. 
 
 Conviene, pues, leer el efecto sobre las **odds de superar un corte**:
-- una unidad más de $x$ multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta}$ —el **mismo** factor en los dos cortes— y, equivalentemente, $\operatorname{odds}(Y\le k)$ por
-$e^{-\beta}$
-- el hecho de que una paciente haya tenido fractura previa frente a que no la haya tenido, resta $\gamma$ a $\operatorname{logit}\Pr(Y\le k)$, de modo que multiplica por $e^{-\gamma}$ las odds acumuladas $\operatorname{odds}(Y\le k)$ y por  $e^{+\gamma}$ las odds de superar el corte $\operatorname{odds}(Y>k)$, y es el mismo factor en los dos cortes.
+- un año más de edad multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta_1}$ —el **mismo** factor en los dos cortes— y, equivalentemente, $\operatorname{odds}(Y\le k)$ por
+$e^{-\beta_1}$
+- el hecho de que una paciente haya tenido fractura previa frente a que no la haya tenido, resta $\beta_2$ a $\operatorname{logit}\Pr(Y\le k)$, de modo que multiplica por $e^{-\beta_2}$ las odds acumuladas $\operatorname{odds}(Y\le k)$ y por  $e^{+\beta_2}$ las odds de superar el corte $\operatorname{odds}(Y>k)$, y es el mismo factor en los dos cortes.
 
 **En GLOW**, los umbrales estimados son $\theta_{\text{Less}}\approx-2{,}06$ y
 $\theta_{\text{Same}}\approx-0{,}44$, y el vector de efectos
-$(\beta_{\text{age}},\gamma_{\text{priorfrac}})\approx(-0{,}023,\ 0{,}90)$. Se lee así: la **fractura
-previa** ($\gamma>0$, $e^{\gamma}\approx 2{,}46$) multiplica por $\approx 2{,}5$ las odds de percibirse
+$(\beta_1,\beta_2)\approx(-0{,}023,\ 0{,}90)$. Se lee así: la **fractura
+previa** ($\beta_2>0$, $e^{\beta_2}\approx 2{,}46$) multiplica por $\approx 2{,}5$ las odds de percibirse
 en una categoría **más alta** (más `Greater`, menos `Less`), por igual en ambos cortes; la **edad**
-($\beta<0$, $e^{\beta}\approx 0{,}98$ por año) empuja levemente hacia categorías **más bajas**
+($\beta_1<0$, $e^{\beta_1}\approx 0{,}98$ por año) empuja levemente hacia categorías **más bajas**
 (`Less`). Ambos efectos coinciden en dirección con los del nominal, señal de que la proporcionalidad
 de odds es razonable aquí.
 

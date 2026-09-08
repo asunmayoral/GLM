@@ -229,6 +229,18 @@ map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
   mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
 
 # -----------------------------------------------------------------------------
+# [u12-misma-mujer]  ·  Odds ratio y riesgo relativo
+# -----------------------------------------------------------------------------
+# La misma mujer de 70 años, con y sin fractura previa, vista por los tres enlaces
+mujer <- tibble(age = 70,
+                priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
+
+map_dfr(ajustes,
+        \(m) mutate(mujer, p = predict(m, mujer, type = "response")),
+        .id = "enlace") |>
+  pivot_wider(names_from = priorfrac, values_from = p)
+
+# -----------------------------------------------------------------------------
 # [u12-ame]  ·  Odds ratio y riesgo relativo > Interpretación en la escala de la probabilidad: efectos marginales
 # -----------------------------------------------------------------------------
 # AME de cada covariable, en puntos de probabilidad
