@@ -225,9 +225,13 @@ En esta unidad trabajaremos con:
 
 Para modelizar con un modelo lineal generalizado la predicción de `fracture`, mantenemos el carácter dicotómico de la respuesta, y su modelización con una variable Bernouilli, con $p$ su valor esperado y la probabilidad de fractura. Buscamos pues, un modelo a través del que relacionar esta probabilidad con un predictor lineal construido en función de las variables `age` y `priorfrac`. Como hemos visto antes, la función `logit` nos permite manejar este cambio de escala de una probabilidad a toda la recta real, y por otro lado, la familia binomial integra a la distribución Bernouilli, por lo que planteamos lo que popularmente se conoce como **el modelo logit**, que aplicado a GLOW para predecir la fractura en función de la edad y el haber tenido una fractura previa, se formularía así:
 
-Si $Y=\begin{cases} 1 \ \text{fractura, con probabilidad } \pi \\
+Con la respuesta  
+
+$$Y=\begin{cases} 1 \ \text{ si fractura, con probabilidad } \pi \\
 0 \ \text{ no fractura, con probabilidad } 1-\pi
-\end{cases}$ y $\mathbf{I}_{\text{priorfrac}}= 1/0 \text{ si priorfrac=Yes/No}$, el modelo se plantea:
+\end{cases}$$
+
+y $\mathbf{I}_{\text{priorfrac}}= 1/0 \text{ si priorfrac=Yes/No}$, el modelo se plantea:
 $$ logit(\pi)=\beta_0 + \beta_1 \cdot \text{age} + \beta_2 \cdot \mathbf{I}_{\text{priorfrac}}.$$
 
 :::: {.callout-tip}

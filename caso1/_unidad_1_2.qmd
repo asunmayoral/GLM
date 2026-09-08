@@ -280,7 +280,7 @@ glow |>
 ## 2.2 El enlace: canónico y alternativas {#sec-u12-enlace}
 
 El **enlace** o *función link* $g$ conecta la media con el predictor lineal, $g(\mu)=\eta=\mathbf{x}^\top
-\boldsymbol\beta$. Una misma familia puede utilizar cualquier enlaces $g$ que sea una función monótona y diferenciable, pero el **enlace canónico** es aquel que iguala el parámetro natural al predictor lineal, esto es, $\theta=\eta$. Este enlace canónico simplemente aporta ventajas formales en las matemáticas, como estadísticos suficientes de dimensión mínima o simplificación de las ecuaciones de verosimilitud.
+\boldsymbol\beta$. Una misma familia puede utilizar cualquier enlace $g$ que sea una función monótona y diferenciable, pero el **enlace canónico** es aquel que iguala el parámetro natural al predictor lineal, esto es, $\theta=\eta$. Este enlace canónico simplemente aporta ventajas formales en las matemáticas, como estadísticos suficientes de dimensión mínima o simplificación de las ecuaciones de verosimilitud.
 
 En el caso binario de la familia binomial, las tres alternativas que re-escalan un predictor lineal -teóricamente definido en toda la recta real- a la escala de una probabilidad -en el rango [0,1]- son el enlace logit, el probit y el complementario log-log -cloglog-, que reproducen la forma de S invertida a la hora de relacionar el predictor lineal con la probabilidad, como se aprecia en la @fig-u12-enlaces. Logit y probit son **simétricos** (casi intercambiables tras reescalar: el
 coeficiente probit ≈ logit/1,6); el **cloglog** (complementario log-log) es **asimétrico** y será el enlace
@@ -387,8 +387,6 @@ probabilidad en el centro de la curva y casi nada en las colas. Para interpretar
 leeremos los coeficientes en la escala donde el modelo **sí** es lineal —y le
 pondremos nombre.
 
-**Lo que da el modelo:** `summary()` (o `broom::tidy`) devuelve los coeficientes en
-la escala del predictor lineal:
 
 Recordemos el modelo que estamos ajustando sobre GLOW:
 
@@ -397,7 +395,7 @@ $$\pi = P(Y=1) \ \rightarrow \ logit(\pi)=\beta_0 + \beta_1 \cdot \text{age} + \
 
 ```{r}
 #| label: u12-coef
-tidy(fit_glm)   # coeficientes en escala log-odds: lo que da summary() por defecto
+tidy(fit_glm)   # coeficientes en escala del predictor lineal: lo que da summary() por defecto
 ```
 
 Su **signo** ya informa —positivo sube $\eta$ y con él la probabilidad; negativo la
@@ -409,32 +407,56 @@ escala?
 Aparecen en la ecuación los **odds y log-odds**, que provienen del enlace canónico de la Bernoulli. 
 
 - El **odds** de un suceso es su **ventaja**, la probabilidad de que ocurra frente a la de que no: un odds de 2 dice que el evento es el doble de probable que su ausencia.
-$$\text{odds}(x)=\frac{\pi(x)}{1-\pi(x)}$$
+$$\text{odds}=\frac{\pi}{1-\pi}$$
 - Su logaritmo —el **log-odds** o **logit**— es precisamente el enlace canónico, y por tanto
 es el predictor lineal:
-$$\eta(x)=\log\frac{\pi(x)}{1-\pi(x)}=\text{log-odds}(x).$$
+$$\eta=\log\frac{\pi}{1-\pi}=\text{log-odds}.$$
 La escala de los log-odds es donde viven los coeficientes y donde el modelo es una recta.
-$$ \text{log-odds}(x)=\eta(x) \rightarrow \text{odds}(x)=e^{\eta(x)}$$
+
+$$ \text{log-odds}=\eta \rightarrow \text{odds}=e^{\eta}$$
 
 
-**Qué dice $\beta$ ahí, y el odds ratio:** 
+**Qué dice $\beta$ ahí, y el odds ratio:**
 
-- Subir $x$ una unidad **suma** $\beta$ al log-odds: el efecto es **aditivo en los log-odds**.
-$$\beta=\eta(x+1)-\eta(x) \rightarrow \text{log-odds}(x+1)= \beta +\text{log-odds}(x)$$
+Un coeficiente siempre **compara dos perfiles**, $A$ y $B$, que coinciden en todo salvo
+en el predictor al que acompaña. Qué son $A$ y $B$ depende del tipo de variable:
+
+- si el predictor es **continuo**, $A$ toma el valor $x$ y $B$ el valor $x+1$;
+- si es **categórico**, $A$ está en el **nivel de referencia** y $B$ en el nivel que ese
+  coeficiente representa.
+
+Los dos casos dicen lo mismo: $B$ supera a $A$ en **una unidad de la columna
+correspondiente** de la matriz de diseño —un año más de edad, o pasar de 0 a 1 en la
+indicadora $\mathbf{I}_{\text{priorfrac}}$—. Por eso comparten idéntica lectura:
+
+- Pasar de $A$ a $B$ **suma** $\beta$ al log-odds: el efecto es **aditivo en los log-odds**.
+$$\beta=\eta_B-\eta_A \rightarrow \text{log-odds}_B= \beta +\text{log-odds}_A$$
 - Al deshacer el logaritmo surge la relación entre los *odds*:
 
-$$\beta=\log\frac{\text{odds}(x+1)}{\text{odds}(x)} \rightarrow \text{odds}(x+1)= \text{odds}(x) \cdot e^{\beta} $$
-de modo que el **efecto en los odds es multiplicativo**. El cociente de odds, **odds-ratio** resulta pues interpretado por el coeficiente exponenciado, 
-$$OR =\frac{\text{odds}(x+1)}{\text{odds}(x)} = e^{\beta}$$
-y así cada unidad adicional de $x$ multiplica los odds por el odds ratio:
-$$\text{odds}(x+1)= \text{odds}(x) \cdot OR$$
+$$\beta=\log\frac{\text{odds}_B}{\text{odds}_A} \rightarrow \text{odds}_B= \text{odds}_A \cdot e^{\beta} $$
+de modo que el **efecto en los odds es multiplicativo**. El cociente de odds, **odds-ratio** resulta pues interpretado por el coeficiente exponenciado,
+$$OR =\frac{\text{odds}_B}{\text{odds}_A} = e^{\beta}$$
+y así cada unidad adicional del predictor —o el paso de la referencia al nivel comparado— multiplica los odds por el odds ratio:
+$$\text{odds}_B= \text{odds}_A \cdot OR$$
 
 
-Por eso, si bien el log-odds depende de $x$, el *odds-ratio* OR es un factor **constante** que aplica a toda la curva, y de ahí su interpretabilidad: cada movimiento de una unidad en $x$, sea cual sea el $x$, multiplica los odds por el mismo factor $e^{\beta}$. La relación entre el signo de los coeficientes, el OR y el efecto que genera en las probabilidades, es ahora más patente:
+Por eso, si bien el log-odds depende del perfil concreto, el *odds-ratio* OR es un factor **constante**, y de ahí su interpretabilidad: en una continua, cada movimiento de una unidad multiplica los odds por el mismo $e^{\beta}$ sea cual sea el punto de partida —el mismo factor entre los 55 y los 56 años que entre los 89 y los 90—; en una categórica, el factor que separa el nivel de su referencia no depende de los valores que tomen las demás covariables. La relación entre el signo de los coeficientes, el OR y el efecto que genera en las probabilidades, es ahora más patente:
 
 - $\beta>0\Leftrightarrow\text{OR}>1$: aumenta la ventaja del evento;
 - $\beta<0\Leftrightarrow\text{OR}<1$: reduce la ventaja del evento;
 - $\beta \approx 0\Leftrightarrow\text{OR}\approx 1$: ni aumenta ni reduce la ventaja del evento.
+
+Conviene retener tres precisiones que esa lectura da por supuestas. Primera: en un
+factor con **más de dos niveles**, cada coeficiente compara **contra la referencia**, de
+modo que la comparación entre dos niveles que no son la referencia no es un coeficiente
+del modelo, sino una **diferencia** de coeficientes, $\beta_j-\beta_k$ (lo veremos con
+`raterisk` en la [Unidad 3](#sec-u13)). Segunda: en una continua, «una unidad» depende de
+la **escala de medida**; expresar la edad en décadas multiplica su coeficiente por diez
+sin que el modelo cambie en nada. Y tercera: la comparación es **condicional** —los dos
+perfiles solo difieren en esa variable—, lo que exige que el predictor entre en $\eta$
+una sola vez y de forma lineal; si aparece en una interacción o mediante un polinomio o
+un *spline*, ningún $\beta$ aislado resume su efecto y hay que acudir a los efectos
+marginales.
 
 **Las tres escalas, sobre nuestro modelo.** Todo lo anterior se ve de golpe si
 escribimos las tres relaciones para el modelo de GLOW. Fijemos el antecedente de
@@ -454,21 +476,19 @@ Son **la misma información** escrita tres veces; lo que cambia es la forma que 
 la relación con la edad, y de ahí los tres paneles de la @fig-u12-tres-escalas.
 
 **Panel izquierdo: una recta.** $\eta$ es lineal en la edad por construcción —es lo
-que impone el enlace—, con pendiente constante
-$$
-\frac{\mathrm{d}\eta}{\mathrm{d}\,\text{age}}=\beta_1 ,
-$$
-la misma a los 55 que a los 90 años. Cada año suma $\beta_1$ al log-odds, y el
+que impone el enlace—, con pendiente constante $\beta_1$ ($\mathrm{d}\ \eta/\mathrm{d}\ \text{age}=\beta_1$ es su derivada), la misma a los 55 que a los 90 años. Cada año suma $\beta_1$ al log-odds, y el
 antecedente de fractura previa solo cambia el intercepto ($a_1-a_0=\beta_2$): dos
 rectas **paralelas**, nunca convergentes ni secantes.
 
 **Panel central: una exponencial.** Al deshacer el logaritmo, lo que era una suma
-pasa a ser un producto, y la edad entra como **exponente**:
+pasa a ser un producto, y la edad entra como **exponente** 
+
 $$
 \frac{\text{odds}(\text{age}+1)}{\text{odds}(\text{age})}=e^{\beta_1},
 \qquad
 \frac{\mathrm{d}\,\text{odds}}{\mathrm{d}\,\text{age}}=\beta_1\;\text{odds}(\text{age}).
 $$
+
 El crecimiento es **proporcional al nivel ya alcanzado** —esa es la ecuación que
 define una exponencial—, de modo que la curva arranca casi plana y se dispara
 después. Nótese que $\text{odds}>0$ siempre: la exponencial nunca cruza el eje, y
@@ -611,7 +631,9 @@ map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
 **Tres coeficientes distintos para el mismo efecto.** La tabla anterior da, para
 `priorfrac`, tres números que no se parecen: $0{,}84$ con logit, $0{,}51$ con probit
 y $0{,}68$ con cloglog. Conviene ver qué dice cada uno tomando una **mujer concreta**:
-70 años, sin fractura previa, y comparándola con otra igual salvo por el antecedente.
+70 años, sin fractura previa, y comparándola con otra igual salvo por el antecedente. De
+cada enlace pedimos las dos escalas: su predictor lineal $\eta$ —que es lo que cada uno
+lee a su manera— y la probabilidad que implica.
 
 ```{r}
 #| label: u12-misma-mujer
@@ -620,9 +642,11 @@ mujer <- tibble(age = 70,
                 priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
 
 map_dfr(ajustes,
-        \(m) mutate(mujer, p = predict(m, mujer, type = "response")),
+        \(m) mutate(mujer,
+                    eta = predict(m, mujer, type = "link"),      # el predictor lineal, en la escala de cada enlace
+                    p   = predict(m, mujer, type = "response")),
         .id = "enlace") |>
-  pivot_wider(names_from = priorfrac, values_from = p)
+  pivot_wider(names_from = priorfrac, values_from = c(eta, p))
 ```
 
 - **logit: $\beta_2=0{,}84$ multiplica la ventaja.** Sin antecedente, la probabilidad de
@@ -700,10 +724,8 @@ mean(predict(fit_glm, g_yes, type = "response") -
      predict(fit_glm, g_no,  type = "response"))   # = AME de priorfrac
 ```
 
-`marginaleffects` empaqueta esa misma operación. La rejilla `grid_type = "counterfactual"` es la
-versión automática de `g_yes` y `g_no`: replica el banco completo en cada nivel de `priorfrac`
-dejando `age` en el valor observado de cada sujeto, de modo que **cada individuo se compara
-consigo mismo**.
+`marginaleffects` empaqueta esa misma operación —`grid_type = "counterfactual"` es la versión
+automática de `g_yes` y `g_no`—, de modo que **cada individuo se compara consigo mismo**.
 
 ```{r}
 #| label: u12-ame-factor-mfx
@@ -822,9 +844,86 @@ $$
 \frac{\mathrm{d}\mu_i}{\mathrm{d}\eta_i}\,\mathbf{x}_i=\mathbf{0}.
 $$
 
-Resulta pues un sistema que iguala a cero una **suma ponderada de residuos** $(y_i-\mu_i)$, que no tiene solución cerrada y requiere de un procedimiento iterativo de optimización. 
+Resulta pues un sistema que iguala a cero una **suma ponderada de residuos** $(y_i-\mu_i)$, que no tiene solución cerrada y requiere de un procedimiento iterativo de optimización.
 
-**Del sistema al algoritmo: Fisher scoring = IWLS (*Iterative Weighted Least Squares*)** 
+**Cómo se ve esto en la logística.** Conviene aterrizar el sistema en nuestro caso,
+porque la Bernoulli lo simplifica de un modo revelador. De la forma canónica de la
+[Sección 2.1](#sec-u12-familia) —con $\theta_i=\eta_i$, por ser el logit el enlace
+canónico— la log-verosimilitud sale directamente:
+
+$$
+\ell(\boldsymbol\beta)=\sum_{i=1}^{n}\Big[y_i\,\eta_i-\log\big(1+e^{\eta_i}\big)\Big],
+\qquad \eta_i=\mathbf{x}_i^\top\boldsymbol\beta .
+$$
+
+Al derivar, las dos piezas centrales de la fórmula general **se cancelan**: con enlace
+canónico $\mathrm{d}\mu_i/\mathrm{d}\eta_i=\pi_i(1-\pi_i)$ es exactamente la función de
+varianza $V(\mu_i)$, y $a(\phi)=1$. Los pesos desaparecen y queda el sistema en su forma
+más limpia:
+
+$$
+\frac{\partial\ell}{\partial\boldsymbol\beta}
+=\sum_{i=1}^{n}\big(y_i-\pi_i\big)\,\mathbf{x}_i=\mathbf{0},
+\qquad
+\pi_i=\frac{1}{1+e^{-\mathbf{x}_i^\top\boldsymbol\beta}} .
+$$
+
+Para nuestro modelo, $\mathbf{x}_i=(1,\ \text{age}_i,\ \mathbf{I}_{\text{priorfrac},i})$,
+de modo que son **tres ecuaciones**, una por columna de la matriz de diseño:
+
+$$
+\sum_i (y_i-\hat\pi_i)=0,
+\qquad
+\sum_i \text{age}_i\,(y_i-\hat\pi_i)=0,
+\qquad
+\sum_i \mathbf{I}_{\text{priorfrac},i}\,(y_i-\hat\pi_i)=0 .
+$$
+
+Tienen una lectura muy concreta: la máxima verosimilitud elige los coeficientes que hacen
+que el modelo **reproduzca exactamente ciertos márgenes de los datos**. La primera dice
+que el total de fracturas ajustadas iguala al observado, $\sum_i\hat\pi_i=\sum_i y_i$; la
+tercera, que eso mismo se cumple **dentro** del grupo con fractura previa; la segunda, que
+también se respeta el total ponderado por edad. Comprobémoslo sobre el ajuste:
+
+```{r}
+#| label: u12-score-cero
+r <- residuals(fit_glm, type = "response")   # residuos en la escala de la respuesta: y_i - pi_hat_i
+
+# Las tres ecuaciones de score, evaluadas en la solución que devuelve glm()
+c(intercepto = sum(r),
+  age        = sum(glow$age * r),
+  priorfrac  = sum((glow$priorfrac == "Yes") * r))
+
+# La primera de ellas, leída como margen: fracturas observadas frente a las ajustadas
+c(observadas = sum(glow$fractura01), ajustadas = sum(fitted(fit_glm)))
+```
+
+**Y aquí está el obstáculo.** Compárese con OLS, donde el sistema análogo es
+$\sum_i(y_i-\mathbf{x}_i^\top\boldsymbol\beta)\,\mathbf{x}_i=\mathbf{0}$: allí
+$\boldsymbol\beta$ aparece **multiplicando**, se puede sacar factor común y el sistema se
+reordena como $\mathbf{X}^\top\mathbf{X}\boldsymbol\beta=\mathbf{X}^\top\mathbf{y}$, lineal
+y con solución explícita. Aquí, en cambio, $\boldsymbol\beta$ está **atrapado dentro de la
+exponencial** de $\pi_i$, sumado sobre $n$ sujetos con valores distintos de las covariables.
+No hay manipulación algebraica que lo despeje: son ecuaciones **trascendentes**.
+
+::: {.callout-note collapse="true"}
+## ¿Dónde muere exactamente la fórmula cerrada?
+Con **solo intercepto**, todos los $\pi_i$ valen lo mismo, $\pi$, y la primera ecuación se
+resuelve a mano:
+$$
+\sum_i (y_i-\pi)=0
+\;\Longrightarrow\;
+\hat\pi=\bar y
+\;\Longrightarrow\;
+\hat\beta_0=\log\frac{\bar y}{1-\bar y}.
+$$
+Es la proporción muestral, como cabía esperar. Basta añadir **una covariable** para que
+cada sujeto tenga su propio $\pi_i$ —cada uno con su edad dentro de su exponencial— y el
+mismo despeje deje de ser posible. De ahí la necesidad de iterar: no es una limitación del
+software, sino de la propia ecuación.
+:::
+
+**Del sistema al algoritmo: Fisher scoring = IWLS (*Iterative Weighted Least Squares*)**
 
 El método de **Newton–Raphson**,
 usando la **información esperada** (*Fisher scoring*), resuelve ese sistema, y tiene una

@@ -236,9 +236,11 @@ mujer <- tibble(age = 70,
                 priorfrac = factor(c("No", "Yes"), levels = levels(glow$priorfrac)))
 
 map_dfr(ajustes,
-        \(m) mutate(mujer, p = predict(m, mujer, type = "response")),
+        \(m) mutate(mujer,
+                    eta = predict(m, mujer, type = "link"),      # el predictor lineal, en la escala de cada enlace
+                    p   = predict(m, mujer, type = "response")),
         .id = "enlace") |>
-  pivot_wider(names_from = priorfrac, values_from = p)
+  pivot_wider(names_from = priorfrac, values_from = c(eta, p))
 
 # -----------------------------------------------------------------------------
 # [u12-ame]  ·  Odds ratio y riesgo relativo > Interpretación en la escala de la probabilidad: efectos marginales
@@ -312,6 +314,19 @@ pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
   theme(legend.position = "bottom",
         plot.title    = element_text(size = 11, face = "bold"),
         plot.subtitle = element_text(size = 8.5))
+
+# -----------------------------------------------------------------------------
+# [u12-score-cero]  ·  Las ecuaciones de score: ¿dónde están los beta?
+# -----------------------------------------------------------------------------
+r <- residuals(fit_glm, type = "response")   # residuos en la escala de la respuesta: y_i - pi_hat_i
+
+# Las tres ecuaciones de score, evaluadas en la solución que devuelve glm()
+c(intercepto = sum(r),
+  age        = sum(glow$age * r),
+  priorfrac  = sum((glow$priorfrac == "Yes") * r))
+
+# La primera de ellas, leída como margen: fracturas observadas frente a las ajustadas
+c(observadas = sum(glow$fractura01), ajustadas = sum(fitted(fit_glm)))
 
 # -----------------------------------------------------------------------------
 # [u12-iwls]  ·  Recordatorio: mínimos cuadrados ponderados (WLS)
