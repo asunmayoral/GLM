@@ -1021,7 +1021,7 @@ do.call(rbind, traza) |>          # apila la lista en matriz: filas = iteracione
 ```
 
 
-## 2.5 Inferencia y selección de modelos {#sec-u12-inferencia}
+## 2.5 Inferencia, selección y bondad de ajuste {#sec-u12-inferencia}
 
 Una vez tenemos los coeficientes estimados, $\hat{\boldsymbol\beta}$, toca interrogar al modelo en tres niveles, de
 lo particular a lo global:
@@ -1057,7 +1057,8 @@ deviance(fit_glm)         # deviance del modelo AJUSTADO (= residual); igual a f
 df.residual(fit_glm)      #   sus g.l.: n - p; igual a fit_glm$df.residual
 ```
 
-La deviance del modelo **saturado es 0 por definición**: es el modelo de referencia —un
+La deviance del modelo **saturado es 0 por definición** —su deviance, no su
+log-verosimilitud—: es el modelo de referencia —un
 parámetro por observación, con g.l. residuales = 0— frente al que se mide *toda* deviance, de
 modo que no hay una función que la devuelva (la "residual" ya es la distancia del modelo
 ajustado al saturado).
@@ -1073,8 +1074,19 @@ glance(fit_glm)
 
 
 ::: {.callout-tip}
-Detalle útil: con datos binarios **individuales**,
-$\ell_{\text{sat}}=0$, de modo que $D=-2\,\ell(\hat{\boldsymbol\beta})$. 
+Detalle útil: con datos binarios **individuales**, $\ell_{\text{sat}}=0$, de modo que
+$D=-2\,\ell(\hat{\boldsymbol\beta})$.
+
+El saturado libera un parámetro por observación, así que ajusta cada una exactamente,
+$\hat\pi_i=y_i$. Y como $y_i$ solo vale 0 o 1, cada sumando se convierte en $\log 1$:
+
+$$
+\ell_{\text{sat}}=\sum_{i=1}^{n}\Big[y_i\log \hat\pi_i+(1-y_i)\log(1-\hat\pi_i)\Big]_{\hat\pi_i=y_i}
+=\sum_{i=1}^{n}\Big[y_i\log y_i+(1-y_i)\log(1-y_i)\Big]=0 ,
+$$
+
+con el convenio $0\log 0=0$. Con datos **agrupados** (Unidad 3) el saturado ajusta la
+proporción del perfil, $\hat\pi_i=y_i/m_i$, y $\ell_{\text{sat}}$ ya no se anula.
 :::
 
 Mostramos las deviances y otros indicadores como el AIC y BIC, que nos serán útiles más adelante para la comparación de modelos:
@@ -1090,7 +1102,7 @@ En GLOW, la deviance baja de **562,3** (nula) a **528,5** (residual) al añadir 
 siguen. 
 
 La deviance residual **no** sirve como test *absoluto* de ajuste con datos
-individuales (lo veremos en la [Sección 2.6](#sec-u12-diagnostico)). De momento la usaremos solo
+individuales (lo veremos al cerrar esta misma sección). De momento la usaremos solo
 para **comparar** modelos.
 
 
@@ -1171,7 +1183,7 @@ Es **un único contraste** que, según qué par anidado compares, responde a pre
 - **pequeño = reducido, grande = completo** → *«¿aporta este bloque de variables?»* (la escalera de
   modelos que recorreremos enseguida).
 - **grande = saturado** → *bondad de ajuste*: la **deviance residual** es el LRT contra el ajuste
-  perfecto ([Sección 2.6](#sec-u12-diagnostico)).
+  perfecto (lo desarrollamos al final de esta sección).
 
 Dos requisitos: los modelos han de estar **anidados** y ajustados sobre los **mismos datos**. Para
 especificaciones **no anidadas** no hay LRT y se recurre a **AIC/BIC** (más abajo).
@@ -1378,37 +1390,19 @@ y la decisión final se justifica con LRT/AIC/BIC, validación y conocimiento de
 [@harrell2015].
 :::
 
-::: {.callout-tip}
-## Protocolo de inferencia y selección
-1. **¿Aporta algo el modelo?** Contraste ómnibus (LRT nulo vs completo).
-2. **¿Aporta cada término?** LRT / `Anova` tipo II por término, con Wald e IC (mejor por
-   perfil) como lectura individual.
-3. **¿Qué especificación?** LRT entre anidados; AIC/BIC entre cualesquiera (AIC → predicción,
-   BIC → parsimonia).
-4. **Selección de variables.** Recorre la escalera **guiada por el problema**, no a ciegas;
-   combina LRT/AIC/BIC; evita la búsqueda automática como árbitro; **valida y argumenta** la
-   elección.
-:::
+### ¿Aportar o ajustar? El contraste de bondad de ajuste
 
-## 2.6 Bondad de ajuste y diagnóstico {#sec-u12-diagnostico}
+Todo lo anterior respondía a **¿aporta el modelo?**. Queda la otra pregunta, distinta: el modelo
+elegido, **¿ajusta bien los datos?** Ambas se responden con la misma deviance, pero comparando
+contra **modelos de referencia** distintos. Conviene situar tres, del peor al mejor ajuste posible:
+el **nulo** (solo intercepto, deviance $D_0$); el **ajustado**, el nuestro (deviance residual $D$);
+y el **saturado**, con un parámetro por observación, que **ajusta los datos a la perfección**
+(deviance $=0$). Con ellos se responden **dos preguntas que no hay que mezclar**:
 
-En 2.5 preguntamos si el modelo **aporta** y **cuál** elegir. Ahora la pregunta es
-otra: el modelo elegido, **¿ajusta bien los datos?** Es la **bondad de ajuste**, y la
-bibliografía la trata de la mano del **análisis de residuos** [@hosmer2013; @faraway2016;
-@agresti2015], porque ambos responden a lo mismo desde dos ángulos: un **contraste
-global** y una **mirada caso a caso**.
-
-### El contraste global: ¿aportar o ajustar? (y por qué falla en binaria)
-
-Conviene situar tres modelos en una **escalera**, del peor al mejor ajuste posible: el **nulo**
-(solo intercepto, deviance $D_0$); el **ajustado**, el nuestro (deviance residual $D$); y el
-**saturado**, con un parámetro por observación, que **ajusta los datos a la perfección**
-(deviance $=0$). Con ellos se responden **dos preguntas distintas que no hay que mezclar**:
-
-- **¿Aporta el modelo?** (utilidad, la de la [Sección 2.5](#sec-u12-inferencia)). Se compara
+- **¿Aporta el modelo?** (utilidad, la de los apartados anteriores). Se compara
   **ajustado vs nulo**: $D_0-D\sim\chi^2_{p}$. Un $p$ bajo **rechaza el nulo** a favor del nuestro
   —las covariables explican algo—. Es la pregunta *«¿mejor que nada?»*.
-- **¿Ajusta bien?** (bondad de ajuste, la de aquí). Se compara **ajustado vs saturado**: la propia
+- **¿Ajusta bien?** (bondad de ajuste). Se compara **ajustado vs saturado**: la propia
   **deviance residual** $D=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})$ **es** el LRT frente al mejor
   ajuste posible y, bajo un modelo correcto, se distribuiría $\chi^2_{n-p}$. Mide *«¿cuánto queda sin
   explicar respecto a un ajuste perfecto?»*; un $p$ bajo señala **falta de ajuste**.
@@ -1430,12 +1424,39 @@ parámetro, $D$ **no** sigue $\chi^2_{n-p}$ y el contraste **carece de valor**. 
 $\ell_{\text{sat}}=0$ y $D=-2\ell(\hat{\boldsymbol\beta})$ depende **solo** de las probabilidades
 ajustadas, sin informar del ajuste absoluto [@agresti2015; @hosmer2013].
 
-**Cómo se resuelve, entonces.** Dos vías: (i) **agrupar** —si las covariables son categóricas, se
+**Cómo se resuelve, entonces.** Dos vías: 
+
+(i) **agrupar** —si las covariables son categóricas, se
 pasa a binomial: tanto $D$ como el **estadístico de Pearson** $X^2$ **recuperan su sentido** como
-contraste $\chi^2$, y allí los definimos con detalle ([Sección 3.2](#sec-u13-gof-binomial))—; (ii) cuando no se
+contraste $\chi^2$, y allí los definimos con detalle ([Sección 3.2](#sec-u13-gof-binomial))—; 
+
+(ii) cuando no se
 puede (covariables continuas, como en GLOW), se sustituye el contraste global por herramientas que
 **agrupan implícitamente** o **simulan**: el **test de Hosmer–Lemeshow** (deciles de riesgo), la
-**curva de calibración** y los **residuos por tramos**, que vemos a continuación.
+**curva de calibración** y los **residuos por tramos**.
+
+::: {.callout-tip}
+## Protocolo de inferencia, selección y bondad de ajuste
+1. **¿Aporta algo el modelo?** Contraste ómnibus (LRT nulo vs completo).
+2. **¿Aporta cada término?** LRT / `Anova` tipo II por término, con Wald e IC (mejor por
+   perfil) como lectura individual.
+3. **¿Qué especificación?** LRT entre anidados; AIC/BIC entre cualesquiera (AIC → predicción,
+   BIC → parsimonia).
+4. **Selección de variables.** Recorre la escalera **guiada por el problema**, no a ciegas;
+   combina LRT/AIC/BIC; evita la búsqueda automática como árbitro; **valida y argumenta** la
+   elección.
+5. **¿Ajusta bien el elegido?** Deviance frente al saturado, **solo si los datos están
+   agrupados**; con binaria individual ese contraste no es válido y el ajuste se juzga con las
+   herramientas de la sección siguiente.
+:::
+
+## 2.6 Diagnóstico y validación {#sec-u12-diagnostico}
+
+El contraste global acaba de dejarnos sin respuesta: con datos binarios individuales no hay
+estadístico que juzgue el ajuste en bloque. La alternativa es mirar el modelo **caso a caso**, que
+es como la bibliografía trata el diagnóstico [@hosmer2013; @faraway2016; @agresti2015]: los
+**residuos**, para localizar dónde falla; la **calibración**, para saber si las probabilidades son
+fiables; y la **separación**, un patrón de los datos que rompe la estimación misma.
 
 ### Residuos
 
@@ -1681,7 +1702,7 @@ glm(fracture ~ smoke * raterisk, family = binomial, data = glow,
 
 El modelo entrega **probabilidades**; convertirlo en un **clasificador** (predecir sí/no)
 exige un **umbral** $c$ y abre un tercer eje de evaluación del modelo: la **discriminación** —¿separa
-eventos de no-eventos?—. Este enfoque de evaluación es distinta al que se realiza sobre la bondad del ajuste (en la [Sección 2.6](#sec-u12-diagnostico) y sobre la utilidad inferencial (en la [Sección 2.5](#sec-u12-inferencia)).
+eventos de no-eventos?—. Este enfoque de evaluación es distinto del que se realiza sobre la utilidad inferencial y la bondad del ajuste ([Sección 2.5](#sec-u12-inferencia)) y del diagnóstico caso a caso ([Sección 2.6](#sec-u12-diagnostico)).
 
 ### Del umbral a la matriz de confusión.
 
@@ -1875,7 +1896,7 @@ Alternativa con `yardstick`: `roc_auc(eval_df, truth, prob, event_level = "secon
 Con el fin de resumir lo trabajado en esta unidad al respecto de cómo evaluar y analizar qué nos proporciona un ajuste, hemos respondido una serie de preguntas, y proporcionado una serie de herramientas con las que contestarlas, y son:
 
 - **¿Aporta? ¿qué modelo?** (utilidad e inferencia) → Wald, LRT ómnibus, AIC/BIC ([2.5](#sec-u12-inferencia)).
-- **¿Ajusta bien?** (bondad de ajuste) → residuos, calibración, Hosmer–Lemeshow ([2.6](#sec-u12-diagnostico)).
+- **¿Ajusta bien?** (bondad de ajuste) → deviance frente al saturado ([2.5](#sec-u12-inferencia)), inservible en binaria individual, y en su lugar residuos, calibración y Hosmer–Lemeshow ([2.6](#sec-u12-diagnostico)).
 - **¿Discrimina bien?** (clasificación) → matriz de confusión, ROC/AUC, umbral ([2.7](#sec-u12-evaluacion)).
 
 Un modelo puede ser **significativo** y aun así **calibrar mal** o **discriminar poco**:

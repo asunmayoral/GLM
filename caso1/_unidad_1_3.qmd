@@ -131,7 +131,7 @@ a las del caso individual. Lo que cambia —y es la ganancia de agrupar— es la
 
 ## 3.2 Bondad de ajuste y diagnóstico en datos binomiales {#sec-u13-gof-binomial}
 
-En la [Sección 2.6](#sec-u12-diagnostico) vimos que, con datos **individuales**, ni la deviance ni el
+En la [Sección 2.5](#sec-u12-inferencia) vimos que, con datos **individuales**, ni la deviance ni el
 estadístico de Pearson sirven como test absoluto de ajuste: el saturado crece con $n$ y la asintótica
 $\chi^2$ no se sostiene. Con datos **agrupados** (y $m_i$ suficientemente grandes) esa asintótica
 **se recupera** [@agresti2015; @faraway2016]. También cobran relevancia ciertos residuos comunes en los GLM que no funcionaban en el caso binario. Presentamos en primer lugar estos residuos y construimos, a partir de ellos y con su **suma de cuadrados**, los estadísticos globales de bondad de ajuste.
@@ -256,7 +256,7 @@ c(p_deviance = pchisq(deviance(fit_bin), gl, lower.tail = FALSE),
 
 Al conseguir un p-valor **alto** (muy superior a la significatividad 0.05) no evidenciamos falta de ajuste (no podemos rechazar el modelo ajustado frente al saturado), y así concluimos que el modelo reproduce
 razonablemente las proporciones por celda. Es exactamente el
-contraste que en la [Sección 2.6](#sec-u12-diagnostico) no podíamos usar y que ahora, 
+contraste que en la [Sección 2.5](#sec-u12-inferencia) no podíamos usar y que ahora, 
 al agrupar, recupera su sentido.
 
 ::: {.callout-important}
@@ -494,7 +494,7 @@ En `vglm`:
 - `coef(m_vglm, matrix = TRUE)`.
 
 **Bondad de ajuste.** Con datos individuales no hay $\chi^2$ de bondad de ajuste
-([Sección 2.6](#sec-u12-diagnostico)); se usan la verosimilitud y los criterios de información: `logLik()`, `AIC()`, `BIC()`,
+([Sección 2.5](#sec-u12-inferencia)); se usan la verosimilitud y los criterios de información: `logLik()`, `AIC()`, `BIC()`,
 `deviance()`. 
 
 **Comparación de modelos.** Modelos **anidados** con el LRT —`lmtest::lrtest(m0, m_nom)` (o `anova()` en `vglm`)—;
