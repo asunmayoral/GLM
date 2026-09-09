@@ -92,7 +92,6 @@ glimpse(banco$averias)
 
 # (Esta unidad no contiene chunks de código: es de encargo y evaluación.)
 
-
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------
 # Todo trabajo del curso cierra dejando constancia de con qué se ejecutó.
 # session_info() añade a sessionInfo() la fecha y la procedencia de cada

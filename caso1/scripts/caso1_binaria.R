@@ -5,6 +5,8 @@
 # descriptivos de presentación del caso. El código de las unidades está
 # en los scripts unidad_*.R de esta misma carpeta.
 #
+# Cada bloque lleva su LABEL y la ruta de encabezados donde aparece.
+#
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
 # =============================================================================
@@ -53,7 +55,8 @@ if (length(.otra))
 rm(.falta, .instalada, .otra)
 
 # -----------------------------------------------------------------------------
-# [setup]  ·  
+# [setup]
+#   (sin sección)
 # -----------------------------------------------------------------------------
 # Núcleo de software (cada unidad carga además lo suyo: lme4, nnet, ordinal,
 # pROC, performance, DHARMa, marginaleffects, car, survival...).
@@ -75,7 +78,8 @@ set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
 # -----------------------------------------------------------------------------
-# [carga-datos]  ·  Dato real — GLOW
+# [carga-datos]
+#   Presentación del caso > Dato real — GLOW
 # -----------------------------------------------------------------------------
 data(glow500)
 glow <- glow500 |>
@@ -85,7 +89,8 @@ glow <- glow500 |>
 glow |> count(fracture) |> mutate(prop = round(n / sum(n), 3))
 
 # -----------------------------------------------------------------------------
-# [fig-glow-eda]  ·  Dato real — GLOW
+# [fig-glow-eda]
+#   Presentación del caso > Dato real — GLOW
 # -----------------------------------------------------------------------------
 # Covariables sustantivas de GLOW (dejo fuera los identificadores)
 vars <- c("age", "weight", "height", "bmi", "fracscore",   # continuas / discretas
@@ -113,7 +118,8 @@ glow |>
   theme(legend.position = "bottom")
 
 # -----------------------------------------------------------------------------
-# [cohorte-sim]  ·  Cohorte simulada
+# [cohorte-sim]
+#   Presentación del caso > Cohorte simulada
 # -----------------------------------------------------------------------------
 library(readr)
 source(url_glm("caso1/R/dgp_cohorte.R"))   # funciones del proceso generador
@@ -125,7 +131,8 @@ glimpse(cohorte)
 head(cohorte)
 
 # -----------------------------------------------------------------------------
-# [fig-cohorte-eda]  ·  Cohorte simulada
+# [fig-cohorte-eda]
+#   Presentación del caso > Cohorte simulada
 # -----------------------------------------------------------------------------
 # Preparo factores legibles (x2, tiempo y el desenlace como categóricos)
 cohorte_eda <- cohorte |>
@@ -158,7 +165,8 @@ cohorte_eda |>
   theme(legend.position = "bottom")
 
 # -----------------------------------------------------------------------------
-# [session-info]  ·  Reproducibilidad
+# [session-info]
+#   Reproducibilidad
 # -----------------------------------------------------------------------------
 sessionInfo()
 # renv::snapshot()   # fijar el estado del entorno al cerrar el caso

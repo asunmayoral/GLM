@@ -2,7 +2,8 @@
 # Caso 1 · Unidad 1.1 — 1 · Cuando la recta no llega: del dato binario al marco GLM
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_1.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -91,7 +92,9 @@ glimpse(cohorte)
 head(cohorte)
 
 # -----------------------------------------------------------------------------
-# [fig-glow-eda-box]  ·  1.1 El modelo lineal en GLOW
+# [fig-glow-eda-box]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.1 El modelo lineal en GLOW
 # -----------------------------------------------------------------------------
 glow |>
   ggplot(aes(x = fracture, y = age, fill = fracture)) +
@@ -103,7 +106,9 @@ glow |>
   guides(fill = "none")
 
 # -----------------------------------------------------------------------------
-# [fig-u11-eda]  ·  1.1 El modelo lineal en GLOW
+# [fig-u11-eda]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.1 El modelo lineal en GLOW
 # -----------------------------------------------------------------------------
 glow |>
   mutate(edad_grupo = cut(age, breaks = seq(55, 95, by = 5))) |>
@@ -118,7 +123,9 @@ glow |>
        color = "Fractura previa", size = "n")
 
 # -----------------------------------------------------------------------------
-# [fig-u11-ols-extrapola]  ·  1.1 El modelo lineal en GLOW
+# [fig-u11-ols-extrapola]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.1 El modelo lineal en GLOW
 # -----------------------------------------------------------------------------
 fit_ols <- lm(fractura01 ~ age + priorfrac, data = glow)
 rango <- range(glow$age)
@@ -137,7 +144,9 @@ ggplot(grid_ext, aes(age, p_hat, color = priorfrac)) +
        y = "Probabilidad predicha (OLS)", color = "Fractura previa")
 
 # -----------------------------------------------------------------------------
-# [fig-u11-diagnostico-ols]  ·  1.1 El modelo lineal en GLOW
+# [fig-u11-diagnostico-ols]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.1 El modelo lineal en GLOW
 # -----------------------------------------------------------------------------
 fit_ols <- lm(fractura01 ~ age + priorfrac, data = glow)
 
@@ -160,7 +169,9 @@ g_qplot <- tibble(residuo = residuals(fit_ols)) |>
 patchwork::wrap_plots(g_res, g_qplot, ncol = 2)
 
 # -----------------------------------------------------------------------------
-# [fig-u11-logit-inversa]  ·  1.3 Los tres componentes de un GLM
+# [fig-u11-logit-inversa]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.3 Los tres componentes de un GLM
 # -----------------------------------------------------------------------------
 library(patchwork)
 g1 <- tibble(p = seq(0.001, 0.999, by = 0.001)) |>
@@ -182,14 +193,18 @@ g2 <- tibble(eta = seq(-6, 6, by = 0.05)) |>
 g1 + g2
 
 # -----------------------------------------------------------------------------
-# [u11-primer-glm]  ·  🔧 En R. El glm() con datos binarios
+# [u11-primer-glm]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.4 GLM en datos binarios
 # -----------------------------------------------------------------------------
 fit_glm <- glm(fracture ~ age + priorfrac, family = binomial, data = glow)
 # Resultado del ajuste
 summary(fit_glm)
 
 # -----------------------------------------------------------------------------
-# [u11-broom]  ·  🔧 En R. El glm() con datos binarios
+# [u11-broom]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.4 GLM en datos binarios
 # -----------------------------------------------------------------------------
 tidy(fit_glm)                                     # coeficientes (escala log-odds)
 glance(fit_glm)                                   # deviance, AIC, BIC, gl...
@@ -198,7 +213,9 @@ augment(fit_glm, type.predict = "response") |>    # ajustes en escala probabilid
   slice_head(n = 5)
 
 # -----------------------------------------------------------------------------
-# [fig-u11-ols-vs-logistica]  ·  🔧 En R. El glm() con datos binarios
+# [fig-u11-ols-vs-logistica]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.4 GLM en datos binarios
 # -----------------------------------------------------------------------------
 # Rejilla de predicción de los modelos 
 grid <- expand_grid(
@@ -230,7 +247,9 @@ ggplot() +
        color = "Fractura previa", size = "n")
 
 # -----------------------------------------------------------------------------
-# [fig-u11-residuos-ols-glm]  ·  🔧 En R. El glm() con datos binarios
+# [fig-u11-residuos-ols-glm]
+#   1 · Cuando la recta no llega: del dato binario al marco GLM
+#     > 1.4 GLM en datos binarios
 # -----------------------------------------------------------------------------
 p_ols <- plot(performance::binned_residuals(fit_ols)) +
   labs(title = "OLS (modelo lineal de probabilidad)")

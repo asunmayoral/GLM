@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.6 — 6 · Del conteo al reloj. Supervivencia
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_6.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -79,7 +80,10 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u26-datos]  ·  6.1 El hazard como una tasa: el problema del tiempo a evento > Los datos y la pregunta
+# [u26-datos]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.1 El hazard como una tasa: el problema del tiempo a evento
+#       > Los datos y la pregunta
 # -----------------------------------------------------------------------------
 cartera |>
   dplyr::select(id_poliza, tiempo_primer_sin, evento, exposicion,
@@ -87,7 +91,10 @@ cartera |>
   head(8)
 
 # -----------------------------------------------------------------------------
-# [fig-u26-km]  ·  Cómo leer una fila: (exposicion,tiempo_primer_sin, evento) > Una primera mirada: la curva de supervivencia
+# [fig-u26-km]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.1 El hazard como una tasa: el problema del tiempo a evento
+#       > Una primera mirada: la curva de supervivencia
 # -----------------------------------------------------------------------------
 km <- survfit(Surv(tiempo_primer_sin, evento) ~ zona_circulacion, data = cartera)
 broom::tidy(km) |>
@@ -96,14 +103,21 @@ broom::tidy(km) |>
   labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = "zona")
 
 # -----------------------------------------------------------------------------
-# [u26-pp]  ·  Cómo leer una fila: (exposicion,tiempo_primer_sin, evento) > La transformación a persona-periodo (y por qué)
+# [u26-pp]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.1 El hazard como una tasa: el problema del tiempo a evento
+#       > La transformación a persona-periodo (y por qué)
 # -----------------------------------------------------------------------------
 pp <- expandir_poliza_tramo(cartera, "tiempo_primer_sin", "evento", col_id = "id_poliza")
 # la primera póliza, desplegada en sus tramos en riesgo:
 head(pp[pp$id == pp$id[1], c("id", "tramo", "y", "zona_circulacion", "uso")], 8)
 
 # -----------------------------------------------------------------------------
-# [u26-haz-emp]  ·  6.2 El modelo de riesgos a trozos como GLM de Poisson > Qué dicen los datos antes de modelar
+# [u26-haz-emp]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > El eje del tiempo: el hazard base
 # -----------------------------------------------------------------------------
 pp |>
   dplyr::group_by(tramo) |>
@@ -111,7 +125,11 @@ pp |>
                    hazard = round(mean(y), 4), .groups = "drop")
 
 # -----------------------------------------------------------------------------
-# [fig-u26-haz-emp]  ·  6.2 El modelo de riesgos a trozos como GLM de Poisson > Qué dicen los datos antes de modelar
+# [fig-u26-haz-emp]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > El eje del tiempo: el hazard base
 # -----------------------------------------------------------------------------
 pp |>
   dplyr::group_by(tramo) |>
@@ -122,7 +140,11 @@ pp |>
   labs(x = "tramo de antigüedad", y = "hazard empírico (eventos / en riesgo)")
 
 # -----------------------------------------------------------------------------
-# [u26-eda-prep]  ·  🔧 En R. Calcular supervivencia y hazard
+# [u26-eda-prep]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > Los predictores, en tres miradas
 # -----------------------------------------------------------------------------
 vars_cont <- c("edad_conductor", "antiguedad_carnet")
 vars_cate <- c("sexo", "tipo_vehiculo", "zona_circulacion")
@@ -146,7 +168,11 @@ km_all <- purrr::map_dfr(vars_eda, \(v) {
 })
 
 # -----------------------------------------------------------------------------
-# [fig-u26-eda-km]  ·  🔧 En R. Calcular supervivencia y hazard
+# [fig-u26-eda-km]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > Los predictores, en tres miradas
 # -----------------------------------------------------------------------------
 patchwork::wrap_plots(
   purrr::map(vars_eda, \(v) {
@@ -163,7 +189,11 @@ patchwork::wrap_plots(
 )
 
 # -----------------------------------------------------------------------------
-# [fig-u26-eda-haz]  ·  🔧 En R. Calcular supervivencia y hazard
+# [fig-u26-eda-haz]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > Los predictores, en tres miradas
 # -----------------------------------------------------------------------------
 purrr::map_dfr(vars_eda, \(v) pp_eda |>
   dplyr::group_by(nivel = as.character(.data[[v]])) |>
@@ -176,7 +206,11 @@ purrr::map_dfr(vars_eda, \(v) pp_eda |>
   labs(x = NULL, y = "hazard empírico (media de y)")
 
 # -----------------------------------------------------------------------------
-# [fig-u26-eda-loglog]  ·  🔧 En R. Calcular supervivencia y hazard
+# [fig-u26-eda-loglog]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Qué dicen los datos antes de modelar
+#         > Los predictores, en tres miradas
 # -----------------------------------------------------------------------------
 patchwork::wrap_plots(
   purrr::map(vars_eda, \(v) {
@@ -193,7 +227,10 @@ patchwork::wrap_plots(
 )
 
 # -----------------------------------------------------------------------------
-# [u26-pw]  ·  🔧 En R. Calcular supervivencia y hazard > Ajuste e interpretación
+# [u26-pw]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_pw <- glm(
   y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
@@ -203,13 +240,21 @@ broom::tidy(m_pw, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::filter(!grepl("^tramo", term))
 
 # -----------------------------------------------------------------------------
-# [u26-ph-check]  ·  🔧 En R. El modelo de riesgos a trozos como glm(poisson) > Bondad de ajuste, diagnóstico y predicción
+# [u26-ph-check]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Bondad de ajuste, diagnóstico y predicción
+#         > Diagnóstico: los supuestos que sostienen el modelo
 # -----------------------------------------------------------------------------
 m_int <- update(m_pw, . ~ . + tramo:zona_circulacion)
 anova(m_pw, m_int, test = "Chisq")
 
 # -----------------------------------------------------------------------------
-# [fig-u26-pw-surv]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos)
+# [fig-u26-pw-surv]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Bondad de ajuste, diagnóstico y predicción
+#         > Predicción: el hazard y la supervivencia de un perfil
 # -----------------------------------------------------------------------------
 perfil <- pp[rep(1, nlevels(pp$tramo)), ]
 perfil$tramo <- factor(levels(pp$tramo), levels = levels(pp$tramo))
@@ -232,7 +277,11 @@ curva |>
   labs(x = "tramo de antigüedad", y = NULL)
 
 # -----------------------------------------------------------------------------
-# [u26-pw-valida]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos) > Validación contra el DGP
+# [u26-pw-valida]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Validación contra el DGP
+#         > 1. La forma del hazard base
 # -----------------------------------------------------------------------------
 verdad    <- attr(cartera, "verdad")
 razon_dgp <- verdad$h0_tramo / verdad$h0_tramo[1]
@@ -245,7 +294,11 @@ tibble::tibble(
 )
 
 # -----------------------------------------------------------------------------
-# [u26-pw-valida-beta]  ·  🔧 En R. Contrastar la proporcionalidad (modelo a trozos) > Validación contra el DGP
+# [u26-pw-valida-beta]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.2 El modelo de riesgos a trozos como GLM de Poisson
+#       > Validación contra el DGP
+#         > 2. Los efectos de las covariables
 # -----------------------------------------------------------------------------
 b <- setNames(verdad$betas$evento, verdad$nombres_beta)
 
@@ -275,7 +328,10 @@ dplyr::bind_rows(
   dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 # -----------------------------------------------------------------------------
-# [u26-cloglog]  ·  6.3 Dos lentes del mismo hazard: Poisson y cloglog > Ajuste y comparación
+# [u26-cloglog]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.3 Dos lentes del mismo hazard: Poisson y cloglog
+#       > Ajuste y comparación
 # -----------------------------------------------------------------------------
 m_cll <- glm(
   y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion,
@@ -292,7 +348,10 @@ comp <- dplyr::inner_join(
 comp
 
 # -----------------------------------------------------------------------------
-# [u26-cox]  ·  6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier > Cox: el mismo efecto, otro trato del hazard base
+# [u26-cox]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier
+#       > Cox: el mismo efecto, otro trato del hazard base
 # -----------------------------------------------------------------------------
 m_cox <- coxph(
   Surv(tiempo_primer_sin, evento) ~ edad_conductor + antiguedad_carnet + sexo +
@@ -310,19 +369,28 @@ comp_cox <- dplyr::inner_join(
 comp_cox
 
 # -----------------------------------------------------------------------------
-# [u26-zph]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox
+# [u26-zph]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier
+#       > Cox: el mismo efecto, otro trato del hazard base
 # -----------------------------------------------------------------------------
 cox.zph(m_cox)
 
 # -----------------------------------------------------------------------------
-# [fig-u26-zph]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox
+# [fig-u26-zph]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier
+#       > Cox: el mismo efecto, otro trato del hazard base
 # -----------------------------------------------------------------------------
 par(mfrow = c(2, 3))
 plot(cox.zph(m_cox))
 par(mfrow = c(1, 1))
 
 # -----------------------------------------------------------------------------
-# [fig-u26-km-vs-pw]  ·  🔧 En R. Contrastar la proporcionalidad en un modelo de Cox > Kaplan–Meier: la curva sin modelo frente a la del modelo
+# [fig-u26-km-vs-pw]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.4 ¿Comparable con los clásicos? Cox y Kaplan–Meier
+#       > Kaplan–Meier: la curva sin modelo frente a la del modelo
 # -----------------------------------------------------------------------------
 m_base <- glm(y ~ 0 + tramo, family = poisson, data = pp)   # solo el hazard base
 S_pw   <- exp(-cumsum(exp(coef(m_base))))
@@ -339,7 +407,9 @@ dplyr::bind_rows(
   labs(x = "tramo de antigüedad", y = "supervivencia estimada  S(t)", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [u26-frailty]  ·  6.5 Fragilidad ≡ GLMM de Poisson
+# [u26-frailty]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.5 Fragilidad ≡ GLMM de Poisson
 # -----------------------------------------------------------------------------
 m_frag <- glmer(
   y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion +
@@ -350,7 +420,9 @@ sd_frag <- as.data.frame(VarCorr(m_frag))$sdcor[1]
 c(sigma_agencia = sd_frag)
 
 # -----------------------------------------------------------------------------
-# [u26-bookend]  ·  6.6 Conteos y supervivencia: dos caras de la tasa
+# [u26-bookend]
+#   6 · Del conteo al reloj. Supervivencia
+#     > 6.6 Conteos y supervivencia: dos caras de la tasa
 # -----------------------------------------------------------------------------
 c(poisson_en_cero = dpois(0, 0.3), exp_supervivencia = exp(-0.3))
 

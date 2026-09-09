@@ -5,6 +5,8 @@
 # descriptivos de presentación del caso. El código de las unidades está
 # en los scripts unidad_*.R de esta misma carpeta.
 #
+# Cada bloque lleva su LABEL y la ruta de encabezados donde aparece.
+#
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
 # =============================================================================
@@ -55,7 +57,8 @@ if (length(.otra))
 rm(.falta, .instalada, .otra)
 
 # -----------------------------------------------------------------------------
-# [setup]  ·  
+# [setup]
+#   (sin sección)
 # -----------------------------------------------------------------------------
 # Núcleo.
 library(broom)
@@ -75,14 +78,16 @@ set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
 # -----------------------------------------------------------------------------
-# [cartera-sim]  ·  El contexto y los datos
+# [cartera-sim]
+#   Presentación del caso > El contexto y los datos
 # -----------------------------------------------------------------------------
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [tbl-cartera-resp]  ·  El contexto y los datos
+# [tbl-cartera-resp]
+#   Presentación del caso > El contexto y los datos
 # -----------------------------------------------------------------------------
 resp <- c("n_asistencia", "n_danos", "n_fraude", "n_gestiones")
 purrr::map_dfr(resp, ~ tibble::tibble(
@@ -93,7 +98,8 @@ purrr::map_dfr(resp, ~ tibble::tibble(
   var_media = round(var(cartera[[.x]]) / mean(cartera[[.x]]), 2)))
 
 # -----------------------------------------------------------------------------
-# [fig-cartera-eda]  ·  El contexto y los datos
+# [fig-cartera-eda]
+#   Presentación del caso > El contexto y los datos
 # -----------------------------------------------------------------------------
 cartera |>
   dplyr::select(dplyr::all_of(resp)) |>

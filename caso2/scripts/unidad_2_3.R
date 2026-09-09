@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.3 — 3 · Sobredispersión
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_3.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -79,7 +80,10 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-eda-modelo]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
+# [fig-u23-eda-modelo]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > La huella: media frente a varianza
 # -----------------------------------------------------------------------------
 dplyr::bind_rows(
   purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
@@ -96,7 +100,10 @@ dplyr::bind_rows(
   labs(x = "nivel (cuartil, en los continuos)", y = "tasa de partes por daños (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
-# [fig-u23-media-varianza]  ·  3.1 Qué es, de dónde viene y cómo se identifica > La huella: media frente a varianza
+# [fig-u23-media-varianza]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > La huella: media frente a varianza
 # -----------------------------------------------------------------------------
 m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                 offset(log(exposicion)), family = poisson, data = cartera)
@@ -128,7 +135,10 @@ ggplot() +
   labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-heterogeneidad]  ·  3.1 Qué es, de dónde viene y cómo se identifica > De dónde viene
+# [fig-u23-heterogeneidad]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > De dónde viene
 # -----------------------------------------------------------------------------
 set.seed(2026)
 n <- 5000; media <- 2
@@ -144,14 +154,20 @@ dplyr::bind_rows(
   labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u23-indice]  ·  3.1 Qué es, de dónde viene y cómo se identifica > El índice de dispersión
+# [u23-indice]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > El índice de dispersión
 # -----------------------------------------------------------------------------
 phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
 phi_dev     <- deviance(m_pois) / df.residual(m_pois)
 c(pearson = phi_pearson, deviance = phi_dev)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-rootograma]  ·  3.1 Qué es, de dónde viene y cómo se identifica > El rootograma: ver dónde falla el ajuste
+# [fig-u23-rootograma]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > El rootograma: ver dónde falla el ajuste
 # -----------------------------------------------------------------------------
 mu <- fitted(m_pois); K <- 0:8
 esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
@@ -165,7 +181,10 @@ tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
   labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u23-tests]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u23-tests]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
 # Tests de sobredispersión
 print(performance::check_overdispersion(m_pois))
@@ -173,13 +192,19 @@ print(AER::dispersiontest(m_pois))
 print(DHARMa::testDispersion(m_pois, plot = FALSE))
 
 # -----------------------------------------------------------------------------
-# [u23-trafo]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u23-trafo]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
 print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
 print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
 
 # -----------------------------------------------------------------------------
-# [u23-trafo-manual]  ·  3.1 Qué es, de dónde viene y cómo se identifica > Los contrastes: ¿hay sobredispersión y de qué tipo?
+# [u23-trafo-manual]
+#   3 · Sobredispersión
+#     > 3.1 Qué es, de dónde viene y cómo se identifica
+#       > Los contrastes: ¿hay sobredispersión y de qué tipo?
 # -----------------------------------------------------------------------------
 mu <- fitted(m_pois); y <- cartera$n_danos
 r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
@@ -192,14 +217,16 @@ rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = me
       test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
 
 # -----------------------------------------------------------------------------
-# [u23-quasi-fit]  ·  3.2 Quasi-Poisson > Ajuste e interpretación
+# [u23-quasi-fit]
+#   3 · Sobredispersión > 3.2 Quasi-Poisson > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                  offset(log(exposicion)), family = quasipoisson, data = cartera)
 summary(m_quasi)$dispersion   # phi estimado
 
 # -----------------------------------------------------------------------------
-# [u23-quasi-comp]  ·  3.2 Quasi-Poisson > Ajuste e interpretación
+# [u23-quasi-comp]
+#   3 · Sobredispersión > 3.2 Quasi-Poisson > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 dplyr::left_join(
   broom::tidy(m_pois)  |> dplyr::select(term, estimacion = estimate, se_poisson = std.error),
@@ -207,7 +234,8 @@ dplyr::left_join(
   by = "term")
 
 # -----------------------------------------------------------------------------
-# [fig-u23-quasi-resid]  ·  🔧 En R. Ajustar una quasi-Poisson > Bondad de ajuste y diagnóstico
+# [fig-u23-quasi-resid]
+#   3 · Sobredispersión > 3.2 Quasi-Poisson > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 tibble::tibble(ajustado = fitted(m_quasi),
                residuo  = residuals(m_quasi, type = "pearson")) |>
@@ -218,14 +246,16 @@ tibble::tibble(ajustado = fitted(m_quasi),
   labs(x = "valor ajustado", y = "residuo de Pearson")
 
 # -----------------------------------------------------------------------------
-# [u23-nb-fit]  ·  3.3 Binomial negativa > Ajuste e interpretación
+# [u23-nb-fit]
+#   3 · Sobredispersión > 3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_nb <- MASS::glm.nb(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                        offset(log(exposicion)), data = cartera)
 c(theta = m_nb$theta, se_theta = m_nb$SE.theta)   # dispersion estimada
 
 # -----------------------------------------------------------------------------
-# [u23-nb1]  ·  3.3 Binomial negativa > Ajuste e interpretación
+# [u23-nb1]
+#   3 · Sobredispersión > 3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
                             tipo_vehiculo + offset(log(exposicion)),
@@ -233,7 +263,8 @@ m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulac
 sigma(m_nb1)   # dispersion alpha de la NB1
 
 # -----------------------------------------------------------------------------
-# [u23-nb1-quasi]  ·  3.3 Binomial negativa > Ajuste e interpretación
+# [u23-nb1-quasi]
+#   3 · Sobredispersión > 3.3 Binomial negativa > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
 se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
@@ -241,23 +272,35 @@ data.frame(term = names(se_q), se_quasi = round(se_q, 4),
            se_nb1 = round(se_nb1[names(se_q)], 4))
 
 # -----------------------------------------------------------------------------
-# [u23-nb-disp]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
+# [u23-nb-disp]
+#   3 · Sobredispersión
+#     > 3.3 Binomial negativa
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
 round(c(NB2 = disp(m_nb), NB1 = disp(m_nb1)), 3)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-nb2-dharma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
+# [fig-u23-nb2-dharma]
+#   3 · Sobredispersión
+#     > 3.3 Binomial negativa
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 DHARMa::simulateResiduals(m_nb, plot = TRUE)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-nb1-dharma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
+# [fig-u23-nb1-dharma]
+#   3 · Sobredispersión
+#     > 3.3 Binomial negativa
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 DHARMa::simulateResiduals(m_nb1, plot = TRUE)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-nb-rootograma]  ·  🔧 En R. Ajustar una binomial negativa (NB1 y NB2) > Bondad de ajuste y diagnóstico
+# [fig-u23-nb-rootograma]
+#   3 · Sobredispersión
+#     > 3.3 Binomial negativa
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
 esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
@@ -272,7 +315,10 @@ tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb)
   labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-comp-modelos]  ·  3.4 Elegir, comparar y conectar > Los cuatro modelos, lado a lado
+# [fig-u23-comp-modelos]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > Los cuatro modelos, lado a lado
 # -----------------------------------------------------------------------------
 ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
   s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
@@ -291,7 +337,10 @@ purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
 # -----------------------------------------------------------------------------
-# [u23-aic-comp]  ·  3.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
+# [u23-aic-comp]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > La decisión formal: AIC y LRT
 # -----------------------------------------------------------------------------
 mods_lik <- list(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb)
 data.frame(modelo = names(mods_lik),
@@ -300,19 +349,28 @@ data.frame(modelo = names(mods_lik),
   dplyr::arrange(AIC)
 
 # -----------------------------------------------------------------------------
-# [u23-lrt]  ·  3.4 Elegir, comparar y conectar > La decisión formal: AIC y LRT
+# [u23-lrt]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > La decisión formal: AIC y LRT
 # -----------------------------------------------------------------------------
 LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
 c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
 
 # -----------------------------------------------------------------------------
-# [u23-perf]  ·  3.4 Elegir, comparar y conectar > Una lectura estándar de bondad de ajuste
+# [u23-perf]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > Una lectura estándar de bondad de ajuste
 # -----------------------------------------------------------------------------
 performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
                                  metrics = c("AIC", "BIC", "RMSE"))
 
 # -----------------------------------------------------------------------------
-# [u23-pred-comp]  ·  🔧 En R. Bondad de ajuste en modelos de conteo > Predicciones: misma media, distinto riesgo
+# [u23-pred-comp]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > Predicciones: misma media, distinto riesgo
 # -----------------------------------------------------------------------------
 i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
 mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
@@ -323,7 +381,10 @@ round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguale
       3)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-pred-dist]  ·  🔧 En R. Bondad de ajuste en modelos de conteo > Predicciones: misma media, distinto riesgo
+# [fig-u23-pred-dist]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > Predicciones: misma media, distinto riesgo
 # -----------------------------------------------------------------------------
 K <- 0:16
 mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
@@ -339,7 +400,10 @@ dist |>
   labs(x = "nº de partes", y = "probabilidad", colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [u23-validacion]  ·  Cuándo cada una > Validación contra el DGP
+# [u23-validacion]
+#   3 · Sobredispersión
+#     > 3.4 Elegir, comparar y conectar
+#       > Validación contra el DGP
 # -----------------------------------------------------------------------------
 verdad <- attr(cartera, "verdad")
 c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))

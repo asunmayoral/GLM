@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.7 — 7 · Selección, validación cruzada y regularización
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_7.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -78,7 +79,8 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u27-datos]  ·  Sobre esta unidad
+# [u27-datos]
+#   7 · Selección, validación cruzada y regularización
 # -----------------------------------------------------------------------------
 # Predictores del riesgo (activos en el DGP) + bloque de ruido (relación nula por diseño).
 activos <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo",
@@ -90,7 +92,10 @@ predictores <- c(activos, ruido)
 cartera |> dplyr::select(n_asistencia, exposicion, dplyr::all_of(predictores)) |> dplyr::glimpse()
 
 # -----------------------------------------------------------------------------
-# [u27-optimismo]  ·  7.1 De la selección clásica a la validación cruzada > Ajustar bien no es predecir bien
+# [u27-optimismo]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.1 De la selección clásica a la validación cruzada
+#       > Ajustar bien no es predecir bien
 # -----------------------------------------------------------------------------
 f_activos <- reformulate(c(activos, "offset(log(exposicion))"), response = "n_asistencia")
 f_todo    <- reformulate(c(predictores, "offset(log(exposicion))"), response = "n_asistencia")
@@ -102,12 +107,18 @@ c(dev_activos = deviance(m_activos), dev_todo = deviance(m_todo),
   gl_activos = m_activos$df.residual, gl_todo = m_todo$df.residual)
 
 # -----------------------------------------------------------------------------
-# [u27-lrt]  ·  7.1 De la selección clásica a la validación cruzada > Ajustar bien no es predecir bien
+# [u27-lrt]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.1 De la selección clásica a la validación cruzada
+#       > Ajustar bien no es predecir bien
 # -----------------------------------------------------------------------------
 anova(m_activos, m_todo, test = "LRT")
 
 # -----------------------------------------------------------------------------
-# [u27-aic-bic]  ·  7.1 De la selección clásica a la validación cruzada > El apaño analítico: AIC y BIC
+# [u27-aic-bic]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.1 De la selección clásica a la validación cruzada
+#       > El apaño analítico: AIC y BIC
 # -----------------------------------------------------------------------------
 tibble::tibble(
   modelo = c("solo activos", "activos + ruido"),
@@ -116,7 +127,10 @@ tibble::tibble(
   BIC    = c(BIC(m_activos), BIC(m_todo)))
 
 # -----------------------------------------------------------------------------
-# [u27-cv-funcion]  ·  7.1 De la selección clásica a la validación cruzada > La validación cruzada: medir el error donde importa
+# [u27-cv-funcion]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.1 De la selección clásica a la validación cruzada
+#       > La validación cruzada: medir el error donde importa
 # -----------------------------------------------------------------------------
 # Deviance de Poisson OUT-OF-SAMPLE = deviance de la familia aplicada a (y de test, mu predicha).
 # poisson()$dev.resids(y, mu, w) da las contribuciones a la deviance que R suma en deviance(fit);
@@ -139,7 +153,10 @@ cv_deviance <- function(formula, datos, k = 10, semilla = SEMILLA_CURSO) {
 }
 
 # -----------------------------------------------------------------------------
-# [u27-cv-comparar]  ·  7.1 De la selección clásica a la validación cruzada > La validación cruzada: medir el error donde importa
+# [u27-cv-comparar]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.1 De la selección clásica a la validación cruzada
+#       > La validación cruzada: medir el error donde importa
 # -----------------------------------------------------------------------------
 f_nulo <- n_asistencia ~ offset(log(exposicion))
 tibble::tibble(
@@ -149,7 +166,10 @@ tibble::tibble(
                    cv_deviance(f_todo, cartera)))
 
 # -----------------------------------------------------------------------------
-# [u27-glmnet-matriz]  ·  Por qué el $L_1$ pone ceros y el $L_2$ no > glmnet sobre la Poisson
+# [u27-glmnet-matriz]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > glmnet sobre la Poisson
 # -----------------------------------------------------------------------------
 library(glmnet)
 x  <- model.matrix(reformulate(predictores), data = cartera)[, -1]  # quita el intercepto
@@ -158,13 +178,19 @@ os <- log(cartera$exposicion)                                       # offset de 
 dim(x)
 
 # -----------------------------------------------------------------------------
-# [fig-u27-ruta-lasso]  ·  Por qué el $L_1$ pone ceros y el $L_2$ no > glmnet sobre la Poisson
+# [fig-u27-ruta-lasso]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > glmnet sobre la Poisson
 # -----------------------------------------------------------------------------
 fit_lasso <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)
 plot(fit_lasso, xvar = "lambda", label = TRUE)
 
 # -----------------------------------------------------------------------------
-# [fig-u27-cvglmnet]  ·  Por qué el $L_1$ pone ceros y el $L_2$ no > Elegir $\lambda$: cv.glmnet
+# [fig-u27-cvglmnet]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > Elegir $\lambda$: cv.glmnet
 # -----------------------------------------------------------------------------
 set.seed(SEMILLA_CURSO)
 cv_lasso <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
@@ -173,7 +199,10 @@ plot(cv_lasso)
 c(lambda_min = cv_lasso$lambda.min, lambda_1se = cv_lasso$lambda.1se)
 
 # -----------------------------------------------------------------------------
-# [u27-lasso-coef]  ·  🔧 En R. Regularizar con glmnet y cv.glmnet > El lasso como selección: ¿acierta con la verdad?
+# [u27-lasso-coef]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > El lasso como selección: ¿acierta con la verdad?
 # -----------------------------------------------------------------------------
 coef_1se <- coef(cv_lasso, s = "lambda.1se")
 coef_min <- coef(cv_lasso, s = "lambda.min")
@@ -193,7 +222,10 @@ lista_retenidas("lambda.1se", retenidas(coef_1se))
 lista_retenidas("lambda.min", retenidas(coef_min))
 
 # -----------------------------------------------------------------------------
-# [u27-lasso-irr]  ·  🔧 En R. Regularizar con glmnet y cv.glmnet > El lasso como selección: ¿acierta con la verdad?
+# [u27-lasso-irr]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > El lasso como selección: ¿acierta con la verdad?
 # -----------------------------------------------------------------------------
 # Coeficientes no nulos del modelo 1se, en escala IRR (exp del coeficiente).
 m1 <- as.matrix(coef_1se)
@@ -203,14 +235,20 @@ tibble::tibble(termino = rownames(m1), coef = m1[, 1]) |>
   dplyr::arrange(dplyr::desc(abs(coef)))
 
 # -----------------------------------------------------------------------------
-# [u27-verdad]  ·  🔧 En R. Regularizar con glmnet y cv.glmnet > El lasso como selección: ¿acierta con la verdad?
+# [u27-verdad]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > El lasso como selección: ¿acierta con la verdad?
 # -----------------------------------------------------------------------------
 verdad <- attr(cartera, "verdad")
 tibble::tibble(termino = verdad$nombres_beta, beta = verdad$betas$limpio) |>
   dplyr::mutate(IRR = exp(beta))
 
 # -----------------------------------------------------------------------------
-# [u27-tres-penalizaciones]  ·  Cómo (no) comparar la tabla estimada con la de la verdad > Ridge, lasso y elastic-net, comparados
+# [u27-tres-penalizaciones]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.2 Regularización: ridge, lasso y elastic-net
+#       > Ridge, lasso y elastic-net, comparados
 # -----------------------------------------------------------------------------
 set.seed(SEMILLA_CURSO)
 cv_ridge <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 0,   type.measure = "deviance", nfolds = 10)
@@ -225,7 +263,9 @@ tibble::tibble(
   variables_vivas = c(n_no_nulos(cv_ridge), n_no_nulos(cv_enet), n_no_nulos(cv_lasso)))
 
 # -----------------------------------------------------------------------------
-# [u27-binomial]  ·  7.3 La misma máquina en la binaria
+# [u27-binomial]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 La misma máquina en la binaria
 # -----------------------------------------------------------------------------
 set.seed(SEMILLA_CURSO)
 cv_bin <- cv.glmnet(x, cartera$evento, family = "binomial",
@@ -236,7 +276,9 @@ n_sel <- function(s) sum(as.matrix(coef(cv_bin, s = s))[, 1] != 0) - 1L
 c(no_nulos_1se = n_sel("lambda.1se"), no_nulos_min = n_sel("lambda.min"))
 
 # -----------------------------------------------------------------------------
-# [u27-binomial-min]  ·  7.3 La misma máquina en la binaria
+# [u27-binomial-min]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 La misma máquina en la binaria
 # -----------------------------------------------------------------------------
 # Coeficientes que sobreviven a lambda.min, en escala ODDS RATIO (exp del coeficiente).
 m_bin <- as.matrix(coef(cv_bin, s = "lambda.min"))

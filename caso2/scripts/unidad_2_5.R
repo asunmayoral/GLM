@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.5 — 5 · Efectos Aleatorios y Modelos Mixtos
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_5.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -78,7 +79,9 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [fig-u25-anidamiento]  ·  5.1 Qué es y de dónde viene: el agrupamiento
+# [fig-u25-anidamiento]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.1 Qué es y de dónde viene: el agrupamiento
 # -----------------------------------------------------------------------------
 tasa_global <- sum(cartera$n_gestiones) / sum(cartera$exposicion)
 cartera |>
@@ -92,7 +95,10 @@ cartera |>
   theme(legend.position = "none")
 
 # -----------------------------------------------------------------------------
-# [u25-glmm]  ·  5.2 El modelo mixto de Poisson > El modelo y su estimación
+# [u25-glmm]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > El modelo y su estimación
 # -----------------------------------------------------------------------------
 m_pois <- glm(
   n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -108,7 +114,10 @@ m_glmm <- glmer(
 summary(m_glmm)
 
 # -----------------------------------------------------------------------------
-# [u25-vc]  ·  5.2 El modelo mixto de Poisson > El modelo y su estimación
+# [u25-vc]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > El modelo y su estimación
 # -----------------------------------------------------------------------------
 # Desviaciones típicas de cada nivel (escala log).
 vc <- as.data.frame(VarCorr(m_glmm))
@@ -117,7 +126,10 @@ sd_ag  <- vc$sdcor[vc$grp == "agencia:region"]
 c(sigma_region = sd_reg, sigma_agencia = sd_ag)
 
 # -----------------------------------------------------------------------------
-# [u25-irr]  ·  Recordatorio · IRR (razón de tasas)
+# [u25-irr]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.3 Interpretación
+#       > Efectos fijos: IRR condicionales
 # -----------------------------------------------------------------------------
 ef <- summary(m_glmm)$coefficients
 data.frame(
@@ -129,12 +141,18 @@ data.frame(
   dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 # -----------------------------------------------------------------------------
-# [u25-icc]  ·  Recordatorio · ICC (correlación intraclase)
+# [u25-icc]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.3 Interpretación
+#       > Componentes de varianza e ICC
 # -----------------------------------------------------------------------------
 performance::icc(m_glmm, by_group = TRUE)
 
 # -----------------------------------------------------------------------------
-# [fig-u25-blups]  ·  Recordatorio · BLUP (predicción del efecto aleatorio)
+# [fig-u25-blups]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.3 Interpretación
+#       > BLUP: qué agencias se desvían
 # -----------------------------------------------------------------------------
 re  <- ranef(m_glmm, condVar = TRUE)$`agencia:region`
 re_df <- tibble::tibble(
@@ -149,7 +167,10 @@ ggplot(re_df, aes(b, agencia)) +
   labs(x = "desviación del log-ritmo (BLUP)", y = "agencia")
 
 # -----------------------------------------------------------------------------
-# [u25-pred]  ·  Recordatorio · Predicción condicional vs marginal
+# [u25-pred]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.3 Interpretación
+#       > Predicción: condicional frente a marginal
 # -----------------------------------------------------------------------------
 nd <- cartera |>
   dplyr::slice(1) |>
@@ -161,12 +182,18 @@ c(
 )
 
 # -----------------------------------------------------------------------------
-# [u25-drop1]  ·  5.4 Inferencia y selección > Los efectos fijos: contraste y selección
+# [u25-drop1]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.4 Inferencia y selección
+#       > Los efectos fijos: contraste y selección
 # -----------------------------------------------------------------------------
 drop1(m_glmm, test = "Chisq")
 
 # -----------------------------------------------------------------------------
-# [u25-aic]  ·  5.4 Inferencia y selección > La estructura aleatoria: ¿hace falta el agrupamiento?
+# [u25-aic]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.4 Inferencia y selección
+#       > La estructura aleatoria: ¿hace falta el agrupamiento?
 # -----------------------------------------------------------------------------
 m_nb <- glm.nb(
   n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -179,18 +206,25 @@ performance::compare_performance(
 )
 
 # -----------------------------------------------------------------------------
-# [fig-u25-dharma]  ·  5.5 Bondad de ajuste y diagnóstico
+# [fig-u25-dharma]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.5 Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 res_glmm <- simulateResiduals(m_glmm)
 plot(res_glmm)
 
 # -----------------------------------------------------------------------------
-# [u25-r2]  ·  5.5 Bondad de ajuste y diagnóstico
+# [u25-r2]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.5 Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 performance::r2(m_glmm)
 
 # -----------------------------------------------------------------------------
-# [u25-olre-disp]  ·  5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > Por qué modelizar n_danos como OLRE
+# [u25-olre-disp]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#       > Por qué modelizar n_danos como OLRE
 # -----------------------------------------------------------------------------
 m_pois_danos <- glm(
   n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -200,7 +234,10 @@ m_pois_danos <- glm(
 performance::check_overdispersion(m_pois_danos)
 
 # -----------------------------------------------------------------------------
-# [u25-olre]  ·  5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > El modelo y su ajuste
+# [u25-olre]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#       > El modelo y su ajuste
 # -----------------------------------------------------------------------------
 cartera$id_obs <- factor(seq_len(nrow(cartera)))   # un nivel aleatorio por observación
 m_olre <- glmer(
@@ -212,13 +249,19 @@ sd_olre <- as.data.frame(VarCorr(m_olre))$sdcor[1]
 c(sigma_obs = sd_olre)
 
 # -----------------------------------------------------------------------------
-# [fig-u25-olre-diag]  ·  5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > Inferencia, bondad de ajuste y diagnóstico
+# [fig-u25-olre-diag]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#       > Inferencia, bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 res_olre <- simulateResiduals(m_olre)
 plot(res_olre)
 
 # -----------------------------------------------------------------------------
-# [u25-olre-comp]  ·  5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > Comparación con la binomial negativa
+# [u25-olre-comp]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#       > Comparación con la binomial negativa
 # -----------------------------------------------------------------------------
 m_nb2 <- glm.nb(
   n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -229,7 +272,10 @@ performance::compare_performance(
 )
 
 # -----------------------------------------------------------------------------
-# [u25-olre-rmse]  ·  5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) > Comparación con la binomial negativa
+# [u25-olre-rmse]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#       > Comparación con la binomial negativa
 # -----------------------------------------------------------------------------
 pred_marg <- predict(m_olre, type = "response", re.form = NA)     # población, sin el BLUP
 rmse_olre_marginal <- sqrt(mean((cartera$n_danos - pred_marg)^2))

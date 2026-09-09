@@ -480,40 +480,51 @@ que impone el enlace—, con pendiente constante $\beta_1$ ($\mathrm{d}\ \eta/\m
 antecedente de fractura previa solo cambia el intercepto ($a_1-a_0=\beta_2$): dos
 rectas **paralelas**, nunca convergentes ni secantes.
 
-**Panel central: una exponencial.** Al deshacer el logaritmo, lo que era una suma
-pasa a ser un producto, y la edad entra como **exponente** 
+**Panel central: una exponencial.** Al deshacer el logaritmo, lo que era una suma pasa a
+ser un producto, y la edad queda como **exponente**. La expresión de arriba es una
+exponencial de libro, $c\,b^{\,\text{age}}$, con sus dos piezas bien identificadas:
 
 $$
-\frac{\text{odds}(\text{age}+1)}{\text{odds}(\text{age})}=e^{\beta_1},
+\text{odds}(\text{age})=\underbrace{e^{\beta_0+\beta_2 i}}_{\textstyle c:\ \text{altura}}
+\cdot\underbrace{\big(e^{\beta_1}\big)^{\text{age}}}_{\textstyle b^{\,\text{age}}:\ \text{ritmo}},
 \qquad
-\frac{\mathrm{d}\,\text{odds}}{\mathrm{d}\,\text{age}}=\beta_1\;\text{odds}(\text{age}).
+\frac{\text{odds}(\text{age}+1)}{\text{odds}(\text{age})}=e^{\beta_1}=b .
 $$
 
-El crecimiento es **proporcional al nivel ya alcanzado** —esa es la ecuación que
-define una exponencial—, de modo que la curva arranca casi plana y se dispara
-después. Nótese que $\text{odds}>0$ siempre: la exponencial nunca cruza el eje, y
-por eso el modelo no puede producir ventajas negativas. El antecedente actúa aquí
-como un **factor de escala** $e^{\beta_2}$, que estira la curva verticalmente.
+La **constante** $c$ solo desplaza la curva verticalmente: el antecedente de fractura previa
+la multiplica por $e^{\beta_2}$ sin alterar su forma. La **base** $b=e^{\beta_1}$ es la que
+manda: cada año de edad multiplica los odds por ella, de modo que si $\beta_1>0$ entonces
+$b>1$ y la curva arranca casi plana y se dispara —el crecimiento es cada vez mayor, porque
+lo que se multiplica ya es mayor—; si $\beta_1<0$, $b<1$ y decae hacia cero sin alcanzarlo.
+Nótese que $\text{odds}>0$ siempre: la exponencial nunca cruza el eje, y por eso el modelo
+no puede producir ventajas negativas.
 
-**Panel derecho: una S.** La probabilidad se obtiene comprimiendo los odds en
-$(0,1)$ mediante $\pi=\text{odds}/(1+\text{odds})$, y el resultado ya no es
-monótono en su *velocidad*:
+**Panel derecho: una S.** La probabilidad se obtiene comprimiendo los odds en $(0,1)$
+mediante $\pi=\text{odds}/(1+\text{odds})$. Reagrupando el resultado en torno a la edad que
+anula el predictor lineal, $\text{age}^\*=-a_i/\beta_1$, la curva se escribe así:
+
+$$
+\pi(\text{age})=\frac{1}{1+e^{-\beta_1\left(\text{age}-\text{age}^\*\right)}} .
+$$
+
+De esta forma se leen sus tres rasgos sin calcular nada. Las **asíntotas**: el denominador
+nunca baja de 1 ni deja de ser positivo, así que $\pi$ vive siempre en $(0,1)$ —y por eso el
+modelo no puede predecir probabilidades imposibles, que era el problema 1 de OLS—. La
+**simetría**: la curva pasa por $\pi=1/2$ en $\text{age}^\*$ y es simétrica respecto de ese
+punto. Y el papel del **antecedente** de fractura previa: como solo entra en $a_i$, no toca
+ni la forma ni la pendiente, únicamente **traslada** la S en $-\beta_2/\beta_1$ años —hacia
+la izquierda si $\beta_2>0$: la misma curva, alcanzada antes— (@fig-u12-dos-escalas).
+
+Lo que la S no tiene es una velocidad constante:
+
 $$
 \frac{\mathrm{d}\pi}{\mathrm{d}\,\text{age}}=\beta_1\,\pi(\text{age})\big[1-\pi(\text{age})\big].
 $$
-Esta expresión explica por sí sola la forma en S. El efecto de un año de edad **no
-es constante**: es proporcional a $\pi(1-\pi)$, que vale casi cero cuando $\pi$ está
-cerca de 0 o de 1 —las colas— y alcanza su máximo, $\beta_1/4$, en $\pi=1/2$. Ese
-punto medio es el **punto de inflexión** de la S, y ocurre exactamente donde el
-predictor lineal se anula:
-$$
-\pi(\text{age})=\tfrac12
-\iff \eta(\text{age})=0
-\iff \text{age}=-\frac{a_i}{\beta_1}.
-$$
-El antecedente de fractura previa desplaza ese punto **horizontalmente**, en
-$\beta_2/\beta_1$ años: la misma curva, alcanzada antes. Es lo que se verá en la
-@fig-u12-dos-escalas.
+
+El efecto de un año de edad es proporcional a $\pi(1-\pi)$: casi cero cuando $\pi$ está cerca
+de 0 o de 1 —las colas, donde la curva se aplana— y máximo, $\beta_1/4$, justo en el centro,
+$\text{age}^\*$. Es la no linealidad que impide leer $\beta_1$ como un cambio de probabilidad
+y la que obliga a los efectos marginales.
 
 Y aquí está la moraleja de la sección: $\beta_1$ es un número limpio y constante en la
 primera escala, un factor constante en la segunda, y en la tercera —la única que le
@@ -561,20 +572,23 @@ p3 <- escala("prob",     "P(evento)",    "probabilidad  ·  forma en S",        
 
 ::: {.callout-warning}
 ## Odds ratio y riesgo relativo
-Puntualizar que **odds-ratio OR** no es lo mismo que **riesgo relativo RR**. El riesgo relativo es útil para comparar probabilidades, luego en el contexto del modelo lineal cabría valorar el efecto, sobre la probabilidad, de añadir una unidad a la $x$
-$$\text{RR}=\frac{\pi(x+1)}{\pi(x)}$$
+Puntualizar que **odds-ratio OR** no es lo mismo que **riesgo relativo RR**. Ambos comparan
+los mismos dos perfiles $A$ y $B$ —una unidad más del predictor, o el paso de la referencia
+al nivel comparado—, pero el RR lo hace sobre las **probabilidades** y el OR sobre las
+**ventajas**:
+$$\text{RR}=\frac{\pi_B}{\pi_A},\qquad\text{OR}=\frac{\text{odds}_B}{\text{odds}_A}$$
 En general $\text{OR}\neq\text{RR}$, si bien ambos se
 relacionan por
 $$
-\text{OR}=\text{RR}\cdot\frac{1-\pi(x)}{1-\pi(x+1)},
+\text{OR}=\text{RR}\cdot\frac{1-\pi_A}{1-\pi_B},
 $$
 de modo que el OR **se aleja de 1 más que el RR** y exagera el efecto cuando el
 evento es frecuente. Solo si el evento es **raro** ($\pi$ pequeña) se cumple
-$1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$. 
+$1-\pi\approx 1$ y entonces $\text{OR}\approx\text{RR}$.
 
 Por eso decir «el riesgo
 se triplica» al leer un $\text{OR}=3$ es una aproximación cómoda pero informal y no veraz. La
-lectura exacta es en términos de *odds* (ventaja): al subir el predictor una unidad (o al pasar de la categoría de referencia a la otra), la ventaja del evento —P(sí)/P(no)— queda multiplicada por 3. Si queremos una interpretación en términos de probabilidades, habremos de echar mano de los efectos marginales, sobre los que hablamos más adelante.
+lectura exacta es en términos de *odds* (ventaja): al pasar de $A$ a $B$, la ventaja del evento —P(sí)/P(no)— queda multiplicada por 3. Si queremos una interpretación en términos de probabilidades, habremos de echar mano de los efectos marginales, sobre los que hablamos más adelante.
 :::
 
 ### Intervalos de confianza
@@ -650,9 +664,11 @@ map_dfr(ajustes,
 ```
 
 - **logit: $\beta_2=0{,}84$ multiplica la ventaja.** Sin antecedente, la probabilidad de
-  fractura es del 21 %, es decir, unas **26 ventajas a favor por cada 100 en contra**
-  ($0{,}209/0{,}791=0{,}26$). Con antecedente, esa ventaja se multiplica por
-  $e^{0{,}84}=2{,}31$ y pasa a $0{,}61$, que corresponde a una probabilidad del 38 %.
+  fractura es del 21 %: de cada 100 mujeres así, unas **21 fracturan y 79 no**. Su ventaja
+  es, por tanto, 21 frente a 79, esto es $0{,}209/0{,}791=0{,}26$ —algo más de una fractura
+  por cada cuatro no fracturas—. Con antecedente, esa ventaja se multiplica por
+  $e^{0{,}84}=2{,}31$ y pasa a $0{,}61$ (38 frente a 62), que corresponde a una probabilidad
+  del 38 %.
   El coeficiente **no** multiplica la probabilidad —que sube de 21 % a 38 %, un factor
   1,8—, sino la ventaja.
 
@@ -1182,7 +1198,7 @@ Es **un único contraste** que, según qué par anidado compares, responde a pre
 - **pequeño = nulo, grande = ajustado** → *«¿aporta algo el modelo?»* (el **ómnibus**, justo abajo).
 - **pequeño = reducido, grande = completo** → *«¿aporta este bloque de variables?»* (la escalera de
   modelos que recorreremos enseguida).
-- **grande = saturado** → *bondad de ajuste*: la **deviance residual** es el LRT contra el ajuste
+- **pequeño = ajustado, grande = saturado** → *bondad de ajuste*: la **deviance residual** es el LRT contra el ajuste
   perfecto (lo desarrollamos al final de esta sección).
 
 Dos requisitos: los modelos han de estar **anidados** y ajustados sobre los **mismos datos**. Para
@@ -1344,8 +1360,8 @@ global <- glm(fracture ~ (age + bmi) * (priorfrac + momfrac),
               family = binomial, data = glow, na.action = na.fail)  # na.fail: requisito de dredge
 
 sel <- dredge(global, rank = "AIC")       # todos los submodelos, ordenados por AIC (respeta marginalidad)
-head(sel, 3)                              # los cinco mejores
-dredge(global, rank = "BIC") |> head(3)   # el BIC, más parsimonioso, suele elegir otro
+head(sel, 5)                              # los cinco mejores
+dredge(global, rank = "BIC") |> head(5)   # el BIC, más parsimonioso, suele elegir otro
 
 # Mejor por AIC (exhaustivo) frente a la búsqueda paso a paso:
 formula(get.models(sel, subset = 1)[[1]])                          # ganador de dredge
@@ -1392,7 +1408,7 @@ y la decisión final se justifica con LRT/AIC/BIC, validación y conocimiento de
 
 ### ¿Aportar o ajustar? El contraste de bondad de ajuste
 
-Todo lo anterior respondía a **¿aporta el modelo?**. Queda la otra pregunta, distinta: el modelo
+Todo lo anterior respondía a **¿aporta el modelo?** Queda la otra pregunta, distinta: el modelo
 elegido, **¿ajusta bien los datos?** Ambas se responden con la misma deviance, pero comparando
 contra **modelos de referencia** distintos. Conviene situar tres, del peor al mejor ajuste posible:
 el **nulo** (solo intercepto, deviance $D_0$); el **ajustado**, el nuestro (deviance residual $D$);
@@ -1474,13 +1490,66 @@ conviene elegirlas **según para qué**:
 - **Diagnóstico general** (mala especificación de cualquier tipo: forma funcional, dispersión,
   *outliers*) → los **residuos simulados / de cuantil** (DHARMa) [@dunnsmyth1996; @hartig2022]. Se
   simula muchas veces del modelo ajustado y se sitúa cada observación en su distribución simulada;
-  bajo un modelo correcto son **uniformes** $(0,1)$, comparables con un Q–Q y un test de
-  Kolmogorov–Smirnov. No son "de binaria": valen para **cualquier** GLM —son, simplemente, el
-  rescate cuando los estándar fallan—.
+  bajo un modelo correcto son **uniformes** $(0,1)$ —con una salvedad en respuestas discretas que
+  el recuadro de abajo detalla, y que es justo la que los hace funcionar en binaria—, comparables
+  con un Q–Q y un test de Kolmogorov–Smirnov. No son "de binaria": valen para **cualquier** GLM
+  —son, simplemente, el rescate cuando los estándar fallan—.
 - **Diagnóstico de calibración** (¿son fiables las probabilidades, y en qué tramo fallan?) → los
   **residuos por tramos** (*binned*), que promedian observado − predicho por tramos de riesgo. Como
   responden a la pregunta de la calibración, los tratamos **donde se usan**: en la subsección
   siguiente.
+
+::: {.callout-note collapse="true"}
+## ¿Por qué uniformes? El residuo cuantil aleatorizado
+
+Conviene deshacer un malentendido de partida: **no se simulan probabilidades, se simulan
+respuestas**. Para cada mujer $i$ se generan cientos de valores $0/1$ con su $\hat\pi_i$, y el
+residuo es **la posición del valor observado dentro de esa distribución simulada**: qué
+proporción de las simulaciones queda por debajo de lo que realmente ocurrió.
+
+La promesa de uniformidad viene de la **transformación integral de probabilidad**: si
+$Y\sim F$ y $F$ es **continua**, entonces $F(Y)\sim U(0,1)$. Es un resultado general, y por eso
+estos residuos sirven para cualquier familia.
+
+**Pero la Bernoulli no es continua**, y ahí el argumento se rompe. Su función de distribución
+es una escalera de dos peldaños, de modo que $F(y_i)$ solo puede tomar **dos valores**:
+$$
+F(y_i)=\begin{cases}1-\hat\pi_i & \text{si } y_i=0\\[2pt] 1 & \text{si } y_i=1\end{cases}
+$$
+Todas las mujeres que fracturaron darían exactamente $1$, y las demás se repartirían en un
+único punto por cada $\hat\pi_i$. Eso no es uniforme: un modelo **perfecto** parecería pésimo.
+
+**La solución —y es el contenido de la referencia [@dunnsmyth1996]— es aleatorizar dentro del
+salto.** En lugar de evaluar $F$ en el peldaño, se sortea uniformemente en el intervalo que el
+peldaño abarca:
+$$
+u_i\sim U\big(0,\;1-\hat\pi_i\big)\ \text{ si } y_i=0,
+\qquad
+u_i\sim U\big(1-\hat\pi_i,\;1\big)\ \text{ si } y_i=1 .
+$$
+
+Y con eso la uniformidad es **exacta**, no aproximada, como se ve en una línea: el primer
+tramo se usa con probabilidad $1-\hat\pi_i$ y tiene longitud $1-\hat\pi_i$, luego aporta
+densidad $(1-\hat\pi_i)\cdot\frac{1}{1-\hat\pi_i}=1$; el segundo se usa con probabilidad
+$\hat\pi_i$ y mide $\hat\pi_i$, luego aporta también $1$. Densidad constante igual a $1$ en
+todo $(0,1)$.
+
+**La clave conceptual.** La uniformidad no afirma nada sobre cómo se reparten las $\hat\pi_i$
+—que pueden valer 0,05 en una mujer y 0,70 en otra—, sino que **cada observación cae en un
+lugar cualquiera de su propia distribución predicha**. Eso es lo que pone en una escala común
+a $n$ observaciones con $n$ distribuciones distintas, y la razón de fondo por la que estos
+residuos funcionan donde Pearson y deviance fracasan: aquellos arrastran la asimetría de cada
+$\pi_i$, estos la eliminan por construcción. Si el modelo está mal —una no linealidad
+ignorada, por ejemplo—, las observaciones dejan de caer al azar dentro de su distribución, los
+$u_i$ se acumulan en unas zonas de $(0,1)$ más que en otras, y el Q–Q lo delata.
+
+**Una cautela para respuestas binarias.** Un $u_i$ aislado es casi ruido: una sola Bernoulli
+aporta poquísima información y la aleatorización añade la suya. La potencia está en el
+**conjunto** —el Q–Q sobre las $n$ observaciones— y en representar los $u_i$ frente a las
+covariables o a $\hat\pi$ para buscar patrones. Cuando aun así el diagnóstico se queda corto,
+la salida es **agrupar** antes de mirar (`DHARMa::recalculateResiduals(res, group = ...)`),
+que es la misma idea que en la Unidad 3 devolvía el sentido a la deviance.
+:::
 
 :::: {.callout-tip}
 ## 🔧 En R. Residuos simulados (DHARMa)
@@ -1526,6 +1595,17 @@ estimación—. Un $\hat C$ **grande** ($p$ bajo) indica que observado y esperad
 calibración; un $p$ **alto** señala **ausencia de evidencia** de mala calibración (no «prueba» que
 calibre bien).
 
+::: {.callout-tip}
+## Un apunte de vocabulario
+En este contexto **«riesgo» y «probabilidad ajustada» son lo mismo**, y así se leerá en la
+literatura clínica: los grupos del contraste de Hosmer–Lemeshow se llaman literalmente *deciles
+de riesgo*. Conviene no confundir este uso con el de la [Unidad 5](#sec-u15), donde «riesgo»
+designa el ***hazard*** —la probabilidad de que el evento ocurra en un periodo **entre quienes
+llegan sin él** a ese periodo—, que es el que lee el enlace cloglog de la
+@tbl-enlaces-eta-mu. En el material nombramos la variable siempre como **probabilidad
+ajustada**, que es lo que devuelve `fitted()`.
+:::
+
 ```{r}
 #| label: u12-hosmer
 performance::performance_hosmer(fit_glm, n_bins = 10)
@@ -1570,7 +1650,7 @@ pB <- ggplot(calib, aes(pred, obs)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +   # calibración perfecta
   geom_line() + geom_point(size = 1.8) +
   coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
-  labs(x = "Riesgo predicho (media por decil)", y = "Frecuencia observada",
+  labs(x = "Probabilidad ajustada (media por decil)", y = "Frecuencia observada",
        title = "Calibración")
 
 pA + pB        # patchwork: lado a lado
@@ -1581,22 +1661,22 @@ no solo *si* hay problema, sino *dónde*, *en qué sentido* y *qué* podría cor
 
 ::: {.callout-tip}
 ## Cómo leer los dos gráficos
-**Curva de calibración** (probabilidad predicha en X, frecuencia observada en Y; la referencia
+**Curva de calibración** (probabilidad ajustada en X, frecuencia observada en Y; la referencia
 es la diagonal de 45°):
 
-- **Sobre la diagonal** → bien calibrado: entre los casos con riesgo predicho $p$, una
+- **Sobre la diagonal** → bien calibrado: entre los casos con probabilidad ajustada $p$, una
   fracción $\approx p$ tiene el evento.
-- **Por debajo de la diagonal** (sobre todo en riesgo alto) → el modelo **sobreestima** el
-  riesgo en esa zona.
-- **Por encima de la diagonal** (sobre todo en riesgo bajo) → **subestima**.
+- **Por debajo de la diagonal** (sobre todo en la zona alta) → el modelo **sobreestima** la
+  probabilidad en ese tramo.
+- **Por encima de la diagonal** (sobre todo en la zona baja) → **subestima**.
 - **Forma en S** alrededor de la diagonal → exceso o defecto de confianza en los extremos.
-- Lo informativo es **en qué tramo** de riesgo aparece la desviación, no solo que exista.
+- Lo informativo es **en qué tramo** aparece la desviación, no solo que exista.
 
-**Residuos por tramos** (residuo medio por tramo en Y, probabilidad media en X, con bandas de
-$\pm 2$ EE $\approx 95\,\%$):
+**Residuos por tramos** (residuo medio por tramo en Y, probabilidad ajustada media del tramo en
+X, con bandas de $\pm 2$ EE $\approx 95\,\%$):
 
 - **Dispersos en torno a 0 y dentro de las bandas** → sin falta de ajuste sistemática.
-- **Patrón sistemático** (p. ej. negativos en riesgo bajo y positivos en alto, o una curva)
+- **Patrón sistemático** (p. ej. negativos en la zona baja y positivos en la alta, o una curva)
   → el modelo **yerra la media** en ese rango.
 - **Más de ~5 % de puntos fuera de las bandas** → señal de mal ajuste.
 - Si se representa el residuo medio por tramos frente a una **covariable** (la edad, por
@@ -1662,6 +1742,75 @@ tidy(fit_sep) |> filter(str_detect(term, "smoke"))  # coef enorme, EE descomunal
 El coeficiente de `smokeYes` ronda **−15 con un EE de varios cientos**: síntoma inequívoco
 de cuasi-separación, no un efecto «protector» real. El Wald carece de sentido aquí.
 
+::: {.callout-note collapse="true"}
+## ¿Por qué se dispara el error estándar?
+
+La respuesta está en los **pesos del IWLS** de la [Sección 2.4](#sec-u12-iwls). El error
+estándar sale de invertir la información de Fisher,
+$$
+\widehat{\operatorname{Var}}(\hat{\boldsymbol\beta})=(\mathbf{X}^\top\mathbf{W}\mathbf{X})^{-1},
+\qquad w_i=\hat\pi_i(1-\hat\pi_i),
+$$
+y ese $w_i$ mide **cuánta información aporta cada observación**. Se anula en los dos extremos:
+una mujer cuya probabilidad ajustada es prácticamente 0 —o prácticamente 1— no informa sobre
+nada, porque el modelo ya «sabe» lo que le va a pasar.
+
+Ahí está la paradoja de la separación: como en esa celda no hay ninguna fractura, el modelo
+puede ajustarla **perfectamente** llevando su probabilidad a cero, y **al hacerlo destruye su
+propia información**. Con $w\to 0$, la celda deja de pesar en
+$\mathbf{X}^\top\mathbf{W}\mathbf{X}$, la matriz se vuelve casi singular en la dirección de
+`smokeYes`, y su inversa —que es la varianza— explota. Evaluando
+$\text{EE}\approx1/\sqrt{n\,w}$ para las $n=12$ mujeres de la celda:
+
+| $\hat\pi$ de la celda | peso $w=\hat\pi(1-\hat\pi)$ | información $n\,w$ | $\text{EE}\approx1/\sqrt{n\,w}$ |
+|---|---|---|---|
+| $0{,}2$ | $0{,}16$ | $1{,}9$ | $0{,}7$ |
+| $10^{-2}$ | $9{,}9\times10^{-3}$ | $0{,}12$ | $2{,}9$ |
+| $10^{-4}$ | $10^{-4}$ | $1{,}2\times10^{-3}$ | $28{,}9$ |
+| $10^{-7}$ | $10^{-7}$ | $1{,}2\times10^{-6}$ | $913$ |
+
+: Cómo se desploma la información de la celda separada a medida que su probabilidad ajustada
+se acerca a cero, y cómo crece en consecuencia el error estándar. {#tbl-separacion-ee}
+
+**Y de ahí la ley que hunde al Wald.** Cuando $\eta$ es muy negativo, $\hat\pi\approx e^{\eta}$
+y por tanto $w\approx e^{\eta}$, de modo que
+$$
+\text{EE}(\hat\beta)\;\approx\;\frac{e^{|\hat\beta|/2}}{\sqrt{n}} .
+$$
+El error estándar crece **exponencialmente** con el coeficiente, mientras el coeficiente crece
+solo linealmente. El cociente $z=\hat\beta/\text{EE}$ no tiene ninguna posibilidad: tiende a
+cero, y el contraste declara «no significativo» el efecto más extremo que unos datos pueden
+mostrar. Es el efecto Hauck–Donner de la [Sección 2.5](#sec-u12-inferencia), aquí en su forma
+límite.
+
+**Dos detalles delatores.** El primero: los errores estándar de los tres términos con `smoke`
+coinciden hasta la cuarta cifra, porque los tres están gobernados por **la misma** dirección
+degenerada del espacio de parámetros. El segundo, y es el criterio práctico: esas cifras
+**no son estimaciones**. La verosimilitud no tiene máximo —asciende hacia una meseta cada vez
+más plana—, así que `glm()` no encuentra un óptimo: se detiene donde su criterio de
+convergencia deja de ver mejora. Si repites el ajuste con
+`glm.control(epsilon = 1e-12, maxit = 100)`, $\hat\beta$ crece y el EE crece aún más deprisa.
+Esa inestabilidad frente a la tolerancia es la mejor prueba de que hay separación.
+:::
+
+```{r}
+#| label: u12-separacion-ee
+# De dónde sale ese error estándar: la información que aporta la celda separada
+celda   <- glow$smoke == "Yes" & glow$raterisk == "Less"
+p_celda <- fitted(fit_sep)[celda]        # probabilidad ajustada de esas 12 mujeres
+w       <- p_celda * (1 - p_celda)       # su peso IWLS
+
+c(n = sum(celda), pi_ajustada = mean(p_celda), informacion = sum(w))
+```
+
+El chunk cuantifica el desastre: esas 12 mujeres tienen una probabilidad ajustada de
+$6{,}4\times10^{-8}$, de modo que **toda la celda aporta una información de
+$7{,}7\times10^{-7}$**, cuando una celda ordinaria aportaría del orden de la unidad. Como el
+error estándar sale de **invertir** esa información, un número tan próximo a cero es justo lo
+que produce los cientos que imprime la tabla. Y con un error estándar así, el estadístico de
+Wald se desploma: de ahí el $z\approx0{,}02$ y el $p\approx0{,}98$ de un efecto que, lejos de
+ser inexistente, es el más extremo que unos datos pueden mostrar.
+
 La solución es detectarla (`detectseparation::detect_separation`) y, si aparece, estimar por
 **verosimilitud penalizada de Firth** [@firth1993; @heinze2002], que produce estimaciones
 finitas:
@@ -1698,9 +1847,10 @@ glm(fracture ~ smoke * raterisk, family = binomial, data = glow,
 ```
 ::::
 
+
 ## 2.7 Evaluación como clasificador {#sec-u12-evaluacion}
 
-El modelo entrega **probabilidades**; convertirlo en un **clasificador** (predecir sí/no)
+El modelo logístico entrega **probabilidades**; convertirlo en un **clasificador** (predecir sí/no)
 exige un **umbral** $c$ y abre un tercer eje de evaluación del modelo: la **discriminación** —¿separa
 eventos de no-eventos?—. Este enfoque de evaluación es distinto del que se realiza sobre la utilidad inferencial y la bondad del ajuste ([Sección 2.5](#sec-u12-inferencia)) y del diagnóstico caso a caso ([Sección 2.6](#sec-u12-diagnostico)).
 
@@ -1717,6 +1867,51 @@ Para evaluar la calidad de la clasificación, tenemos fácil la comparación ent
 Con un umbral dado $c$, cada caso cae en una de cuatro celdas según coincidan predicción y realidad:
 **verdadero positivo** (TP, *true positive*), **falso positivo** (FP, *false positive*),
 **falso negativo** (FN, *false negative*) y **verdadero negativo** (TN, *true negative*).
+::: {.callout-tip}
+## Cómo no confundirse nunca con TP, FP, FN y TN
+
+Los cuatro nombres se leen **de derecha a izquierda**, y siguen siempre la misma regla:
+
+> El **sustantivo** (*positive* / *negative*) es lo que **predijo el modelo**.
+> El **adjetivo** (*true* / *false*) dice si **acertó**.
+
+Es decir, **el adjetivo no califica a la paciente: califica al modelo**. La ancla para
+recordarlo la tenemos en el idioma: una **falsa alarma** es exactamente un *false positive*.
+La alarma sonó —eso es la predicción, «positivo»— y se equivocó —«falsa»—. Nadie diría que la
+falsa alarma describe al incendio: describe al detector.
+
+**Y de ahí se recupera la realidad sin memorizar nada más.** Si el adjetivo es *true*, la
+realidad coincide con el sustantivo; si es *false*, la realidad es **la contraria**:
+
+| | **Observado: Yes** | **Observado: No** |
+|---|---|---|
+| **Predicho: Yes** | **TP** · dijo sí y era sí | **FP** · dijo sí y era no *(falsa alarma)* |
+| **Predicho: No** | **FN** · dijo no y era sí *(se escapó)* | **TN** · dijo no y era no |
+
+: Las cuatro celdas, en la misma orientación que usa el código de esta sección: predicción en
+filas, realidad en columnas. {#tbl-confusion-mnemo}
+
+**El mismo truco resuelve los denominadores**, que es donde de verdad se falla. La pregunta es
+siempre *«¿sobre qué total?»*:
+
+- Las **positivas reales** son aquellas cuya realidad es «sí»: la que el modelo acertó
+  diciendo sí (**TP**) y la que falló diciendo no (**FN**). De ahí
+  $\text{sensibilidad}=TP/(TP+FN)$ —la **columna** «Observado: Yes»—.
+- Las **predichas positivas** son aquellas cuyo sustantivo es «positivo»: **TP** y **FP**.
+  De ahí $\text{precisión}=TP/(TP+FP)$ —la **fila** «Predicho: Yes»—.
+
+En una frase: **sensibilidad y especificidad se leen por la realidad; precisión, por la
+predicción**. Por eso las dos primeras no dependen de la prevalencia y la tercera sí: cambiar
+cuántas mujeres fracturan cambia la composición de las filas, no la de las columnas.
+
+**Al leer una salida de R, comprueba siempre dos cosas** antes de interpretar, porque el
+software no sigue un criterio único: **qué va en filas y qué en columnas**
+—`caret::confusionMatrix` coloca la predicción en filas y la referencia en columnas, igual que
+la tabla de arriba, pero no todo el software lo hace así— y **cuál es la clase positiva**
+(en `caret`, el argumento `positive = "Yes"`; si no se declara, toma el primer nivel del factor,
+que aquí sería `No` y daría la sensibilidad y la especificidad intercambiadas).
+:::
+
 De ahí salen las métricas más habituales (nombradas en inglés porque es así como las nombra casi
 todo el software):
 

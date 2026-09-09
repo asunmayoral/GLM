@@ -2,7 +2,8 @@
 # Caso 1 · Unidad 1.3 — 3 · Extensión de la respuesta binaria: binomial y politómica
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_3.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -92,7 +93,9 @@ glimpse(cohorte)
 head(cohorte)
 
 # -----------------------------------------------------------------------------
-# [u13-agrupar]  ·  🔧 En R. El glm() con datos binomiales
+# [u13-agrupar]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.1 Del dato individual al agrupado: respuesta binomial
 # -----------------------------------------------------------------------------
 glow_agg <- glow |>
   count(priorfrac, momfrac, raterisk, fracture) |>
@@ -101,7 +104,9 @@ glow_agg <- glow |>
 glow_agg
 
 # -----------------------------------------------------------------------------
-# [fig-u13-barras]  ·  🔧 En R. El glm() con datos binomiales
+# [fig-u13-barras]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.1 Del dato individual al agrupado: respuesta binomial
 # -----------------------------------------------------------------------------
 glow_agg |>
   mutate(prop = Yes / total) |>
@@ -115,7 +120,9 @@ glow_agg |>
   ylim(0, NA)
 
 # -----------------------------------------------------------------------------
-# [u13-binomial-fit]  ·  🔧 En R. El glm() con datos binomiales
+# [u13-binomial-fit]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.1 Del dato individual al agrupado: respuesta binomial
 # -----------------------------------------------------------------------------
 fit_bin <- glm(cbind(Yes, No) ~ priorfrac + momfrac + raterisk,
                family = binomial, data = glow_agg)
@@ -125,7 +132,10 @@ fit_ind <- glm(fracture ~ priorfrac + momfrac + raterisk,
 cbind(agrupado = coef(fit_bin), individual = coef(fit_ind))   # idénticos
 
 # -----------------------------------------------------------------------------
-# [fig-u13-residuos]  ·  La matriz sombrero en un GLM
+# [fig-u13-residuos]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
+#       > Residuos
 # -----------------------------------------------------------------------------
 #library(patchwork)
 
@@ -151,7 +161,10 @@ p_cook <- ggplot(diag_bin, aes(cell, cook, size = total)) +
 p_res + p_cook + plot_layout(guides = "collect")
 
 # -----------------------------------------------------------------------------
-# [u13-gof]  ·  🔧 En R. Residuos e influencia > Bondad de ajuste
+# [u13-gof]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
+#       > Bondad de ajuste
 # -----------------------------------------------------------------------------
 gl <- df.residual(fit_bin)                       # n - p = nº de celdas - nº de parámetros
 c(deviance = deviance(fit_bin),
@@ -163,7 +176,10 @@ c(p_deviance = pchisq(deviance(fit_bin), gl, lower.tail = FALSE),
   p_pearson  = pchisq(sum(residuals(fit_bin, "pearson")^2), gl, lower.tail = FALSE))
 
 # -----------------------------------------------------------------------------
-# [fig-u13-calibracion]  ·  🔧 En R. El contraste χ² de bondad de ajuste (deviance y Pearson) > Calibración
+# [fig-u13-calibracion]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
+#       > Calibración
 # -----------------------------------------------------------------------------
 # Calibración DIRECTA: cada celda = (probabilidad predicha, proporción observada)
 calib_bin <- glow_agg |>
@@ -176,13 +192,18 @@ ggplot(calib_bin, aes(pred, obs, size = total)) +
        size = "n por celda")
 
 # -----------------------------------------------------------------------------
-# [u13-sobredisp]  ·  🔧 En R. El data frame de observados vs predichos para la calibración > Sobredispersión
+# [u13-sobredisp]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
+#       > Sobredispersión
 # -----------------------------------------------------------------------------
 # Índice de sobredispersión (cociente de Pearson)
 sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
 
 # -----------------------------------------------------------------------------
-# [u13-nominal]  ·  🔧 En R. Ajustar e inspeccionar el multinomial nominal
+# [u13-nominal]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.3 Más de dos categorías sin orden: politómica nominal
 # -----------------------------------------------------------------------------
 library(nnet)
 m_nom <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac,
@@ -192,13 +213,17 @@ tidy(m_nom) # visualización ordenada
 exp(coef(m_nom))      # odds ratios relativos
 
 # -----------------------------------------------------------------------------
-# [fig-u13-pred-nominal]  ·  🔧 En R. Ajustar e inspeccionar el multinomial nominal
+# [fig-u13-pred-nominal]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.3 Más de dos categorías sin orden: politómica nominal
 # -----------------------------------------------------------------------------
 library(ggeffects)
 plot(ggpredict(m_nom, terms = "age [all]"))
 
 # -----------------------------------------------------------------------------
-# [u13-ordinal]  ·  3.4 Categorías ordenadas: el modelo de odds proporcionales
+# [u13-ordinal]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.4 Categorías ordenadas: el modelo de odds proporcionales
 # -----------------------------------------------------------------------------
 glow_ord <- glow |>
   mutate(raterisk = ordered(raterisk, levels = c("Less", "Same", "Greater")))
@@ -207,13 +232,17 @@ tidy(m_ord)        # dos umbrales (theta) y los efectos (beta), comunes a ambos 
 exp(coef(m_ord))      # odds ratios acumulados
 
 # -----------------------------------------------------------------------------
-# [fig-u13-pred-ordinal]  ·  🔧 En R. Ajustar e inspeccionar el ordinal (odds proporcionales)
+# [fig-u13-pred-ordinal]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.4 Categorías ordenadas: el modelo de odds proporcionales
 # -----------------------------------------------------------------------------
 library(ggeffects)
 plot(ggpredict(m_ord, terms = "age [all]"))
 
 # -----------------------------------------------------------------------------
-# [u13-comparacion-nom-ord]  ·  🔧 En R. Ajustar e inspeccionar el ordinal (odds proporcionales)
+# [u13-comparacion-nom-ord]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.4 Categorías ordenadas: el modelo de odds proporcionales
 # -----------------------------------------------------------------------------
 # Ajuste y parsimonia (el ordinal usa menos parámetros)
 ajuste <- tibble::tibble(

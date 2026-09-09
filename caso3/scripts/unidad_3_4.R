@@ -875,8 +875,10 @@ d_nuevas <- purrr::map_dbl(pliegues_maq$splits, function(s) {
   dev_tw(pru$coste_total, predict(m, pru, type = "response", re.form = NA))
 })
 
-round(c(maquina_nueva_media = mean(d_nuevas),
-        maquina_nueva_ee    = sd(d_nuevas) / sqrt(length(d_nuevas))), 1)
+# data.frame de una fila, como la tabla anterior: un vector con nombres se imprime
+# por consola y Quarto no puede numerarlo ni referenciarlo como tabla
+tibble::tibble(maquina_nueva_media = round(mean(d_nuevas), 1),
+               maquina_nueva_ee    = round(sd(d_nuevas) / sqrt(length(d_nuevas)), 1))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

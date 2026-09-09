@@ -2,7 +2,8 @@
 # Caso 1 · Unidad 1.6 — 6 · Estudio de caso, exposición y evaluación
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_1_6.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -91,7 +92,6 @@ glimpse(cohorte)
 head(cohorte)
 
 # (Esta unidad no contiene chunks de código: es de encargo y evaluación.)
-
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------
 # Todo trabajo del curso cierra dejando constancia de con qué se ejecutó.

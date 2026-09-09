@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.4 — 4 · Demasiados ceros
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_4.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -78,7 +79,10 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u24-fraude-ceros]  ·  4.1 Qué es, de dónde viene y cómo se identifica > La huella: más ceros de los que el modelo espera
+# [u24-fraude-ceros]
+#   4 · Demasiados ceros
+#     > 4.1 Qué es, de dónde viene y cómo se identifica
+#       > La huella: más ceros de los que el modelo espera
 # -----------------------------------------------------------------------------
 m_fp <- glm(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
             family = poisson, data = cartera)
@@ -87,7 +91,10 @@ esp0 <- mean(dpois(0, fitted(m_fp)))    # proporción esperada por la Poisson
 c(observados = obs0, esperados_poisson = esp0, ratio = obs0 / esp0)
 
 # -----------------------------------------------------------------------------
-# [fig-u24-ceros]  ·  4.1 Qué es, de dónde viene y cómo se identifica > La huella: más ceros de los que el modelo espera
+# [fig-u24-ceros]
+#   4 · Demasiados ceros
+#     > 4.1 Qué es, de dónde viene y cómo se identifica
+#       > La huella: más ceros de los que el modelo espera
 # -----------------------------------------------------------------------------
 mu <- fitted(m_fp); K <- 0:8
 esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
@@ -101,7 +108,10 @@ tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
   labs(x = "nº de reclamaciones en revisión antifraude", y = "nº de pólizas", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u24-mecanismo]  ·  4.1 Qué es, de dónde viene y cómo se identifica > De dónde viene: dos procesos de cero
+# [fig-u24-mecanismo]
+#   4 · Demasiados ceros
+#     > 4.1 Qué es, de dónde viene y cómo se identifica
+#       > De dónde viene: dos procesos de cero
 # -----------------------------------------------------------------------------
 set.seed(2026)
 n <- 5000; mu <- 2; pi_e <- 0.4
@@ -116,19 +126,28 @@ dplyr::bind_rows(
   labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u24-nb-zerotest]  ·  4.1 Qué es, de dónde viene y cómo se identifica > Cómo se identifica
+# [u24-nb-zerotest]
+#   4 · Demasiados ceros
+#     > 4.1 Qué es, de dónde viene y cómo se identifica
+#       > Cómo se identifica
 # -----------------------------------------------------------------------------
 m_fnb <- MASS::glm.nb(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                         offset(log(exposicion)), data = cartera)
 DHARMa::testZeroInflation(m_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
 
 # -----------------------------------------------------------------------------
-# [u24-scoretest]  ·  4.1 Qué es, de dónde viene y cómo se identifica > Cómo se identifica
+# [u24-scoretest]
+#   4 · Demasiados ceros
+#     > 4.1 Qué es, de dónde viene y cómo se identifica
+#       > Cómo se identifica
 # -----------------------------------------------------------------------------
 vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
 
 # -----------------------------------------------------------------------------
-# [fig-u24-zip-motiv]  ·  4.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [fig-u24-zip-motiv]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 cartera |>
   dplyr::mutate(tramo_pot = dplyr::ntile(potencia_cv, 5)) |>
@@ -143,7 +162,10 @@ cartera |>
   labs(x = "quintil de potencia (CV)", y = NULL, colour = NULL)
 
 # -----------------------------------------------------------------------------
-# [fig-u24-zip-motiv2]  ·  4.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [fig-u24-zip-motiv2]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 dplyr::bind_rows(
   cartera |> dplyr::group_by(predictor = "zona_circulacion", nivel = as.character(zona_circulacion)) |>
@@ -156,7 +178,10 @@ dplyr::bind_rows(
   labs(x = NULL, y = "tasa de reclamaciones (por unidad de exposición)")
 
 # -----------------------------------------------------------------------------
-# [u24-zip]  ·  4.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [u24-zip]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_zip <- pscl::zeroinfl(
   n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
@@ -165,7 +190,10 @@ m_zip <- pscl::zeroinfl(
 summary(m_zip)
 
 # -----------------------------------------------------------------------------
-# [u24-zinb]  ·  4.2 Modelos zero-inflated (ZIP / ZINB) > Ajuste e interpretación
+# [u24-zinb]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_zinb <- pscl::zeroinfl(
   n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
@@ -174,13 +202,19 @@ m_zinb <- pscl::zeroinfl(
 AIC(m_zip, m_zinb)
 
 # -----------------------------------------------------------------------------
-# [u24-zip-diag]  ·  🔧 En R. Ajustar un ZIP / ZINB > Bondad de ajuste y diagnóstico
+# [u24-zip-diag]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 c(observados    = sum(cartera$n_fraude == 0),
   esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
 
 # -----------------------------------------------------------------------------
-# [fig-u24-zip-root]  ·  🔧 En R. Ajustar un ZIP / ZINB > Bondad de ajuste y diagnóstico
+# [fig-u24-zip-root]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
 tibble::tibble(k = K,
@@ -193,7 +227,8 @@ tibble::tibble(k = K,
   labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u24-hurdle]  ·  4.3 Modelos hurdle > Ajuste e interpretación
+# [u24-hurdle]
+#   4 · Demasiados ceros > 4.3 Modelos hurdle > Ajuste e interpretación
 # -----------------------------------------------------------------------------
 m_hp <- pscl::hurdle(
   n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
@@ -202,13 +237,19 @@ m_hp <- pscl::hurdle(
 summary(m_hp)
 
 # -----------------------------------------------------------------------------
-# [u24-hurdle-diag]  ·  4.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [u24-hurdle-diag]
+#   4 · Demasiados ceros
+#     > 4.3 Modelos hurdle
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 c(observados       = sum(cartera$n_fraude == 0),
   esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
 
 # -----------------------------------------------------------------------------
-# [fig-u24-hurdle-root]  ·  4.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [fig-u24-hurdle-root]
+#   4 · Demasiados ceros
+#     > 4.3 Modelos hurdle
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
 tibble::tibble(k = K,
@@ -221,7 +262,10 @@ tibble::tibble(k = K,
   labs(x = "nº de reclamaciones", y = "nº de pólizas", fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u24-hurdle-nb]  ·  4.3 Modelos hurdle > Bondad de ajuste y diagnóstico
+# [u24-hurdle-nb]
+#   4 · Demasiados ceros
+#     > 4.3 Modelos hurdle
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 m_hnb <- pscl::hurdle(
   n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
@@ -230,7 +274,10 @@ m_hnb <- pscl::hurdle(
 AIC(m_hp, m_hnb)
 
 # -----------------------------------------------------------------------------
-# [u24-aic]  ·  4.4 Elegir, comparar y conectar > Los modelos, lado a lado
+# [u24-aic]
+#   4 · Demasiados ceros
+#     > 4.4 Elegir, comparar y conectar
+#       > Los modelos, lado a lado
 # -----------------------------------------------------------------------------
 mods <- list(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
              `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb)
@@ -240,21 +287,30 @@ data.frame(modelo = names(mods),
   dplyr::arrange(AIC)
 
 # -----------------------------------------------------------------------------
-# [u24-perf]  ·  4.4 Elegir, comparar y conectar > Los modelos, lado a lado
+# [u24-perf]
+#   4 · Demasiados ceros
+#     > 4.4 Elegir, comparar y conectar
+#       > Los modelos, lado a lado
 # -----------------------------------------------------------------------------
 performance::compare_performance(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, ZINB = m_zinb,
                                  `Hurdle-P` = m_hp, `Hurdle-NB` = m_hnb,
                                  metrics = c("AIC", "BIC", "RMSE"))
 
 # -----------------------------------------------------------------------------
-# [u24-pred]  ·  🔧 En R. Bondad de ajuste con exceso de ceros > Predicción: dos recetas, casi el mismo número
+# [u24-pred]
+#   4 · Demasiados ceros
+#     > 4.4 Elegir, comparar y conectar
+#       > Predicción: dos recetas, casi el mismo número
 # -----------------------------------------------------------------------------
 nuevas <- cartera[1:5, ]
 cbind(ZIP    = predict(m_zip, nuevas, type = "response"),
       Hurdle = predict(m_hp,  nuevas, type = "response"))
 
 # -----------------------------------------------------------------------------
-# [u24-validacion]  ·  ZI o hurdle: cuándo cada uno > Validación contra el DGP
+# [u24-validacion]
+#   4 · Demasiados ceros
+#     > 4.4 Elegir, comparar y conectar
+#       > Validación contra el DGP
 # -----------------------------------------------------------------------------
 v <- attr(cartera, "verdad")
 v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia

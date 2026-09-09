@@ -2,7 +2,8 @@
 # Caso 2 · Unidad 2.2 — 2 · Modelos log-lineales para tablas
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_2.qmd.
-# Cada bloque va precedido de su LABEL y de la sección/subsección donde aparece.
+# Cada bloque va precedido de su LABEL y de la ruta de encabezados
+# (sección > subsección > apartado) en la que aparece dentro del documento.
 #
 # GENERADO AUTOMÁTICAMENTE por _scripts/generar_scripts_unidades.R:
 # no editar a mano; los cambios se pierden al regenerar. Edita el .qmd.
@@ -78,7 +79,10 @@ cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera d
 glimpse(cartera)
 
 # -----------------------------------------------------------------------------
-# [u22-de-ficha-a-tabla]  ·  2.1 Contexto: cuando el dato es la celda > De la ficha a la tabla
+# [u22-de-ficha-a-tabla]
+#   2 · Modelos log-lineales para tablas
+#     > 2.1 Contexto: cuando el dato es la celda
+#       > De la ficha a la tabla
 # -----------------------------------------------------------------------------
 # Trabajamos sobre una copia con el indicador de daños; no modificamos `cartera`, que las
 # unidades siguientes siguen usando tal cual. El nivel "con" va segundo: será el "éxito".
@@ -88,41 +92,58 @@ tab2 <- xtabs(~ zona_circulacion + danos, data = cart_tab)
 addmargins(tab2)
 
 # -----------------------------------------------------------------------------
-# [u22-gl]  ·  La regla práctica: fija en el modelo lo que estaba fijo en el diseño > Grados de libertad: contar celdas y contar parámetros
+# [u22-gl]
+#   2 · Modelos log-lineales para tablas
+#     > 2.1 Contexto: cuando el dato es la celda
+#       > Grados de libertad: contar celdas y contar parámetros
 # -----------------------------------------------------------------------------
 d2 <- as.data.frame(tab2)                                   # una fila por celda; columna Freq
 m_ind <- glm(Freq ~ zona_circulacion + danos, family = poisson, data = d2)
 c(celdas = nrow(d2), parametros = length(coef(m_ind)), gl_residuales = df.residual(m_ind))
 
 # -----------------------------------------------------------------------------
-# [u22-dosvias-fit]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El modelo y su lectura
+# [u22-dosvias-fit]
+#   2 · Modelos log-lineales para tablas
+#     > 2.2 Dos vías: independencia, asociación y el puente con la logística
+#       > El modelo y su lectura
 # -----------------------------------------------------------------------------
 m_sat <- glm(Freq ~ zona_circulacion * danos, family = poisson, data = d2)
 anova(m_ind, m_sat, test = "LRT")     # H0: independencia
 
 # -----------------------------------------------------------------------------
-# [u22-dosvias-or]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El modelo y su lectura
+# [u22-dosvias-or]
+#   2 · Modelos log-lineales para tablas
+#     > 2.2 Dos vías: independencia, asociación y el puente con la logística
+#       > El modelo y su lectura
 # -----------------------------------------------------------------------------
 broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::filter(grepl(":", term)) |>
   dplyr::select(term, estimate, conf.low, conf.high)
 
 # -----------------------------------------------------------------------------
-# [u22-puente-logit]  ·  2.2 Dos vías: independencia, asociación y el puente con la logística > El puente con la logística
+# [u22-puente-logit]
+#   2 · Modelos log-lineales para tablas
+#     > 2.2 Dos vías: independencia, asociación y el puente con la logística
+#       > El puente con la logística
 # -----------------------------------------------------------------------------
 m_logit <- glm(danos ~ zona_circulacion, family = binomial, data = cart_tab)
 rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
       logistica = coef(m_logit)[-1]) |> round(4)
 
 # -----------------------------------------------------------------------------
-# [u22-tab3]  ·  2.3 Tres vías: la jerarquía de modelos
+# [u22-tab3]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
 # -----------------------------------------------------------------------------
 tab3 <- xtabs(~ zona_circulacion + tipo_vehiculo + danos, data = cart_tab)
 d3   <- as.data.frame(tab3)
 ftable(tab3)
 
 # -----------------------------------------------------------------------------
-# [u22-jerarquia]  ·  2.3 Tres vías: la jerarquía de modelos > Los cinco modelos
+# [u22-jerarquia]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
+#       > Los cinco modelos
 # -----------------------------------------------------------------------------
 f <- function(fml) glm(fml, family = poisson, data = d3)
 mods <- list(
@@ -143,13 +164,19 @@ purrr::map_dfr(names(mods), ~ {
     AIC      = round(AIC(m), 1))})
 
 # -----------------------------------------------------------------------------
-# [u22-lrt-jerarquia]  ·  Ajuste absoluto: aquí sí, y por qué > La selección, término a término
+# [u22-lrt-jerarquia]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
+#       > La selección, término a término
 # -----------------------------------------------------------------------------
 anova(mods$homogenea, mods$saturado, test = "LRT")        # ¿hay interacción de 3 vías?
 anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dados los daños?
 
 # -----------------------------------------------------------------------------
-# [u22-simpson]  ·  Ajuste absoluto: aquí sí, y por qué > Simpson: la asociación marginal puede mentir
+# [u22-simpson]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
+#       > Simpson: la asociación marginal puede mentir
 # -----------------------------------------------------------------------------
 # DGP explícito: Z está asociado a la vez con X y con Y. En z1 son raros tanto X=sí como
 # Y=sí; en z2 son frecuentes los dos. Dentro de CADA estrato X protege levemente (OR < 1),
@@ -165,13 +192,19 @@ round(c(condicional_z1 = or(tt[, , "z1"]),
         marginal       = or(margin.table(tt, c(1, 2)))), 3)
 
 # -----------------------------------------------------------------------------
-# [u22-simpson-modelos]  ·  Ajuste absoluto: aquí sí, y por qué > Simpson: la asociación marginal puede mentir
+# [u22-simpson-modelos]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
+#       > Simpson: la asociación marginal puede mentir
 # -----------------------------------------------------------------------------
 anova(glm(Freq ~ X*Z + Y*Z, family = poisson, data = toy),    # X _||_ Y | Z
       glm(Freq ~ (X + Y + Z)^2, family = poisson, data = toy), test = "LRT")
 
 # -----------------------------------------------------------------------------
-# [u22-cuatro-vias]  ·  Cuándo se puede colapsar una tabla > Cuatro factores o más: trabajar por orden de interacción
+# [u22-cuatro-vias]
+#   2 · Modelos log-lineales para tablas
+#     > 2.3 Tres vías: la jerarquía de modelos
+#       > Cuatro factores o más: trabajar por orden de interacción
 # -----------------------------------------------------------------------------
 tab4 <- xtabs(~ zona_circulacion + tipo_vehiculo + uso + danos, data = cart_tab)
 d4   <- as.data.frame(tab4)
@@ -190,7 +223,10 @@ purrr::map_dfr(names(ordenes), ~ {
                             else NA_real_)})
 
 # -----------------------------------------------------------------------------
-# [u22-residuos]  ·  2.4 Diagnóstico: dónde falla el modelo > Residuos ajustados
+# [u22-residuos]
+#   2 · Modelos log-lineales para tablas
+#     > 2.4 Diagnóstico: dónde falla el modelo
+#       > Residuos ajustados
 # -----------------------------------------------------------------------------
 d3$r_aj <- rstandard(mods$condicional, type = "pearson")   # residuos AJUSTADOS
 d3 |>
@@ -199,14 +235,20 @@ d3 |>
   head(6)
 
 # -----------------------------------------------------------------------------
-# [fig-u22-mosaico-mutua]  ·  2.4 Diagnóstico: dónde falla el modelo > El mosaico
+# [fig-u22-mosaico-mutua]
+#   2 · Modelos log-lineales para tablas
+#     > 2.4 Diagnóstico: dónde falla el modelo
+#       > El mosaico
 # -----------------------------------------------------------------------------
 vcd::mosaic(tab3, shade = TRUE, legend = TRUE,   # por defecto: ~ zona + tipo + danos
             main = "Independencia mutua",
             labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 
 # -----------------------------------------------------------------------------
-# [fig-u22-mosaico-condicional]  ·  2.4 Diagnóstico: dónde falla el modelo > El mosaico
+# [fig-u22-mosaico-condicional]
+#   2 · Modelos log-lineales para tablas
+#     > 2.4 Diagnóstico: dónde falla el modelo
+#       > El mosaico
 # -----------------------------------------------------------------------------
 vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
             expected = ~ zona_circulacion * danos + tipo_vehiculo * danos,
@@ -214,13 +256,18 @@ vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
             labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
 
 # -----------------------------------------------------------------------------
-# [u22-escasez]  ·  Pearson frente a ajustados > Tablas escasas y ceros
+# [u22-escasez]
+#   2 · Modelos log-lineales para tablas
+#     > 2.4 Diagnóstico: dónde falla el modelo
+#       > Tablas escasas y ceros
 # -----------------------------------------------------------------------------
 c(celdas = length(tab4), minimo = min(tab4),
   menores_de_5 = sum(tab4 < 5), vacias = sum(tab4 == 0))
 
 # -----------------------------------------------------------------------------
-# [u22-cuadrada]  ·  2.5 Tablas cuadradas: modelizar el cambio
+# [u22-cuadrada]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
 # -----------------------------------------------------------------------------
 cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera)) |>
   dplyr::rename(prev = bonus_malus_prev, act = bonus_malus_act) |>
@@ -229,25 +276,37 @@ cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera
 xtabs(Freq ~ prev + act, data = cuad) |> addmargins()
 
 # -----------------------------------------------------------------------------
-# [u22-simetria]  ·  2.5 Tablas cuadradas: modelizar el cambio > Simetría
+# [u22-simetria]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Simetría
 # -----------------------------------------------------------------------------
 m_sim <- glm(Freq ~ par, family = poisson, data = cuad)
 c(deviance = round(deviance(m_sim), 2), gl = df.residual(m_sim),
   p = signif(pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE), 3))
 
 # -----------------------------------------------------------------------------
-# [u22-cuasisimetria]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuasi-simetría y homogeneidad marginal
+# [u22-cuasisimetria]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Cuasi-simetría y homogeneidad marginal
 # -----------------------------------------------------------------------------
 m_qs <- glm(Freq ~ prev + act + par, family = poisson, data = cuad)
 c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs))
 
 # -----------------------------------------------------------------------------
-# [u22-homogeneidad-marginal]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuasi-simetría y homogeneidad marginal
+# [u22-homogeneidad-marginal]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Cuasi-simetría y homogeneidad marginal
 # -----------------------------------------------------------------------------
 anova(m_sim, m_qs, test = "LRT")   # H0: homogeneidad marginal (dada la cuasi-simetría)
 
 # -----------------------------------------------------------------------------
-# [u22-deriva]  ·  2.5 Tablas cuadradas: modelizar el cambio > Cuánta deriva, y en qué sentido
+# [u22-deriva]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Cuánta deriva, y en qué sentido
 # -----------------------------------------------------------------------------
 niv <- as.integer(cartera$bonus_malus_prev); nva <- as.integer(cartera$bonus_malus_act)
 c(nivel_medio_previo = round(mean(niv), 3),
@@ -257,7 +316,10 @@ c(nivel_medio_previo = round(mean(niv), 3),
   pct_mejora         = round(100 * mean(nva < niv), 1))
 
 # -----------------------------------------------------------------------------
-# [u22-ordinal]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
+# [u22-ordinal]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
 m_indep_c <- glm(Freq ~ prev + act,               family = poisson, data = cuad)
 m_unif    <- glm(Freq ~ prev + act + I(i * j),    family = poisson, data = cuad)
@@ -266,12 +328,18 @@ c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
   OR_local        = round(exp(coef(m_unif)["I(i * j)"]), 3))
 
 # -----------------------------------------------------------------------------
-# [u22-ordinal-ajuste]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
+# [u22-ordinal-ajuste]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
 c(deviance = round(deviance(m_unif), 1), gl = df.residual(m_unif))
 
 # -----------------------------------------------------------------------------
-# [u22-movilidad]  ·  Significativo no es lo mismo que importante > Asociación ordinal: aprovechar que los niveles están ordenados
+# [u22-movilidad]
+#   2 · Modelos log-lineales para tablas
+#     > 2.5 Tablas cuadradas: modelizar el cambio
+#       > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
 cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
 m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
@@ -279,7 +347,9 @@ anova(m_unif, m_mov, test = "LRT")
 c(deviance = round(deviance(m_mov), 1), gl = df.residual(m_mov))
 
 # -----------------------------------------------------------------------------
-# [u22-proxy-control]  ·  2.6 Aplicación: detectar proxies del factor prohibido
+# [u22-proxy-control]
+#   2 · Modelos log-lineales para tablas
+#     > 2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
 tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + danos, data = cart_tab))
 m_ci  <- glm(Freq ~ sexo * danos + tipo_vehiculo * danos, family = poisson, data = tp)
@@ -287,7 +357,9 @@ m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + danos)^2,      family = poisson, dat
 anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | danos  (no hay proxy)
 
 # -----------------------------------------------------------------------------
-# [u22-proxy-control-tamano]  ·  2.6 Aplicación: detectar proxies del factor prohibido
+# [u22-proxy-control-tamano]
+#   2 · Modelos log-lineales para tablas
+#     > 2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
 broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::filter(grepl("^sexo.*:tipo", term)) |>
@@ -295,7 +367,9 @@ broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
 
 # -----------------------------------------------------------------------------
-# [u22-proxy-simulado]  ·  Este es un falso positivo, y lo sabemos con certeza
+# [u22-proxy-simulado]
+#   2 · Modelos log-lineales para tablas
+#     > 2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
 set.seed(SEMILLA_CURSO)
 n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
@@ -312,7 +386,9 @@ anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
       glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
 
 # -----------------------------------------------------------------------------
-# [u22-proxy-fuga]  ·  Este es un falso positivo, y lo sabemos con certeza
+# [u22-proxy-fuga]
+#   2 · Modelos log-lineales para tablas
+#     > 2.6 Aplicación: detectar proxies del factor prohibido
 # -----------------------------------------------------------------------------
 d_sim <- data.frame(y = y, s = s, v = v)
 or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
