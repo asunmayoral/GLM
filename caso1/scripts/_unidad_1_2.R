@@ -186,7 +186,7 @@ ggplot(pred_enlaces, aes(age, p_hat, color = enlace)) +
 # -----------------------------------------------------------------------------
 # [u12-coef]  ·  2.3 Interpretación: del coeficiente a la probabilidad
 # -----------------------------------------------------------------------------
-tidy(fit_glm)   # coeficientes en escala log-odds: lo que da summary() por defecto
+tidy(fit_glm)   # coeficientes en escala del predictor lineal: lo que da summary() por defecto
 
 # -----------------------------------------------------------------------------
 # [fig-u12-tres-escalas]  ·  2.3 Interpretación: del coeficiente a la probabilidad > Interpretación en la escala de los odds y log-odds
