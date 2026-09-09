@@ -1867,6 +1867,7 @@ Para evaluar la calidad de la clasificación, tenemos fácil la comparación ent
 Con un umbral dado $c$, cada caso cae en una de cuatro celdas según coincidan predicción y realidad:
 **verdadero positivo** (TP, *true positive*), **falso positivo** (FP, *false positive*),
 **falso negativo** (FN, *false negative*) y **verdadero negativo** (TN, *true negative*).
+
 ::: {.callout-tip}
 ## Cómo no confundirse nunca con TP, FP, FN y TN
 
