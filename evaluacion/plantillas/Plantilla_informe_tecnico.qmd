@@ -153,7 +153,7 @@ necesarias para evaluar, auditar y reutilizar el análisis.
 - Debe permitir valorar la solidez del análisis: qué datos se han usado, cómo se han preparado,
   qué metodología se aplicó, cómo se evaluaron los resultados y qué limitaciones condicionan la
   interpretación. Sustituye el texto entre corchetes `[...]` y elimina las indicaciones.
-- Estructura: (0) Resumen técnico · (1) Contexto, problema, objetivos y preguntas ·
+- Estructura: (0) Resumen técnico · (1) Contexto, problema, preguntas y objetivos ·
   (2) Datos, preparación y calidad · (3) Metodología y criterios · (4) Resultados, evaluación
   e interpretación · (5) Implicaciones, recomendaciones y próximos pasos · (6) Riesgos,
   limitaciones y uso de IA · (7) Referencias y anexos técnicos.
@@ -182,7 +182,7 @@ más relevantes; implicaciones o usos; y cautelas esenciales para interpretar el
 
 > [Texto del resumen técnico o ejecutivo...]
 
-# Contexto, problema, objetivos y preguntas del análisis
+# Contexto, problema, preguntas y objetivos del análisis
 
 ::: {.callout-note}
 Explica por qué se realiza el análisis, qué decisión o conocimiento se pretende apoyar y
@@ -202,21 +202,11 @@ cómo se traduce esa necesidad en preguntas respondibles con datos.
 
 > [Redactar el problema de forma concreta, evitando formulaciones genéricas como "analizar los datos".]
 
-## Objetivos del análisis
-
-| Tipo de objetivo | Redacción del objetivo |
-|---|---|
-| Objetivo general | [Completar] |
-| Objetivo específico 1 | [Completar] |
-| Objetivo específico 2 | [Completar] |
-| Objetivo específico 3 | [Completar] |
-| Objetivo específico 4, si procede | [Completar] |
-
 ## Preguntas de negocio y preguntas analíticas
 
 ::: {.callout-note}
 Formula aquí las preguntas **sin nombrar todavía variables ni modelos concretos**: los datos se
-presentan en el apartado siguiente y la técnica se justifica en el de metodología. La pregunta
+presentan en la sección siguiente y la técnica se justifica en la de metodología. La pregunta
 analítica debe decir **qué se quiere modelizar** —una probabilidad, un momento de ocurrencia, una
 categoría, un grado, un reparto de variabilidad— **en función de qué tipo de predictores**.
 Identifica cada pregunta con un código (P1, P2, …) y reutilízalo después en los objetivos, en la
@@ -228,6 +218,23 @@ presentación de los datos y en los resultados.
 | P1 | [Completar] | [Completar] | [Completar] |
 | P2 | [Completar] | [Completar] | [Completar] |
 | P3 | [Completar] | [Completar] | [Completar] |
+
+## Objetivos del análisis
+
+::: {.callout-note}
+Los objetivos se derivan de las preguntas analíticas que acabas de formular: cada objetivo
+específico dice, en términos de lo que el análisis se compromete a estimar, qué pregunta o preguntas
+va a resolver. Cierra cada uno con el código de la pregunta correspondiente (P1, P2, …) para que la
+trazabilidad pregunta → objetivo → resultado quede a la vista.
+:::
+
+| Tipo de objetivo | Redacción del objetivo |
+|---|---|
+| Objetivo general | [Completar] |
+| Objetivo específico 1 | [Completar] (P…) |
+| Objetivo específico 2 | [Completar] (P…) |
+| Objetivo específico 3 | [Completar] (P…) |
+| Objetivo específico 4, si procede | [Completar] (P…) |
 
 # Datos, preparación y calidad de la evidencia
 
