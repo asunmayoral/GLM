@@ -124,7 +124,7 @@ Y cuatro son las preguntas en torno a las cuales se ordena el curso:
 
 | ¿Qué mides? | Distribuciones | Dónde aparece | En el curso |
 |:---|:---|:---|:--:|
-| **¿Ocurre un evento?** — y, si ocurre, ¿de qué clase o en qué grado? | Bernouilli, binomial, politómica nominal y ordinal, riesgo y Kaplan Meier | diagnóstico clínico, riesgo de impago, probabilidad de compra, pieza defectuosa, presencia de una especie, intención de voto | Caso 1 |
+| **¿Ocurre un evento?** — y, si ocurre, ¿de qué clase o en qué grado? | Bernoulli, binomial, politómica nominal y ordinal, riesgo y Kaplan Meier | diagnóstico clínico, riesgo de impago, probabilidad de compra, pieza defectuosa, presencia de una especie, intención de voto | Caso 1 |
 | **¿Cuántas veces y a qué ritmo?** | Poisson, binomial negativa, multinomial y tablas de contingencia, ceros inflados, riesgos a trozos y Cox | ingresos hospitalarios, siniestros de una cartera, accidentes de tráfico, fallos de red, incendios forestales, goles | Caso 2 |
 | **¿Qué coste genera?** — una magnitud estrictamente positiva | Gamma, inversa gaussiana, Tweedie, AFT, Cox | coste de una reclamación, importe de una reparación, consumo energético, rendimiento de un cultivo | Caso 3 |
 | **¿Cuándo ocurre?** — sabiendo que a muchos aún no les ha pasado | Weibull y demás AFT, Cox | supervivencia de un paciente, vida útil de un equipo, abandono de clientes, duración de una póliza | 1.5 · 2.6 · 3.5–3.6 |

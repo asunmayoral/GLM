@@ -235,12 +235,24 @@ suficiente y qué alcance tienen los datos.
 ::: {.callout-note}
 Explica el enfoque metodológico sin convertirlo en una clase técnica. La pregunta clave es:
 por qué este análisis es adecuado para apoyar la decisión.
+
+Este apartado **no lleva subsecciones ni diagnóstico**. Nada de supuestos, contrastes, residuos,
+métricas de ajuste o criterios de selección de modelos: eso es el informe técnico, y si el lector lo
+necesita, ahí está. Aquí basta con decir qué se analizó, por qué era lo adecuado y en una línea qué
+hace fiable el resultado. Tampoco van cifras de resultado: esas son los hallazgos clave.
 :::
+
+> [**Abre la sección y presenta la tabla**: en dos o tres frases, el enfoque general y por qué
+> responde a la decisión que se quiere apoyar. Anuncia que la tabla empareja cada pregunta con el
+> análisis que la responde.]
 
 | Pregunta que se quería responder | Análisis realizado | Por qué era adecuado |
 |--------------------|-----------------|-----------------------|
 | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] |
+
+> [**Lee la tabla**: qué elección metodológica no era obvia y qué gana la decisión con ella. Una
+> frase, no un párrafo. Borra este recuadro cuando lo hayas redactado.]
 
 > **Nota metodológica breve:** [100–150 palabras como máximo. El detalle técnico va al anexo metodológico.]
 

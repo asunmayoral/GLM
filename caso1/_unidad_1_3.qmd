@@ -9,29 +9,28 @@ unidad recorre ambas.
 La primera es **agrupar**. Cuando las predictoras son **categóricas**, dos sujetos con el mismo
 perfil de covariables son **intercambiables** —para el modelo, ensayos idénticos—, así que podemos
 **colapsar** cada perfil en una fila que cuente cuántos casos hay en el grupo. Con respuesta
-**binaria**, agrupar convierte la Bernoulli individual ($y_i\in\{0,1\}$) en una **binomial**,
-$Y_i\sim\mathrm{Bin}(m_i,\pi_i)$ con $m_i$ el tamaño del grupo: es **el mismo modelo logístico**,
+**binaria**, agrupar convierte la Bernoulli individual ($y\in\{0,1\}$) en una **binomial**,
+$Y\sim\mathrm{Bin}(m,\pi)$ con $m$ el tamaño del grupo: es **el mismo modelo logístico**,
 solo cambia la disposición del dato. Lo vemos en las Secciones [3.1](#sec-u13-binomial) y
 [3.2](#sec-u13-gof-binomial), donde agrupar además **recupera los diagnósticos de ajuste**.
 
 La segunda es admitir **más de dos categorías**. Si la respuesta es **politómica** —categórica con
-tres o más niveles—, el logit binario se generaliza al **logit de categoría base** cuando no hay
-orden ([Sección 3.3](#sec-u13-nominal)) y al de **odds proporcionales** cuando sí lo hay
-([Sección 3.4](#sec-u13-ordinal)). Aquí las tratamos sobre datos **individuales** de GLOW
-(`raterisk`). 
+tres o más niveles— y los datos siguen **individualizados**, cada observación es una **multinomial
+de un solo ensayo**, $\mathbf{Y}\sim\mathrm{Mult}(1,\boldsymbol{\pi})$, con
+$\boldsymbol{\pi}=(\pi_1,\dots,\pi_K)$ y $K$ el número de categorías. El logit binario se
+generaliza entonces al **logit de categoría base** cuando no hay orden
+([Sección 3.3](#sec-u13-nominal)) y al de **odds proporcionales** cuando sí lo hay
+([Sección 3.4](#sec-u13-ordinal)). Lo trabajamos sobre `raterisk` (GLOW). 
 
 ::: {.callout-tip}
 ## Qué se estudia aquí y qué se pospone al Caso 2
 
-Las dos extensiones se **cruzan**: la politómica también admite agrupación. Colapsando cada perfil
-de covariables en un **vector de recuentos** se obtiene $\mathbf{Y}_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$,
-igual que agrupar la binaria llevaba de la Bernoulli a la binomial.
-
-Conviene ser preciso con lo que se pospone. **No** es la respuesta politómica: esta unidad la
-modeliza y la resuelve por completo en las Secciones [3.3](#sec-u13-nominal) y
-[3.4](#sec-u13-ordinal), sobre datos **individuales** ($m_i=1$). Lo que se pospone es la **vía de
-ajuste de su versión agrupada** ($m_i>1$), que se apoya en la equivalencia con un modelo
-**log-lineal de Poisson** y necesita, por tanto, la Poisson que se introduce en el Caso 2.
+También el caso politómico es agrupable —como la Bernoulli en binomial— cuando las predictoras son
+categóricas: colapsando cada perfil en un **vector de recuentos** por categoría de respuesta se
+llega a la multinomial $\mathbf{Y}\sim\mathrm{Mult}(m,\boldsymbol{\pi})$. Aquí, sin embargo, nos
+quedamos en $m=1$: las Secciones [3.3](#sec-u13-nominal) y [3.4](#sec-u13-ordinal) resuelven la
+politómica sobre datos individuales. La versión agrupada se aborda mediante la equivalencia con un
+modelo **log-lineal de Poisson**, y necesita por tanto la Poisson que se introduce en el Caso 2.
 :::
 
 ::: {.callout-note}

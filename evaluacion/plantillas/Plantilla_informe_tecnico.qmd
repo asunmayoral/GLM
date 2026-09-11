@@ -401,46 +401,109 @@ un párrafo breve, qué banco responde a cada pregunta y por qué.
 # Metodología y criterios de análisis
 
 ::: {.callout-note}
-Justifica la metodología en función del problema y de las preguntas analíticas. No la
-conviertas en una explicación de manual sobre cada técnica.
+Esta sección narra **qué vas a hacer y por qué**, no qué te salió. Ninguna cifra, ningún
+coeficiente, ningún valor *p*: los resultados son la sección 5. Justifica la metodología en función
+del problema y de las preguntas analíticas, y no la conviertas en una explicación de manual sobre
+cada técnica.
+
+Cuando una misma comprobación valga para varios modelos, **redáctala una sola vez** y di a cuáles se
+aplica. Repetir el mismo párrafo cinco veces, cambiando el nombre del modelo, no añade rigor: añade
+páginas.
 :::
 
-> [**Abre la sección y presenta la @tbl-metodologia**: explica con qué criterio general has elegido
-> las técnicas —qué propiedad de cada respuesta las impone— y anuncia que la tabla empareja cada
-> pregunta con su técnica, su justificación y el criterio con que se valida.]
+> [**Abre la sección**: enuncia el criterio general con el que has elegido las técnicas —normalmente,
+> qué propiedad de cada respuesta las impone— y anuncia el recorrido de la sección: primero qué
+> exploras y con qué modelos respondes, después bajo qué supuestos son válidos, y por último con qué
+> criterios los evalúas y seleccionas.]
 
-| Pregunta analítica | Técnica o enfoque aplicado | Por qué es adecuado | Criterio de evaluación o validación |
-|-------|--------------|-----------------|----------------------|
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
+## Técnicas y modelos
+
+::: {.callout-tip}
+## Qué va aquí y qué no
+Aquí se **declara** el análisis exploratorio: qué descriptivo o qué gráfico vas a mirar y **qué tiene
+que revelarte**. El descriptivo en sí —la tabla, la figura, sus cifras— se enseña en la sección 5.
+Si escribes aquí «la media de edad es 74,3», has cruzado la frontera.
+:::
+
+> [**Análisis exploratorio.** Antes de modelizar, di qué vas a mirar y para qué: distribución de la
+> respuesta, relación de cada predictor candidato con ella, desequilibrios entre grupos, valores
+> extremos, estructura de agrupamiento. Para cada uno, una línea diciendo qué decisión del
+> modelo depende de lo que ahí se vea. Un descriptivo que no cambia ninguna decisión sobra.]
+
+> [**Modelos, pregunta a pregunta.** Un párrafo por pregunta analítica (o por grupo de preguntas que
+> compartan modelo). Cada párrafo recorre el mismo camino: qué naturaleza tiene la respuesta
+> —binaria, de conteo, categórica, ordinal, continua positiva, tiempo hasta un evento—, qué
+> distribución y qué función de enlace impone esa naturaleza, sobre qué unidad de análisis se ajusta,
+> y qué lectura habilita el modelo elegido (odds ratios, razones de tasas, hazard ratios…). Cita la
+> referencia que sostiene cada elección.
+>
+> **Las alternativas descartadas no necesitan párrafo propio.** Si la justificación está bien escrita,
+> ya explica por qué el modelo elegido es el adecuado. Menciona la alternativa solo cuando descartarla
+> *sea* el argumento —por ejemplo, cuando la obvia sea la habitual en tu campo y tú no la uses—, y
+> hazlo en una frase dentro de la justificación, no en un apartado aparte.]
+
+> [**Presenta la @tbl-metodologia**: anuncia que la tabla resume, sin argumentación, qué exploras y
+> con qué respondes a cada pregunta.]
+
+| Pregunta analítica | AED que la prepara | Modelos o técnicas |
+|--------------------|--------------------------|--------------------------|
+| [Completar] | [Qué tiene que revelar el descriptivo, no cómo se llama el gráfico] | [Completar] |
+| [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] |
 
 : [Descripción de la tabla] {#tbl-metodologia}
 
-> [**Lee la @tbl-metodologia**: justifica las elecciones que no sean obvias y, sobre todo, **las
-> alternativas que descartaste y por qué**. Un informe técnico se audita por las decisiones, no por
-> los resultados. Borra este recuadro cuando lo hayas redactado.]
+## Supuestos y diagnóstico
 
-## Supuestos, decisiones y limitaciones metodológicas
+::: {.callout-note}
+Va antes de la evaluación por una razón, no por orden alfabético: los contrastes con los que
+compararás y seleccionarás modelos en el apartado siguiente solo son válidos si los supuestos de
+esta se sostienen. Comprobarlos después sería medir con una regla cuya calibración aún no has
+mirado.
+:::
 
-> [Explicar supuestos, selección de variables, particiones entrenamiento/prueba, criterios de validación, pruebas estadísticas, criterios de comparación o decisiones técnicas que condicionen la interpretación.]
+> [**Qué supone cada modelo.** Enumera los supuestos que condicionan la interpretación: forma
+> funcional y enlace, independencia de las observaciones (o la estructura de dependencia que has
+> modelizado), distribución de la respuesta, y los supuestos propios de cada familia —proporcionalidad
+> de odds, proporcionalidad de riesgos, ausencia de sobredispersión, linealidad en la escala del
+> enlace—. Si un supuesto es común a varios modelos, dilo una vez.]
 
-## Evaluación, validación o comprobaciones
+> [**Cómo los vas a comprobar.** Para cada supuesto, el procedimiento concreto: qué contraste, qué
+> gráfico de residuos, qué diagnóstico. Nombra la función y el paquete si eso hace reproducible la
+> comprobación.]
 
-> [**Abre el apartado y presenta la @tbl-comprobaciones**: qué has hecho para comprobar que los
-> modelos son adecuados, y no solo que sus coeficientes son significativos. Anuncia que la tabla las
-> recoge con su resultado.]
+> [**Qué harías si falla.** Este punto se olvida siempre y es el que distingue un plan de análisis de
+> una lista de buenas intenciones: si la proporcionalidad no se sostiene, si aparece sobredispersión,
+> si hay observaciones influyentes o separación, ¿qué modelo alternativo usarías? Decirlo por
+> anticipado evita que la decisión parezca tomada a posteriori para que saliera bien.]
 
-| Comprobación realizada | Resultado | Interpretación técnica | Implicación para el análisis |
-|-----------|-----------------|---------------|-----------------|
-| [Métrica, contraste, validación, sensibilidad, diagnóstico] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
+> [**Decisiones y limitaciones metodológicas.** Cierra con las decisiones que condicionan la lectura
+> de todo lo demás: transformaciones aplicadas, tratamiento de los datos ausentes, particiones de
+> entrenamiento y prueba, y —si procede— por qué las asociaciones que vas a estimar no admiten
+> lectura causal.]
 
-: [Descripción de la tabla] {#tbl-comprobaciones}
+## Evaluación, selección de modelos y validación
 
-> [**Lee la @tbl-comprobaciones**: qué comprobación cambia algo. Una que sale bien confirma el
-> camino; una que sale mal es información valiosa y hay que contarla, no esconderla. Si alguna
-> obligó a rehacer un ajuste, dilo aquí. Borra este recuadro cuando lo hayas redactado.]
+> [**Cómo seleccionas.** Con qué criterio decides entre modelos candidatos: contrastes entre modelos
+> anidados, criterios de información cuando no lo son, procedimientos de selección de variables. Di
+> el criterio **antes** de aplicarlo; un criterio elegido después de ver los resultados no es un
+> criterio.]
+
+> [**Con qué mides que el modelo sirve.** Las métricas y los gráficos con los que juzgarás el
+> ajuste, y por qué esos y no otros: discriminación, calibración, capacidad predictiva frente a una
+> regla trivial, bondad de ajuste global. Que la métrica encaje con la pregunta: una que ordena
+> pacientes no se juzga igual que una que decide caso a caso.]
+
+> [**Cómo lo validas.** Validación cruzada o partición, remuestreo, comparación con una estimación
+> que no suponga modelo, contraste con una fuente externa, o análisis de sensibilidad. Si no validas,
+> dilo y explica por qué; es una limitación legítima, no algo que ocultar.]
+
+::: {.callout-tip}
+## Unifica lo común
+Es muy probable que varias preguntas compartan criterio de selección, métricas o procedimiento de
+validación. Escribe el tronco común una vez y añade después solo lo específico de cada modelo. Los
+resultados de todas estas comprobaciones van en la sección 5, no aquí.
+:::
 
 # Resultados, evaluación e interpretación
 
@@ -550,6 +613,23 @@ Los resultados secundarios van al anexo.
 
 # Código que genera la figura o tabla del resultado clave 3
 ```
+
+## Comprobaciones y validación de los modelos
+
+> [**Abre el apartado y presenta la @tbl-comprobaciones**: recuerda en una línea qué anunciaste
+> comprobar en la sección 4 y anuncia que aquí están los resultados de esas comprobaciones. Lo que
+> importa no es que las hayas hecho, sino qué cambió cada una.]
+
+| Comprobación realizada | Resultado | Interpretación técnica | Implicación para el análisis |
+|-----------|-----------------|---------------|-----------------|
+| [Métrica, contraste, validación, sensibilidad, diagnóstico] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-comprobaciones}
+
+> [**Lee la @tbl-comprobaciones**: qué comprobación cambia algo. Una que sale bien confirma el
+> camino; una que sale mal es información valiosa y hay que contarla, no esconderla. Si alguna
+> obligó a rehacer un ajuste, dilo aquí. Borra este recuadro cuando lo hayas redactado.]
 
 ## Síntesis técnica de hallazgos
 
@@ -744,6 +824,8 @@ sessioninfo::session_info()
 | Los datos están descritos y se valora críticamente su calidad. | ☐ | ☐ |
 | La metodología está justificada y no es una explicación de manual. | ☐ | ☐ |
 | Se documentan criterios de evaluación, validación o comprobación. | ☐ | ☐ |
+| **La sección de metodología no contiene resultados**: ni una cifra, ni un coeficiente, ni un valor *p*; declara qué se va a hacer y con qué se va a comprobar, y los valores aparecen en la sección de resultados. | ☐ | ☐ |
+| **Para cada supuesto se dice cómo se comprueba y qué se haría si falla**, y la alternativa está decidida por anticipado, no a posteriori. | ☐ | ☐ |
 | Los resultados clave están interpretados y vinculados a objetivos. | ☐ | ☐ |
 | Las limitaciones, riesgos e incertidumbres están reconocidos. | ☐ | ☐ |
 | Las referencias están citadas en el texto y completas al final. | ☐ | ☐ |

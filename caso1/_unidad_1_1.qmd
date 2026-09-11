@@ -92,7 +92,7 @@ ggplot(grid_ext, aes(age, p_hat, color = priorfrac)) +
 ```
 
 
-Otro fallo se da en el diagnóstico de los residuos, como vemos en la @fig-u11-diagnostico-ols: a la izquierda apreciamos que los residuos, para un x dado, toman solo dos valores posibles, y se mueven con la media ajustada; se rompe la independencia de los residuos y la homocedasticidad. En el gráfico a la derecha se muestran los residuos versus los percentiles de una distribución normal, y de nuevo se aprecia la ruptura de la hipótesis de normalidad. Esto ya era previsible desde el inicio, puesto que la respuesta es Bernouilli y no Normal.
+Otro fallo se da en el diagnóstico de los residuos, como vemos en la @fig-u11-diagnostico-ols: a la izquierda apreciamos que los residuos, para un x dado, toman solo dos valores posibles, y se mueven con la media ajustada; se rompe la independencia de los residuos y la homocedasticidad. En el gráfico a la derecha se muestran los residuos versus los percentiles de una distribución normal, y de nuevo se aprecia la ruptura de la hipótesis de normalidad. Esto ya era previsible desde el inicio, puesto que la respuesta es Bernoulli y no Normal.
 
 ```{r}
 #| label: fig-u11-diagnostico-ols
@@ -223,7 +223,7 @@ En esta unidad trabajaremos con:
 ## 1.4 GLM en datos binarios
 
 
-Para modelizar con un modelo lineal generalizado la predicción de `fracture`, mantenemos el carácter dicotómico de la respuesta, y su modelización con una variable Bernouilli, con $p$ su valor esperado y la probabilidad de fractura. Buscamos pues, un modelo a través del que relacionar esta probabilidad con un predictor lineal construido en función de las variables `age` y `priorfrac`. Como hemos visto antes, la función `logit` nos permite manejar este cambio de escala de una probabilidad a toda la recta real, y por otro lado, la familia binomial integra a la distribución Bernouilli, por lo que planteamos lo que popularmente se conoce como **el modelo logit**, que aplicado a GLOW para predecir la fractura en función de la edad y el haber tenido una fractura previa, se formularía así:
+Para modelizar con un modelo lineal generalizado la predicción de `fracture`, mantenemos el carácter dicotómico de la respuesta, y su modelización con una variable Bernoulli, con $p$ su valor esperado y la probabilidad de fractura. Buscamos pues, un modelo a través del que relacionar esta probabilidad con un predictor lineal construido en función de las variables `age` y `priorfrac`. Como hemos visto antes, la función `logit` nos permite manejar este cambio de escala de una probabilidad a toda la recta real, y por otro lado, la familia binomial integra a la distribución Bernoulli, por lo que planteamos lo que popularmente se conoce como **el modelo logit**, que aplicado a GLOW para predecir la fractura en función de la edad y el haber tenido una fractura previa, se formularía así:
 
 Con la respuesta  
 
@@ -318,7 +318,7 @@ ggplot() +
 Se aprecia en la @fig-u11-ols-vs-logistica la diferencia en la predicción de la probabilidad de fractura, asimilada en el OLS por sendas rectas paralelas y en el GLM con dos curvas que intentan adaptar mejor la forma de los datos.
 
 
-Ya con el glm ajustado, al comparar los residuos medios por tramos (*binned residuals*, en la [Unidad 2](#sec-u12-diagnostico) para el ajuste OLS y el GLM (@fig-u11-residuos-ols-glm), apreciamos mejor rendimiento en este último, con la mayoría de residuos dentro de la banda de confianza, a diferencia de los residuos OLS, que fluyen fuera de la banda.
+Ya con el glm ajustado, podemos comparar los dos ajustes con los **residuos medios por tramos** (*binned residuals*, que retomamos en la [Unidad 2](#sec-u12-diagnostico)): se agrupan las pacientes por probabilidad ajustada y, en cada tramo, se promedia observado − predicho. Si el modelo está bien calibrado, esos promedios oscilan alrededor de cero dentro de una banda de ±2 errores estándar. La @fig-u11-residuos-ols-glm los dibuja para el ajuste OLS y para el GLM.
 
 ```{r}
 #| label: fig-u11-residuos-ols-glm
@@ -327,13 +327,20 @@ Ya con el glm ajustado, al comparar los residuos medios por tramos (*binned resi
 #| out-width: "100%"
 #| fig-cap: "Residuos medios por tramos para los ajustes OLS y GLM."
 
-p_ols <- plot(performance::binned_residuals(fit_ols)) +
-  labs(title = "OLS (modelo lineal de probabilidad)")
-p_glm <- plot(performance::binned_residuals(fit_glm)) +
-  labs(title = "GLM logístico")
+# `residuals = "response"` en ambos paneles: es observado − predicho, la definición de
+# Gelman y Hill. Sin él, `binned_residuals()` promedia residuos deviance, que en el lm
+# coinciden con y − ŷ pero en el GLM binomial no, y la comparación dejaría de ser homogénea.
+b_ols <- performance::binned_residuals(fit_ols, residuals = "response")
+b_glm <- performance::binned_residuals(fit_glm, residuals = "response")
+
+p_ols <- plot(b_ols) + labs(title = "OLS (modelo lineal de probabilidad)")
+p_glm <- plot(b_glm) + labs(title = "GLM logístico")
 patchwork::wrap_plots( p_ols, p_glm, nrow = 2) +
   patchwork::plot_annotation(title = "Residuos medios por tramos: OLS vs GLM")
 ```
+
+De los `r nrow(b_glm)` tramos del GLM se salen de la banda `r sum(b_glm$group == "no")`, frente a
+`r sum(b_ols$group == "no")` de los `r nrow(b_ols)` del OLS.
 
 
 ::: {.callout-important}

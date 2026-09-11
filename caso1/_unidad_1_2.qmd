@@ -1701,7 +1701,11 @@ ResourceSelection::hoslem.test(glow$fractura01, fitted(fit_glm), g = 10)   # alt
 **Residuos por tramos (binned):**
 
 ```r
-plot(performance::binned_residuals(fit_glm))   # observado − predicho promediado por tramo, ±2 EE
+# Ojo con el argumento `residuals`: vale "deviance" por defecto, y los residuos deviance de una
+# binaria son asimétricos (con probabilidades pequeñas son casi siempre negativos), de modo que
+# la salida por defecto se desplaza en bloque hacia abajo. Para leer calibración hay que pedir
+# "response", que es observado − predicho promediado por tramo, ±2 EE.
+plot(performance::binned_residuals(fit_glm, residuals = "response"))
 ```
 
 **Curva de calibración** (riesgo predicho vs frecuencia observada, por deciles):

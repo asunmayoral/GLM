@@ -346,19 +346,47 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 
 ## Técnicas de análisis
 
-> [**Presenta la @tbl-tecnicas**: con qué criterio has elegido cada técnica. En un artículo hay que
-> dar el detalle suficiente para que otro grupo pueda replicar el análisis.]
+::: {.callout-note}
+Este apartado describe **qué se hizo y por qué**, con el detalle suficiente para que otro grupo
+pueda replicar el análisis. Ningún resultado: las cifras van en la sección de Resultados. La
+convención de artículo no admite sub-subsecciones aquí, así que el apartado se redacta como prosa
+continua, pero siguiendo siempre este orden: exploración, modelos, supuestos, evaluación.
+:::
 
-| Pregunta u objetivo | Técnica aplicada | Justificación | Criterio de evaluación |
-|-------------|------------|------------------|-----------------|
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
+> [**Análisis exploratorio.** Qué descriptivos y qué representaciones gráficas se emplearon para
+> caracterizar la muestra y las relaciones entre variables, y qué decisión del modelo dependía de lo
+> que ahí se observara. Declara aquí qué se miró; lo observado se cuenta en Resultados.]
+
+> [**Modelos y su fundamento.** Un párrafo por pregunta u objetivo (o por grupo de preguntas que
+> compartan modelo): qué naturaleza tiene la variable respuesta, qué distribución y qué función de
+> enlace impone esa naturaleza, sobre qué unidad de análisis se ajusta el modelo y qué lectura
+> habilita —odds ratios, razones de tasas, hazard ratios—. Cita la referencia original de cada
+> técnica, en su edición más reciente. Menciona una alternativa descartada solo cuando descartarla
+> sea parte del argumento, típicamente si es la habitual en el campo y aquí no se usa.]
+
+> [**Supuestos y su comprobación.** Qué supone cada modelo, con qué procedimiento se comprobó cada
+> supuesto —contraste, gráfico de residuos, diagnóstico— y qué análisis alternativo se habría
+> empleado si algún supuesto no se hubiera sostenido. Si un supuesto es común a varios modelos,
+> enúncialo una sola vez. Declarar por anticipado la alternativa es lo que evita que la decisión
+> parezca tomada a posteriori.]
+
+> [**Evaluación, selección y validación.** Con qué criterio se seleccionó entre modelos candidatos
+> —contrastes entre modelos anidados, criterios de información, procedimientos de selección de
+> variables—, con qué métricas se juzgó el ajuste y por qué esas, y cómo se validó el resultado:
+> validación cruzada o partición, remuestreo, comparación con una estimación no paramétrica o
+> análisis de sensibilidad. Si no hubo validación, decláralo como limitación.]
+
+> [**Software.** Versión del entorno y de los paquetes empleados, con su cita cuando proceda.]
+
+> [**Presenta la @tbl-tecnicas**: anuncia que la tabla resume, sin argumentación, qué se exploró y
+> con qué se respondió a cada pregunta. Los detalles quedan en el texto anterior.]
+
+| Pregunta u objetivo | Exploración previa | Modelos o técnicas |
+|--------------------|--------------------------|--------------------------|
+| [Completar] | [Qué debía revelar el descriptivo, no cómo se llama el gráfico] | [Completar] |
+| [Completar] | [Completar] | [Completar] |
 
 : [Descripción de la tabla] {#tbl-tecnicas}
-
-> [**Lee la @tbl-tecnicas**: justifica los supuestos que asume cada técnica y cómo los has
-> comprobado, y menciona las alternativas descartadas. Borra este recuadro cuando lo hayas
-> redactado.]
 
 # Resultados
 
@@ -633,6 +661,8 @@ sessioninfo::session_info()
 | El marco teórico conecta literatura previa con el estudio realizado. | ☐ | ☐ |
 | Los objetivos, preguntas o hipótesis están formulados con precisión. | ☐ | ☐ |
 | La metodología permite valorar la validez del análisis. | ☐ | ☐ |
+| **El apartado de metodología no contiene resultados**: declara qué se hizo y con qué se comprobó, y los valores aparecen en Resultados. | ☐ | ☐ |
+| **Para cada supuesto se dice cómo se comprobó y qué análisis alternativo se habría usado si hubiera fallado.** | ☐ | ☐ |
 | Los resultados se presentan sin mezclarlos con discusión excesiva. | ☐ | ☐ |
 | La discusión interpreta y relaciona resultados con literatura o expectativas. | ☐ | ☐ |
 | Las conclusiones no van más allá de lo que los datos permiten afirmar. | ☐ | ☐ |
