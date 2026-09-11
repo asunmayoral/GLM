@@ -21,10 +21,17 @@ orden ([Sección 3.3](#sec-u13-nominal)) y al de **odds proporcionales** cuando 
 (`raterisk`). 
 
 ::: {.callout-tip}
-Las respuestas politómicas también podrían agruparse en recuentos, generando una **multinomial**,
-$Y_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$, pero su ajuste se apoya en la equivalencia con un modelo
-**log-lineal de Poisson**, que desarrollamos en el Caso 2, donde se introduce la Poisson, 
-de modo que lo estudiaremos allí.
+## Qué se estudia aquí y qué se pospone al Caso 2
+
+Las dos extensiones se **cruzan**: la politómica también admite agrupación. Colapsando cada perfil
+de covariables en un **vector de recuentos** se obtiene $\mathbf{Y}_i\sim\mathrm{Mult}(m_i,\boldsymbol{\pi}_i)$,
+igual que agrupar la binaria llevaba de la Bernoulli a la binomial.
+
+Conviene ser preciso con lo que se pospone. **No** es la respuesta politómica: esta unidad la
+modeliza y la resuelve por completo en las Secciones [3.3](#sec-u13-nominal) y
+[3.4](#sec-u13-ordinal), sobre datos **individuales** ($m_i=1$). Lo que se pospone es la **vía de
+ajuste de su versión agrupada** ($m_i>1$), que se apoya en la equivalencia con un modelo
+**log-lineal de Poisson** y necesita, por tanto, la Poisson que se introduce en el Caso 2.
 :::
 
 ::: {.callout-note}
@@ -476,7 +483,7 @@ probabilidades ajustadas.
 ::: {.callout-note}
 ## Individual o agrupado: qué cambia y qué no
 Tanto si la respuesta categórica es **individual** (una fila por sujeto, como aquí con
-`raterisk`) como **agrupada** (recuentos por perfil, multinomial), el **modelo y sus estimaciones
+`raterisk`) como **agrupada** ($m_i>1$, recuentos por perfil), el **modelo y sus estimaciones
 son los mismos**: misma verosimilitud, misma interpretación de coeficientes, y la **selección de
 modelos** (LRT, AIC/BIC) funciona igual. Lo que **no** vale con datos individuales es el contraste
 **$\chi^2$ de bondad de ajuste** ni el análisis de **residuos**: como en el paso Bernoulli→binomial

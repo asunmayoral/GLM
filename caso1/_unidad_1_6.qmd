@@ -18,7 +18,7 @@ caso reproducibles) y, de forma acumulativa, RA1–RA7.
 ### El encargo
 
 Te contrata la dirección médica de **OsteoRed**, una red de 24 clínicas de salud ósea que, dentro de
-un programa de prevención, ha seguido durante seis años a una cohorte de mujeres. No son
+un programa de prevención, ha seguido durante un máximo de seis años a una cohorte de mujeres. No son
 estadísticos: te traen sus datos y sus preguntas, y esperan **respuestas y recomendaciones**, no una
 clase de modelos.
 
@@ -38,6 +38,37 @@ Después, a lo largo de hasta **seis revisiones anuales**, anotaron si sufrió u
 Conviene fijar esto desde el principio para no confundirse al interpretar: el **endotipo** y el
 **estadio** describen a la *paciente* y su enfermedad ósea, están registrados para **todas** las
 mujeres de la cohorte y **no dependen de que la fractura llegue a ocurrir** ni de cuándo ocurra.
+
+::: {.callout-important}
+## Cómo funciona el seguimiento (léelo antes de tocar los datos)
+Hay dos rasgos del diseño que te van a desconcertar si no los tienes presentes, porque los verás
+en los datos y no son un error.
+
+**1. La observación termina con la fractura.** En cuanto una paciente se fractura sale del
+seguimiento: no se la vuelve a citar, no hay segundas fracturas y no existen revisiones posteriores
+al evento. Por eso `tiempo` es el periodo de la fractura en quienes la sufrieron.
+
+**2. No todas tienen las mismas revisiones.** Las pacientes **se incorporaron al programa en
+momentos distintos** y el estudio se cerró en una fecha común, de modo que la ventana de seguimiento
+de cada una depende de cuándo entró: unas llegaron a completar las seis revisiones y otras solo
+tres, cuatro o cinco. Esa ventana **no guarda relación** con la fragilidad de la paciente, ni con el
+tratamiento, ni con la clínica; es cuestión de calendario. Nadie tiene menos de tres revisiones,
+salvo que se fracturara antes.
+
+De ahí se siguen dos cosas que verás enseguida en tu cohorte. La primera es que **el número de filas
+que cada mujer aporta a `pp` no es seis, sino su `tiempo`**: tantas como revisiones estuvo realmente
+en riesgo. La segunda es que **el conjunto de mujeres en riesgo se reduce revisión a revisión**, y
+por dos motivos distintos que conviene no mezclar: unas han salido porque se fracturaron y otras
+porque se les acabó su ventana. El segundo motivo es puro calendario y su efecto es grande: como las
+ventanas se reparten entre tres y seis revisiones, **solo tres de cada cuatro pacientes alcanzan la
+cuarta revisión, la mitad la quinta y una de cada cuatro la sexta**, aun sin contar las que se
+fracturan. En la sexta revisión estarás estimando con una fracción pequeña de tu cohorte.
+
+Esa mezcla es exactamente lo que la Pregunta 2 te pide tratar bien. Contar a una mujer censurada en
+la tercera revisión como «no se fracturó» sería atribuirle tres años de riesgo que no ha corrido, y
+los periodos tardíos, estimados con muchas menos pacientes, llegan con intervalos más anchos: dilo
+cuando interpretes el riesgo base.
+:::
 
 > **Lo que la dirección de OsteoRed quiere saber**
 >
@@ -162,9 +193,11 @@ seguimiento sin fracturarse, es decir, censurada).
 
 **`pp`: una fila por paciente y revisión en riesgo**, la llamada *expansión persona-periodo*.
 Contiene `id`, `centro`, `x1`, `x2`, la revisión (`periodo`) y el indicador `y`, que vale 1 si la
-fractura ocurrió en esa revisión. Una mujer que se fractura en la tercera revisión aporta tres filas
-(`y` = 0, 0, 1) y una que termina las seis sin fracturarse aporta seis filas de ceros: cada paciente
-contribuye **solo mientras estuvo en riesgo**.
+fractura ocurrió en esa revisión. Cada mujer aporta **tantas filas como revisiones estuvo en
+riesgo**, es decir, exactamente su `tiempo`: quien se fractura en la tercera aporta tres
+(`y` = 0, 0, 1), y quien llega al final de su ventana sin fracturarse aporta tantas filas de ceros
+como revisiones tuviera esa ventana —seis si entró pronto en el programa, y tres, cuatro o cinco si
+entró más tarde—. Ninguna paciente contribuye después de salir del seguimiento.
 
 Elegir bien la tabla es parte del análisis. Las preguntas sobre atributos de la paciente se responden
 sobre `cohorte`; la pregunta sobre *cuándo* ocurre el evento, sobre `pp`. Las dos describen a las
