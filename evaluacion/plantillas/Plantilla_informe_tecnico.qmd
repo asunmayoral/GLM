@@ -214,11 +214,20 @@ cómo se traduce esa necesidad en preguntas respondibles con datos.
 
 ## Preguntas de negocio y preguntas analíticas
 
-| Pregunta de negocio | Pregunta analítica asociada | Datos necesarios | Decisión que podría apoyar |
-|---|---|---|---|
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
+::: {.callout-note}
+Formula aquí las preguntas **sin nombrar todavía variables ni modelos concretos**: los datos se
+presentan en el apartado siguiente y la técnica se justifica en el de metodología. La pregunta
+analítica debe decir **qué se quiere modelizar** —una probabilidad, un momento de ocurrencia, una
+categoría, un grado, un reparto de variabilidad— **en función de qué tipo de predictores**.
+Identifica cada pregunta con un código (P1, P2, …) y reutilízalo después en los objetivos, en la
+presentación de los datos y en los resultados.
+:::
+
+| # | Pregunta de negocio | Pregunta analítica asociada | Decisión que podría apoyar |
+|:--:|---|---|---|
+| P1 | [Completar] | [Completar] | [Completar] |
+| P2 | [Completar] | [Completar] | [Completar] |
+| P3 | [Completar] | [Completar] | [Completar] |
 
 # Datos, preparación y calidad de la evidencia
 
@@ -250,6 +259,13 @@ y hasta qué punto son adecuados para responder las preguntas planteadas.
 ```
 
 ## Variables principales
+
+::: {.callout-note}
+Este es el lugar donde se conectan los datos con las preguntas: la última columna enlaza cada
+variable con el código (P1, P2, …) de la pregunta que ayuda a responder. Si trabajas con más de una
+tabla, añade una columna que indique en cuál vive cada variable y explica debajo, en un párrafo
+breve, qué tabla responde a cada pregunta y por qué.
+:::
 
 | Variable | Tipo | Descripción | Objetivo o pregunta que ayuda a responder |
 |---|---|---|---|
