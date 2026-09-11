@@ -163,7 +163,7 @@ una contribución investigadora con método, evidencia, discusión crítica y re
 ## Autoría
 
 | Elemento | Contenido |
-|---|---|
+|-----------|-------------------------------------------------|
 | Autores/as | [Completar] |
 | Asignatura / titulación | [Completar] |
 | Universidad o centro | [Completar] |
@@ -191,7 +191,7 @@ aborda el artículo. Las afirmaciones de contexto y literatura deben citarse en 
 :::
 
 | Elemento | Contenido |
-|---|---|
+|-------------|-----------------------------------------------|
 | Contexto del problema | [Completar con apoyo de fuentes citadas] |
 | Relevancia académica o aplicada | [Completar] |
 | Brecha, tensión o necesidad de estudio | [Completar] |
@@ -208,7 +208,7 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 :::
 
 | Fuente | Aportación principal | Relación con el artículo |
-|---|---|---|
+|------------|-------------------------|-----------------------|
 | [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
 | [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
 | [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
@@ -218,7 +218,7 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 # Objetivos, preguntas de investigación e hipótesis
 
 | Tipo de objetivo | Redacción |
-|---|---|
+|------------|------------------------------------------------|
 | Objetivo general | [Completar] |
 | Objetivo específico 1 | [Completar] |
 | Objetivo específico 2 | [Completar] |
@@ -227,7 +227,7 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 ## Preguntas de investigación
 
 | Código | Pregunta de investigación | Variable, comparación o evidencia necesaria |
-|---|---|---|
+|------|----------------------------|--------------------------|
 | P1 | [Completar] | [Completar] |
 | P2 | [Completar] | [Completar] |
 | P3 | [Completar] | [Completar] |
@@ -235,7 +235,7 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 ## Hipótesis, si procede
 
 | Hipótesis | Formulación | Justificación teórica o empírica |
-|---|---|---|
+|-------|--------------------------|--------------------------|
 | H1 | [Completar] | [Completar] |
 | H2 | [Completar] | [Completar] |
 
@@ -249,7 +249,7 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 ## Datos, muestra o corpus analizado
 
 | Elemento | Descripción |
-|---|---|
+|----------------|--------------------------------------------|
 | Fuente de datos | [Completar] |
 | Población o proceso de referencia | [Completar] |
 | Muestra, registros o unidades analizadas | [Completar] |
@@ -260,7 +260,7 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 ## Variables, indicadores o medidas
 
 | Variable o indicador | Tipo / escala | Descripción | Papel en el análisis |
-|---|---|---|---|
+|-----------|--------|------------------------|-----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
@@ -281,7 +281,7 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 ## Técnicas de análisis
 
 | Pregunta u objetivo | Técnica aplicada | Justificación | Criterio de evaluación |
-|---|---|---|---|
+|-------------|------------|------------------|-----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 
@@ -295,7 +295,7 @@ La discusión amplia se reserva para la sección siguiente.
 ## Resultado asociado a la pregunta/objetivo 1: [título]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
 | Resultado principal | [Completar] |
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
@@ -313,7 +313,7 @@ La discusión amplia se reserva para la sección siguiente.
 ## Resultado asociado a la pregunta/objetivo 2: [título]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
 | Resultado principal | [Completar] |
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
@@ -331,7 +331,7 @@ La discusión amplia se reserva para la sección siguiente.
 ## Resultado asociado a la pregunta/objetivo 3: [título]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
 | Resultado principal | [Completar] |
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
@@ -359,7 +359,7 @@ plantearse como interpretación plausible.
 :::
 
 | Aspecto | Contenido de la discusión |
-|---|---|
+|--------------|----------------------------------------------|
 | Resultado principal | [Completar] |
 | Relación con literatura o expectativas | [Completar con citas si procede] |
 | Interpretación razonable | [Completar] |
@@ -377,7 +377,7 @@ plantearse como interpretación plausible.
 ## Limitaciones
 
 | Tipo de limitación | Descripción | Efecto sobre la interpretación |
-|---|---|---|
+|------------|------------------------|------------------------|
 | Datos / muestra | [Completar] | [Completar] |
 | Método | [Completar] | [Completar] |
 | Medición / variables | [Completar] | [Completar] |
@@ -395,7 +395,7 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 :::
 
 | Aspecto | Declaración a completar |
-|---|---|
+|--------------|----------------------------------------------|
 | Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
 | Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
 | Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
@@ -424,7 +424,7 @@ Si usas `bibliography: references.bib` en el encabezado, las referencias se gene
 # Material suplementario o anexos
 
 | Anexo | Contenido recomendado |
-|---|---|
+|--------------|----------------------------------------------|
 | Anexo A. Datos o fuente de datos | [Enlace, descripción o información de acceso] |
 | Anexo B. Código o cuaderno reproducible | [Código comentado o enlace a repositorio] |
 | Anexo C. Instrumento, cuestionario o protocolo | [Si procede] |
@@ -491,7 +491,7 @@ sessioninfo::session_info()
 # Checklist final antes de entregar
 
 | Comprobación | Sí | A revisar |
-|---|:--:|:--:|
+|-------------------------------------------------|:---:|:---:|
 | **El documento está íntegramente personalizado**: título, subtítulo, autoría y fecha son los del equipo; cabeceras y pies no conservan texto de la plantilla; no queda ningún `[texto entre corchetes]`, ninguna instrucción de la plantilla ni ninguna sección de ejemplo sin sustituir por contenido propio; se han eliminado los apartados que no apliquen. | ☐ | ☐ |
 | El título refleja claramente el tema, contexto o método del estudio. | ☐ | ☐ |
 | El resumen sintetiza objetivo, datos, método, resultados y conclusión. | ☐ | ☐ |

@@ -47,7 +47,7 @@ Para ejemplificar la implementación de esta versión del modelo binomial, appli
 
 Agrupados los datos en $k$ celdas (perfiles de covariables), en la celda $i$
 
-$$Y_i \sim \mathrm{Bi}(m_i,\pi_i), \qquad i=1,\dots,k,\quad \textstyle\sum_i m_i=n,$$
+$$Y_i \sim \mathrm{Bin}(m_i,\pi_i), \qquad i=1,\dots,k,\quad \textstyle\sum_i m_i=n,$$
 
 donde $Y_i$ es el número de fracturas entre las $m_i$ mujeres del perfil y $\pi_i$ su probabilidad de fractura. 
 
@@ -422,6 +422,35 @@ log-odds de cada una de las demás.
 
 Para ilustrar este modelo con GLOW, usamos `raterisk` —el riesgo de fractura **autopercibido** como variable respuesta $Y$, observada en tres niveles `Less`/`Same`/`Greater`—, y usamos la categoría `Same` como referencia. 
 
+Antes de escribir el logit conviene fijar la **componente aleatoria**, porque de ella se deriva
+todo lo demás. Igual que una respuesta binaria individual es una $\mathrm{Bin}(1,\pi_i)$ —una
+binomial de un solo ensayo—, una respuesta politómica individual es una **multinomial de un solo
+ensayo**. Codificando la respuesta del sujeto $i$ como vector indicador
+$\mathbf{Y}_i=(Y_{i1},\dots,Y_{iK})$, con $Y_{ik}=1$ si el sujeto cae en la categoría $k$ y $0$ en
+las demás,
+
+$$\mathbf{Y}_i\sim\mathrm{Mult}(1,\boldsymbol{\pi}_i),\qquad
+\boldsymbol{\pi}_i=(\pi_{i1},\dots,\pi_{iK}),\quad \textstyle\sum_{k}\pi_{ik}=1,$$
+
+con función de masa $\prod_{k}\pi_{ik}^{\,y_{ik}}$. Aquí $K=3$, y el subíndice $i$ en
+$\boldsymbol{\pi}_i$ es la pieza que hace falta modelizar: el vector de probabilidades **cambia de
+sujeto a sujeto** según sus covariables. Esta distribución recibe también el nombre de
+**categórica**; es el análogo exacto de la Bernoulli, que no es otra cosa que una binomial con
+$m=1$ [@agresti2013].
+
+De aquí salen dos hechos estructurales que conviene tener a mano. El primero: el vector tiene $K$
+componentes, pero solo $K-1$ son **libres**, porque suman 1. El segundo: la relación
+media–varianza que en la [Sección 2.1](#sec-u12-familia) era un escalar pasa a ser una **matriz**,
+
+$$\mathbb{E}[\mathbf{Y}_i]=\boldsymbol{\pi}_i,\qquad
+\operatorname{Var}(\mathbf{Y}_i)=\operatorname{diag}(\boldsymbol{\pi}_i)-\boldsymbol{\pi}_i\boldsymbol{\pi}_i^{\top},$$
+
+singular y de rango $K-1$, precisamente por esa restricción de suma. Con $K=2$ el elemento $(1,1)$
+de esa matriz es $\pi_{i1}(1-\pi_{i1})$: recuperamos la varianza Bernoulli, como debe ser.
+
+Fijada la componente aleatoria, lo que queda por especificar es cómo $\boldsymbol{\pi}_i$ depende de
+las covariables. Y como solo hay $K-1$ probabilidades libres, bastarán $K-1$ ecuaciones.
+
 
 $$
  \log\frac{\Pr(Y=k)}{\Pr(Y=\text{Same})}=\eta_{k}= \beta_{0k} + \beta_{1k} \cdot \text{age} + \beta_{2k} \cdot \mathbf{I}_{\text{priorfrac}}, \qquad k\in\{\text{Less},\text{Greater}\}
@@ -457,8 +486,8 @@ valoramos el ajuste mirando las **probabilidades predichas**, no un $\chi^2$.
 
 **Un cambio de motor: esto ya no se ajusta con `glm()`.** La función `glm()` está programada para
 respuestas de la familia exponencial **univariante** —un predictor lineal para una respuesta
-escalar—; el multinomial tiene respuesta **vectorial** ($K$ probabilidades que suman 1) y necesita
-**$K-1$ predictores lineales a la vez**, de modo que se sale de lo que cubre `glm()` (aunque sigue
+escalar—; el multinomial tiene respuesta **vectorial** y necesita los **$K-1$ predictores lineales
+a la vez** que acabamos de plantear, de modo que se sale de lo que cubre `glm()` (aunque sigue
 siendo un GLM en sentido amplio). En R se ajusta con `nnet::multinom()` —lo que usamos aquí— o con
 `VGAM::vglm(..., family = multinomial)`; ambas estiman por máxima verosimilitud el **mismo** logit de
 categoría base.
@@ -647,6 +676,14 @@ brier_class(prob, truth = obs, Same, Less, Greater)
 ## 3.4 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
 
 Consideramos ahora la respuesta individualizada `raterisk`, que **tiene orden** (`Less < Same < Greater`), y el modelo politómico anterior lo ignoraba.
+
+La **componente aleatoria no cambia**: sigue siendo la misma
+$\mathbf{Y}_i\sim\mathrm{Mult}(1,\boldsymbol{\pi}_i)$ que declaramos en la
+[Sección 3.3](#sec-u13-nominal), con sus $K-1$ probabilidades libres. Lo que cambia es la
+**parametrización** de $\boldsymbol{\pi}_i$: en lugar de $K-1$ contrastes contra una categoría
+base —que tratan los niveles como intercambiables—, $K-1$ **cortes acumulados** que sí explotan el
+orden.
+
 Cuando el orden existe, conviene aprovecharlo con el modelo de **odds proporcionales**
 (*cumulative logit*), que modela los **logits acumulados** con umbrales ordenados y **un único**
 vector de efectos:
@@ -820,19 +857,24 @@ de hecho, un ordinal *continuation-ratio*, allí con **fragilidad** de centro.
 ## Tarea del estudiante (1.3) — resuelve las Preguntas 3 y 4 del caso
 Sobre la cohorte de tu equipo, responde dos preguntas del cliente ([Unidad 6](#sec-u16)).
 
-**Pregunta 3 — tipo de fractura (`clase_nom`).**
+Ambas se responden sobre la tabla `cohorte`: el endotipo y el estadio se registran en la revisión
+inicial para **todas** las pacientes, con independencia de que la fractura llegue a ocurrir.
 
-1. **Identifica y ajusta (RA3).** Reconoce que el tipo es una respuesta **nominal** (sin orden) y  ajusta el modelo adecuado (`nnet::multinom`) con `x1` y `x2`.
+**Pregunta 3 — endotipo de fragilidad ósea (`clase_nom`).**
+
+1. **Identifica y ajusta (RA3).** Reconoce que el endotipo es una respuesta **nominal** (sin orden) y ajusta el modelo adecuado (`nnet::multinom`) con `x1` y `x2`.
 2. **Interpreta y predice.** Lee los efectos como **odds ratios relativos** frente a la categoría
-   base (¿hacia qué tipo empuja cada factor?), predice el tipo más probable para un par de perfiles y
-   evalúa (p. ej. **Brier multiclase**).
+   base (¿hacia qué endotipo empuja cada factor?), predice el endotipo más probable para un par de
+   perfiles y evalúa si esa señal basta para acertarlo (p. ej. **Brier multiclase**).
 
-**Pregunta 4 — gravedad (`sever_ord`).**
+**Pregunta 4 — estadio de la osteoporosis (`sever_ord`).**
 
-3. **Identifica y ajusta (RA3).** Reconoce que la gravedad es una respuesta **ordinal** y ajusta el
+3. **Identifica y ajusta (RA3).** Reconoce que el estadio es una respuesta **ordinal** y ajusta el
    modelo de **odds proporcionales**; comprueba el supuesto de proporcionalidad.
-4. **Interpreta y responde.** Lee el **odds ratio acumulado** común (¿el tratamiento hace las
-   fracturas menos graves?) y responde al cliente.
+4. **Interpreta y responde.** Lee el **odds ratio acumulado** común (¿las mujeres tratadas están en
+   estadios más leves?) y responde al cliente. Cuidado con la lectura: tratamiento y estadio se
+   registran **a la vez**, en la revisión inicial, de modo que la asociación es de
+   **indicación/selección** y no autoriza a hablar de efecto del tratamiento sobre el estadio.
 
 *Apoyo — control de calidad (RA2, RA4).* Como técnica de bondad de ajuste, agrupa la binaria de la
 Pregunta 1 en su versión **binomial** y aplica el **contraste χ²** (deviance y Pearson),

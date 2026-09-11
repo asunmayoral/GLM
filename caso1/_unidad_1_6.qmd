@@ -22,11 +22,22 @@ un programa de prevención, ha seguido durante seis años a una cohorte de mujer
 estadísticos: te traen sus datos y sus preguntas, y esperan **respuestas y recomendaciones**, no una
 clase de modelos.
 
-De cada mujer registraron su **fragilidad ósea** (un marcador de densidad mineral, estandarizado;
-`x1`), si seguía el **tratamiento preventivo** (`x2`), la **clínica** a la que acude (`centro`) y, a
-lo largo de hasta **seis revisiones anuales**, si sufrió una **fractura** y **cuándo** —o si terminó
-el seguimiento sin fracturarse— (`ever`, `tiempo`, `evento`); y, cuando la hubo, su **tipo**
-(`clase_nom`: A/B/C) y su **gravedad** (`sever_ord`: leve/moderada/grave).
+En la **revisión inicial**, de cada mujer registraron su **fragilidad ósea** (un marcador de
+densidad mineral, estandarizado; `x1`), si seguía el **tratamiento preventivo** (`x2`), la **clínica**
+a la que acude (`centro`) y dos rasgos más de su enfermedad ósea:
+
+- su **endotipo de fragilidad** (`clase_nom`), una clasificación **sin orden** en tres categorías:
+  **A**, baja densidad sin causa secundaria; **B**, fragilidad por caídas y pérdida
+  musculoesquelética; **C**, osteoporosis secundaria (corticoidea o endocrina);
+- el **estadio de su osteoporosis** (`sever_ord`), una escala **ordenada** de tres grados —leve,
+  moderado, grave— que corresponde a osteopenia, osteoporosis y osteoporosis establecida.
+
+Después, a lo largo de hasta **seis revisiones anuales**, anotaron si sufrió una **fractura** y
+**cuándo** —o si terminó el seguimiento sin fracturarse— (`ever`, `tiempo`, `evento`).
+
+Conviene fijar esto desde el principio para no confundirse al interpretar: el **endotipo** y el
+**estadio** describen a la *paciente* y su enfermedad ósea, están registrados para **todas** las
+mujeres de la cohorte y **no dependen de que la fractura llegue a ocurrir** ni de cuándo ocurra.
 
 > **Lo que la dirección de OsteoRed quiere saber**
 >
@@ -37,10 +48,11 @@ el seguimiento sin fracturarse— (`ever`, `tiempo`, `evento`); y, cuando la hub
 >    seguimiento se dispara el riesgo? ¿Cada cuánto deberíamos citarlas a revisión? ¿El tratamiento
 >    **retrasa** la fractura? Y cuidado: muchas terminan el seguimiento sin fracturarse, no queremos
 >    que eso distorsione las cuentas.»
-> 3. «Cuando hay fractura, la clasificamos en tres **tipos** (A, B, C). ¿Los mismos factores empujan
->    hacia unos tipos más que otros? ¿Podríamos anticipar el tipo más probable?»
-> 4. «Cada fractura tiene una **gravedad** (leve, moderada, grave). ¿Qué la agrava? ¿Nuestro
->    tratamiento, además de evitar fracturas, hace que las que ocurren sean **menos graves**?»
+> 3. «A cada paciente le asignamos un **endotipo** de fragilidad ósea (A, B o C). ¿Los mismos
+>    factores empujan hacia unos endotipos más que otros? ¿Podríamos anticipar cuál es el más
+>    probable en una paciente, para orientar desde el principio cómo prevenir?»
+> 4. «Su osteoporosis está en un **estadio** (leve, moderado o grave). ¿Qué se asocia a los estadios
+>    más avanzados? ¿Las mujeres que siguen nuestro tratamiento están en estadios **más leves**?»
 > 5. «Trabajamos en **24 clínicas** y sospechamos que no todas rinden igual. ¿El riesgo depende de la
 >    clínica o es todo cosa de la paciente? ¿Hay centros que lo hacen claramente mejor o peor? Si
 >    abrimos uno nuevo, ¿qué deberíamos esperar?»
@@ -121,10 +133,32 @@ Reflexión.
 ## Cada equipo, una base de datos distinta
 Cada equipo trabaja sobre **su propia cohorte**, generada con una configuración diferente —pero
 coherente— de los parámetros del DGP. Las veinte configuraciones y los datos por equipo los produce el
-script `R/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` la cohorte
-(`cohorte.rds` / `.csv`) y su expansión persona-periodo (`pp.rds` / `.csv`). El enunciado y las
-preguntas del cliente son los mismos para todos; lo que cambia de un equipo a otro son las
-**conclusiones numéricas** (efectos, riesgos, plazos).
+script `R/generar_datos_equipos.R`, que deja en `datos_equipos/equipo_XX/` **dos tablas**, cada una en
+formato `.rds` y `.csv`. El enunciado y las preguntas del cliente son los mismos para todos; lo que
+cambia de un equipo a otro son las **conclusiones numéricas** (efectos, riesgos, plazos).
+
+**`cohorte`: una fila por paciente.** Contiene `id`, la clínica (`centro`), la fragilidad (`x1`), el
+tratamiento (`x2`), el endotipo (`clase_nom`) y el estadio (`sever_ord`) registrados en la revisión
+inicial, y el desenlace del seguimiento: `ever` (1 si llegó a fracturarse), `tiempo` (la revisión en
+que termina su observación) y `evento` (1 si esa revisión fue por fractura, 0 si terminó el
+seguimiento sin fracturarse, es decir, censurada).
+
+**`pp`: una fila por paciente y revisión en riesgo**, la llamada *expansión persona-periodo*.
+Contiene `id`, `centro`, `x1`, `x2`, la revisión (`periodo`) y el indicador `y`, que vale 1 si la
+fractura ocurrió en esa revisión. Una mujer que se fractura en la tercera revisión aporta tres filas
+(`y` = 0, 0, 1) y una que termina las seis sin fracturarse aporta seis filas de ceros: cada paciente
+contribuye **solo mientras estuvo en riesgo**.
+
+Elegir bien la tabla es parte del análisis. Las preguntas sobre atributos de la paciente se responden
+sobre `cohorte`; la pregunta sobre *cuándo* ocurre el evento, sobre `pp`. Las dos describen a las
+mismas mujeres y se enlazan por `id`, pero **no llevan las mismas columnas**: `pp` despliega el
+seguimiento y por eso tiene `periodo` e `y`, mientras que `ever`, `tiempo`, `evento`, `clase_nom` y
+`sever_ord` viven solo en `cohorte`. Si en algún momento necesitas el endotipo o el estadio junto a
+las filas de la expansión, únelos por `id`.
+
+Los ficheros `.rds` guardan además, en el atributo `verdad`, los parámetros con que se generaron los
+datos; los `.csv` no. Ese atributo es el que necesitas para el control de calidad de más arriba, de
+modo que carga los `.rds` si quieres poder hacerlo.
 
 Los parámetros verdaderos de las veinte configuraciones están en el propio repositorio
 (`configuraciones_equipos.csv`), igual que la «verdad» que guarda cada `.rds`. **Que estén a la vista
@@ -151,8 +185,8 @@ has saltado ninguna de las **tareas que un buen analista** hace en un proyecto. 
 
 - [ ] **P1 · Riesgo de fractura:** quién se fractura, papel de la fragilidad y del tratamiento, riesgo de una paciente nueva, y si el efecto del tratamiento depende de la fragilidad.
 - [ ] **P2 · Cuándo ocurre:** evolución del riesgo a lo largo de las revisiones, calendario de seguimiento y efecto del tratamiento sobre los plazos, con la censura bien tratada.
-- [ ] **P3 · Tipo de fractura:** qué factores empujan hacia cada tipo y anticipación del más probable.
-- [ ] **P4 · Gravedad:** qué agrava la fractura y si el tratamiento la reduce.
+- [ ] **P3 · Endotipo de fragilidad:** qué factores empujan hacia cada endotipo y hasta qué punto se puede anticipar el más probable.
+- [ ] **P4 · Estadio de la osteoporosis:** qué se asocia a los estadios más avanzados y si el tratamiento se asocia a estadios más leves.
 - [ ] **P5 · Peso de la clínica:** cuánto del riesgo depende del centro, centros mejores o peores y qué esperar de uno nuevo.
 
 ### Tareas analíticas del proyecto

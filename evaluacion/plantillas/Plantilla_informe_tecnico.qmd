@@ -162,7 +162,7 @@ necesarias para evaluar, auditar y reutilizar el análisis.
 ## Datos de la entrega {.unnumbered}
 
 | Elemento | Contenido |
-|---|---|
+|-----------|-------------------------------------------------|
 | Título del proyecto | [Completar] |
 | Equipo | [Completar] |
 | Asignatura / titulación | [Completar] |
@@ -192,7 +192,7 @@ cómo se traduce esa necesidad en preguntas respondibles con datos.
 ## Contexto, audiencia y necesidad de análisis
 
 | Elemento | Contenido |
-|---|---|
+|-------------|-----------------------------------------------|
 | Contexto del proyecto | [Completar] |
 | Audiencia destinataria | [Completar] |
 | Decisión, proceso o problema que se quiere apoyar | [Completar] |
@@ -214,7 +214,7 @@ presentación de los datos y en los resultados.
 :::
 
 | # | Pregunta de negocio | Pregunta analítica asociada | Decisión que podría apoyar |
-|:--:|---|---|---|
+|:----:|-----------------|-------------------------|------------|
 | P1 | [Completar] | [Completar] | [Completar] |
 | P2 | [Completar] | [Completar] | [Completar] |
 | P3 | [Completar] | [Completar] | [Completar] |
@@ -229,7 +229,7 @@ trazabilidad pregunta → objetivo → resultado quede a la vista.
 :::
 
 | Tipo de objetivo | Redacción del objetivo |
-|---|---|
+|------------|------------------------------------------------|
 | Objetivo general | [Completar] |
 | Objetivo específico 1 | [Completar] (P…) |
 | Objetivo específico 2 | [Completar] (P…) |
@@ -246,7 +246,7 @@ y hasta qué punto son adecuados para responder las preguntas planteadas.
 ## Descripción de los datos
 
 | Elemento | Información a completar |
-|---|---|
+|----------------|--------------------------------------------|
 | Fuente de los datos | [Base interna, encuesta, datos abiertos, API, experimento, simulación...] |
 | Periodo analizado | [Fechas o intervalo temporal cubierto] |
 | Unidad de análisis | [Cliente, transacción, producto, visita, estudiante, empresa, registro...] |
@@ -275,7 +275,7 @@ breve, qué tabla responde a cada pregunta y por qué.
 :::
 
 | Variable | Tipo | Descripción | Objetivo o pregunta que ayuda a responder |
-|---|---|---|---|
+|--------|-----------|--------------------------|----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
@@ -284,7 +284,7 @@ breve, qué tabla responde a cada pregunta y por qué.
 ## Preparación y calidad de los datos
 
 | Aspecto revisado | Qué se detectó | Tratamiento aplicado | Impacto o cautela |
-|---|---|---|---|
+|-------|---------------------------|-------------|-------------|
 | Valores perdidos | [Completar] | [Completar] | [Completar] |
 | Duplicados | [Completar] | [Completar] | [Completar] |
 | Valores atípicos | [Completar] | [Completar] | [Completar] |
@@ -312,7 +312,7 @@ conviertas en una explicación de manual sobre cada técnica.
 :::
 
 | Pregunta analítica | Técnica o enfoque aplicado | Por qué es adecuado | Criterio de evaluación o validación |
-|---|---|---|---|
+|-------|--------------|-----------------|----------------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
@@ -324,7 +324,7 @@ conviertas en una explicación de manual sobre cada técnica.
 ## Evaluación, validación o comprobaciones
 
 | Comprobación realizada | Resultado | Interpretación técnica | Implicación para el análisis |
-|---|---|---|---|
+|-----------|-----------------|---------------|-----------------|
 | [Métrica, contraste, validación, sensibilidad, diagnóstico] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 
@@ -340,7 +340,7 @@ Los resultados secundarios van al anexo.
 ## Resultado clave 1: [título interpretativo]
 
 | Elemento | Contenido a completar |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo al que responde | [Completar] |
 | Resultado principal | [Completar] |
 | Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
@@ -359,7 +359,7 @@ Los resultados secundarios van al anexo.
 ## Resultado clave 2: [título interpretativo]
 
 | Elemento | Contenido a completar |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo al que responde | [Completar] |
 | Resultado principal | [Completar] |
 | Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
@@ -378,7 +378,7 @@ Los resultados secundarios van al anexo.
 ## Resultado clave 3: [título interpretativo]
 
 | Elemento | Contenido a completar |
-|---|---|
+|---------------|---------------------------------------------|
 | Pregunta u objetivo al que responde | [Completar] |
 | Resultado principal | [Completar] |
 | Visualización o tabla asociada | [Insertar figura o tabla numerada, con título y fuente] |
@@ -406,7 +406,7 @@ En proyectos más exploratorios, sustituye por implicaciones y líneas de contin
 :::
 
 | Hallazgo | Implicación | Recomendación o acción | Cómo evaluar el impacto |
-|---|---|---|---|
+|----------------|------------|-----------------|----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
@@ -420,7 +420,7 @@ En proyectos más exploratorios, sustituye por implicaciones y líneas de contin
 ## Limitaciones e incertidumbre
 
 | Tipo de limitación | Descripción | Cómo afecta | Cómo podría mitigarse |
-|---|---|---|---|
+|--------|-------------------|-----------------|----------------|
 | Datos | [Completar] | [Completar] | [Completar] |
 | Muestra / cobertura | [Completar] | [Completar] | [Completar] |
 | Metodología | [Completar] | [Completar] | [Completar] |
@@ -439,7 +439,7 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 :::
 
 | Aspecto | Declaración a completar |
-|---|---|
+|--------------|----------------------------------------------|
 | Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
 | Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
 | Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
@@ -474,7 +474,7 @@ auditar o ampliar el análisis sin que la argumentación principal dependa de ma
 :::
 
 | Anexo | Contenido recomendado |
-|---|---|
+|--------------|----------------------------------------------|
 | Anexo A. Diccionario de variables | [Nombre, tipo, descripción, codificación, unidades y valores posibles] |
 | Anexo B. Base de datos utilizada | [Enlace a base de datos o repositorio, respetando privacidad y condiciones de uso] |
 | Anexo C. Código o cuaderno reproducible | [Código comentado o enlace a Colab, GitHub u otro repositorio] |
@@ -542,7 +542,7 @@ sessioninfo::session_info()
 # Checklist final antes de entregar
 
 | Comprobación | Sí | A revisar |
-|---|:--:|:--:|
+|-------------------------------------------------|:---:|:---:|
 | **El documento está íntegramente personalizado**: título, subtítulo, autoría y fecha son los del equipo; cabeceras y pies no conservan texto de la plantilla; no queda ningún `[texto entre corchetes]`, ninguna instrucción de la plantilla ni ninguna sección de ejemplo sin sustituir por contenido propio; se han eliminado los apartados que no apliquen. | ☐ | ☐ |
 | El informe permite evaluar la solidez técnica del análisis. | ☐ | ☐ |
 | El problema está formulado como una necesidad de análisis o decisión. | ☐ | ☐ |

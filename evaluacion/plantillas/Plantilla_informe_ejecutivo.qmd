@@ -154,7 +154,7 @@ decidir qué hacer, por qué hacerlo y con qué cautelas.
 ## Datos de la entrega {.unnumbered}
 
 | Elemento | Contenido |
-|---|---|
+|-----------|-------------------------------------------------|
 | Título del proyecto | [Completar] |
 | Equipo | [Completar] |
 | Asignatura / titulación | [Completar] |
@@ -182,7 +182,7 @@ decisión se quiere apoyar con el análisis.
 :::
 
 | Elemento | Contenido ejecutivo |
-|---|---|
+|----------------|--------------------------------------------|
 | Situación de partida | [Completar] |
 | Problema de negocio | [Completar] |
 | Audiencia decisora | [Completar] |
@@ -200,7 +200,7 @@ suficiente y qué alcance tienen los datos.
 :::
 
 | Aspecto | Resumen para la audiencia |
-|---|---|
+|----------------|--------------------------------------------|
 | Fuente y periodo | [Completar] |
 | Unidad de análisis | [Completar] |
 | Volumen de datos | [Completar] |
@@ -218,7 +218,7 @@ por qué este análisis es adecuado para apoyar la decisión.
 :::
 
 | Pregunta que se quería responder | Análisis realizado | Por qué era adecuado |
-|---|---|---|
+|--------------------|-----------------|-----------------------|
 | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] |
 
@@ -236,7 +236,7 @@ a muchos gráficos mostrados sin interpretación.
 ## Hallazgo clave 1: [título interpretativo]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Mensaje principal | [Completar en una frase interpretativa] |
 | Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
@@ -254,7 +254,7 @@ a muchos gráficos mostrados sin interpretación.
 ## Hallazgo clave 2: [título interpretativo]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Mensaje principal | [Completar en una frase interpretativa] |
 | Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
@@ -272,7 +272,7 @@ a muchos gráficos mostrados sin interpretación.
 ## Hallazgo clave 3: [título interpretativo]
 
 | Elemento | Contenido |
-|---|---|
+|---------------|---------------------------------------------|
 | Mensaje principal | [Completar en una frase interpretativa] |
 | Evidencia | [Dato, métrica, tabla o gráfico que respalda el hallazgo] |
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
@@ -295,7 +295,7 @@ beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 :::
 
 | Prioridad | Acción propuesta | Evidencia que la respalda | Beneficio esperado | Riesgo o condición |
-|---|---|---|---|---|
+|------|--------------|--------------|-------------|-------------|
 | Alta | [Completar] | [Completar] | [Completar] | [Completar] |
 | Media | [Completar] | [Completar] | [Completar] | [Completar] |
 | Baja / futura | [Completar] | [Completar] | [Completar] | [Completar] |
@@ -307,7 +307,7 @@ beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 # Riesgos, limitaciones y próximos pasos
 
 | Riesgo o limitación | Por qué importa | Cómo gestionarlo |
-|---|---|---|
+|----------------|--------------------|-------------------------|
 | Datos | [Completar] | [Completar] |
 | Método | [Completar] | [Completar] |
 | Aplicación de la recomendación | [Completar] | [Completar] |
@@ -316,7 +316,7 @@ beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 ## Próximos pasos propuestos
 
 | Paso | Acción | Responsable o área | Indicador de seguimiento |
-|---|---|---|---|
+|-----|--------------------|--------------|--------------------|
 | 1 | [Completar] | [Completar] | [Completar] |
 | 2 | [Completar] | [Completar] | [Completar] |
 | 3 | [Completar] | [Completar] | [Completar] |
@@ -343,7 +343,7 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 :::
 
 | Aspecto | Declaración a completar |
-|---|---|
+|--------------|----------------------------------------------|
 | Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
 | Tareas para las que se utilizó IA | [Redacción, código, depuración, visualización, búsqueda, síntesis, revisión...] |
 | Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
@@ -364,7 +364,7 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 # Anexos opcionales
 
 | Anexo | Contenido recomendado |
-|---|---|
+|--------------|----------------------------------------------|
 | Anexo A. Nota metodológica | [Detalle técnico resumido del análisis] |
 | Anexo B. Visualizaciones complementarias | [Gráficos o tablas no esenciales para la lectura ejecutiva] |
 | Anexo C. Calidad de datos | [Resumen de incidencias, sesgos y tratamientos aplicados] |
@@ -430,7 +430,7 @@ sessioninfo::session_info()
 # Checklist final antes de entregar
 
 | Comprobación | Sí | A revisar |
-|---|:--:|:--:|
+|-------------------------------------------------|:---:|:---:|
 | **El documento está íntegramente personalizado**: título, subtítulo, autoría y fecha son los del equipo; cabeceras y pies no conservan texto de la plantilla; no queda ningún `[texto entre corchetes]`, ninguna instrucción de la plantilla ni ninguna sección de ejemplo sin sustituir por contenido propio; se han eliminado los apartados que no apliquen. | ☐ | ☐ |
 | El resumen ejecutivo puede leerse de forma autónoma. | ☐ | ☐ |
 | La decisión que se quiere apoyar aparece claramente formulada. | ☐ | ☐ |
