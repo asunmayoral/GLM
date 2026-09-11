@@ -159,6 +159,26 @@ necesarias para evaluar, auditar y reutilizar el análisis.
   limitaciones y uso de IA · (7) Referencias y anexos técnicos.
 :::
 
+::: {.callout-tip}
+## Las tablas son un andamio, no una obligación
+Las tablas de esta plantilla están para **asegurar que no se te olvida nada**, no para que rellenes
+casillas. Si en tu proyecto una fila no aplica, bórrala en lugar de escribir «no procede»; y si un
+apartado se lee mejor en prosa que en cuadrícula, **nárralo**: lo que se evalúa es que la información
+esté y se entienda, no el formato en que la presentes.
+
+Cuando sí uses tabla, **ponle título y etiqueta** para poder citarla desde el texto. Se escribe
+justo debajo de la tabla, en una línea que empieza por dos puntos:
+
+```
+: Variables analizadas y pregunta a la que sirve cada una {#tbl-ejemplo}
+```
+
+Con eso la tabla se numera sola y en el texto la citas escribiendo `@tbl-ejemplo`, que se
+convierte en «Tabla 3» o el número que le toque. Usa etiquetas que empiecen por `tbl-` y no repitas
+ninguna. Ojo: si escribes mal una etiqueta, la cita **no da error**, se convierte en una referencia
+bibliográfica rota; compruébalo en el documento renderizado.
+:::
+
 ## Datos de la entrega {.unnumbered}
 
 | Elemento | Contenido |
@@ -180,7 +200,8 @@ limitaciones principales; enfoque metodológico y criterios de evaluación; hall
 más relevantes; implicaciones o usos; y cautelas esenciales para interpretar el análisis.
 :::
 
-> [Texto del resumen técnico o ejecutivo...]
+> [**Texto del resumen técnico o ejecutivo.** Va narrado, sin tablas ni viñetas: es lo único que
+> leerá quien no pase de la primera página, y debe sostenerse por sí solo.]
 
 # Contexto, problema, preguntas y objetivos del análisis
 
@@ -191,6 +212,10 @@ cómo se traduce esa necesidad en preguntas respondibles con datos.
 
 ## Contexto, audiencia y necesidad de análisis
 
+> [**Abre el apartado y presenta la @tbl-contexto**: sitúa al lector en el proyecto. Qué
+> organización o entorno, qué está pasando, quién ha pedido el análisis y quién va a leer esto.
+> Anuncia que la tabla resume ese encuadre.]
+
 | Elemento | Contenido |
 |-------------|-----------------------------------------------|
 | Contexto del proyecto | [Completar] |
@@ -198,11 +223,22 @@ cómo se traduce esa necesidad en preguntas respondibles con datos.
 | Decisión, proceso o problema que se quiere apoyar | [Completar] |
 | Consecuencia de no abordar el problema | [Completar] |
 
+: [Descripción de la tabla] {#tbl-contexto}
+
+> [**Lee la @tbl-contexto**: no repitas las casillas. Explica la tensión que justifica el
+> encargo —qué decisión está bloqueada, qué se está haciendo a ciegas— y, si el destinatario del
+> documento y el de las conclusiones no son el mismo, dilo aquí y di cómo lo has resuelto al
+> escribir. Borra este recuadro cuando lo hayas redactado.]
+
 ## Problema de análisis
 
 > [Redactar el problema de forma concreta, evitando formulaciones genéricas como "analizar los datos".]
 
 ## Preguntas de negocio y preguntas analíticas
+
+> [**Abre el apartado**: presenta las preguntas que planteó el cliente y advierte de que a
+> continuación se recorren una a una para traducirlas. Traducir es la parte delicada del encargo:
+> una pregunta mal traducida se responde con un modelo impecable que contesta otra cosa.]
 
 ::: {.callout-note}
 Formula aquí las preguntas **sin nombrar todavía variables ni modelos concretos**: los datos se
@@ -218,6 +254,13 @@ presentación de los datos y en los resultados.
 | P1 | [Completar] | [Completar] | [Completar] |
 | P2 | [Completar] | [Completar] | [Completar] |
 | P3 | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-preguntas}
+
+> [**Desarrolla cada pregunta** en un párrafo propio antes o después de la tabla: qué quiere saber
+> el cliente, qué habría que estimar exactamente para contestarle y qué decisión suya depende de la
+> respuesta. La tabla resume esa correspondencia; el texto es donde se justifica.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ## Objetivos del análisis
 
@@ -236,6 +279,13 @@ trazabilidad pregunta → objetivo → resultado quede a la vista.
 | Objetivo específico 3 | [Completar] (P…) |
 | Objetivo específico 4, si procede | [Completar] (P…) |
 
+: [Descripción de la tabla] {#tbl-objetivos}
+
+> [**Lee la @tbl-objetivos**: en dos o tres frases, explica cómo se encadenan —qué hace el objetivo
+> general y cómo se reparten el trabajo los específicos— y deja explícito el compromiso que
+> adquieres: qué se va a estimar y qué no entra en el alcance.
+> Borra este recuadro cuando lo hayas redactado.]
+
 # Datos, preparación y calidad de la evidencia
 
 ::: {.callout-note}
@@ -243,7 +293,16 @@ El lector debe entender de dónde salen los datos, qué representan, cómo se ha
 y hasta qué punto son adecuados para responder las preguntas planteadas.
 :::
 
+> [**Abre la sección**: en un párrafo, di qué evidencia se ha utilizado y qué va a encontrar el
+> lector en los apartados que siguen —procedencia y alcance de los datos, variables, auditoría de
+> calidad y valoración final de adecuación—. Si trabajas con más de un banco de datos, este es el
+> sitio para nombrarlos y decir en qué se diferencian.]
+
 ## Descripción de los datos
+
+> [**Abre el apartado y presenta la @tbl-datos**: de dónde salen estos datos, quién los recogió y con
+> qué propósito, y por qué son los adecuados para las preguntas del apartado anterior. Anuncia lo que
+> resume la tabla antes de mostrarla. Una o dos frases bastan.]
 
 | Elemento | Información a completar |
 |----------------|--------------------------------------------|
@@ -252,9 +311,14 @@ y hasta qué punto son adecuados para responder las preguntas planteadas.
 | Unidad de análisis | [Cliente, transacción, producto, visita, estudiante, empresa, registro...] |
 | Número de observaciones | [Completar] |
 | Número de variables | [Completar] |
-| Variable objetivo, si existe | [Completar] |
 | Criterios de inclusión/exclusión | [Completar] |
-| Nivel de agregación | [Completar] |
+
+: [Descripción de la tabla] {#tbl-datos}
+
+> [**Lee la @tbl-datos**: qué conviene retener de ella. No repitas las filas una a una; señala lo que
+> condiciona el análisis —el tamaño, la ventana temporal, la unidad de observación, lo que quedó
+> fuera— y cualquier cosa que el lector deba tener en la cabeza al interpretar los resultados.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: carga-datos
@@ -268,20 +332,38 @@ y hasta qué punto son adecuados para responder las preguntas planteadas.
 ## Variables principales
 
 ::: {.callout-note}
-Este es el lugar donde se conectan los datos con las preguntas: la última columna enlaza cada
-variable con el código (P1, P2, …) de la pregunta que ayuda a responder. Si trabajas con más de una
-tabla, añade una columna que indique en cuál vive cada variable y explica debajo, en un párrafo
-breve, qué tabla responde a cada pregunta y por qué.
+Este es el lugar donde se conectan los datos con las preguntas: la columna **Papel** dice qué hace
+cada variable en el análisis —respuesta, predictor, factor de agrupamiento o identificador— y la
+última la enlaza con el código (P1, P2, …) de la pregunta que ayuda a responder. Si trabajas con más
+de un banco de datos, añade una columna que indique en cuál vive cada variable y explica debajo, en
+un párrafo breve, qué banco responde a cada pregunta y por qué.
 :::
 
-| Variable | Tipo | Descripción | Objetivo o pregunta que ayuda a responder |
-|--------|-----------|--------------------------|----------------|
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
-| [Completar] | [Completar] | [Completar] | [Completar] |
+> [**Abre el apartado y presenta la @tbl-variables**: cuántas variables entran en el análisis y de
+> qué naturaleza son —continuas, categóricas, de conteo, temporales—. Anuncia que la tabla las
+> detalla una a una con el papel que juega cada una.]
+
+| Variable | Tipo | Papel | Descripción | Objetivo o pregunta que ayuda a responder |
+|--------|--------|---------|------------------|-------------|
+| [Completar] | [Completar] | [respuesta / predictor / agrupamiento / identificador] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] | [Completar] |
+| [Completar] | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-variables}
+
+> [**Lee la @tbl-variables**: no recorras la tabla variable por variable. Destaca cuál es la
+> respuesta de cada pregunta y qué predictores la acompañan, señala las variables que exigen alguna
+> cautela —escalas poco habituales, categorías con muy pocos casos, variables derivadas— y explica
+> cualquier variable disponible que hayas decidido **no** usar, y por qué.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ## Preparación y calidad de los datos
+
+> [**Abre el apartado y presenta la @tbl-auditoria**: qué comprobaciones has hecho sobre los datos
+> antes de modelizar y con qué criterio. Deja claro si este apartado documenta una **limpieza** —los
+> datos venían con problemas y los has tratado— o una **auditoría** —venían limpios y lo has
+> verificado—, porque son dos historias distintas y el lector necesita saber cuál está leyendo.]
 
 | Aspecto revisado | Qué se detectó | Tratamiento aplicado | Impacto o cautela |
 |-------|---------------------------|-------------|-------------|
@@ -293,6 +375,14 @@ breve, qué tabla responde a cada pregunta y por qué.
 | Variables derivadas | [Completar] | [Completar] | [Completar] |
 | Sesgos posibles | [Completar] | [Completar] | [Completar] |
 
+: [Descripción de la tabla] {#tbl-auditoria}
+
+> [**Lee la @tbl-auditoria**: qué encontraste que condicione de verdad el análisis. Distingue lo que
+> corregiste de lo que decidiste conservar, y justifica ambas decisiones: conservar un atípico es una
+> decisión tan deliberada como eliminarlo. Si no apareció ningún problema, dilo explícitamente —un
+> apartado de calidad sin hallazgos es un resultado, no un apartado vacío—.
+> Borra este recuadro cuando lo hayas redactado.]
+
 ```{r}
 #| label: preparacion-datos
 #| eval: false
@@ -302,7 +392,11 @@ breve, qué tabla responde a cada pregunta y por qué.
 
 ## Valoración de adecuación de los datos
 
-> [Explicar si los datos son suficientes, pertinentes y fiables para responder las preguntas. Señalar qué preguntas quedan limitadas por calidad, cobertura o disponibilidad.]
+> [**Cierra la sección**, aquí sin tabla: este apartado es un juicio, y va narrado. Explica si los
+> datos son suficientes, pertinentes y fiables para responder a las preguntas, apoyándote en lo que
+> acabas de mostrar. Señala **qué preguntas quedan limitadas** por calidad, cobertura o
+> disponibilidad, y hasta qué punto. Mójate: una valoración que dice que todo está bien sin matices
+> no es una valoración.]
 
 # Metodología y criterios de análisis
 
@@ -311,11 +405,21 @@ Justifica la metodología en función del problema y de las preguntas analítica
 conviertas en una explicación de manual sobre cada técnica.
 :::
 
+> [**Abre la sección y presenta la @tbl-metodologia**: explica con qué criterio general has elegido
+> las técnicas —qué propiedad de cada respuesta las impone— y anuncia que la tabla empareja cada
+> pregunta con su técnica, su justificación y el criterio con que se valida.]
+
 | Pregunta analítica | Técnica o enfoque aplicado | Por qué es adecuado | Criterio de evaluación o validación |
 |-------|--------------|-----------------|----------------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-metodologia}
+
+> [**Lee la @tbl-metodologia**: justifica las elecciones que no sean obvias y, sobre todo, **las
+> alternativas que descartaste y por qué**. Un informe técnico se audita por las decisiones, no por
+> los resultados. Borra este recuadro cuando lo hayas redactado.]
 
 ## Supuestos, decisiones y limitaciones metodológicas
 
@@ -323,10 +427,20 @@ conviertas en una explicación de manual sobre cada técnica.
 
 ## Evaluación, validación o comprobaciones
 
+> [**Abre el apartado y presenta la @tbl-comprobaciones**: qué has hecho para comprobar que los
+> modelos son adecuados, y no solo que sus coeficientes son significativos. Anuncia que la tabla las
+> recoge con su resultado.]
+
 | Comprobación realizada | Resultado | Interpretación técnica | Implicación para el análisis |
 |-----------|-----------------|---------------|-----------------|
 | [Métrica, contraste, validación, sensibilidad, diagnóstico] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-comprobaciones}
+
+> [**Lee la @tbl-comprobaciones**: qué comprobación cambia algo. Una que sale bien confirma el
+> camino; una que sale mal es información valiosa y hay que contarla, no esconderla. Si alguna
+> obligó a rehacer un ajuste, dilo aquí. Borra este recuadro cuando lo hayas redactado.]
 
 # Resultados, evaluación e interpretación
 
@@ -337,7 +451,15 @@ una decisión, cambien la interpretación del problema o aporten una cautela imp
 Los resultados secundarios van al anexo.
 :::
 
+> [**Abre la sección**: anuncia cuántos resultados clave presentas y en qué orden, y explica que
+> cada uno recorre el mismo ciclo —objetivo, ajuste, diagnóstico, interpretación y respuesta—, para
+> que el lector sepa qué estructura va a repetirse.]
+
 ## Resultado clave 1: [título interpretativo]
+
+> [**Abre el apartado y presenta la @tbl-ficha-1**: a qué pregunta responde este resultado y por
+> qué merece estar en el cuerpo del informe y no en un anexo. La ficha que sigue lo resume; el
+> desarrollo viene después de ella.]
 
 | Elemento | Contenido a completar |
 |---------------|---------------------------------------------|
@@ -347,6 +469,15 @@ Los resultados secundarios van al anexo.
 | Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
 | Relevancia para la decisión o para el análisis | [Completar] |
 | Cautela interpretativa | [Completar] |
+
+: [Descripción de la tabla] {#tbl-ficha-1}
+
+> [**Desarrolla el resultado 1**, que es el cuerpo real de este apartado y no cabe en la ficha:
+> cómo se ajustó el modelo y por qué se retuvo ese y no otro, qué dice el diagnóstico, qué
+> significan los efectos **en la escala que entiende quien decide** —probabilidades, plazos, veces
+> más riesgo— y qué cautela condiciona la lectura. Cierra respondiendo a la pregunta del cliente con
+> una recomendación accionable. Presenta y comenta también la figura de abajo.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-1
@@ -358,6 +489,10 @@ Los resultados secundarios van al anexo.
 
 ## Resultado clave 2: [título interpretativo]
 
+> [**Abre el apartado y presenta la @tbl-ficha-2**: a qué pregunta responde este resultado y por
+> qué merece estar en el cuerpo del informe y no en un anexo. La ficha que sigue lo resume; el
+> desarrollo viene después de ella.]
+
 | Elemento | Contenido a completar |
 |---------------|---------------------------------------------|
 | Pregunta u objetivo al que responde | [Completar] |
@@ -366,6 +501,15 @@ Los resultados secundarios van al anexo.
 | Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
 | Relevancia para la decisión o para el análisis | [Completar] |
 | Cautela interpretativa | [Completar] |
+
+: [Descripción de la tabla] {#tbl-ficha-2}
+
+> [**Desarrolla el resultado 2**, que es el cuerpo real de este apartado y no cabe en la ficha:
+> cómo se ajustó el modelo y por qué se retuvo ese y no otro, qué dice el diagnóstico, qué
+> significan los efectos **en la escala que entiende quien decide** —probabilidades, plazos, veces
+> más riesgo— y qué cautela condiciona la lectura. Cierra respondiendo a la pregunta del cliente con
+> una recomendación accionable. Presenta y comenta también la figura de abajo.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-2
@@ -377,6 +521,10 @@ Los resultados secundarios van al anexo.
 
 ## Resultado clave 3: [título interpretativo]
 
+> [**Abre el apartado y presenta la @tbl-ficha-3**: a qué pregunta responde este resultado y por
+> qué merece estar en el cuerpo del informe y no en un anexo. La ficha que sigue lo resume; el
+> desarrollo viene después de ella.]
+
 | Elemento | Contenido a completar |
 |---------------|---------------------------------------------|
 | Pregunta u objetivo al que responde | [Completar] |
@@ -385,6 +533,15 @@ Los resultados secundarios van al anexo.
 | Interpretación | [Explicar qué significa el resultado, no solo qué muestra el gráfico] |
 | Relevancia para la decisión o para el análisis | [Completar] |
 | Cautela interpretativa | [Completar] |
+
+: [Descripción de la tabla] {#tbl-ficha-3}
+
+> [**Desarrolla el resultado 3**, que es el cuerpo real de este apartado y no cabe en la ficha:
+> cómo se ajustó el modelo y por qué se retuvo ese y no otro, qué dice el diagnóstico, qué
+> significan los efectos **en la escala que entiende quien decide** —probabilidades, plazos, veces
+> más riesgo— y qué cautela condiciona la lectura. Cierra respondiendo a la pregunta del cliente con
+> una recomendación accionable. Presenta y comenta también la figura de abajo.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-3
@@ -405,11 +562,22 @@ Traduce los resultados a consecuencias prácticas cuando el proyecto tenga final
 En proyectos más exploratorios, sustituye por implicaciones y líneas de continuidad.
 :::
 
+> [**Abre la sección y presenta la @tbl-implicaciones**: da el paso del hallazgo a la consecuencia.
+> Anuncia que la tabla empareja cada hallazgo con lo que implica, qué se recomienda hacer y cómo
+> sabremos si funcionó.]
+
 | Hallazgo | Implicación | Recomendación o acción | Cómo evaluar el impacto |
 |----------------|------------|-----------------|----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-implicaciones}
+
+> [**Lee la @tbl-implicaciones**: prioriza. No todas las recomendaciones valen lo mismo ni cuestan
+> lo mismo; di cuál harías primero y por qué, y cuál depende de algo que todavía no sabes.
+> Distingue además lo que el análisis **sostiene** de lo que es criterio tuyo.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ## Próximos pasos
 
@@ -419,6 +587,10 @@ En proyectos más exploratorios, sustituye por implicaciones y líneas de contin
 
 ## Limitaciones e incertidumbre
 
+> [**Abre la sección y presenta la @tbl-limitaciones**: reconocer límites no debilita el informe,
+> lo hace creíble. Anuncia que la tabla recorre los de datos, muestra, metodología, modelo y
+> contexto.]
+
 | Tipo de limitación | Descripción | Cómo afecta | Cómo podría mitigarse |
 |--------|-------------------|-----------------|----------------|
 | Datos | [Completar] | [Completar] | [Completar] |
@@ -426,6 +598,12 @@ En proyectos más exploratorios, sustituye por implicaciones y líneas de contin
 | Metodología | [Completar] | [Completar] | [Completar] |
 | Modelo / evaluación | [Completar] | [Completar] | [Completar] |
 | Contexto / aplicabilidad | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-limitaciones}
+
+> [**Lee la @tbl-limitaciones**: de todas las de la tabla, ¿cuáles condicionan de verdad las
+> conclusiones y cuáles son de manual? Sé honesto: señalar la limitación que más te incomoda es lo
+> que distingue un informe técnico de un folleto. Borra este recuadro cuando lo hayas redactado.]
 
 ## Riesgos de mala interpretación
 
@@ -438,6 +616,9 @@ Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe 
 transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
 :::
 
+> [**Abre el apartado y presenta la @tbl-ia**: en qué fases del trabajo has usado IA y con qué
+> papel. Anuncia que la tabla lo detalla.]
+
 | Aspecto | Declaración a completar |
 |--------------|----------------------------------------------|
 | Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
@@ -445,6 +626,13 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 | Revisión humana realizada | [Cómo se verificaron las salidas de IA] |
 | Decisiones no delegadas en IA | [Limpieza de datos, elección metodológica, interpretación, conclusiones...] |
 | Errores, límites o ajustes detectados | [Si la IA inventó, simplificó en exceso o propuso código incorrecto] |
+
+: [Descripción de la tabla] {#tbl-ia}
+
+> [**Reflexiona**, que es más que declarar: cómo verificaste lo que la IA produjo, qué corregiste y
+> qué descartaste, con ejemplos concretos. Si en algún momento una salida parecía correcta y no lo
+> era, ese episodio es lo más valioso que puedes contar aquí.
+> Borra este recuadro cuando lo hayas redactado.]
 
 > **Modelo de declaración.** En este proyecto se han utilizado herramientas de inteligencia
 > artificial como apoyo para [indicar tareas concretas]. Todas las salidas generadas por estas
@@ -473,6 +661,10 @@ Los anexos aportan trazabilidad sin sobrecargar el cuerpo principal. El lector d
 auditar o ampliar el análisis sin que la argumentación principal dependa de material escondido.
 :::
 
+> [**Abre la sección y presenta la @tbl-anexos**: qué has dejado fuera del cuerpo y con qué
+> criterio. El anexo no es el cajón de lo que no cupo: es lo que permite auditar sin entorpecer la
+> lectura.]
+
 | Anexo | Contenido recomendado |
 |--------------|----------------------------------------------|
 | Anexo A. Diccionario de variables | [Nombre, tipo, descripción, codificación, unidades y valores posibles] |
@@ -481,6 +673,8 @@ auditar o ampliar el análisis sin que la argumentación principal dependa de ma
 | Anexo D. Limpieza y preparación de datos | [Decisiones sobre perdidos, atípicos, duplicados, transformaciones y derivadas] |
 | Anexo E. Resultados complementarios | [Tablas completas, métricas ampliadas, pruebas alternativas o secundarias] |
 | Anexo F. Prompts relevantes de IA | [Solo si el profesorado lo solicita o si son necesarios para trazabilidad] |
+
+: [Descripción de la tabla] {#tbl-anexos}
 
 # Anexo · Reproducibilidad y entorno de ejecución
 
@@ -555,5 +749,7 @@ sessioninfo::session_info()
 | Las referencias están citadas en el texto y completas al final. | ☐ | ☐ |
 | Los anexos permiten auditar o reproducir el análisis. | ☐ | ☐ |
 | El uso de IA está declarado. | ☐ | ☐ |
+| **Cada sección y cada apartado están introducidos**, y toda tabla o figura se presenta antes, se cita por su número y se comenta después: ninguna aparece sin texto que la explique. | ☐ | ☐ |
+| **No queda ningún recuadro de instrucción de la plantilla** sin sustituir por texto propio. | ☐ | ☐ |
 | **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
 | **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |

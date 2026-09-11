@@ -151,6 +151,26 @@ decidir qué hacer, por qué hacerlo y con qué cautelas.
   (6) Riesgos, limitaciones y próximos pasos · (7) Referencias, IA y anexo metodológico.
 :::
 
+::: {.callout-tip}
+## Las tablas son un andamio, no una obligación
+Las tablas de esta plantilla están para **asegurar que no se te olvida nada**, no para que rellenes
+casillas. Si en tu proyecto una fila no aplica, bórrala en lugar de escribir «no procede»; y si un
+apartado se lee mejor en prosa que en cuadrícula, **nárralo**: lo que se evalúa es que la información
+esté y se entienda, no el formato en que la presentes.
+
+Cuando sí uses tabla, **ponle título y etiqueta** para poder citarla desde el texto. Se escribe
+justo debajo de la tabla, en una línea que empieza por dos puntos:
+
+```
+: Variables analizadas y pregunta a la que sirve cada una {#tbl-ejemplo}
+```
+
+Con eso la tabla se numera sola y en el texto la citas escribiendo `@tbl-ejemplo`, que se
+convierte en «Tabla 3» o el número que le toque. Usa etiquetas que empiecen por `tbl-` y no repitas
+ninguna. Ojo: si escribes mal una etiqueta, la cita **no da error**, se convierte en una referencia
+bibliográfica rota; compruébalo en el documento renderizado.
+:::
+
 ## Datos de la entrega {.unnumbered}
 
 | Elemento | Contenido |
@@ -233,7 +253,13 @@ decisión o sostienen una recomendación. Dos o tres hallazgos bien explicados s
 a muchos gráficos mostrados sin interpretación.
 :::
 
+> [**Abre la sección**: anuncia cuántos hallazgos presentas y en qué orden. Ordénalos por lo que
+> pesan en la decisión, no por el orden en que los encontraste.]
+
 ## Hallazgo clave 1: [título interpretativo]
+
+> [**Presenta el hallazgo 1**: enúncialo en una frase antes de la ficha. El título del apartado ya
+> lo adelanta; aquí lo concretas.]
 
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
@@ -242,6 +268,12 @@ a muchos gráficos mostrados sin interpretación.
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
 | Interpretación ejecutiva | [Qué significa para la decisión] |
 | Cautela | [Qué no debe sobreinterpretarse] |
+
+: [Descripción de la tabla] {#tbl-hallazgo-1}
+
+> [**Desarrolla el hallazgo 1** y comenta la figura de abajo: qué se ve, qué significa para la
+> decisión y qué no puede concluirse. En un informe ejecutivo esta es la parte que se lee; la ficha
+> es solo el resumen. Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-hallazgo-1
@@ -253,6 +285,9 @@ a muchos gráficos mostrados sin interpretación.
 
 ## Hallazgo clave 2: [título interpretativo]
 
+> [**Presenta el hallazgo 2**: enúncialo en una frase antes de la ficha. El título del apartado ya
+> lo adelanta; aquí lo concretas.]
+
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
 | Mensaje principal | [Completar en una frase interpretativa] |
@@ -260,6 +295,12 @@ a muchos gráficos mostrados sin interpretación.
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
 | Interpretación ejecutiva | [Qué significa para la decisión] |
 | Cautela | [Qué no debe sobreinterpretarse] |
+
+: [Descripción de la tabla] {#tbl-hallazgo-2}
+
+> [**Desarrolla el hallazgo 2** y comenta la figura de abajo: qué se ve, qué significa para la
+> decisión y qué no puede concluirse. En un informe ejecutivo esta es la parte que se lee; la ficha
+> es solo el resumen. Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-hallazgo-2
@@ -271,6 +312,9 @@ a muchos gráficos mostrados sin interpretación.
 
 ## Hallazgo clave 3: [título interpretativo]
 
+> [**Presenta el hallazgo 3**: enúncialo en una frase antes de la ficha. El título del apartado ya
+> lo adelanta; aquí lo concretas.]
+
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
 | Mensaje principal | [Completar en una frase interpretativa] |
@@ -278,6 +322,12 @@ a muchos gráficos mostrados sin interpretación.
 | Visualización sugerida | [Insertar figura o tabla clara, con título y fuente] |
 | Interpretación ejecutiva | [Qué significa para la decisión] |
 | Cautela | [Qué no debe sobreinterpretarse] |
+
+: [Descripción de la tabla] {#tbl-hallazgo-3}
+
+> [**Desarrolla el hallazgo 3** y comenta la figura de abajo: qué se ve, qué significa para la
+> decisión y qué no puede concluirse. En un informe ejecutivo esta es la parte que se lee; la ficha
+> es solo el resumen. Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-hallazgo-3
@@ -294,17 +344,28 @@ Transforma evidencia en acción. Cada recomendación debe indicar qué hacer, po
 beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 :::
 
+> [**Abre la sección y presenta la @tbl-acciones**: enlaza los hallazgos con lo que procede hacer.
+> Anuncia que la tabla ordena las acciones por prioridad, con la evidencia que respalda cada una.]
+
 | Prioridad | Acción propuesta | Evidencia que la respalda | Beneficio esperado | Riesgo o condición |
 |------|--------------|--------------|-------------|-------------|
 | Alta | [Completar] | [Completar] | [Completar] | [Completar] |
 | Media | [Completar] | [Completar] | [Completar] | [Completar] |
 | Baja / futura | [Completar] | [Completar] | [Completar] | [Completar] |
 
+: [Descripción de la tabla] {#tbl-acciones}
+
+> [**Lee la @tbl-acciones**: justifica el orden de prioridad y di qué acción depende de algo que
+> todavía no se sabe. Borra este recuadro cuando lo hayas redactado.]
+
 ## Decisión recomendada
 
 > [Redactar la decisión o acción que se recomienda adoptar, con la justificación mínima necesaria.]
 
 # Riesgos, limitaciones y próximos pasos
+
+> [**Abre la sección y presenta la @tbl-riesgos**: qué puede salir mal al actuar sobre estas
+> conclusiones. Decirlo aquí protege la decisión; callarlo la compromete.]
 
 | Riesgo o limitación | Por qué importa | Cómo gestionarlo |
 |----------------|--------------------|-------------------------|
@@ -313,13 +374,26 @@ beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 | Aplicación de la recomendación | [Completar] | [Completar] |
 | Generalización | [Completar] | [Completar] |
 
+: [Descripción de la tabla] {#tbl-riesgos}
+
+> [**Lee la @tbl-riesgos**: cuál de ellos vigilarías de cerca y con qué señal de alarma.
+> Borra este recuadro cuando lo hayas redactado.]
+
 ## Próximos pasos propuestos
+
+> [**Abre el apartado y presenta la @tbl-pasos**: qué habría que hacer a continuación y en qué
+> plazo. Anuncia que la tabla asigna responsable e indicador a cada paso.]
 
 | Paso | Acción | Responsable o área | Indicador de seguimiento |
 |-----|--------------------|--------------|--------------------|
 | 1 | [Completar] | [Completar] | [Completar] |
 | 2 | [Completar] | [Completar] | [Completar] |
 | 3 | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-pasos}
+
+> [**Lee la @tbl-pasos**: qué paso desbloquea a los demás. Borra este recuadro cuando lo hayas
+> redactado.]
 
 # Referencias, uso de IA y anexo metodológico breve
 
@@ -342,6 +416,8 @@ Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe 
 transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
 :::
 
+> [**Abre el apartado y presenta la @tbl-ia**: en qué fases has usado IA y con qué papel.]
+
 | Aspecto | Declaración a completar |
 |--------------|----------------------------------------------|
 | Herramientas utilizadas | [Herramienta, versión si se conoce y fecha aproximada de uso] |
@@ -357,11 +433,19 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 > las conclusiones. Las decisiones sobre limpieza de datos, metodología, interpretación,
 > recomendaciones y redacción final han sido responsabilidad del equipo.
 
+: [Descripción de la tabla] {#tbl-ia}
+
+> [**Reflexiona**, que es más que declarar: cómo verificaste lo que la IA produjo, qué corregiste y
+> qué descartaste. Borra este recuadro cuando lo hayas redactado.]
+
 ## Anexo metodológico breve
 
 > [Incluir el detalle mínimo para que el lector interesado conozca técnicas, métricas, validación, supuestos, limpieza de datos o decisiones relevantes, sin sobrecargar el cuerpo ejecutivo.]
 
 # Anexos opcionales
+
+> [**Abre la sección y presenta la @tbl-anexos**: qué has dejado fuera del cuerpo y con qué
+> criterio.]
 
 | Anexo | Contenido recomendado |
 |--------------|----------------------------------------------|
@@ -369,6 +453,8 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 | Anexo B. Visualizaciones complementarias | [Gráficos o tablas no esenciales para la lectura ejecutiva] |
 | Anexo C. Calidad de datos | [Resumen de incidencias, sesgos y tratamientos aplicados] |
 | Anexo D. Prompts de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
+
+: [Descripción de la tabla] {#tbl-anexos}
 
 # Anexo · Reproducibilidad y entorno de ejecución
 
@@ -442,5 +528,7 @@ sessioninfo::session_info()
 | Las limitaciones principales están reconocidas sin exceso técnico. | ☐ | ☐ |
 | Las referencias y fuentes de datos están citadas. | ☐ | ☐ |
 | El uso de IA está declarado. | ☐ | ☐ |
+| **Cada sección está introducida**, y toda tabla o figura se presenta antes, se cita por su número y se comenta después. | ☐ | ☐ |
+| **No queda ningún recuadro de instrucción de la plantilla** sin sustituir por texto propio. | ☐ | ☐ |
 | **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
 | **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |

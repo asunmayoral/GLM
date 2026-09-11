@@ -154,6 +154,26 @@ una contribución investigadora con método, evidencia, discusión crítica y re
   (6) Discusión · (7) Conclusiones, limitaciones y líneas futuras · (8) Referencias y material suplementario.
 :::
 
+::: {.callout-tip}
+## Las tablas son un andamio, no una obligación
+Las tablas de esta plantilla están para **asegurar que no se te olvida nada**, no para que rellenes
+casillas. Si en tu proyecto una fila no aplica, bórrala en lugar de escribir «no procede»; y si un
+apartado se lee mejor en prosa que en cuadrícula, **nárralo**: lo que se evalúa es que la información
+esté y se entienda, no el formato en que la presentes.
+
+Cuando sí uses tabla, **ponle título y etiqueta** para poder citarla desde el texto. Se escribe
+justo debajo de la tabla, en una línea que empieza por dos puntos:
+
+```
+: Variables analizadas y pregunta a la que sirve cada una {#tbl-ejemplo}
+```
+
+Con eso la tabla se numera sola y en el texto la citas escribiendo `@tbl-ejemplo`, que se
+convierte en «Tabla 3» o el número que le toque. Usa etiquetas que empiecen por `tbl-` y no repitas
+ninguna. Ojo: si escribes mal una etiqueta, la cita **no da error**, se convierte en una referencia
+bibliográfica rota; compruébalo en el documento renderizado.
+:::
+
 # Título, autoría, resumen y palabras clave
 
 ## Título
@@ -177,7 +197,8 @@ contexto o problema, objetivo o pregunta principal, datos y metodología, result
 principales, conclusión o contribución y, si es relevante, la limitación esencial.
 :::
 
-> [Texto del resumen del artículo...]
+>[**Texto del resumen del artículo.** Va narrado y sin citas: contexto, objetivo, datos, método,
+> resultado principal y conclusión, en ese orden. Es lo único que leerá la mayoría.]
 
 ## Palabras clave
 
@@ -207,6 +228,10 @@ Presenta conceptos, estudios previos, enfoques metodológicos o evidencias que s
 la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 :::
 
+> [**Abre la sección y presenta la @tbl-marco**: cuál es el estado de la cuestión y dónde se sitúa
+> tu trabajo dentro de él. La tabla lista las fuentes; el texto es donde se construye el argumento
+> que lleva de lo que ya se sabe a lo que tú aportas.]
+
 | Fuente | Aportación principal | Relación con el artículo |
 |------------|-------------------------|-----------------------|
 | [Autor, año] | [Idea relevante] | [Cómo se conecta con este estudio] |
@@ -215,7 +240,16 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 
 > **Síntesis del marco o antecedentes:** [Redactar una síntesis argumentada, citando las fuentes en formato APA 7.]
 
+: [Descripción de la tabla] {#tbl-marco}
+
+> [**Lee la @tbl-marco**: qué hueco dejan estos antecedentes y por qué justifica tu pregunta. No
+> resumas fuente por fuente: agrúpalas por lo que discuten y señala dónde discrepan.
+> Borra este recuadro cuando lo hayas redactado.]
+
 # Objetivos, preguntas de investigación e hipótesis
+
+> [**Abre la sección y presenta la @tbl-objetivos**: qué se propone el artículo. Anuncia que
+> después se concretan en preguntas de investigación y, si procede, en hipótesis contrastables.]
 
 | Tipo de objetivo | Redacción |
 |------------|------------------------------------------------|
@@ -224,7 +258,13 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 | Objetivo específico 2 | [Completar] |
 | Objetivo específico 3 | [Completar] |
 
+: [Descripción de la tabla] {#tbl-objetivos}
+
 ## Preguntas de investigación
+
+> [**Presenta la @tbl-preguntas**: cómo se traduce cada objetivo en una pregunta respondible, y qué
+> evidencia exige cada una. Esa tercera columna es un compromiso: lo que dices que necesitas es lo
+> que el apartado de datos tendrá que aportar.]
 
 | Código | Pregunta de investigación | Variable, comparación o evidencia necesaria |
 |------|----------------------------|--------------------------|
@@ -232,12 +272,19 @@ la pregunta de investigación. No debe ser una lista de reseñas inconexas.
 | P2 | [Completar] | [Completar] |
 | P3 | [Completar] | [Completar] |
 
+: [Descripción de la tabla] {#tbl-preguntas}
+
 ## Hipótesis, si procede
+
+> [**Presenta la @tbl-hipotesis**: qué esperas encontrar y por qué lo esperas. Una hipótesis sin
+> justificación teórica o empírica previa es una conjetura, no una hipótesis.]
 
 | Hipótesis | Formulación | Justificación teórica o empírica |
 |-------|--------------------------|--------------------------|
 | H1 | [Completar] | [Completar] |
 | H2 | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-hipotesis}
 
 # Datos y metodología
 
@@ -248,6 +295,10 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 
 ## Datos, muestra o corpus analizado
 
+> [**Abre la sección y presenta la @tbl-datos**: de dónde proceden los datos, cómo se obtuvieron y
+> qué representan. En un artículo, este apartado es lo que permite juzgar la validez externa de tus
+> conclusiones: sé preciso con la población y con el procedimiento de muestreo.]
+
 | Elemento | Descripción |
 |----------------|--------------------------------------------|
 | Fuente de datos | [Completar] |
@@ -257,13 +308,28 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 | Criterios de inclusión/exclusión | [Completar] |
 | Consideraciones éticas o de privacidad | [Completar] |
 
+: [Descripción de la tabla] {#tbl-datos}
+
+> [**Lee la @tbl-datos**: a quién representan estos datos y a quién no. Declara cualquier sesgo de
+> selección o de cobertura que condicione la generalización. Borra este recuadro cuando lo hayas
+> redactado.]
+
 ## Variables, indicadores o medidas
+
+> [**Presenta la @tbl-variables**: cómo se operacionaliza cada concepto del marco teórico. El salto
+> del concepto a la medida es una decisión discutible y hay que argumentarla.]
 
 | Variable o indicador | Tipo / escala | Descripción | Papel en el análisis |
 |-----------|--------|------------------------|-----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-variables}
+
+> [**Lee la @tbl-variables**: qué medidas son estándar en la literatura y cuáles has construido tú.
+> Si alguna operacionalización es debatible, reconócelo aquí antes de que lo haga un revisor.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ## Preparación de datos
 
@@ -280,10 +346,19 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 
 ## Técnicas de análisis
 
+> [**Presenta la @tbl-tecnicas**: con qué criterio has elegido cada técnica. En un artículo hay que
+> dar el detalle suficiente para que otro grupo pueda replicar el análisis.]
+
 | Pregunta u objetivo | Técnica aplicada | Justificación | Criterio de evaluación |
 |-------------|------------|------------------|-----------------|
 | [Completar] | [Completar] | [Completar] | [Completar] |
 | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-tecnicas}
+
+> [**Lee la @tbl-tecnicas**: justifica los supuestos que asume cada técnica y cómo los has
+> comprobado, y menciona las alternativas descartadas. Borra este recuadro cuando lo hayas
+> redactado.]
 
 # Resultados
 
@@ -294,6 +369,9 @@ La discusión amplia se reserva para la sección siguiente.
 
 ## Resultado asociado a la pregunta/objetivo 1: [título]
 
+> [**Presenta el resultado 1**: a qué pregunta responde y con qué análisis. Enúncialo antes de
+> mostrarlo.]
+
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
@@ -301,6 +379,13 @@ La discusión amplia se reserva para la sección siguiente.
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
 | Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
 | Cautela inmediata | [Completar si procede] |
+
+: [Descripción de la tabla] {#tbl-resultado-1}
+
+> [**Desarrolla el resultado 1** y comenta la figura de abajo. En un artículo, este apartado
+> **describe**: qué se observa, con qué magnitud y con qué incertidumbre. La interpretación amplia y
+> el diálogo con la literatura van en la Discusión, no aquí.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-1
@@ -312,6 +397,9 @@ La discusión amplia se reserva para la sección siguiente.
 
 ## Resultado asociado a la pregunta/objetivo 2: [título]
 
+> [**Presenta el resultado 2**: a qué pregunta responde y con qué análisis. Enúncialo antes de
+> mostrarlo.]
+
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
@@ -319,6 +407,13 @@ La discusión amplia se reserva para la sección siguiente.
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
 | Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
 | Cautela inmediata | [Completar si procede] |
+
+: [Descripción de la tabla] {#tbl-resultado-2}
+
+> [**Desarrolla el resultado 2** y comenta la figura de abajo. En un artículo, este apartado
+> **describe**: qué se observa, con qué magnitud y con qué incertidumbre. La interpretación amplia y
+> el diálogo con la literatura van en la Discusión, no aquí.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-2
@@ -330,6 +425,9 @@ La discusión amplia se reserva para la sección siguiente.
 
 ## Resultado asociado a la pregunta/objetivo 3: [título]
 
+> [**Presenta el resultado 3**: a qué pregunta responde y con qué análisis. Enúncialo antes de
+> mostrarlo.]
+
 | Elemento | Contenido |
 |---------------|---------------------------------------------|
 | Pregunta u objetivo | [Completar] |
@@ -337,6 +435,13 @@ La discusión amplia se reserva para la sección siguiente.
 | Tabla o figura | [Insertar tabla o figura numerada y con fuente] |
 | Lectura del resultado | [Explicar qué muestra, sin discutir todavía implicaciones amplias] |
 | Cautela inmediata | [Completar si procede] |
+
+: [Descripción de la tabla] {#tbl-resultado-3}
+
+> [**Desarrolla el resultado 3** y comenta la figura de abajo. En un artículo, este apartado
+> **describe**: qué se observa, con qué magnitud y con qué incertidumbre. La interpretación amplia y
+> el diálogo con la literatura van en la Discusión, no aquí.
+> Borra este recuadro cuando lo hayas redactado.]
 
 ```{r}
 #| label: fig-resultado-3
@@ -358,6 +463,9 @@ y delimita el alcance. Distingue entre lo que los datos muestran y lo que solo p
 plantearse como interpretación plausible.
 :::
 
+> [**Abre la sección y presenta la @tbl-discusion**: aquí es donde los resultados dialogan con el
+> marco teórico. Anuncia los ejes que vas a recorrer.]
+
 | Aspecto | Contenido de la discusión |
 |--------------|----------------------------------------------|
 | Resultado principal | [Completar] |
@@ -366,7 +474,12 @@ plantearse como interpretación plausible.
 | Resultado inesperado o matiz | [Completar] |
 | Alcance y cautela | [Completar] |
 
-> [Redactar aquí la discusión del artículo.]
+: [Descripción de la tabla] {#tbl-discusion}
+
+> [**Redacta aquí la discusión del artículo**, que es el núcleo argumental: qué significan los
+> resultados a la luz de los antecedentes, en qué coinciden y en qué discrepan con ellos, y qué
+> explicación alternativa a la tuya podría dar cuenta de lo observado. Descartar esa alternativa,
+> o reconocer que no puedes, es lo que distingue una discusión de un resumen.]
 
 # Conclusiones, limitaciones y líneas futuras
 
@@ -376,12 +489,20 @@ plantearse como interpretación plausible.
 
 ## Limitaciones
 
+> [**Presenta la @tbl-limitaciones**: qué condiciona el alcance de las conclusiones. Reconocer
+> límites no debilita el artículo: anticipa la objeción del revisor.]
+
 | Tipo de limitación | Descripción | Efecto sobre la interpretación |
 |------------|------------------------|------------------------|
 | Datos / muestra | [Completar] | [Completar] |
 | Método | [Completar] | [Completar] |
 | Medición / variables | [Completar] | [Completar] |
 | Generalización | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-limitaciones}
+
+> [**Lee la @tbl-limitaciones**: cuál de ellas afecta de verdad a la validez de tus conclusiones y
+> cuál es una cautela de rutina. Borra este recuadro cuando lo hayas redactado.]
 
 ## Líneas futuras o aplicaciones potenciales
 
@@ -393,6 +514,9 @@ plantearse como interpretación plausible.
 Apartado obligatorio si se ha utilizado IA en cualquier fase del proyecto. Debe ser
 transparente y concreto, y permitir constatar que la autoría del trabajo no es de la IA.
 :::
+
+> [**Abre el apartado y presenta la @tbl-ia**: en qué fases del trabajo has usado IA y con qué
+> papel.]
 
 | Aspecto | Declaración a completar |
 |--------------|----------------------------------------------|
@@ -409,6 +533,11 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 > las conclusiones. Las decisiones sobre limpieza de datos, metodología, interpretación,
 > recomendaciones y redacción final han sido responsabilidad del equipo.
 
+: [Descripción de la tabla] {#tbl-ia}
+
+> [**Reflexiona**, que es más que declarar: cómo verificaste lo que la IA produjo, qué corregiste y
+> qué descartaste. Borra este recuadro cuando lo hayas redactado.]
+
 # Referencias
 
 ::: {.callout-note}
@@ -423,6 +552,9 @@ Si usas `bibliography: references.bib` en el encabezado, las referencias se gene
 
 # Material suplementario o anexos
 
+> [**Abre la sección y presenta la @tbl-anexos**: qué material suplementario acompaña al artículo
+> y con qué criterio se ha separado del cuerpo.]
+
 | Anexo | Contenido recomendado |
 |--------------|----------------------------------------------|
 | Anexo A. Datos o fuente de datos | [Enlace, descripción o información de acceso] |
@@ -430,6 +562,8 @@ Si usas `bibliography: references.bib` en el encabezado, las referencias se gene
 | Anexo C. Instrumento, cuestionario o protocolo | [Si procede] |
 | Anexo D. Tablas y resultados complementarios | [Resultados secundarios o pruebas adicionales] |
 | Anexo E. Prompts relevantes de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
+
+: [Descripción de la tabla] {#tbl-anexos}
 
 # Anexo · Reproducibilidad y entorno de ejecución
 
@@ -505,5 +639,7 @@ sessioninfo::session_info()
 | Las limitaciones y líneas futuras están reconocidas. | ☐ | ☐ |
 | Todas las citas tienen su referencia final en formato APA 7. | ☐ | ☐ |
 | El uso de IA está declarado. | ☐ | ☐ |
+| **Cada sección está introducida**, y toda tabla o figura se presenta antes, se cita por su número y se comenta después. | ☐ | ☐ |
+| **No queda ningún recuadro de instrucción de la plantilla** sin sustituir por texto propio. | ☐ | ☐ |
 | **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
 | **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |

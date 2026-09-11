@@ -57,6 +57,23 @@ mujeres de la cohorte y **no dependen de que la fractura llegue a ocurrir** ni d
 >    clínica o es todo cosa de la paciente? ¿Hay centros que lo hacen claramente mejor o peor? Si
 >    abrimos uno nuevo, ¿qué deberíamos esperar?»
 
+### Dónde has trabajado ya cada pregunta
+
+Ninguna de estas cinco preguntas te pilla de nuevas: las has ido resolviendo, sobre la cohorte de tu
+equipo, en la tarea que cierra cada unidad del caso. Lo que se te pide ahora no es empezar de cero,
+sino **integrar** ese trabajo en un informe coherente, revisando las decisiones a la luz de todo lo
+que sabes al final del recorrido.
+
+| Pregunta | Qué pide | Dónde la has trabajado |
+|:--:|-------------------------------------|------------------------|
+| **P1** | Quién se fractura, papel de la fragilidad y del tratamiento, riesgo de una paciente nueva y si el tratamiento protege por igual a todas | [Unidad 1](#sec-u11), que la plantea y hace el primer ajuste, y [Unidad 2](#sec-u12), que la interpreta, decide y evalúa |
+| **P2** | Cuándo ocurre la fractura, cada cuánto revisar y si el tratamiento retrasa el evento, con la censura bien tratada | [Unidad 5](#sec-u15) |
+| **P3** | Qué factores empujan hacia cada endotipo de fragilidad y hasta qué punto se puede anticipar | [Unidad 3](#sec-u13) |
+| **P4** | Qué se asocia a estadios más avanzados de la osteoporosis y si las tratadas están en estadios más leves | [Unidad 3](#sec-u13) |
+| **P5** | Cuánto del riesgo depende de la clínica, qué centros destacan y qué esperar de uno nuevo | [Unidad 4](#sec-u14) |
+
+: Correspondencia entre las preguntas del cliente y la unidad en que se resolvió cada una. {#tbl-mapa-preguntas}
+
 ### Tu trabajo
 
 Entregas un **informe de consultoría reproducible** que convierta esas preguntas en análisis. Nadie
@@ -201,6 +218,8 @@ has saltado ninguna de las **tareas que un buen analista** hace en un proyecto. 
 - [ ] Identificar el tipo de respuesta y elegir un modelo adecuado a cada objetivo, justificándolo.
 - [ ] Especificar bien: enlace, interacciones pertinentes, agrupamiento (efectos aleatorios), tiempo con censura, proporcionalidad.
 - [ ] Comprobar la modificación de un efecto por otra variable cuando el cliente lo pregunta (interacción).
+- [ ] Probar si los datos justifican una **pendiente aleatoria** además del intercepto por clínica, y razonar la respuesta con la varianza estimada, su correlación con el intercepto y la convergencia ([Unidad 4](#sec-u14)).
+- [ ] Reconocer el agrupamiento por clínica también en el modelo de **tiempo discreto**, y comentar qué cambia —y qué no— en los efectos fijos y en sus errores estándar ([Unidad 5](#sec-u15)).
 - [ ] Ajustar y comprobar la convergencia y la estabilidad del ajuste.
 
 *Evaluación*
