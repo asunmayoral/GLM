@@ -350,7 +350,8 @@ preparación, técnicas y criterios de análisis, con detalle suficiente pero si
 Este apartado describe **qué se hizo y por qué**, con el detalle suficiente para que otro grupo
 pueda replicar el análisis. Ningún resultado: las cifras van en la sección de Resultados. La
 convención de artículo no admite sub-subsecciones aquí, así que el apartado se redacta como prosa
-continua, pero siguiendo siempre este orden: exploración, modelos, supuestos, evaluación.
+continua, pero siguiendo siempre este orden: exploración, modelos y su formulación,
+supuestos, selección, evaluación y diagnóstico.
 :::
 
 > [**Análisis exploratorio.** Qué descriptivos y qué representaciones gráficas se emplearon para
@@ -364,17 +365,45 @@ continua, pero siguiendo siempre este orden: exploración, modelos, supuestos, e
 > técnica, en su edición más reciente. Menciona una alternativa descartada solo cuando descartarla
 > sea parte del argumento, típicamente si es la habitual en el campo y aquí no se usa.]
 
+> [**Formulación.** Escribe la ecuación de cada modelo, con la notación fijada una sola vez —qué
+> indexa cada subíndice, qué variables van estandarizadas o transformadas— y la **codificación
+> explícita** de las variables: qué vale 1 en las binarias, cuál es la categoría de referencia, si un
+> factor entra libre o con tendencia, cómo se ordenan los umbrales en un modelo ordinal. En un
+> artículo esto no es ornamento: es lo que permite replicar el ajuste sin adivinar, y obliga a
+> decidir cosas que la prosa deja en el aire.]
+
 > [**Supuestos y su comprobación.** Qué supone cada modelo, con qué procedimiento se comprobó cada
 > supuesto —contraste, gráfico de residuos, diagnóstico— y qué análisis alternativo se habría
 > empleado si algún supuesto no se hubiera sostenido. Si un supuesto es común a varios modelos,
 > enúncialo una sola vez. Declarar por anticipado la alternativa es lo que evita que la decisión
-> parezca tomada a posteriori.]
+> parezca tomada a posteriori. Atiende en particular a los supuestos que suelen darse por sentados
+> porque están escondidos en la especificación: que una covariable continua entra de forma lineal en
+> la **escala del enlace** y no en la de la respuesta, y que un modelo mixto con solo intercepto
+> aleatorio asume que el grupo desplaza el nivel pero no el efecto de los predictores.]
 
-> [**Evaluación, selección y validación.** Con qué criterio se seleccionó entre modelos candidatos
-> —contrastes entre modelos anidados, criterios de información, procedimientos de selección de
-> variables—, con qué métricas se juzgó el ajuste y por qué esas, y cómo se validó el resultado:
-> validación cruzada o partición, remuestreo, comparación con una estimación no paramétrica o
-> análisis de sensibilidad. Si no hubo validación, decláralo como limitación.]
+> [**Selección de modelos.** Con qué criterio se eligió entre candidatos: razón de verosimilitudes
+> para modelos anidados, criterios de información cuando no lo están, procedimientos de selección de
+> variables. Si se comparó un modelo mixto con uno de efectos fijos, recuerda que se contrasta si una
+> **varianza vale cero**, valor situado en la frontera del espacio de parámetros: el valor *p* que
+> devuelve el software es conservador, y la decisión debe apoyarse además en la magnitud de la
+> varianza estimada y en los criterios de información.]
+
+> [**Evaluación.** Las métricas dependen de la naturaleza de la respuesta, y conviene que el texto lo
+> refleje: en una respuesta **binaria**, discriminación y calibración por separado, que son
+> propiedades independientes; en una **politómica**, la referencia es la regla trivial, con Brier
+> multiclase y matriz de confusión completa; en **conteos o continuas positivas**, bondad de ajuste y
+> error de predicción en la escala de uso; y en datos de **tiempo hasta evento en formato
+> persona-periodo**, la evaluación es agregada —riesgo estimado frente a observado por periodo, curva
+> de supervivencia frente a una estimación no paramétrica—, no fila a fila, porque las filas de un
+> mismo individuo no son independientes.]
+
+> [**Diagnóstico y validación.** Qué residuos se examinaron y qué se miró en ellos: en respuestas
+> discretas, residuos cuantil aleatorizados por simulación, con contrastes de uniformidad, dispersión
+> y atípicos, y residuos frente al valor predicho y frente a cada predictor. **Declara el alcance**:
+> no todas las familias admiten la misma maquinaria, y si algún modelo queda fuera hay que decir en
+> qué descansa entonces su comprobación. Añade cómo se validó el resultado —validación cruzada o
+> partición, remuestreo, comparación con una estimación no paramétrica, contraste con una fuente
+> externa o análisis de sensibilidad— y, si no hubo validación, decláralo como limitación.]
 
 > [**Software.** Versión del entorno y de los paquetes empleados, con su cita cuando proceda.]
 

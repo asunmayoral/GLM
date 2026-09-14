@@ -48,7 +48,7 @@ RA implicados (el marco de 1.1–1.2 aplicado a nuevos tipos de respuesta):
 
 ## 3.1 Del dato individual al agrupado: respuesta binomial {#sec-u13-binomial}
 
-Para ejemplificar la implementación de esta versión del modelo binomial, appliquemos una agrupación a GLOW, considerando ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables. Al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia —y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
+Para ejemplificar la implementación de esta versión del modelo binomial, apliquemos una agrupación a GLOW, considerando ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables. Al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia —y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
 
 
 Agrupados los datos en $k$ celdas (perfiles de covariables), en la celda $i$
@@ -59,10 +59,20 @@ donde $Y_i$ es el número de fracturas entre las $m_i$ mujeres del perfil y $\pi
 
 La parte sistemática es común a todos los perfiles, así que la escribimos sin índice —con la respuesta $(\text{éxitos},\text{fracasos})=(Y,\,m-Y)$—, y así el modelo binomial plantea estimar:
 
-$$\operatorname{logit}(\pi)=\beta_0+\beta_1\,\mathbf{I}_{\text{priorfrac}}+\beta_2\,\mathbf{I}_{\text{momfrac}}+\beta_3\,\mathbf 1(\text{raterisk}=\text{Same})+\beta_4\,\mathbf 1(\text{raterisk}=\text{Greater}),$$
+$$\operatorname{logit}(\pi)=\beta_0 + \beta_1 \cdot \mathbf{I}_{\text{priorfrac}} + \beta_2 \cdot \mathbf{I}_{\text{momfrac}} + \beta_3 \cdot \mathbf{I}_{\text{raterisk}=\text{Same}} + \beta_4 \cdot \mathbf{I}_{\text{raterisk}=\text{Greater}}$$
 
+Las indicatrices se leen igual que en la [Sección 2.3](#sec-u12-interpretacion): valen $1$ cuando
+el perfil presenta la característica y $0$ en caso contrario.
 
-con `raterisk = Less` como referencia. 
+- $\mathbf{I}_{\text{priorfrac}}=1/0$ si `priorfrac` es `Yes`/`No`,
+- $\mathbf{I}_{\text{momfrac}}=1/0$ si `momfrac` es `Yes`/`No`,
+- $\mathbf{I}_{\text{raterisk}=\text{Same}}=1/0$ si `raterisk` es `Same`/otro nivel,
+- $\mathbf{I}_{\text{raterisk}=\text{Greater}}=1/0$ si `raterisk` es `Greater`/otro nivel.
+
+Un factor de $L$ niveles necesita $L-1$ indicatrices, y el nivel que se queda sin la suya es el de
+**referencia**. Aquí lo son `No`, `No` y `Less`, de modo que $\beta_0$ es el logit de la
+probabilidad de fractura en el perfil base: sin fractura previa, sin fractura materna y con riesgo
+autopercibido `Less`. 
 
 
 :::: {.callout-tip}
@@ -119,7 +129,7 @@ bondad de ajuste cuando hay celdas pequeñas (la cautela de la [Sección 3.2](#s
 
 Ahora ajustamos el binomial con la sintaxis `cbind(éxitos, fracasos)` y comprobamos que
 **recupera exactamente** los mismos coeficientes que la logística individual con esas
-predictoras —misma verosimilitud, distinta presentación—:
+predictoras —mismos estimadores, distinta disposición del dato—:
 
 ```{r}
 #| label: u13-binomial-fit
@@ -132,8 +142,18 @@ cbind(agrupado = coef(fit_bin), individual = coef(fit_ind))   # idénticos
 ```
 
 La interpretación de los coeficientes (odds ratios, [Sección 2.3](#sec-u12-interpretacion))
-y la selección de modelos (LRT/AIC/BIC, [Sección 2.5](#sec-u12-inferencia)) son **idénticas**
-a las del caso individual. Lo que cambia —y es la ganancia de agrupar— es la bondad de ajuste.
+y los contrastes entre modelos anidados (LRT, [Sección 2.5](#sec-u12-inferencia)) son
+**idénticos** a los del caso individual. Lo que cambia —y es la ganancia de agrupar— es la bondad de ajuste.
+
+::: {.callout-warning}
+## 🎯 Reto
+
+Tienes `fit_bin` y `fit_ind` ajustados arriba. Compáralos:
+
+1. ¿Coinciden los coeficientes, sus errores estándar y las probabilidades ajustadas de cada perfil?
+2. ¿Coinciden `logLik()`, `AIC()`, la deviance y sus grados de libertad?
+3. ¿Por qué tus respuestas a 1 y a 2 no son la misma?
+:::
 
 ## 3.2 Bondad de ajuste y diagnóstico en datos binomiales {#sec-u13-gof-binomial}
 
@@ -148,10 +168,19 @@ Al agrupar los datos, cada celda reúne $m_i$ ensayos, de modo que los residuos
 **estándar** ya son informativos —aproximadamente $N(0,1)$ con $m_i$ grande
 [@mccullagh1989]—. Estos residuos, genéricos en los GLM, son:
 
-- **Pearson:**, la diferencia entre lo observado y lo esperado en la celda, tipificada por su desviación estándar,
+- **Pearson:** la diferencia entre lo observado y lo esperado en la celda, tipificada por su desviación estándar,
   $$r_{P,i}=\dfrac{y_i-m_i\hat\pi_i}{\sqrt{m_i\hat\pi_i(1-\hat\pi_i)}}$$
-- **Deviance:**, la raíz con signo de la contribución $d_i$ de cada celda a la deviance,
-    $$r_{D,i}=\operatorname{sign}(y_i-m_i\hat\pi_i)\sqrt{d_i}$$
+- **Deviance:**,la raíz con signo de la **contribución** $d_i$ de la celda $i$ a la deviance
+  —de modo que $D=\sum_i d_i$—,
+    $$d_i = 2\left[\,y_i\log\frac{y_i}{m_i\hat\pi_i}+(m_i-y_i)\log\frac{m_i-y_i}{m_i(1-\hat\pi_i)}\,\right],
+    \qquad r_{D,i}=\operatorname{sign}(y_i-m_i\hat\pi_i)\sqrt{d_i}$$
+
+  $d_i$ es **dos veces** la log-verosimilitud que la celda pierde al pasar del modelo **saturado**
+  —el que clava la proporción observada, $\tilde\pi_i=y_i/m_i$— al **ajustado**: compara los éxitos
+  $y_i$ con los esperados $m_i\hat\pi_i$ y, simétricamente, los fracasos. Por construcción
+  $d_i\ge 0$, y solo vale $0$ si $\hat\pi_i=y_i/m_i$: por eso la raíz tiene sentido, y por eso el
+  signo de «observado menos esperado» hay que devolvérselo a mano. Si $y_i=0$ o $y_i=m_i$, el
+  término afectado se anula, por el límite $y\log y\to 0$.
 
 - Para compararlos en igualdad de condiciones se usan sus versiones **estandarizadas** (o
 *estudentizadas*), que dividen por $\sqrt{1-h_{ii}}$,
@@ -243,6 +272,30 @@ mejor ajuste posible—:
 - **Pearson:** $X^2=\sum_i r_{P,i}^2$, la suma directa de los residuos de Pearson al cuadrado.
 - **Deviance:** $D=\sum_i r_{D,i}^2=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})$, que es además el
   **LRT frente al saturado**.
+
+Antes de contrastar nada, conviene ver el cálculo por dentro. La tabla siguiente reconstruye $D$
+celda a celda aplicando la definición de $d_i$: los éxitos observados $y_i$, los esperados por el
+modelo $m_i\hat\pi_i$, la contribución $d_i$ y el residuo $r_{D,i}$ que sale de ella.
+
+```{r}
+#| label: u13-deviance-celda
+aporta <- glow_agg |>
+  mutate(
+    esperado = total * fitted(fit_bin),
+    # El ifelse implementa el convenio 0*log(0) = 0: la celda con Yes = 0 lo necesita.
+    d_i  = 2 * (ifelse(Yes > 0, Yes * log(Yes / esperado), 0) +
+                ifelse(No  > 0, No  * log(No  / (total - esperado)), 0)),
+    r_Di = sign(Yes - esperado) * sqrt(d_i)
+  )
+
+aporta |> select(priorfrac, momfrac, raterisk, y = Yes, m = total, esperado, d_i, r_Di)
+
+c(suma_d_i = sum(aporta$d_i), deviance = deviance(fit_bin))   # la suma ES la deviance
+```
+
+La última línea cierra el círculo: sumar las contribuciones de las doce celdas devuelve exactamente
+lo que `deviance(fit_bin)` calcula. Y como $r_{D,i}^2=d_i$, sumar los residuos deviance al cuadrado
+es la misma operación.
 
 Bajo un modelo correcto y con celdas no demasiado pequeñas, ambos se distribuyen $\chi^2_{n-p}$
 [@agresti2015; @faraway2016], con lo que **ya podemos contrastar el ajuste de forma absoluta** contra el modelo saturado y responder a la pregunta **¿ajusta bien nuestro modelo?**.
@@ -483,8 +536,8 @@ probabilidades ajustadas.
 ## Individual o agrupado: qué cambia y qué no
 Tanto si la respuesta categórica es **individual** (una fila por sujeto, como aquí con
 `raterisk`) como **agrupada** ($m_i>1$, recuentos por perfil), el **modelo y sus estimaciones
-son los mismos**: misma verosimilitud, misma interpretación de coeficientes, y la **selección de
-modelos** (LRT, AIC/BIC) funciona igual. Lo que **no** vale con datos individuales es el contraste
+son los mismos**: mismos estimadores, misma interpretación de coeficientes, y el **contraste
+entre modelos anidados** (LRT) funciona igual. Lo que **no** vale con datos individuales es el contraste
 **$\chi^2$ de bondad de ajuste** ni el análisis de **residuos**: como en el paso Bernoulli→binomial
 ([Sección 3.2](#sec-u13-gof-binomial)), solo recuperan su sentido al **agrupar**. Por eso aquí
 valoramos el ajuste mirando las **probabilidades predichas**, no un $\chi^2$.

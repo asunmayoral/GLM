@@ -412,40 +412,57 @@ páginas.
 :::
 
 > [**Abre la sección**: enuncia el criterio general con el que has elegido las técnicas —normalmente,
-> qué propiedad de cada respuesta las impone— y anuncia el recorrido de la sección: primero qué
-> exploras y con qué modelos respondes, después bajo qué supuestos son válidos, y por último con qué
-> criterios los evalúas y seleccionas.]
+> qué propiedad de cada respuesta las impone— y anuncia el recorrido: primero qué exploras y con qué
+> modelos respondes, después bajo qué supuestos son válidos, y por último con qué criterios los
+> seleccionas, evalúas y diagnosticas.]
 
 ## Técnicas y modelos
 
 ::: {.callout-tip}
-## Qué va aquí y qué no
-Aquí se **declara** el análisis exploratorio: qué descriptivo o qué gráfico vas a mirar y **qué tiene
-que revelarte**. El descriptivo en sí —la tabla, la figura, sus cifras— se enseña en la sección 5.
-Si escribes aquí «la media de edad es 74,3», has cruzado la frontera.
+## Una pregunta, un bloque
+Recorre las preguntas **una a una** y despacha cada una entera: qué mirar en los datos, qué modelo la
+responde y su formulación. Encabeza cada bloque con la pregunta **tal como la enunciaste** en la
+sección 2, para que el lector reconozca que es la misma y no una reformulación.
+
+Evita el reparto en dos apartados —uno de exploración y otro de modelización—: obliga a enunciar cada
+pregunta dos veces y rompe el hilo entre lo que miras y lo que ajustas.
+
+Y declara aquí el análisis exploratorio, no lo ejecutes: qué descriptivo o qué gráfico vas a mirar y
+**qué tiene que revelarte**. El descriptivo en sí —la tabla, la figura, sus cifras— se enseña en la
+sección 5. Si escribes aquí «la media de edad es 74,3», has cruzado la frontera.
 :::
 
-> [**Análisis exploratorio.** Antes de modelizar, di qué vas a mirar y para qué: distribución de la
-> respuesta, relación de cada predictor candidato con ella, desequilibrios entre grupos, valores
-> extremos, estructura de agrupamiento. Para cada uno, una línea diciendo qué decisión del
-> modelo depende de lo que ahí se vea. Un descriptivo que no cambia ninguna decisión sobra.]
+> [**Fija la notación una vez**, antes de las preguntas, para no repetirla en cada fórmula: qué
+> indexa cada subíndice, qué variables están estandarizadas o transformadas, y qué codificación
+> tienen las binarias. Si hay algún cruce entre predictores que condicione **todas** las preguntas
+> —por ejemplo, que el tratamiento se haya asignado siguiendo una covariable—, este es su sitio,
+> porque no pertenece a ninguna pregunta en particular.]
 
-> [**Modelos, pregunta a pregunta.** Un párrafo por pregunta analítica (o por grupo de preguntas que
-> compartan modelo). Cada párrafo recorre el mismo camino: qué naturaleza tiene la respuesta
-> —binaria, de conteo, categórica, ordinal, continua positiva, tiempo hasta un evento—, qué
-> distribución y qué función de enlace impone esa naturaleza, sobre qué unidad de análisis se ajusta,
-> y qué lectura habilita el modelo elegido (odds ratios, razones de tasas, hazard ratios…). Cita la
-> referencia que sostiene cada elección.
+> [**Un bloque por pregunta**, con estas tres piezas:
 >
-> **Las alternativas descartadas no necesitan párrafo propio.** Si la justificación está bien escrita,
-> ya explica por qué el modelo elegido es el adecuado. Menciona la alternativa solo cuando descartarla
-> *sea* el argumento —por ejemplo, cuando la obvia sea la habitual en tu campo y tú no la uses—, y
-> hazlo en una frase dentro de la justificación, no en un apartado aparte.]
+> · *Qué explorar*: qué descriptivo univariante de la respuesta y qué bivariante frente a sus
+> predictores potenciales, y qué decisión depende de lo que ahí se vea. Un descriptivo que no cambia
+> ninguna decisión sobra.
+>
+> · *Qué modelo*: qué naturaleza tiene la respuesta —binaria, politómica, ordinal, de conteo,
+> continua positiva, tiempo hasta un evento—, qué distribución y qué enlace impone esa naturaleza,
+> sobre qué unidad de análisis se ajusta, y qué lectura habilita (odds ratios, razones de tasas,
+> hazard ratios…). Cita la referencia que sostiene la elección.
+>
+> · *Formulación*: la ecuación del modelo, con la **codificación explícita** de cada variable —qué
+> vale 1 en las binarias, cuál es la categoría de referencia, si un factor entra libre o con
+> tendencia, cómo se ordenan los umbrales en un ordinal—. Escribir la fórmula obliga a decidir cosas
+> que la prosa deja en el aire, y es lo que permite a otro equipo reproducir el ajuste sin adivinar.
+>
+> **Las alternativas descartadas no necesitan párrafo propio.** Si la justificación está bien
+> escrita, ya explica por qué el modelo elegido es el adecuado. Menciona la alternativa solo cuando
+> descartarla *sea* el argumento —típicamente, cuando la obvia es la habitual en tu campo y tú no la
+> usas—, y hazlo en una frase dentro de la justificación.]
 
 > [**Presenta la @tbl-metodologia**: anuncia que la tabla resume, sin argumentación, qué exploras y
 > con qué respondes a cada pregunta.]
 
-| Pregunta analítica | AED que la prepara | Modelos o técnicas |
+| Pregunta analítica | AED que la prepara | Modelo propuesto |
 |--------------------|--------------------------|--------------------------|
 | [Completar] | [Qué tiene que revelar el descriptivo, no cómo se llama el gráfico] | [Completar] |
 | [Completar] | [Completar] | [Completar] |
@@ -453,55 +470,116 @@ Si escribes aquí «la media de edad es 74,3», has cruzado la frontera.
 
 : [Descripción de la tabla] {#tbl-metodologia}
 
-## Supuestos y diagnóstico
+## Supuestos y decisiones metodológicas
 
 ::: {.callout-note}
 Va antes de la evaluación por una razón, no por orden alfabético: los contrastes con los que
 compararás y seleccionarás modelos en el apartado siguiente solo son válidos si los supuestos de
-esta se sostienen. Comprobarlos después sería medir con una regla cuya calibración aún no has
+este se sostienen. Comprobarlos después sería medir con una regla cuya calibración aún no has
 mirado.
 :::
 
-> [**Qué supone cada modelo.** Enumera los supuestos que condicionan la interpretación: forma
-> funcional y enlace, independencia de las observaciones (o la estructura de dependencia que has
-> modelizado), distribución de la respuesta, y los supuestos propios de cada familia —proporcionalidad
-> de odds, proporcionalidad de riesgos, ausencia de sobredispersión, linealidad en la escala del
-> enlace—. Si un supuesto es común a varios modelos, dilo una vez.]
+> [**Qué supone cada modelo.** Empieza por los supuestos **comunes** a todos —que la respuesta sigue
+> la distribución declarada, que el predictor lineal actúa en la escala del enlace, que las
+> observaciones son independientes una vez tenida en cuenta la estructura que hayas modelizado— y
+> añade después el propio de cada familia: proporcionalidad de odds, proporcionalidad de riesgos,
+> ausencia de sobredispersión, equidispersión en un Poisson, forma de la varianza en un Gamma.
+> Si un supuesto es común a varios modelos, enúncialo una sola vez.]
 
-> [**Cómo los vas a comprobar.** Para cada supuesto, el procedimiento concreto: qué contraste, qué
-> gráfico de residuos, qué diagnóstico. Nombra la función y el paquete si eso hace reproducible la
-> comprobación.]
+> [**Los supuestos que se dan por sentados.** Hay supuestos que no se declaran porque están
+> escondidos en la especificación, y son los que más caro salen. Dos ejemplos frecuentes: que una
+> covariable continua entra de forma **lineal en la escala del enlace**, no en la de la respuesta; y,
+> en un modelo mixto, que al dejar variar **solo el intercepto** estás asumiendo que el grupo
+> desplaza el nivel pero no el efecto de los predictores, es decir, que todos los grupos comparten
+> las mismas pendientes. Ese segundo es sustantivo y conviene contrastarlo —añadiendo pendiente
+> aleatoria y comparando— en lugar de darlo por bueno.]
 
 > [**Qué harías si falla.** Este punto se olvida siempre y es el que distingue un plan de análisis de
 > una lista de buenas intenciones: si la proporcionalidad no se sostiene, si aparece sobredispersión,
-> si hay observaciones influyentes o separación, ¿qué modelo alternativo usarías? Decirlo por
-> anticipado evita que la decisión parezca tomada a posteriori para que saliera bien.]
+> si hay observaciones influyentes o separación, si el modelo mixto resulta singular, ¿qué
+> alternativa usarías? Decirlo por anticipado evita que la decisión parezca tomada a posteriori para
+> que saliera bien.]
 
 > [**Decisiones y limitaciones metodológicas.** Cierra con las decisiones que condicionan la lectura
 > de todo lo demás: transformaciones aplicadas, tratamiento de los datos ausentes, particiones de
 > entrenamiento y prueba, y —si procede— por qué las asociaciones que vas a estimar no admiten
 > lectura causal.]
 
-## Evaluación, selección de modelos y validación
+## Evaluación, selección y diagnóstico
 
-> [**Cómo seleccionas.** Con qué criterio decides entre modelos candidatos: contrastes entre modelos
-> anidados, criterios de información cuando no lo son, procedimientos de selección de variables. Di
-> el criterio **antes** de aplicarlo; un criterio elegido después de ver los resultados no es un
-> criterio.]
+> [**Con qué criterio seleccionas.** Enúncialo en **genérico** antes de aplicarlo a tus modelos; un
+> criterio elegido después de ver los resultados no es un criterio. Lo habitual son dos: **razón de
+> verosimilitudes** cuando un modelo está anidado en otro, con su estadístico y sus grados de
+> libertad, exigiendo que ambos se hayan ajustado sobre los mismos datos; y **criterios de
+> información** (AIC, BIC) cuando no lo están, recordando que el BIC penaliza más la complejidad y
+> que ninguno es comparable entre muestras distintas. Añade, si procede, el procedimiento de
+> selección de variables. Y cierra con la regla de desempate: entre dos modelos que describen los
+> datos de forma equivalente, el más simple.]
 
-> [**Con qué mides que el modelo sirve.** Las métricas y los gráficos con los que juzgarás el
-> ajuste, y por qué esos y no otros: discriminación, calibración, capacidad predictiva frente a una
-> regla trivial, bondad de ajuste global. Que la métrica encaje con la pregunta: una que ordena
-> pacientes no se juzga igual que una que decide caso a caso.]
+> [**El efecto aleatorio, aparte.** Si comparas un modelo mixto con uno de efectos fijos, estás
+> contrastando si una **varianza** vale cero, y ese valor está en la frontera del espacio de
+> parámetros. El estadístico de razón de verosimilitudes no sigue entonces la distribución de
+> referencia habitual, y el valor *p* que devuelve el software es **conservador**. Decláralo, y no
+> decidas la estructura aleatoria con un solo número: léelo junto a la magnitud de la varianza
+> estimada, su traducción a ICC, y el AIC. Un ajuste **singular** invalida los tres.]
+
+> [**Con qué mides que el modelo sirve**, y aquí lo que puedes medir depende de la **naturaleza de la
+> respuesta**:
+>
+> · *Binaria*: separa **discriminación** (¿ordena bien?, área bajo la curva ROC con su intervalo) de
+> **calibración** (¿son creíbles las probabilidades?, predicho frente a observado por grupos de
+> riesgo, más un contraste de bondad de ajuste). Son independientes: se puede ordenar bien y calibrar
+> mal. Si das una matriz de confusión, di de dónde sale el umbral, que es una decisión del problema y
+> no del modelo.
+>
+> · *Politómica, nominal u ordinal*: no hay una única curva que resuma el problema. La referencia es
+> la **regla trivial** —predecir siempre la categoría mayoritaria—, y las herramientas, el Brier
+> multiclase y la matriz de confusión completa, que es lo único que revela si el modelo llega a
+> predecir las categorías minoritarias. En la ordinal, mira además **dónde** cae el error: confundir
+> categorías extremas no es lo mismo que confundir contiguas.
+>
+> · *Conteo o continua positiva*: bondad de ajuste global, comparación de la dispersión observada con
+> la que el modelo predice, y error de predicción en la escala en que se va a usar el resultado.
+>
+> · *Tiempo hasta un evento en formato persona-periodo*: la evaluación **no es fila a fila**. El
+> riesgo por periodo suele ser pequeño y las filas de un mismo individuo no son independientes, de
+> modo que un índice de clasificación calculado sobre ellas no mide lo que parece ni tiene el error
+> estándar que dice. Evalúa en **agregado**: riesgo estimado frente a riesgo bruto observado por
+> periodo, y curva de supervivencia reconstruida frente a una estimación no paramétrica.]
+
+> [**Con qué diagnosticas.** Que un modelo seleccione bien y prediga razonablemente no garantiza que
+> esté bien **especificado**; eso lo dicen los residuos. En respuestas discretas los residuos
+> ordinarios no sirven observación a observación, así que la herramienta son los **residuos cuantil
+> aleatorizados obtenidos por simulación**, uniformes bajo el modelo correcto sea cual sea la
+> distribución. Di qué vas a mirar sobre ellos y en qué orden: Q–Q con contraste de uniformidad,
+> dispersión, valores atípicos, residuos frente al valor predicho —donde un patrón revela la media
+> mal especificada— y frente a **cada predictor** —donde una curvatura indica que ese predictor no
+> entra de forma lineal en la escala del enlace—. Añade, en respuestas binarias, los residuos
+> agrupados por tramos de riesgo predicho; y las patologías del ajuste que invalidan la inferencia
+> aunque los residuos parezcan correctos: separación y observaciones influyentes.
+>
+> Dos particularidades frecuentes: si las filas están anidadas —persona-periodo, medidas repetidas—,
+> examina los residuos también **agregados** por individuo y por periodo; y si hay efectos
+> aleatorios, inspecciónalos con su incertidumbre, ordenados por magnitud, que muestra a la vez la
+> dispersión entre grupos y lo imprecisa que es cada estimación.
+>
+> **Declara el alcance de tu diagnóstico.** No todas las familias admiten la misma maquinaria: los
+> residuos simulados cubren los GLM y los GLMM, pero no los modelos multinomiales ni los de logit
+> acumulado. Si alguno de tus modelos queda fuera, dilo y explica en qué descansa entonces su
+> diagnóstico, en lugar de dar por hecho que se comprobó lo mismo en todos.]
 
 > [**Cómo lo validas.** Validación cruzada o partición, remuestreo, comparación con una estimación
 > que no suponga modelo, contraste con una fuente externa, o análisis de sensibilidad. Si no validas,
-> dilo y explica por qué; es una limitación legítima, no algo que ocultar.]
+> dilo y explica por qué; es una limitación legítima, no algo que ocultar. Y si trabajas sobre datos
+> **simulados de un proceso generador conocido**, tienes una validación que la práctica habitual no
+> ofrece: cotejar cada estimación con el parámetro que la produjo. Anúnciala aquí y ejecútala al
+> final, cuando el diagnóstico interno esté agotado: responde a «¿acertó el modelo?», que es otra
+> pregunta que «¿es el modelo coherente con los datos?».]
 
 ::: {.callout-tip}
 ## Unifica lo común
 Es muy probable que varias preguntas compartan criterio de selección, métricas o procedimiento de
-validación. Escribe el tronco común una vez y añade después solo lo específico de cada modelo. Los
+diagnóstico. Escribe el tronco común una vez y añade después solo lo específico de cada modelo. Los
 resultados de todas estas comprobaciones van en la sección 5, no aquí.
 :::
 
@@ -826,6 +904,8 @@ sessioninfo::session_info()
 | Se documentan criterios de evaluación, validación o comprobación. | ☐ | ☐ |
 | **La sección de metodología no contiene resultados**: ni una cifra, ni un coeficiente, ni un valor *p*; declara qué se va a hacer y con qué se va a comprobar, y los valores aparecen en la sección de resultados. | ☐ | ☐ |
 | **Para cada supuesto se dice cómo se comprueba y qué se haría si falla**, y la alternativa está decidida por anticipado, no a posteriori. | ☐ | ☐ |
+| **Cada modelo propuesto lleva su formulación**, con la codificación explícita de las variables: qué vale 1, cuál es la referencia, cómo se ordenan los umbrales. | ☐ | ☐ |
+| **El alcance del diagnóstico está declarado**: si algún modelo queda fuera de la maquinaria de residuos empleada, se dice y se explica en qué descansa su comprobación. | ☐ | ☐ |
 | Los resultados clave están interpretados y vinculados a objetivos. | ☐ | ☐ |
 | Las limitaciones, riesgos e incertidumbres están reconocidos. | ☐ | ☐ |
 | Las referencias están citadas en el texto y completas al final. | ☐ | ☐ |
