@@ -208,7 +208,7 @@ La última línea cierra el círculo: sumar las contribuciones de las doce celda
 lo que `deviance(fit_bin)` calcula.
 
 Bajo un modelo correcto y con celdas no demasiado pequeñas, ambos se distribuyen $\chi^2_{n-p}$
-[@agresti2015; @faraway2016], con lo que **ya podemos contrastar el ajuste de forma absoluta** contra el modelo saturado y responder a la pregunta **¿ajusta bien nuestro modelo?**.
+[@agresti2015; @faraway2016], con lo que **ya podemos contrastar el ajuste de forma absoluta** contra el modelo saturado y responder a la pregunta **¿ajusta bien nuestro modelo?**
 
 
 ```{r}
@@ -299,8 +299,7 @@ $$
 \hat H = W^{1/2}X\,(X^{\top}WX)^{-1}X^{\top}W^{1/2}.
 $$
 Es **simétrica e idempotente**, sus diagonales son los **leverages** $h_{ii}$ y suman el
-número de parámetros, $\sum_i h_{ii}=\operatorname{tr}(\hat H)=p$. Es el $h_{ii}$ que aparece en
-$r^{\,s}_{P,i}=r_{P,i}/\sqrt{1-h_{ii}}$ y en la distancia de Cook.
+número de parámetros, $\sum_i h_{ii}=\operatorname{tr}(\hat H)=p$. 
 
 **Por qué $h_{ii}$ se lee como un peso.** Aplicar $\hat H$ equivale a escribir cada valor ajustado
 como una **media ponderada de todas las respuestas observadas** [@fox2016]:
@@ -368,30 +367,24 @@ Los valores que comentamos a continuación están en esta tabla, celda a celda:
 ```{r}
 #| label: u13-diagnosticos-tabla
 diag_bin |>
-  select(celda = cell, priorfrac, momfrac, raterisk, m = total, pred, w, h, r_std, cook)
+  mutate(p_obs=Yes/total) |>
+  select( priorfrac, momfrac, raterisk, m = total, p_obs, pred, w, h, r_std, cook,celda = cell)
 
 c(referencia_cook = 4 / nrow(diag_bin))   # la línea de puntos del panel derecho
 ```
 
-En GLOW, vemos, a la izquierda en la @fig-u13-residuos, que los **12 perfiles** (celdas) dejan todos los residuos estandarizados (de Pearson)  dentro de la banda de ±2, y se reparten sin
-patrón alrededor de 0 (rango −1,25 a +1,41). Los más cercanos a cero corresponden a celdas de
-tamaño intermedio (6 y 7); las celdas con más ensayos (1–3) tienen residuos **moderados**, no
-pequeños, y en cambio los **leverages** más altos ($h_{ii}$ entre 0,63 y 0,72): son las que más
-pesan en el ajuste.
+En GLOW, el panel izquierdo de la @fig-u13-residuos muestra los **12 perfiles** con todos los
+residuos estandarizados dentro de la banda de ±2 y repartidos sin patrón alrededor de 0
+(rango −1,25 a +1,41): ninguna celda está mal ajustada. Las celdas con más ensayos (1–3) no son
+las de residuo más pequeño, sino las de **leverage** más alto ($h_{ii}$ entre 0,63 y 0,72): son
+las que más pesan en el ajuste. Y pesan por su $w_i=m_i\hat\pi_i(1-\hat\pi_i)$, no solo por su
+tamaño —el peso es máximo cuando $\hat\pi_i$ ronda $0{,}5$ y se desvanece hacia 0 y 1—, de modo
+que una celda grande con probabilidad ajustada extrema puede pesar menos que otra más pequeña
+situada cerca del centro.
 
-Conviene ver **por qué** son esas las de más peso. Comparemos la celda 1 ($m_i=127$) con la 3
-($m_i=76$): la primera tiene un 67 % más de ensayos, pero su peso de trabajo apenas la supera
-—14,7 frente a 13,5—, porque su probabilidad ajustada, 0,133 frente a 0,232, queda bastante más
-lejos de $0{,}5$, que es donde $w_i=m_i\hat\pi_i(1-\hat\pi_i)$ se hace máximo. En el extremo
-opuesto, la celda 10, con $m_i=2$, se queda en $h_{ii}=0{,}07$: aporta tan poca información que el
-modelo no está obligado a pasar por ella, y la corrección por leverage apenas altera su residuo. En
-las celdas 1–3, con $h_{ii}$ próximo a $0{,}7$, esa misma corrección es la que más infla el residuo
-crudo.
-
-En el panel derecho, las distancias de Cook son pequeñas en términos absolutos —la mayor (celda 9)
-es 0,326, justo por debajo de la referencia orientativa $4/n=0{,}333$—, muy por debajo del umbral
-clásico $D\gtrsim 1$. Las celdas 1–3, ya señaladas por su leverage, presentan un Cook moderado por
-su peso en el ajuste, no por desajuste.
+En el panel derecho, las distancias de Cook son pequeñas: la mayor (celda 9) es 0,326, por debajo
+de la referencia orientativa $4/n=0{,}333$ y muy lejos del umbral clásico $D\gtrsim 1$. Las
+celdas 1–3 presentan un Cook moderado por su peso en el ajuste, no por desajuste.
 
 Los dos paneles coinciden: ninguna celda aparece **mal ajustada** —todos los residuos dentro de la
 banda de ±2— ni **influyente**. El diagnóstico celda a celda concuerda, pues, con el
