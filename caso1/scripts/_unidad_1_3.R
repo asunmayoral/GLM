@@ -130,6 +130,7 @@ fit_ind <- glm(fracture ~ priorfrac + momfrac + raterisk,
                family = binomial, data = glow)
 
 cbind(agrupado = coef(fit_bin), individual = coef(fit_ind))   # idénticos
+# cbind(agrupado = summary(fit_bin)$coefficients[,1:2], individual = summary(fit_ind)$coefficients[,1:2])
 
 # -----------------------------------------------------------------------------
 # [fig-u13-residuos]

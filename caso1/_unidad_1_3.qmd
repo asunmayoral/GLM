@@ -160,122 +160,33 @@ Tienes `fit_bin` y `fit_ind` ajustados arriba. Compáralos:
 En la [Sección 2.5](#sec-u12-inferencia) vimos que, con datos **individuales**, ni la deviance ni el
 estadístico de Pearson sirven como test absoluto de ajuste: el saturado crece con $n$ y la asintótica
 $\chi^2$ no se sostiene. Con datos **agrupados** (y $m_i$ suficientemente grandes) esa asintótica
-**se recupera** [@agresti2015; @faraway2016]. También cobran relevancia ciertos residuos comunes en los GLM que no funcionaban en el caso binario. Presentamos en primer lugar estos residuos y construimos, a partir de ellos y con su **suma de cuadrados**, los estadísticos globales de bondad de ajuste.
-
-### Residuos
-
-Al agrupar los datos, cada celda reúne $m_i$ ensayos, de modo que los residuos
-**estándar** ya son informativos —aproximadamente $N(0,1)$ con $m_i$ grande
-[@mccullagh1989]—. Estos residuos, genéricos en los GLM, son:
-
-- **Pearson:** la diferencia entre lo observado y lo esperado en la celda, tipificada por su desviación estándar,
-  $$r_{P,i}=\dfrac{y_i-m_i\hat\pi_i}{\sqrt{m_i\hat\pi_i(1-\hat\pi_i)}}$$
-- **Deviance:**,la raíz con signo de la **contribución** $d_i$ de la celda $i$ a la deviance
-  —de modo que $D=\sum_i d_i$—,
-    $$d_i = 2\left[\,y_i\log\frac{y_i}{m_i\hat\pi_i}+(m_i-y_i)\log\frac{m_i-y_i}{m_i(1-\hat\pi_i)}\,\right],
-    \qquad r_{D,i}=\operatorname{sign}(y_i-m_i\hat\pi_i)\sqrt{d_i}$$
-
-  $d_i$ es **dos veces** la log-verosimilitud que la celda pierde al pasar del modelo **saturado**
-  —el que clava la proporción observada, $\tilde\pi_i=y_i/m_i$— al **ajustado**: compara los éxitos
-  $y_i$ con los esperados $m_i\hat\pi_i$ y, simétricamente, los fracasos. Por construcción
-  $d_i\ge 0$, y solo vale $0$ si $\hat\pi_i=y_i/m_i$: por eso la raíz tiene sentido, y por eso el
-  signo de «observado menos esperado» hay que devolvérselo a mano. Si $y_i=0$ o $y_i=m_i$, el
-  término afectado se anula, por el límite $y\log y\to 0$.
-
-- Para compararlos en igualdad de condiciones se usan sus versiones **estandarizadas** (o
-*estudentizadas*), que dividen por $\sqrt{1-h_{ii}}$,
-$$
-r^{\,s}_{P,i}=\frac{r_{P,i}}{\sqrt{1-h_{ii}}}, \qquad r^{\,s}_{D,i}=\frac{r_{D,i}}{\sqrt{1-h_{ii}}}
-$$
-donde $h_{ii}$ es el **leverage** (apalancamiento) de la celda —su influencia *potencial*, dada por el
-elemento diagonal de la matriz gorro $\hat H$, con $\sum_i h_{ii}=p$—: un $h_{ii}$ alto marca una celda con
-un perfil de covariables extremo, esto es, sujetos con características alejadas de la mayoría de los datos.
-
-
-::: {.callout-note}
-## La matriz sombrero en un GLM
-
-En regresión lineal $\hat H = X(X^{\top}X)^{-1}X^{\top}$ proyecta $\mathbf y$ sobre los
-valores ajustados. En un GLM el ajuste es por mínimos cuadrados **ponderados** (IWLS), así
-que la matriz sombrero incorpora los pesos de la última iteración $W=\operatorname{diag}(w_i)$:
-$$
-\hat H = W^{1/2}X\,(X^{\top}WX)^{-1}X^{\top}W^{1/2}.
-$$
-Es **simétrica e idempotente**, sus diagonales son los **leverages** $h_{ii}$ y suman el
-número de parámetros, $\sum_i h_{ii}=\operatorname{tr}(\hat H)=p$. En el binomial/logístico
-los pesos de trabajo son $w_i=m_i\hat\pi_i(1-\hat\pi_i)$, de modo que $h_{ii}$ combina lo
-extremo del perfil de covariables con su varianza. Es el $h_{ii}$ que aparece en
-$r^{\,s}_{P,i}=r_{P,i}/\sqrt{1-h_{ii}}$ y en la distancia de Cook.
-:::
-
-- La **distancia de Cook** combina residuo y leverage, y mide **cuánto cambiarían los coeficientes** si se eliminara esa celda; valores grandes señalan **celdas influyentes** que conviene revisar.
-$$
-D_i=\frac{(r^{\,s}_{P,i})^2}{p}\,\frac{h_{ii}}{1-h_{ii}}
-$$
-Calculamos y representamos los residuos estandarizados y las distancias de Cook para GLOW en la @fig-u13-residuos.
-
-```{r}
-#| label: fig-u13-residuos
-#| fig-width: 10
-#| fig-height: 4
-#| fig-cap: "Diagnósticos por celda (el tamaño del punto es el nº de ensayos). Izquierda: residuos de Pearson estandarizados frente a la probabilidad ajustada; con un buen ajuste se reparten en torno a 0 dentro de la banda de ±2. Derecha: distancia de Cook por celda, con línea de referencia orientativa en 4/n."
-#library(patchwork)
-
-diag_bin <- glow_agg |>
-  mutate(pred  = fitted(fit_bin),
-         r_std = rstandard(fit_bin, type = "pearson"),
-         cook  = cooks.distance(fit_bin),
-         cell  = row_number())
-
-p_res <- ggplot(diag_bin, aes(pred, r_std, size = total)) +
-  geom_hline(yintercept = c(-2, 0, 2), linetype = c("dotted", "dashed", "dotted")) +
-  geom_point(alpha = 0.7) +
-  labs(x = "Probabilidad ajustada", y = "Residuo de Pearson estandarizado",
-       size = "n por celda")
-
-p_cook <- ggplot(diag_bin, aes(cell, cook, size = total)) +
-  geom_hline(yintercept = 4 / nrow(diag_bin), linetype = "dotted") +
-  geom_segment(aes(xend = cell, yend = 0), linewidth = 0.3) +
-  geom_point(alpha = 0.7) +
-  scale_x_continuous(breaks = diag_bin$cell) +
-  labs(x = "Celda", y = "Distancia de Cook", size = "n por celda")
-
-p_res + p_cook + plot_layout(guides = "collect")
-```
-
-En GLOW, vemos, a la izquierda en la @fig-u13-residuos, que los **12 perfiles** (celdas) dejan todos los residuos estandarizados (de Pearson)  dentro de la banda de ±2, y se reparten sin
-patrón alrededor de 0 (rango ≈ −1,3 a +1,4); las celdas con más ensayos —las de menor riesgo— caen
-muy cerca de 0. No hay, pues, **celdas mal ajustadas ni influyentes**, en línea con el χ² de bondad
-de ajuste y la calibración. En el panel derecho, las distancias de Cook son pequeñas en términos absolutos —la mayor (celda 9)
-ronda 0,33 y apenas roza la referencia orientativa de $4/n$—, muy por debajo del umbral clásico
-$D\gtrsim 1$. Las celdas con más ensayos (1–3) presentan un Cook moderado por su peso en el ajuste,
-no por desajuste. Junto con la ausencia de residuos fuera de la banda de ±2, se confirma que ninguna
-celda resulta influyente.
-
-:::: {.callout-tip}
-## 🔧 En R. Residuos e influencia
-
-```r
-residuals(fit_bin, type = "deviance")     # o "deviance", "response"
-rstandard(fit_bin, type = "pearson")     # estandarizados (ajustan por el leverage)
-hatvalues(fit_bin)                        # leverage h_ii de cada celda
-cooks.distance(fit_bin)                   # influencia de cada celda
-```
-::::
+**se recupera** [@agresti2015; @faraway2016]. También cobran relevancia ciertos residuos comunes en los GLM que no funcionaban en el caso binario. Empezamos, pues, por los **estadísticos globales** —los que responden a «¿ajusta el modelo?»— y
+los descomponemos después celda a celda: de esa descomposición salen los **residuos**, con los que
+localizamos *dónde* falla. La **calibración** y la **sobredispersión** cierran el diagnóstico.
 
 ### Bondad de ajuste
 
-Sumando los cuadrados de los residuos deviance y Pearson se
-obtienen los **dos estadísticos globales**, que comparan el modelo **ajustado con el saturado** —el
-mejor ajuste posible—:
+Dos **estadísticos globales** resumen en un único número el desacuerdo de las $n$ celdas,
+comparando el modelo **ajustado con el saturado** —el mejor ajuste posible—:
 
-- **Pearson:** $X^2=\sum_i r_{P,i}^2$, la suma directa de los residuos de Pearson al cuadrado.
-- **Deviance:** $D=\sum_i r_{D,i}^2=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})$, que es además el
-  **LRT frente al saturado**.
+- **Pearson:** contrapone en cada celda lo observado con lo esperado, tipificando por la desviación
+  estándar binomial,
+  $$X^2=\sum_i \frac{(y_i-m_i\hat\pi_i)^2}{m_i\hat\pi_i(1-\hat\pi_i)}.$$
+- **Deviance:** es el **cociente de verosimilitudes frente al saturado**,
+  $D=2(\ell_{\text{sat}}-\ell_{\text{ajustado}})$, y se descompone en una **contribución por
+  celda**, $D=\sum_i d_i$, con
+  $$d_i = 2\left[\,y_i\log\frac{y_i}{m_i\hat\pi_i}+(m_i-y_i)\log\frac{m_i-y_i}{m_i(1-\hat\pi_i)}\,\right].$$
+
+$d_i$ es **dos veces** la log-verosimilitud que la celda pierde al pasar del modelo **saturado**
+—el que clava la proporción observada, $\tilde\pi_i=y_i/m_i$— al **ajustado**: compara los éxitos
+$y_i$ con los esperados $m_i\hat\pi_i$ y, simétricamente, los fracasos. Por construcción
+$d_i\ge 0$, y solo vale $0$ si $\hat\pi_i=y_i/m_i$. Si $y_i=0$ o $y_i=m_i$, el término afectado se
+anula, por el límite $y\log y\to 0$.
 
 Antes de contrastar nada, conviene ver el cálculo por dentro. La tabla siguiente reconstruye $D$
-celda a celda aplicando la definición de $d_i$: los éxitos observados $y_i$, los esperados por el
-modelo $m_i\hat\pi_i$, la contribución $d_i$ y el residuo $r_{D,i}$ que sale de ella.
+celda a celda aplicando esa definición: los éxitos observados $y_i$, los esperados por el modelo
+$m_i\hat\pi_i$ y la contribución $d_i$. La última columna, `r_Di`, la usaremos en el apartado
+siguiente.
 
 ```{r}
 #| label: u13-deviance-celda
@@ -294,8 +205,7 @@ c(suma_d_i = sum(aporta$d_i), deviance = deviance(fit_bin))   # la suma ES la de
 ```
 
 La última línea cierra el círculo: sumar las contribuciones de las doce celdas devuelve exactamente
-lo que `deviance(fit_bin)` calcula. Y como $r_{D,i}^2=d_i$, sumar los residuos deviance al cuadrado
-es la misma operación.
+lo que `deviance(fit_bin)` calcula.
 
 Bajo un modelo correcto y con celdas no demasiado pequeñas, ambos se distribuyen $\chi^2_{n-p}$
 [@agresti2015; @faraway2016], con lo que **ya podemos contrastar el ajuste de forma absoluta** contra el modelo saturado y responder a la pregunta **¿ajusta bien nuestro modelo?**.
@@ -349,6 +259,154 @@ Un $p$ **alto** = no hay evidencia de falta de ajuste. ¿Cuál usar?
   pequeños.
 - **Ambos** exigen celdas **no pequeñas** (regla práctica: frecuencias esperadas $\gtrsim 5$); con
   muchos $m_i$ pequeños la aproximación $\chi^2$ se degrada —y la deviance, antes—.
+::::
+
+### Residuos
+
+Los dos estadísticos anteriores dicen **cuánto** discrepa el modelo en conjunto, pero no **dónde**.
+Para averiguarlo volvemos a sus sumandos: cada celda aporta un término a $X^2$ y otro a $D$, y ese
+término, con el signo de «observado menos esperado», es su **residuo**. Al agrupar, además, cada
+celda reúne $m_i$ ensayos, de modo que estos residuos ya son informativos por sí solos
+—aproximadamente $N(0,1)$ con $m_i$ grande [@mccullagh1989]—, cosa que no ocurría con datos
+individuales. Son genéricos en los GLM:
+
+- **Residuos Pearson:** la diferencia entre lo observado y lo esperado en la celda, tipificada por su desviación estándar,
+  $$r_{P,i}=\dfrac{y_i-m_i\hat\pi_i}{\sqrt{m_i\hat\pi_i(1-\hat\pi_i)}}$$
+- **Residuos Deviance:** la raíz cuadrada de la contribución $d_i$ definida más arriba, con el
+  signo de «observado menos esperado»,
+  $$r_{D,i}=\operatorname{sign}(y_i-m_i\hat\pi_i)\sqrt{d_i}$$
+  Como $d_i\ge 0$, la raíz siempre existe, pero por eso mismo ha perdido la **dirección** del error:
+  de ahí que el signo haya que devolvérselo a mano. Y como $r_{D,i}^2=d_i$, sumar estos residuos al
+  cuadrado reconstruye la deviance — es la columna `d_i` de la tabla anterior, sumada.
+
+- Para compararlos en igualdad de condiciones se usan sus versiones **estandarizadas** (o
+*estudentizadas*), que dividen por $\sqrt{1-h_{ii}}$,
+$$
+r^{\,s}_{P,i}=\frac{r_{P,i}}{\sqrt{1-h_{ii}}}, \qquad r^{\,s}_{D,i}=\frac{r_{D,i}}{\sqrt{1-h_{ii}}}
+$$
+donde $h_{ii}$ es el **leverage** (apalancamiento) de la celda: el peso que esa celda tiene sobre su
+propio valor ajustado, dado por el elemento diagonal de la matriz gorro $\hat H$. El callout
+siguiente explica esa lectura y por qué justifica dividir por $\sqrt{1-h_{ii}}$.
+
+
+::: {.callout-note}
+## La matriz sombrero en un GLM
+
+En regresión lineal $\hat H = X(X^{\top}X)^{-1}X^{\top}$ proyecta $\mathbf y$ sobre los
+valores ajustados. En un GLM el ajuste es por mínimos cuadrados **ponderados** (IWLS), así
+que la matriz sombrero incorpora los pesos de la última iteración $W=\operatorname{diag}(w_i)$:
+$$
+\hat H = W^{1/2}X\,(X^{\top}WX)^{-1}X^{\top}W^{1/2}.
+$$
+Es **simétrica e idempotente**, sus diagonales son los **leverages** $h_{ii}$ y suman el
+número de parámetros, $\sum_i h_{ii}=\operatorname{tr}(\hat H)=p$. Es el $h_{ii}$ que aparece en
+$r^{\,s}_{P,i}=r_{P,i}/\sqrt{1-h_{ii}}$ y en la distancia de Cook.
+
+**Por qué $h_{ii}$ se lee como un peso.** Aplicar $\hat H$ equivale a escribir cada valor ajustado
+como una **media ponderada de todas las respuestas observadas** [@fox2016]:
+$$\hat y_j=h_{1j}y_1+h_{2j}y_2+\dots+h_{nj}y_n=\sum_i h_{ij}\,y_i,$$
+de modo que $h_{ij}$ es el peso que la observación $i$ tiene sobre el ajustado $j$. La diagonal
+$h_{ii}$ es entonces el peso de la celda **sobre su propio valor ajustado**: cuánto se ajusta el
+modelo a sí misma. Con $h_{ii}$ cercano a 1 el modelo pasa casi forzosamente por ese punto —tiene
+poco margen para discrepar de él, y de ahí que su residuo salga artificialmente pequeño y haya que
+inflarlo dividiendo por $\sqrt{1-h_{ii}}$—; con $h_{ii}$ cercano a 0, la celda apenas interviene en
+lo que el modelo predice para ella. Además $h_{ii}=\sum_j h_{ij}^2$, así que resume también su
+influencia potencial sobre **todos** los ajustados, no solo el suyo.
+
+**Un presupuesto que se reparte.** Que $\sum_i h_{ii}=p$ convierte el leverage en un reparto: hay
+$p$ unidades de peso para $n$ celdas, así que la parte proporcional es $p/n$. Es habitual marcar
+como destacadas las que superan **dos o tres veces** esa media [@fox2016].
+
+**Y aquí está la diferencia con el modelo lineal.** En OLS el leverage depende solo de $X$: es pura
+geometría, fijada antes de ver la respuesta. En un GLM entra $W$, y en el binomial/logístico
+$w_i=m_i\hat\pi_i(1-\hat\pi_i)$, de modo que $h_{ii}$ mezcla dos ingredientes: cuánta
+**información** aporta la celda —crece con $m_i$, pero es máxima en $\hat\pi_i=0{,}5$ y se
+desvanece cuando $\hat\pi_i$ se acerca a 0 o a 1— y cuán **extremo** es su perfil de covariables.
+El leverage no es, por tanto, el tamaño de la celda: una celda grande con probabilidad ajustada
+muy extrema puede pesar menos que otra más pequeña situada cerca de $0{,}5$.
+:::
+
+- La **distancia de Cook** combina residuo y leverage, y mide **cuánto cambiarían los coeficientes** si se eliminara esa celda; valores grandes señalan **celdas influyentes** que conviene revisar.
+$$
+D_i=\frac{(r^{\,s}_{P,i})^2}{p}\,\frac{h_{ii}}{1-h_{ii}}
+$$
+Calculamos y representamos los residuos estandarizados y las distancias de Cook para GLOW en la @fig-u13-residuos.
+
+```{r}
+#| label: fig-u13-residuos
+#| fig-width: 10
+#| fig-height: 4
+#| fig-cap: "Diagnósticos por celda (el tamaño del punto es el nº de ensayos). Izquierda: residuos de Pearson estandarizados frente a la probabilidad ajustada; con un buen ajuste se reparten en torno a 0 dentro de la banda de ±2. Derecha: distancia de Cook por celda, con línea de referencia orientativa en 4/n."
+#library(patchwork)
+
+diag_bin <- glow_agg |>
+  mutate(pred  = fitted(fit_bin),
+         w     = total * pred * (1 - pred),   # peso de trabajo del IWLS
+         r_std = rstandard(fit_bin, type = "pearson"),
+         cook  = cooks.distance(fit_bin),
+         h     = hatvalues(fit_bin),
+         cell  = row_number())
+
+p_res <- ggplot(diag_bin, aes(pred, r_std, size = total)) +
+  geom_hline(yintercept = c(-2, 0, 2), linetype = c("dotted", "dashed", "dotted")) +
+  geom_point(alpha = 0.7) +
+  labs(x = "Probabilidad ajustada", y = "Residuo de Pearson estandarizado",
+       size = "n por celda")
+
+p_cook <- ggplot(diag_bin, aes(cell, cook, size = total)) +
+  geom_hline(yintercept = 4 / nrow(diag_bin), linetype = "dotted") +
+  geom_segment(aes(xend = cell, yend = 0), linewidth = 0.3) +
+  geom_point(alpha = 0.7) +
+  scale_x_continuous(breaks = diag_bin$cell) +
+  labs(x = "Celda", y = "Distancia de Cook", size = "n por celda")
+
+p_res + p_cook + plot_layout(guides = "collect")
+```
+
+Los valores que comentamos a continuación están en esta tabla, celda a celda:
+
+```{r}
+#| label: u13-diagnosticos-tabla
+diag_bin |>
+  select(celda = cell, priorfrac, momfrac, raterisk, m = total, pred, w, h, r_std, cook)
+
+c(referencia_cook = 4 / nrow(diag_bin))   # la línea de puntos del panel derecho
+```
+
+En GLOW, vemos, a la izquierda en la @fig-u13-residuos, que los **12 perfiles** (celdas) dejan todos los residuos estandarizados (de Pearson)  dentro de la banda de ±2, y se reparten sin
+patrón alrededor de 0 (rango −1,25 a +1,41). Los más cercanos a cero corresponden a celdas de
+tamaño intermedio (6 y 7); las celdas con más ensayos (1–3) tienen residuos **moderados**, no
+pequeños, y en cambio los **leverages** más altos ($h_{ii}$ entre 0,63 y 0,72): son las que más
+pesan en el ajuste.
+
+Conviene ver **por qué** son esas las de más peso. Comparemos la celda 1 ($m_i=127$) con la 3
+($m_i=76$): la primera tiene un 67 % más de ensayos, pero su peso de trabajo apenas la supera
+—14,7 frente a 13,5—, porque su probabilidad ajustada, 0,133 frente a 0,232, queda bastante más
+lejos de $0{,}5$, que es donde $w_i=m_i\hat\pi_i(1-\hat\pi_i)$ se hace máximo. En el extremo
+opuesto, la celda 10, con $m_i=2$, se queda en $h_{ii}=0{,}07$: aporta tan poca información que el
+modelo no está obligado a pasar por ella, y la corrección por leverage apenas altera su residuo. En
+las celdas 1–3, con $h_{ii}$ próximo a $0{,}7$, esa misma corrección es la que más infla el residuo
+crudo.
+
+En el panel derecho, las distancias de Cook son pequeñas en términos absolutos —la mayor (celda 9)
+es 0,326, justo por debajo de la referencia orientativa $4/n=0{,}333$—, muy por debajo del umbral
+clásico $D\gtrsim 1$. Las celdas 1–3, ya señaladas por su leverage, presentan un Cook moderado por
+su peso en el ajuste, no por desajuste.
+
+Los dos paneles coinciden: ninguna celda aparece **mal ajustada** —todos los residuos dentro de la
+banda de ±2— ni **influyente**. El diagnóstico celda a celda concuerda, pues, con el
+$\chi^2$ global del apartado anterior: aquel no detectaba falta de ajuste, y este muestra que
+tampoco hay una celda concreta que pudiera causarla.
+
+:::: {.callout-tip}
+## 🔧 En R. Residuos e influencia
+
+```r
+residuals(fit_bin, type = "deviance")     # o "deviance", "response"
+rstandard(fit_bin, type = "pearson")     # estandarizados (ajustan por el leverage)
+hatvalues(fit_bin)                        # leverage h_ii de cada celda
+cooks.distance(fit_bin)                   # influencia de cada celda
+```
 ::::
 
 ### Calibración 
