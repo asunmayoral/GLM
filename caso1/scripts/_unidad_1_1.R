@@ -251,10 +251,14 @@ ggplot() +
 #   1 · Cuando la recta no llega: del dato binario al marco GLM
 #     > 1.4 GLM en datos binarios
 # -----------------------------------------------------------------------------
-p_ols <- plot(performance::binned_residuals(fit_ols)) +
-  labs(title = "OLS (modelo lineal de probabilidad)")
-p_glm <- plot(performance::binned_residuals(fit_glm)) +
-  labs(title = "GLM logístico")
+# `residuals = "response"` en ambos paneles: es observado − predicho, la definición de
+# Gelman y Hill. Sin él, `binned_residuals()` promedia residuos deviance, que en el lm
+# coinciden con y − ŷ pero en el GLM binomial no, y la comparación dejaría de ser homogénea.
+b_ols <- performance::binned_residuals(fit_ols, residuals = "response")
+b_glm <- performance::binned_residuals(fit_glm, residuals = "response")
+
+p_ols <- plot(b_ols) + labs(title = "OLS (modelo lineal de probabilidad)")
+p_glm <- plot(b_glm) + labs(title = "GLM logístico")
 patchwork::wrap_plots( p_ols, p_glm, nrow = 2) +
   patchwork::plot_annotation(title = "Residuos medios por tramos: OLS vs GLM")
 

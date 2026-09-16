@@ -89,15 +89,18 @@ generar_scripts <- function(casos = NULL,
   # cifras medidas, no supuestas. Al actualizar paquetes, actualizar aquí.
   PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
   VERSIONES <- c(
-    AER = "1.2.17", aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13",
+    AER = "1.2.17", aplore3 = "0.9", arm = "1.15.3", brant = "0.3.0",
+    broom = "1.0.13",
     broom.mixed = "0.2.9.7", car = "3.1.5", DHARMa = "0.5.0", dplyr = "1.2.1",
     emmeans = "2.0.3", flexsurv = "2.3.2", forcats = "1.0.1", GGally = "2.4.0",
     ggeffects = "2.3.2", ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
-    lme4 = "2.0.1", logistf = "1.26.1", marginaleffects = "0.32.0",
-    MASS = "7.3.65", MuMIn = "1.48.19", nnet = "7.3.20", patchwork = "1.3.2",
+    lme4 = "2.0.1", lmtest = "0.9.40", logistf = "1.26.1",
+    marginaleffects = "0.32.0",
+    MASS = "7.3.65", MuMIn = "1.48.19", nnet = "7.3.20", ordinal = "2025.12.29",
+    patchwork = "1.3.2",
     performance = "0.17.0", pROC = "1.19.0.1", pscl = "1.5.9", purrr = "1.2.2",
     readr = "2.2.0", rsample = "1.3.2", scales = "1.4.0", see = "0.14.0",
-    sessioninfo = "1.2.4",
+    sessioninfo = "1.2.4", sure = "0.2.0",
     survival = "3.8.6", survminer = "0.5.2", tibble = "3.3.1", tidyr = "1.3.2",
     tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6", yardstick = "1.4.0")
 

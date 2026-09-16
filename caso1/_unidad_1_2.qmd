@@ -713,6 +713,7 @@ $$\text{AME}_k=\beta_k\cdot\frac{1}{n}\sum_i \hat\pi_i(1-\hat\pi_i)$$
 
 ```{r}
 #| label: u12-ame
+# library(marginaleffects)
 # AME de cada covariable, en puntos de probabilidad
 avg_slopes(fit_glm)                       
 
@@ -1177,6 +1178,122 @@ list(perfil = confint(fit_glm),
      wald   = confint.default(fit_glm)) |>
   map(\(m) round(m, 4))
 ```
+
+::: {.callout-note collapse="true"}
+## Cómo se calcula, de hecho, el intervalo de perfil
+
+La definición de arriba es **constructiva**: dice exactamente qué hay que hacer.
+La recorremos sobre $\beta_2$, el coeficiente de `priorfracYes`.
+
+1. **Fijar** un valor $b$ para $\beta_2$ y **reajustar** el modelo dejando libres los
+   demás parámetros. El máximo que se alcanza así es $\ell_p(b)$.
+2. Repetirlo en una **rejilla** de valores de $b$: se obtiene la **curva** de
+   log-verosimilitud perfil.
+3. **Cortarla a 1,92** por debajo del máximo $\ell(\hat{\boldsymbol\beta})$.
+4. Las **dos abscisas del corte** son los extremos del intervalo.
+
+El paso 1 no necesita un optimizador especial. Fijar $\beta_2=b$ equivale a **mover ese
+término al `offset`**: el `offset` entra en el predictor lineal con coeficiente 1 y ya no
+se estima, de modo que
+$\eta_i=\beta_0+\beta_{\text{age}}\,x_i+\underbrace{b\,z_i}_{\text{offset}}$
+es un `glm` ordinario con una covariable menos.
+
+```{r}
+#| label: fig-u12-perfil
+#| fig-width: 8
+#| fig-height: 5
+#| out-width: "85%"
+#| fig-cap: "Construcción del IC de perfil al 95 % para $\\beta_2$ (`priorfracYes`) en GLOW: caída de la log-verosimilitud perfil respecto de su máximo, corte a 1,92 y las dos abscisas del cruce. La parábola de Wald se superpone casi por completo."
+
+caida_critica <- qchisq(0.95, df = 1) / 2   # 1,92 = medio cuantil chi-cuadrado, 1 gl
+
+b_hat  <- unname(coef(fit_glm)["priorfracYes"])
+ee_hat <- unname(sqrt(diag(vcov(fit_glm)))["priorfracYes"])
+l_max  <- as.numeric(logLik(fit_glm))
+
+# priorfrac como indicadora 0/1: es lo que multiplica a beta2 en el predictor lineal
+glow_perfil <- mutate(glow, prior01 = as.integer(priorfrac) - 1L)
+
+# Paso 1: fijar beta2 = b y maximizar sobre el RESTO de parámetros
+logver_perfil <- function(b) {
+  as.numeric(logLik(glm(fracture ~ age + offset(b * prior01),
+                        family = binomial, data = glow_perfil)))
+}
+
+# Paso 2: la curva sobre una rejilla de ±4 errores estándar
+rejilla <- tibble(b = seq(b_hat - 4 * ee_hat, b_hat + 4 * ee_hat, length.out = 121)) |>
+  mutate(perfil = l_max - map_dbl(b, logver_perfil),
+         wald   = (b - b_hat)^2 / (2 * ee_hat^2))
+
+# Pasos 3 y 4: las raíces de «la caída vale exactamente 1,92». La tolerancia por
+# defecto de uniroot es ~1e-4, del orden de la cifra que queremos comparar con
+# confint(): hay que apretarla.
+abscisa_corte <- function(desde, hasta) {
+  uniroot(\(b) l_max - logver_perfil(b) - caida_critica,
+          c(desde, hasta), tol = 1e-10)$root
+}
+ic_perfil <- c(abscisa_corte(b_hat - 4 * ee_hat, b_hat),
+               abscisa_corte(b_hat, b_hat + 4 * ee_hat))
+
+# Las dos curvas en formato largo: así comparten una única leyenda y Wald, que se
+# dibuja en segundo lugar y a trazos, se ve por encima del perfil donde coinciden.
+rejilla_larga <- rejilla |>
+  pivot_longer(c(perfil, wald), names_to = "curva", values_to = "caida") |>
+  mutate(curva = if_else(curva == "perfil",
+                         "log-verosimilitud perfil", "parábola de Wald"))
+
+ggplot(rejilla_larga, aes(b, caida, color = curva, linetype = curva)) +
+  geom_hline(yintercept = caida_critica, color = "grey40", linetype = "22") +
+  geom_segment(aes(x = b, xend = b, y = 0, yend = caida_critica),
+               data = tibble(b = ic_perfil), inherit.aes = FALSE,
+               color = "grey40", linetype = "22") +
+  geom_line(linewidth = 1) +
+  geom_point(aes(x = b, y = caida_critica), data = tibble(b = ic_perfil),
+             inherit.aes = FALSE, size = 2.6) +
+  annotate("point", x = b_hat, y = 0, size = 2.6) +
+  annotate("text", x = ic_perfil, y = -0.35,
+           label = sprintf("%.4f", ic_perfil), size = 3.4) +
+  scale_color_manual(values = c("log-verosimilitud perfil" = "#3B5BA5",
+                                "parábola de Wald"         = "#C2703D")) +
+  scale_linetype_manual(values = c("log-verosimilitud perfil" = "solid",
+                                   "parábola de Wald"         = "31")) +
+  coord_cartesian(ylim = c(-0.6, 8.5)) +
+  labs(x = expression(paste("valores posibles de ", beta[2],
+                            " (log-OR de fractura previa)")),
+       y = "caída de la log-verosimilitud respecto del máximo",
+       color = NULL, linetype = NULL) +
+  theme(legend.position = "top")
+```
+
+**Lo que se lee.** El máximo está en $\hat\beta_2$; el corte a 1,92 se produce en los dos
+valores que `confint()` acaba de imprimir. Los **brazos no miden lo mismo**: el perfil no
+tiene por qué ser simétrico, mientras que Wald, al sustituir la curva por una parábola,
+está obligado a repartir $1{,}96\,\widehat{\text{EE}}$ a cada lado. En GLOW la asimetría
+es mínima —las dos curvas se superponen— porque la muestra es grande y no hay separación.
+
+**La curva contiene el LRT.** Si en vez de cortar a 1,92 se lee la caída en $b=0$ —la
+hipótesis «`priorfrac` no aporta nada»—, su doble es el estadístico del contraste de
+razón de verosimilitudes de `priorfrac`, el mismo que devolverá `car::Anova(type = "II")`
+en el apartado siguiente. El IC de perfil y el LRT no son dos técnicas: son **la misma
+curva leída de dos maneras**.
+
+```{r}
+#| label: u12-perfil-check
+# Los cortes calculados a mano frente a confint(): dos rutas numéricas distintas
+# hacia la misma cantidad, así que la fila de diferencias mide el error de ambas.
+ic_confint <- confint(fit_glm, "priorfracYes")
+rbind(a_mano     = ic_perfil,
+      confint    = ic_confint,
+      diferencia = ic_perfil - ic_confint) |> round(6)
+
+# Los dos brazos del intervalo no miden lo mismo
+c(brazo_izquierdo = b_hat - ic_perfil[1],
+  brazo_derecho   = ic_perfil[2] - b_hat) |> round(4)
+
+# Leer la curva en b = 0 es, exactamente, el LRT de priorfrac
+2 * (l_max - logver_perfil(0))
+```
+:::
 
 
 ### Inferencia sobre bloques: el contraste de razón de verosimilitudes (LRT)

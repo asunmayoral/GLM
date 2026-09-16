@@ -276,6 +276,7 @@ map_dfr(ajustes,
 #     > 2.3 Interpretación: del coeficiente a la probabilidad
 #       > Interpretación en la escala de la probabilidad: efectos marginales
 # -----------------------------------------------------------------------------
+# library(marginaleffects)
 # AME de cada covariable, en puntos de probabilidad
 avg_slopes(fit_glm)                       
 
@@ -432,6 +433,91 @@ glance(fit_glm) |>
 list(perfil = confint(fit_glm),
      wald   = confint.default(fit_glm)) |>
   map(\(m) round(m, 4))
+
+# -----------------------------------------------------------------------------
+# [fig-u12-perfil]
+#   2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación
+#     > 2.5 Inferencia, selección y bondad de ajuste
+#       > Inferencia sobre los coeficientes
+# -----------------------------------------------------------------------------
+caida_critica <- qchisq(0.95, df = 1) / 2   # 1,92 = medio cuantil chi-cuadrado, 1 gl
+
+b_hat  <- unname(coef(fit_glm)["priorfracYes"])
+ee_hat <- unname(sqrt(diag(vcov(fit_glm)))["priorfracYes"])
+l_max  <- as.numeric(logLik(fit_glm))
+
+# priorfrac como indicadora 0/1: es lo que multiplica a beta2 en el predictor lineal
+glow_perfil <- mutate(glow, prior01 = as.integer(priorfrac) - 1L)
+
+# Paso 1: fijar beta2 = b y maximizar sobre el RESTO de parámetros
+logver_perfil <- function(b) {
+  as.numeric(logLik(glm(fracture ~ age + offset(b * prior01),
+                        family = binomial, data = glow_perfil)))
+}
+
+# Paso 2: la curva sobre una rejilla de ±4 errores estándar
+rejilla <- tibble(b = seq(b_hat - 4 * ee_hat, b_hat + 4 * ee_hat, length.out = 121)) |>
+  mutate(perfil = l_max - map_dbl(b, logver_perfil),
+         wald   = (b - b_hat)^2 / (2 * ee_hat^2))
+
+# Pasos 3 y 4: las raíces de «la caída vale exactamente 1,92». La tolerancia por
+# defecto de uniroot es ~1e-4, del orden de la cifra que queremos comparar con
+# confint(): hay que apretarla.
+abscisa_corte <- function(desde, hasta) {
+  uniroot(\(b) l_max - logver_perfil(b) - caida_critica,
+          c(desde, hasta), tol = 1e-10)$root
+}
+ic_perfil <- c(abscisa_corte(b_hat - 4 * ee_hat, b_hat),
+               abscisa_corte(b_hat, b_hat + 4 * ee_hat))
+
+# Las dos curvas en formato largo: así comparten una única leyenda y Wald, que se
+# dibuja en segundo lugar y a trazos, se ve por encima del perfil donde coinciden.
+rejilla_larga <- rejilla |>
+  pivot_longer(c(perfil, wald), names_to = "curva", values_to = "caida") |>
+  mutate(curva = if_else(curva == "perfil",
+                         "log-verosimilitud perfil", "parábola de Wald"))
+
+ggplot(rejilla_larga, aes(b, caida, color = curva, linetype = curva)) +
+  geom_hline(yintercept = caida_critica, color = "grey40", linetype = "22") +
+  geom_segment(aes(x = b, xend = b, y = 0, yend = caida_critica),
+               data = tibble(b = ic_perfil), inherit.aes = FALSE,
+               color = "grey40", linetype = "22") +
+  geom_line(linewidth = 1) +
+  geom_point(aes(x = b, y = caida_critica), data = tibble(b = ic_perfil),
+             inherit.aes = FALSE, size = 2.6) +
+  annotate("point", x = b_hat, y = 0, size = 2.6) +
+  annotate("text", x = ic_perfil, y = -0.35,
+           label = sprintf("%.4f", ic_perfil), size = 3.4) +
+  scale_color_manual(values = c("log-verosimilitud perfil" = "#3B5BA5",
+                                "parábola de Wald"         = "#C2703D")) +
+  scale_linetype_manual(values = c("log-verosimilitud perfil" = "solid",
+                                   "parábola de Wald"         = "31")) +
+  coord_cartesian(ylim = c(-0.6, 8.5)) +
+  labs(x = expression(paste("valores posibles de ", beta[2],
+                            " (log-OR de fractura previa)")),
+       y = "caída de la log-verosimilitud respecto del máximo",
+       color = NULL, linetype = NULL) +
+  theme(legend.position = "top")
+
+# -----------------------------------------------------------------------------
+# [u12-perfil-check]
+#   2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación
+#     > 2.5 Inferencia, selección y bondad de ajuste
+#       > Inferencia sobre los coeficientes
+# -----------------------------------------------------------------------------
+# Los cortes calculados a mano frente a confint(): dos rutas numéricas distintas
+# hacia la misma cantidad, así que la fila de diferencias mide el error de ambas.
+ic_confint <- confint(fit_glm, "priorfracYes")
+rbind(a_mano     = ic_perfil,
+      confint    = ic_confint,
+      diferencia = ic_perfil - ic_confint) |> round(6)
+
+# Los dos brazos del intervalo no miden lo mismo
+c(brazo_izquierdo = b_hat - ic_perfil[1],
+  brazo_derecho   = ic_perfil[2] - b_hat) |> round(4)
+
+# Leer la curva en b = 0 es, exactamente, el LRT de priorfrac
+2 * (l_max - logver_perfil(0))
 
 # -----------------------------------------------------------------------------
 # [u12-inferencia]
