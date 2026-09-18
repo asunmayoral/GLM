@@ -18,6 +18,8 @@ renv/staging/
 *_files/
 *_cache/
 *.html
+# intermedio que escribe el motor knitr y borra al acabar; queda huérfano si el render falla
+*.rmarkdown
 # copia de las librerías del sitio en la raíz: la regenera cada render
 /site_libs/
 

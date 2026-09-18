@@ -37,10 +37,10 @@ leer_datos_glm <- function(ruta) {
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
   DHARMa = "0.5.0", GGally = "2.4.0", MuMIn = "1.48.19", aplore3 = "0.9",
-  arm = "1.15.3", broom = "1.0.13", dplyr = "1.2.1", ggplot2 = "4.0.3",
-  lme4 = "2.0.1", patchwork = "1.3.2", performance = "0.17.0",
-  readr = "2.2.0", see = "0.14.0", sessioninfo = "1.2.4", tibble = "3.3.1",
-  tidyr = "1.3.2", tidyverse = "2.0.0")
+  arm = "1.15.3", broom = "1.0.13", dplyr = "1.2.1", lme4 = "2.0.1",
+  patchwork = "1.3.2", performance = "0.17.0", readr = "2.2.0",
+  see = "0.14.0", sessioninfo = "1.2.4", tibble = "3.3.1", tidyr = "1.3.2",
+  tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -96,7 +96,6 @@ head(cohorte)
 # [fig-u14-prop-centro]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 # -----------------------------------------------------------------------------
-library(patchwork)
 lims     <- c(0, 0.62)
 col_coh  <- "#2c7fb8"   # azul  → cohorte
 col_glow <- "#e6810a"   # naranja → GLOW
@@ -129,7 +128,7 @@ p_coh + p_glow
 #       > Intercepto aleatorio en cohorte
 # -----------------------------------------------------------------------------
 cohorte |>
-  mutate(Desenlace   = factor(evento, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
+  mutate(Desenlace   = factor(ever, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
          Tratamiento = factor(x2,     levels = c(0, 1), labels = c("No", "Sí"))) |>
   ggplot(aes(x = x1, y = Desenlace, fill = Tratamiento)) +
   geom_boxplot(alpha = 0.75, outlier.alpha = 0.25) +
@@ -168,51 +167,23 @@ vc$sdcor[1]   # desviación sigma_u
 # y de ahí el ICC latente:
 vc$vcov[1] / (vc$vcov[1] + pi^2/3)
 
-# verdad simulada
-attr(cohorte, "verdad")$binaria[c("sigma_u", "icc_latente")]
-
-# -----------------------------------------------------------------------------
-# [fig-u14-glmm-coef]
-#   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.2 Intercepto aleatorio
-#       > 2. Condicional vs marginal
-# -----------------------------------------------------------------------------
-# verdad
-attr(cohorte,"verdad")$binaria[c("beta")]
-# coeficientes estimados
-sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
-si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
-
-coefs <- rbind(
-  data.frame(modelo = "pooled (glm)",  term = rownames(sp),
-             estimate = sp[, "Estimate"], se = sp[, "Std. Error"]),
-  data.frame(modelo = "mixto (glmer)", term = rownames(si),
-             estimate = si[, "Estimate"], se = si[, "Std. Error"])
-)
-
-library(ggplot2)
-ggplot(coefs, aes(estimate, term, color = modelo)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-  geom_pointrange(aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
-                  position = position_dodge(width = 0.5)) +
-  labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
-
 # -----------------------------------------------------------------------------
 # [fig-u14-cond-marg]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.2 Intercepto aleatorio
 #       > 2. Condicional vs marginal
 # -----------------------------------------------------------------------------
-b0 <- 0; b1 <- 1.5; sigma_u <- 2          # sigma_u exagerado para que el aplanamiento se vea
+# Valores de juguete: nada de esto procede del ajuste, solo ilustra la geometria
+b0 <- 0; b1 <- 1.5; sigma_u_demo <- 2     # sigma_u exagerado para que el aplanamiento se vea
 x  <- seq(-6, 6, length.out = 200)
 
 # Familia de curvas condicionales: varios centros (distinto u_j), MISMA pendiente
 cond_fam <- tidyr::expand_grid(x = x, u = c(-4, -2, 0, 2, 4)) |>
   dplyr::mutate(p = plogis(b0 + b1 * x + u))
 
-# Curva marginal: promedio de plogis(b0 + b1*x + u) sobre u ~ N(0, sigma_u^2)
-ug <- seq(-4 * sigma_u, 4 * sigma_u, length.out = 401)
-w  <- dnorm(ug, 0, sigma_u); w <- w / sum(w)
+# Curva marginal: promedio de plogis(b0 + b1*x + u) sobre u ~ N(0, sigma_u_demo^2)
+ug <- seq(-4 * sigma_u_demo, 4 * sigma_u_demo, length.out = 401)
+w  <- dnorm(ug, 0, sigma_u_demo); w <- w / sum(w)
 destacadas <- dplyr::bind_rows(
   tibble::tibble(x = x, p = plogis(b0 + b1 * x),
                  tipo = "condicional (un centro)"),
@@ -227,6 +198,28 @@ ggplot() +
                                 "marginal (promedio)"     = "#e6810a")) +
   labs(x = "covariable", y = "Probabilidad de fractura", color = NULL) +
   theme(legend.position = "top")
+
+# -----------------------------------------------------------------------------
+# [fig-u14-glmm-coef]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.2 Intercepto aleatorio
+#       > 2. Condicional vs marginal
+# -----------------------------------------------------------------------------
+sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
+si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
+
+coefs <- rbind(
+  data.frame(modelo = "pooled (glm)",  term = rownames(sp),
+             estimate = sp[, "Estimate"], se = sp[, "Std. Error"]),
+  data.frame(modelo = "mixto (glmer)", term = rownames(si),
+             estimate = si[, "Estimate"], se = si[, "Std. Error"])
+)
+
+ggplot(coefs, aes(estimate, term, color = modelo)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  geom_pointrange(aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
+                  position = position_dodge(width = 0.5)) +
+  labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
 
 # -----------------------------------------------------------------------------
 # [fig-u14-cohorte-caterpillar]
@@ -268,7 +261,6 @@ AIC(m_pool, m_int)          # data.frame con df y AIC de cada uno
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Pendiente aleatoria: cuando el efecto varía por grupo
 # -----------------------------------------------------------------------------
-library(tidyverse)
 n_bins <- 4
 br  <- seq(min(cohorte$x1), max(cohorte$x1), length.out = n_bins + 1)
 mid <- (head(br, -1) + tail(br, -1)) / 2              # punto medio de cada bin (posición en X)
@@ -276,7 +268,7 @@ cohorte |>
   mutate(bin    = cut(x1, breaks = br, include.lowest = TRUE),  # bins de igual longitud
          x1_bin = mid[as.integer(bin)]) |>
   group_by(centro, x1_bin) |>
-  summarise(prop = mean(evento), .groups = "drop") |>           # proporción de fracturas por centro y bin
+  summarise(prop = mean(ever), .groups = "drop") |>             # proporción de fracturas por centro y bin
   ggplot(aes(x1_bin, prop, color = factor(centro), group = centro)) +
   geom_line(alpha = 0.5) +
   geom_point(size = 1.6, alpha = 0.8) +
@@ -298,15 +290,23 @@ VarCorr(m_slope)        # sigma_u0, sigma_u1 y su correlacion
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Pendiente aleatoria: cuando el efecto varía por grupo
 # -----------------------------------------------------------------------------
-AIC(m_pool, m_int, m_slope)   # pooled  <  intercepto  <  intercepto + pendiente
+AIC(m_pool, m_int, m_slope)   # los tres modelos, de menos a más estructura aleatoria
 anova(m_int, m_slope)          # LRT de la pendiente
+isSingular(m_slope)            # ¿ajuste singular?
+
+# -----------------------------------------------------------------------------
+# [u14-lrt-frontera]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.3 Pendiente aleatoria: cuando el efecto varía por grupo
+# -----------------------------------------------------------------------------
+chi2 <- anova(m_int, m_slope)$Chisq[2]
+0.5 * pchisq(chi2, 1, lower.tail = FALSE) + 0.5 * pchisq(chi2, 2, lower.tail = FALSE)
 
 # -----------------------------------------------------------------------------
 # [fig-u14-dharma]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Bondad de ajuste y diagnóstico del modelo mixto
 # -----------------------------------------------------------------------------
-library(DHARMa)
 sim <- simulateResiduals(m_int)
 plot(sim)
 
@@ -315,8 +315,11 @@ plot(sim)
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Bondad de ajuste y diagnóstico del modelo mixto
 # -----------------------------------------------------------------------------
-testDispersion(sim)                          # sobre/infradispersión
-plotResiduals(sim, form = cohorte$centro)    # residuos agregados por centro
+# plot = FALSE: el grafico ya lo da fig-u14-dharma; aqui solo queremos el contraste
+testUniformity(sim, plot = FALSE)            # KS: ¿residuos uniformes? (ajuste global)
+testDispersion(sim, plot = FALSE)            # sobre/infradispersión
+testOutliers(sim, plot = FALSE)              # exceso de valores atípicos
+plotResiduals(sim, form = cohorte$centro)    # residuos frente al factor de agrupamiento
 
 # -----------------------------------------------------------------------------
 # [u14-r2]
@@ -339,7 +342,6 @@ performance::check_singularity(m_int)
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.6 El modelo mixto sobre datos reales: GLOW por centro
 # -----------------------------------------------------------------------------
-library(lme4)
 glow_m <- glow |> mutate(site_id = factor(site_id))
 
 m_glow_pool <- glm  (fracture ~ age + priorfrac,                 family = binomial, data = glow_m)
@@ -366,6 +368,36 @@ ggplot(re_glow, aes(reorder(grp, condval), condval)) +
                       ymax = condval + 1.96 * condsd)) +
   coord_flip() +
   labs(x = "Centro (site_id)", y = "Intercepto aleatorio (log-odds)")
+
+# -----------------------------------------------------------------------------
+# [u14-dgp-escala]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.7 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La verdad, traducida a la escala en que hemos estimado
+# -----------------------------------------------------------------------------
+# La misma maquinaria generadora, con centros y pacientes de sobra: lo que sale de
+# aqui es, a efectos practicos, la verdad del DGP expresada en la escala logit(ever),
+# que es en la que ajusta m_int.
+cohorte_grande <- simular_cohorte(n_centros = 150, media_por_centro = 200, semilla = 1)
+m_grande <- glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte_grande)
+
+v          <- attr(cohorte, "verdad")$binaria             # escala cloglog por periodo
+s_u_grande <- as.data.frame(VarCorr(m_grande))$sdcor[1]   # sigma_u en logit(ever)
+s_u_int    <- as.data.frame(VarCorr(m_int))$sdcor[1]      # lo estimado en la cohorte real
+
+comparacion <- data.frame(
+  verdad_cloglog = c(v$beta[["x1"]], v$beta[["x2"]], v$sigma_u),
+  logit_ever     = c(fixef(m_grande)[["x1"]], fixef(m_grande)[["x2"]], s_u_grande),
+  m_int          = c(fixef(m_int)[["x1"]],    fixef(m_int)[["x2"]],    s_u_int),
+  row.names      = c("beta_x1", "beta_x2", "sigma_u")
+)
+comparacion$factor <- comparacion$logit_ever / comparacion$verdad_cloglog
+round(comparacion, 3)
+
+# el mismo contraste, leido como ICC latente
+c(verdad     = v$icc_latente,
+  logit_ever = s_u_grande^2 / (s_u_grande^2 + pi^2/3),
+  m_int      = s_u_int^2    / (s_u_int^2    + pi^2/3))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

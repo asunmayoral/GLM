@@ -29,8 +29,7 @@ variabilidad de base entre los centros, mucho más notoria en `cohorte` que en G
 #| label: fig-u14-prop-centro
 #| fig-width: 11
 #| fig-height: 5
-#| fig-cap: "Proporción observada de fractura por centro. Izquierda (azul): cohorte simulada (24 centros). Derecha (naranja): GLOW (6 centros, datos reales). Línea discontinua: proporción global. Ambos paneles comparten el eje de proporción: la cohorte se despliega (~0,12 a ~0,60; los centros estructuran el riesgo), mientras que en GLOW los seis se apiñan (el centro apenas aporta, ICC ≈ 0,7%). El color distingue cada conjunto, no codifica ninguna variable."
-library(patchwork)
+#| fig-cap: "Proporción observada de fractura por centro. Izquierda (azul): cohorte simulada (24 centros). Derecha (naranja): GLOW (6 centros, datos reales). Línea discontinua: proporción global de cada conjunto. En la cohorte los centros se despliegan a lo largo del eje —estructuran el riesgo—, mientras que en GLOW los seis se apiñan en torno a la media, un contraste que cuantificaremos en la Sección 4.6. El color distingue cada conjunto, no codifica ninguna variable."
 lims     <- c(0, 0.62)
 col_coh  <- "#2c7fb8"   # azul  → cohorte
 col_glow <- "#e6810a"   # naranja → GLOW
@@ -136,10 +135,12 @@ $$
 $$
 
 Ese término $u_j$ no es una abstracción: ya teníamos su **huella visual** en la cohorte. La
-@fig-u14-prop-centro mostraba que la proporción de fractura **varía de un centro a otro** —de
-$\approx 0{,}12$ a $\approx 0{,}60$ (en torno a una media global explícita con la vertical punteada)—, justo la dispersión de **niveles basales** que $u_j$ recoge (y
-que en GLOW era mínima). Hay que tener en cuenta que en general, una proporción
-por centro mezclaría el nivel basal con la **composición** de covariables del centro; si estas estuvieran correladas con  `centro`, el gráfico estaría confundiendo efectos.
+@fig-u14-prop-centro mostraba que la proporción de fractura **varía de un centro a otro** en un rango
+amplio alrededor de la media global (la vertical punteada): justo la dispersión de **niveles
+basales** que $u_j$ recoge, y que en GLOW era mínima. Con una cautela: una proporción por centro
+mezcla el nivel basal con la **composición** de covariables de ese centro, y si estas estuvieran
+correladas con `centro` el gráfico estaría confundiendo ambos efectos. Razón de más para estimarlo
+con un modelo, que es lo que hacemos a continuación.
 
 En **forma matricial** —la notación habitual de los modelos mixtos, que conviene reconocer desde
 ya—, el predictor lineal de todas las observaciones se escribe
@@ -158,7 +159,7 @@ parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo nuevo es el término $\m
 
 ### Intercepto aleatorio en `cohorte`
 
-Para interpretar los resultados que genera un modelo mixto, nada mejor que ajustarlo en unos datos y ver qué produce. Utilizamos `cohorte` para intentar predecir la respuesta binaria relativa a si se dió o no una fractura, `evento`, en función de la fragilidad ósea (`x1`) y el tratamiento preventivo (`x2`) recibido por cada paciente, teniendo en cuenta el `centro` clínico de referencia.
+Para interpretar los resultados que genera un modelo mixto, nada mejor que ajustarlo en unos datos y ver qué produce. Utilizamos `cohorte` para intentar predecir la respuesta binaria relativa a si se produjo o no una fractura, `ever`, en función de la fragilidad ósea (`x1`) y el tratamiento preventivo (`x2`) recibido por cada paciente, teniendo en cuenta el `centro` clínico de referencia. (En la cohorte conviven dos variables muy próximas: `ever` es el **desenlace binario** —¿hubo fractura?— y `evento` es el **indicador de censura** del tiempo a evento, que reservamos para la [Unidad 5](#sec-u15). Toda esta unidad trabaja con `ever`.)
 
 La primera tarea pasa pues, por inspeccionar los datos. Así, acompañamos al gráfico inicial en el que representamos las probabilidades de  fractura por centros en @fig-u14-prop-centro, con la @fig-cohorte-eda-box, donde mostramos la relación de la respuesta con las predictivas `x1` y `x2`. 
 
@@ -169,7 +170,7 @@ La primera tarea pasa pues, por inspeccionar los datos. Así, acompañamos al gr
 #| out-width: "100%"
 #| fig-cap: "Fragilidad ósea (x1) según el desenlace, por brazo de tratamiento (x2). Quienes fracturan presentan mayor fragilidad; entre las tratadas, las que llegan a fracturar son aún más frágiles (el desplazamiento de umbral propio de un factor protector)."
 cohorte |>
-  mutate(Desenlace   = factor(evento, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
+  mutate(Desenlace   = factor(ever, levels = c(0, 1), labels = c("Sin fractura", "Fractura")),
          Tratamiento = factor(x2,     levels = c(0, 1), labels = c("No", "Sí"))) |>
   ggplot(aes(x = x1, y = Desenlace, fill = Tratamiento)) +
   geom_boxplot(alpha = 0.75, outlier.alpha = 0.25) +
@@ -234,11 +235,9 @@ Con el ajuste delante, recorremos las **tres lecturas** de un intercepto aleator
 
 ### 1. Componentes de varianza
 
-La varianza $\sigma_u^2$ resume cuánto varían los grupos entre sí. 
-Surge un nuevo índice, común en modelos mixtos: el ICC. 
-En la escala latente logística, el **coeficiente de correlación intraclase (ICC)** mide qué fracción de la variación total ocurre **entre** centros.
-
-El **coeficiente de correlación intraclase (ICC)** mide qué fracción de la variación total ocurre **entre** grupos (y no dentro de ellos);
+La varianza $\sigma_u^2$ resume cuánto varían los grupos entre sí, y de ella se deriva un índice
+nuevo, común en modelos mixtos: el **coeficiente de correlación intraclase (ICC)**, que mide qué
+fracción de la variación total ocurre **entre** grupos (y no dentro de ellos);
 equivalentemente, es la **correlación** entre dos observaciones del **mismo** grupo. En un modelo
 con intercepto aleatorio, descompone la varianza en una parte **entre grupos** ($\sigma_u^2$) y una
 parte **dentro** (residual, $\sigma_\varepsilon^2$):
@@ -277,11 +276,12 @@ library(performance)
 icc(m_int)
 ```
 
-- **Adjusted ICC**: $\sigma_u^2/(\sigma_u^2+\sigma^2_{\text{resid}})$, solo efectos aleatorios. Es el
-  que **coincide** con la fórmula manual y el que interpretamos como «cuánto pesa el centro frente a
-  las diferencias entre pacientes».
-- **Conditional ICC**: mete además la varianza de los **efectos fijos** en el denominador, así que
-  sale **menor**.
+- `ICC_adjusted` (**ajustado**): $\sigma_u^2/(\sigma_u^2+\sigma^2_{\text{resid}})$, solo efectos
+  aleatorios. Es el que **coincide** con la fórmula manual y el que interpretamos como «cuánto pesa el
+  centro frente a las diferencias entre pacientes».
+- `ICC_unadjusted` (**no ajustado**): mete además la varianza de los **efectos fijos** en el
+  denominador, así que sale **menor**. Versiones antiguas de `performance` lo rotulaban
+  *Conditional ICC*; es el mismo número.
 
 Vale limpio para un **intercepto aleatorio**; con **pendiente aleatoria** el ICC depende de la
 covariable y conviene usar `performance::icc()`.
@@ -291,7 +291,7 @@ covariable y conviene usar `performance::icc()`.
 
 En nuestro ejemplo, el ICC responde a una pregunta concreta: de toda la variación en el riesgo de fractura, ¿cuánta se debe a en qué clínica te atienden, y cuánta a las diferencias entre pacientes (su fragilidad, su tratamiento, su azar individual)?
 
-Comparemos pues, la varianza del efecto aleatorio y el ICC, y puesto que los datos los hemos simulado con unos valores dados, podemos contrastar las estimaciones con la verdad del DGP (*Data Generating Process*).
+Calculemos pues la varianza del efecto aleatorio y el ICC que se deriva de ella.
 
 ```{r}
 #| label: u14-glmm-varcov
@@ -301,16 +301,17 @@ vc$vcov[1]    # varianza  sigma_u^2
 vc$sdcor[1]   # desviación sigma_u
 # y de ahí el ICC latente:
 vc$vcov[1] / (vc$vcov[1] + pi^2/3)
-
-# verdad simulada
-attr(cohorte, "verdad")$binaria[c("sigma_u", "icc_latente")]
 ```
 
-Aquí el modelo estima $\hat\sigma_u\approx0{,}44$ (ICC $\approx0{,}06$), **por
-debajo** de la verdad del DGP ($\sigma_u=0{,}70$, ICC $=0{,}13$): la **subestimación** típica de las
-varianzas con respuesta binaria y pocos grupos (24). 
+El modelo estima $\hat\sigma_u\approx0{,}44$ ($\hat\sigma_u^2\approx0{,}20$) y, con la varianza
+residual latente fija en $\pi^2/3$, un ICC $\approx0{,}056$: hay heterogeneidad entre centros y es
+**modesta**. Volveremos sobre su lectura al comparar los dos modelos, al cierre de esta sección.
 
-Es pues, un resultado que merece comentarse: el ICC cuantifica cuánta de la variación del riesgo se debe al centro (≈ 6–13 % aquí) frente a las diferencias entre pacientes (el resto). El centro pesa poco, pero no nada: conviene modelarlo —para no falsear la precisión— aunque el grueso del riesgo se juegue a nivel de paciente.
+Y como la `cohorte` está **simulada**, cabe preguntarse si estas cifras **recuperan la verdad** con la
+que se generaron los datos. La respuesta exige un cuidado que merece sección propia: el DGP no genera
+`ever` con un logit, sino como subproducto de un proceso en **tiempo discreto** con enlace
+**cloglog**, de modo que el `sigma_u` guardado en `attr(cohorte, "verdad")` **no está en la escala**
+en la que acabamos de estimarlo. Lo resolvemos en la [Sección 4.7](#sec-u14-dgp).
 
 
 ### 2. Condicional vs marginal
@@ -319,43 +320,7 @@ Con un enlace **no lineal** como el logit, el efecto de una covariable
 tiene **dos versiones que no coinciden** (en un modelo lineal sí lo harían). Geométricamente se entiende bien con la @fig-u14-cond-marg: cada centro tiene su propia curva logística con la **misma pendiente** —el
 efecto **condicional**, «para un centro dado», que es el que estima `glmer`— pero **desplazada** por
 su intercepto $u_j$. Al **promediar** esas curvas sobre la población de centros, la sigmoide sale
-**más plana**, y su pendiente —el efecto **marginal**, poblacional— es **menor en magnitud**. 
-
-Comparemos pues los coeficientes, de nuevo entre los dos modelos y con la verdad del DGP.
-
-```{r}
-#| label: fig-u14-glmm-coef
-#| fig-width: 7
-#| fig-height: 3
-#| fig-cap: "Efectos fijos del modelo *pooled* (`glm`) frente al mixto de intercepto aleatorio (`glmer`): punto = coeficiente (log-odds) y bigotes = ±1,96·EE (intervalo de Wald al 95 %). Dos lecturas a la vez: los coeficientes del mixto son algo **mayores en magnitud** (la des-atenuación marginal→condicional) y sus bigotes, **más anchos** —errores estándar honestos que tienen en cuenta el agrupamiento por centro, que el *pooled* ignoraba—."
- 
-# verdad
-attr(cohorte,"verdad")$binaria[c("beta")]
-# coeficientes estimados
-sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
-si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
-
-coefs <- rbind(
-  data.frame(modelo = "pooled (glm)",  term = rownames(sp),
-             estimate = sp[, "Estimate"], se = sp[, "Std. Error"]),
-  data.frame(modelo = "mixto (glmer)", term = rownames(si),
-             estimate = si[, "Estimate"], se = si[, "Std. Error"])
-)
-
-library(ggplot2)
-ggplot(coefs, aes(estimate, term, color = modelo)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
-  geom_pointrange(aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
-                  position = position_dodge(width = 0.5)) +
-  labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
-```
-
-Se ve en los números: `m_int` da $x_1=1{,}08$, $x_2=-0{,}66$, algo **mayores** que el *pooled* ($x_1=1{,}02$,
-$x_2=-0{,}63$) —la atenuación marginal→condicional, leve aquí porque $\sigma_u$ es pequeño,
-$\beta_{\text{marg}}\approx\beta_{\text{cond}}/\sqrt{1+0{,}346\,\sigma_u^2}$—. Y, sobre todo, los
-**errores estándar crecen** en el mixto (el del intercepto pasa de $0{,}106$ a $0{,}142$): `m_int`
-**tiene en cuenta** el agrupamiento que el *pooled* ignoraba, que daba una precisión **falsamente
-alta**.
+**más plana**, y su pendiente —el efecto **marginal**, poblacional— es **menor en magnitud**.
 
 ```{r}
 #| label: fig-u14-cond-marg
@@ -364,16 +329,17 @@ alta**.
 #| fig-width: 6.5
 #| fig-height: 4
 #| fig-cap: "Por qué *condicional* ≠ *marginal* con enlace no lineal. En gris, varias curvas logísticas con la misma pendiente desplazadas por el intercepto de centro; en azul, una de ellas (un centro típico: el efecto condicional, lo que estima glmer). Su promedio sobre los centros (naranja) es la curva marginal, más plana: la pendiente poblacional es menor que la de cada centro. El efecto se ha exagerado (sigma_u grande) para hacerlo visible; con sigma_u pequeño, como en la cohorte, ambas curvas casi coinciden."
-b0 <- 0; b1 <- 1.5; sigma_u <- 2          # sigma_u exagerado para que el aplanamiento se vea
+# Valores de juguete: nada de esto procede del ajuste, solo ilustra la geometria
+b0 <- 0; b1 <- 1.5; sigma_u_demo <- 2     # sigma_u exagerado para que el aplanamiento se vea
 x  <- seq(-6, 6, length.out = 200)
 
 # Familia de curvas condicionales: varios centros (distinto u_j), MISMA pendiente
 cond_fam <- tidyr::expand_grid(x = x, u = c(-4, -2, 0, 2, 4)) |>
   dplyr::mutate(p = plogis(b0 + b1 * x + u))
 
-# Curva marginal: promedio de plogis(b0 + b1*x + u) sobre u ~ N(0, sigma_u^2)
-ug <- seq(-4 * sigma_u, 4 * sigma_u, length.out = 401)
-w  <- dnorm(ug, 0, sigma_u); w <- w / sum(w)
+# Curva marginal: promedio de plogis(b0 + b1*x + u) sobre u ~ N(0, sigma_u_demo^2)
+ug <- seq(-4 * sigma_u_demo, 4 * sigma_u_demo, length.out = 401)
+w  <- dnorm(ug, 0, sigma_u_demo); w <- w / sum(w)
 destacadas <- dplyr::bind_rows(
   tibble::tibble(x = x, p = plogis(b0 + b1 * x),
                  tipo = "condicional (un centro)"),
@@ -389,6 +355,40 @@ ggplot() +
   labs(x = "covariable", y = "Probabilidad de fractura", color = NULL) +
   theme(legend.position = "top")
 ```
+
+
+Comparemos pues los coeficientes de los dos modelos, el *pooled* y el mixto, en la
+@fig-u14-glmm-coef.
+
+```{r}
+#| label: fig-u14-glmm-coef
+#| fig-width: 7
+#| fig-height: 3
+#| fig-cap: "Efectos fijos del modelo *pooled* (`glm`) frente al mixto de intercepto aleatorio (`glmer`): punto = coeficiente (log-odds) y bigotes = ±1,96·EE (intervalo de Wald al 95 %). Dos lecturas a la vez: los coeficientes del mixto son algo **mayores en magnitud** (la des-atenuación marginal→condicional) y sus bigotes, **más anchos** —errores estándar honestos que tienen en cuenta el agrupamiento por centro, que el *pooled* ignoraba—."
+sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
+si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
+
+coefs <- rbind(
+  data.frame(modelo = "pooled (glm)",  term = rownames(sp),
+             estimate = sp[, "Estimate"], se = sp[, "Std. Error"]),
+  data.frame(modelo = "mixto (glmer)", term = rownames(si),
+             estimate = si[, "Estimate"], se = si[, "Std. Error"])
+)
+
+ggplot(coefs, aes(estimate, term, color = modelo)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
+  geom_pointrange(aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
+                  position = position_dodge(width = 0.5)) +
+  labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
+```
+
+Se ve en los números: `m_int` da $x_1=1{,}08$, $x_2=-0{,}66$, algo **mayores** que el *pooled* ($x_1=1{,}02$,
+$x_2=-0{,}63$) —la atenuación marginal→condicional, leve aquí porque $\sigma_u$ es pequeño,
+$\beta_{\text{marg}}\approx\beta_{\text{cond}}/\sqrt{1+0{,}346\,\sigma_u^2}$—. Y, sobre todo, los
+**errores estándar crecen** en el mixto (el del intercepto pasa de $0{,}106$ a $0{,}142$): `m_int`
+**tiene en cuenta** el agrupamiento que el *pooled* ignoraba, que daba una precisión **falsamente
+alta**.
+
 
 ### 3. Encogimiento o *shrinkage* (*partial pooling*).
 
@@ -536,7 +536,6 @@ de esas líneas diferirían de un panel a otro.
 #| fig-width: 10
 #| fig-height: 6.5
 #| fig-cap: "Proporción de fracturas frente a la fragilidad ósea (x1), en bins de igual longitud, con una faceta por centro (rejilla 6×4). La tendencia creciente común refleja el efecto (fijo) de x1; las diferencias de nivel entre paneles, el intercepto aleatorio. Con pocas pacientes por centro y bin las curvas son ruidosas, así que las diferencias de pendiente no son interpretables a ojo."
-library(tidyverse)
 n_bins <- 4
 br  <- seq(min(cohorte$x1), max(cohorte$x1), length.out = n_bins + 1)
 mid <- (head(br, -1) + tail(br, -1)) / 2              # punto medio de cada bin (posición en X)
@@ -544,7 +543,7 @@ cohorte |>
   mutate(bin    = cut(x1, breaks = br, include.lowest = TRUE),  # bins de igual longitud
          x1_bin = mid[as.integer(bin)]) |>
   group_by(centro, x1_bin) |>
-  summarise(prop = mean(evento), .groups = "drop") |>           # proporción de fracturas por centro y bin
+  summarise(prop = mean(ever), .groups = "drop") |>             # proporción de fracturas por centro y bin
   ggplot(aes(x1_bin, prop, color = factor(centro), group = centro)) +
   geom_line(alpha = 0.5) +
   geom_point(size = 1.6, alpha = 0.8) +
@@ -581,8 +580,11 @@ VarCorr(m_slope)        # sigma_u0, sigma_u1 y su correlacion
 ```
 
 En el modelo **intercepto + pendiente**, `VarCorr` da una desviación de pendiente
-$\hat\sigma_{u_1}\approx0{,}40$ con una **correlación casi extrema** entre los efectos aleatorios (intercepto y pendiente) $\rho\approx-0{,}80$ —señales de
-un ajuste **inestable**, frecuente cuando la pendiente no aporta señal real—. La pregunta, entonces, no es *¿se puede?* sino *¿merece la pena?*; y eso se decide **comparando**.
+$\hat\sigma_{u_1}\approx0{,}40$ y una **correlación alta** entre los dos efectos aleatorios,
+$\rho\approx-0{,}80$. Una $\rho$ así conviene mirarla de cerca —es la antesala de los ajustes
+**singulares**, los que aparecen cuando se pide más estructura aleatoria de la que los datos
+sostienen—, pero por sí sola no descarta nada: el ajuste ha convergido sin avisos. La pregunta,
+entonces, no es *¿se puede?* sino *¿merece la pena?*; y eso se decide **comparando**.
 
 **La estrategia de selección, sistematizada.** 
 
@@ -598,20 +600,51 @@ Con efectos aleatorios se procede **de menos a más** y se contrasta cada salto:
 ## 🔧 En R. Comparar y elegir
 
 ```r
-AIC(m_pool, m_int, m_slope)   # escalera de complejidad (menor AIC, mejor)
+AIC(m_pool, m_int, m_slope)   # los tres modelos, de menos a más estructura (menor AIC, mejor)
 anova(m_int, m_slope)          # LRT: ¿aporta la pendiente sobre el intercepto?
+isSingular(m_slope)            # ¿sostienen los datos la estructura aleatoria más rica?
 ```
 ::::
 
 ```{r}
 #| label: u14-glmm-comparacion
-AIC(m_pool, m_int, m_slope)   # pooled  <  intercepto  <  intercepto + pendiente
+AIC(m_pool, m_int, m_slope)   # los tres modelos, de menos a más estructura aleatoria
 anova(m_int, m_slope)          # LRT de la pendiente
+isSingular(m_slope)            # ¿ajuste singular?
 ```
 
-Los números **deciden**: el `AIC` apenas cambia al añadir la pendiente ($899{,}0\to898{,}1$,
-despreciable) y el **LRT** frente a `m_int` no es significativo ($p\approx0{,}08$, 2 g.l.). Como el
-DGP **no** incluye pendiente aleatoria, ese $\hat\sigma_{u_1}=0{,}40$ era **ruido sobreajustado**.
+Los números **deciden**, aunque no por unanimidad. El `AIC` **baja** muy ligeramente al añadir la
+pendiente ($898{,}97\to898{,}05$): menos de un punto, dentro de lo que el AIC no distingue, y desde
+luego no el respaldo que justificaría dos parámetros más. Y el **LRT** frente a `m_int` no alcanza
+significación ($\chi^2=4{,}92$, 2 g.l., $p=0{,}086$). Como el DGP **no** incluye pendiente aleatoria,
+ese $\hat\sigma_{u_1}=0{,}40$ era **ruido sobreajustado**.
+
+Nótese que `isSingular(m_slope)` devuelve **`FALSE`**: el modelo con pendiente **no** es singular. Y
+conviene separar las dos cosas que se están preguntando, porque es fácil confundirlas: la
+singularidad diagnostica una estructura aleatoria que los datos **no pueden sostener** —el ajuste
+degenera—; el AIC y el LRT deciden si esa estructura **merece la pena**. Aquí los datos la sostienen
+sin problemas; simplemente no la necesitan.
+
+:::: {.callout-note}
+## El LRT de una varianza cae en la frontera
+
+`anova()` compara la diferencia de $-2\log L$ contra una $\chi^2_2$, pero el contraste **no es
+estándar**: bajo la hipótesis nula, $\sigma^2_{u_1}=0$ queda en el **borde** del espacio de
+parámetros —una varianza no puede ser negativa—, y ahí no se cumplen las condiciones de regularidad
+del test. La referencia correcta al añadir un efecto aleatorio a un modelo que ya tiene uno es una
+**mezcla a partes iguales** de $\chi^2_1$ y $\chi^2_2$ [@selfliang1987; @stramlee1994]:
+
+```{r}
+#| label: u14-lrt-frontera
+chi2 <- anova(m_int, m_slope)$Chisq[2]
+0.5 * pchisq(chi2, 1, lower.tail = FALSE) + 0.5 * pchisq(chi2, 2, lower.tail = FALSE)
+```
+
+El $p$ que imprime `anova()` es, por tanto, **conservador**: el correcto es **menor**
+($0{,}056$ frente a $0{,}086$). Aquí la decisión no cambia —sigue sin alcanzar el $5\,\%$—, pero la
+holgura es bastante menor de lo que sugería el $p$ sin corregir, y conviene saberlo: en un caso más
+ajustado, la corrección **sí** puede invertir la conclusión.
+::::
 
 **Conclusión:** nos quedamos con el **intercepto aleatorio** (`m_int`) —mejora claramente al *pooled*
 ([Sección 4.2](#sec-u14-intercepto)) y la pendiente no se justifica—.
@@ -620,7 +653,7 @@ DGP **no** incluye pendiente aleatoria, ese $\hat\sigma_{u_1}=0{,}40$ era **ruid
 
 Ajustado el modelo, ¿**ajusta bien**? Un GLMM hereda las dificultades del GLM binario —el $\chi^2$ de
 la deviance no es un test de bondad de ajuste válido con respuesta **individual**
-([Sección 3.2](#sec-u13-gof-binomial))— y añade la del efecto aleatorio: los residuos ordinarios
+([Sección 3.1](#sec-u13-gof-binomial))— y añade la del efecto aleatorio: los residuos ordinarios
 (Pearson, deviance) se **enredan** con los $u_j$ y dejan de ser informativos. El instrumental, por
 tanto, es el que afinamos en la **Unidad 2**, ahora **sobre el modelo mixto**: lo que se **extrae**
 del ajuste, los **residuos simulados**, una medida de **varianza explicada** adaptada a los mixtos y
@@ -716,37 +749,49 @@ residuos por **bootstrap paramétrico** —más exacto con **pocos grupos**, per
 ::::
 
 
-Se revisan pues el **Q–Q** (uniformidad, test KS), los **residuos frente a lo predicho** (patrones, dispersión, *outliers*) y, lo propio de un mixto, **agrupando por centro** para mirar el nivel del efecto aleatorio:
+Se revisan pues el **Q–Q** (uniformidad, test KS), los **residuos frente a lo predicho** (patrones, dispersión, *outliers*) y, lo propio de un mixto, los **residuos frente al factor de agrupamiento** para mirar el nivel del efecto aleatorio:
 
 ```{r}
 #| label: fig-u14-dharma
 #| fig-width: 9
 #| fig-height: 4
 #| fig-cap: "Residuos simulados (DHARMa) del GLMM de intercepto aleatorio. Izquierda: Q–Q de los residuos escalados, que bajo un buen ajuste siguen la diagonal uniforme. Derecha: residuos frente a lo predicho, que deberían repartirse sin patrón. Curvatura en el Q–Q o un abanico a la derecha señalarían forma funcional inadecuada o dispersión mal modelada."
-library(DHARMa)
 sim <- simulateResiduals(m_int)
 plot(sim)
 ```
 
 
+El panel de la izquierda de la @fig-u14-dharma rotula los tres contrastes, pero conviene **pedirlos
+por separado**: así se leen los $p$ en una salida de texto, y no estimados a ojo sobre el gráfico.
+
 ```{r}
 #| label: u14-dharma-tests
-testDispersion(sim)                          # sobre/infradispersión
-plotResiduals(sim, form = cohorte$centro)    # residuos agregados por centro
+# plot = FALSE: el grafico ya lo da fig-u14-dharma; aqui solo queremos el contraste
+testUniformity(sim, plot = FALSE)            # KS: ¿residuos uniformes? (ajuste global)
+testDispersion(sim, plot = FALSE)            # sobre/infradispersión
+testOutliers(sim, plot = FALSE)              # exceso de valores atípicos
+plotResiduals(sim, form = cohorte$centro)    # residuos frente al factor de agrupamiento
 ```
 
-**Conclusión: no hay problemas.** El Q–Q se pega a la diagonal y los tres tests (Kolmogorov-Smirnov, Dispersion y outliers) salen **no significativos**
-(KS $p=0{,}71$, dispersión $p=0{,}98$, *outliers* $p=0{,}18$; DHARMa rotula *«no significant problems
-detected»*) —el intercepto aleatorio reproduce bien los datos, también al **agrupar por centro**—. Si
-fallara, lo veríamos como una **curvatura** sistemática en el Q–Q, **sobredispersión** o un grupo de
-centros desviado, que apuntarían a una **covariable omitida**, una **forma funcional** inadecuada o
-una **estructura aleatoria** insuficiente.
+**Conclusión: no hay problemas.** Los tres contrastes salen **no significativos**:
+
+- **Uniformidad** (Kolmogorov-Smirnov): $D=0{,}024$, $p=0{,}706$. Los residuos escalados se reparten
+  como una $U(0,1)$, que es lo que explica que el Q–Q se pegue a la diagonal.
+- **Dispersión**: cociente $0{,}997$ con $p=0{,}976$; la variabilidad simulada y la observada
+  coinciden.
+- **Atípicos**: 3 de 877 observaciones, $p=0{,}178$. De hecho son **menos** de los que cabría esperar
+  ($0{,}34\,\%$ observado frente a $0{,}80\,\%$ esperado), no más.
+
+Y los residuos **frente al factor de agrupamiento** no marcan ningún centro desviado. El intercepto
+aleatorio, por tanto, reproduce bien los datos. Si fallara, lo veríamos como una **curvatura**
+sistemática en el Q–Q, **sobredispersión** o un grupo de centros desviado, que apuntarían a una
+**covariable omitida**, una **forma funcional** inadecuada o una **estructura aleatoria** insuficiente.
 
 **¿Cuánto explica el modelo? $R^2$ marginal y condicional.** 
 
 En un modelo mixto la varianza explicada se
 parte en dos (Nakagawa): el $R^2$ **marginal** —solo los **efectos fijos**— y el $R^2$ **condicional**
-—fijos **más** aleatorios—. La **diferencia** $R^2_{\text{condicional}}-R^2_{\text{marginal}}=\dfrac{\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}$ **es el ICC no ajustado**: la fracción de la varianza total que aporta el **agrupamiento** (los centros) más allá de los efectos fijos. Es justo el *Unadjusted/Conditional ICC* que devuelve `performance::icc(m)`.
+—fijos **más** aleatorios—. La **diferencia** $R^2_{\text{condicional}}-R^2_{\text{marginal}}=\dfrac{\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}$ **es el ICC no ajustado**: la fracción de la varianza total que aporta el **agrupamiento** (los centros) más allá de los efectos fijos. Es justo el `ICC_unadjusted` que devuelve `performance::icc(m)` ([Sección 4.2](#sec-u14-intercepto)).
 
 ```{r}
 #| label: u14-r2
@@ -761,8 +806,9 @@ el 31 %) —una contribución **modesta**, coherente con el ICC pequeño—.
 **El ajuste, ¿es sólido? Singularidad y convergencia.** 
 
 Un GLMM puede **converger mal** o quedar
-**singular** —típico al pedir más estructura aleatoria de la que los datos sostienen, como la pendiente
-casi singular de la [Sección 4.3](#sec-u14-pendiente)—. Conviene comprobarlo siempre:
+**singular** —lo típico al pedir más estructura aleatoria de la que los datos sostienen: justo el
+riesgo que vigilábamos al añadir la pendiente en la [Sección 4.3](#sec-u14-pendiente)—. Conviene
+comprobarlo siempre:
 
 ```{r}
 #| label: u14-singular
@@ -771,7 +817,7 @@ performance::check_singularity(m_int)
 ```
 
 Aquí `isSingular(m_int)` devuelve **`FALSE`**: el intercepto aleatorio está **bien sostenido** por los
-datos (a diferencia de lo que ocurría al forzar la pendiente en la [Sección 4.3](#sec-u14-pendiente)).
+datos.
 Un ajuste **singular** (o con avisos de convergencia) **no sería de fiar** y obligaría a
 **simplificar** la parte aleatoria. Para una panorámica de golpe, `performance::check_model(m_int)` reúne varios
 diagnósticos —incluida la **normalidad de los efectos aleatorios** ($u_j\sim\mathcal N$)— en un solo
@@ -784,7 +830,7 @@ Para los **residuos**, el tip de DHARMa de arriba. El resto del diagnóstico:
 ```r
 # Varianza explicada (Nakagawa)
 performance::r2(m_int)        # R2 marginal (fijos) y condicional (fijos + aleatorios)
-performance::icc(m_int)       # ICC ajustado y no ajustado (= R2_cond - R2_marg)
+performance::icc(m_int)       # ICC ajustado y no ajustado (el no ajustado = R2_cond - R2_marg)
 
 # Solidez del ajuste
 performance::check_model(m_int)   # panel de diagnósticos del mixto
@@ -850,7 +896,6 @@ logístico** con intercepto aleatorio por centro, ahora sobre la respuesta real 
 
 ```{r}
 #| label: u14-glow-mixto
-library(lme4)
 glow_m <- glow |> mutate(site_id = factor(site_id))
 
 m_glow_pool <- glm  (fracture ~ age + priorfrac,                 family = binomial, data = glow_m)
@@ -883,7 +928,8 @@ ggplot(re_glow, aes(reorder(grp, condval), condval)) +
 
 Y el resultado es **claro**: la variación entre centros es **mínima**. El modelo estima
 $\hat\sigma_u=0{,}15$ (log-odds) y un **ICC latente de apenas $0{,}7\,\%$** —casi todo el riesgo está
-**dentro** de los centros, no entre ellos—. El *caterpillar* lo confirma: los **seis** interceptos se
+**dentro** de los centros, no entre ellos—. El *caterpillar* de la @fig-u14-glow-caterpillar lo
+confirma: los **seis** interceptos se
 apiñan en torno a $0$ (de $-0{,}13$ a $+0{,}09$) y **todos** los intervalos lo cruzan, así que ninguno
 se separa del riesgo medio. Y como el efecto aleatorio es tan pequeño, los efectos fijos del mixto son
 **prácticamente idénticos** a los del *pooled* (edad $\approx+0{,}04$ por año; fractura previa
@@ -897,6 +943,119 @@ verdad conocida, sigue siendo el banco de pruebas riguroso—; y un $\hat\sigma_
 otros casos, **pegado al borde**) es el tipo de situación de **frontera** que el enfoque bayesiano
 maneja con más suavidad (callout al cierre). GLOW gana en **intuición** (pocos centros, reales,
 dibujables); la cohorte, en **rigor**.
+
+## 4.7 Validación contra el DGP: ¿recuperamos la verdad? {#sec-u14-dgp}
+
+La `cohorte` se simuló con parámetros conocidos, así que toda la unidad admite una última pregunta:
+¿las estimaciones **recuperan la verdad**? Responderla exige un cuidado que hasta aquí hemos ido
+aplazando: **la verdad y la estimación no están en la misma escala**.
+
+### La verdad vive en la escala del riesgo por periodo
+
+El DGP no genera `ever` con un modelo logístico. Genera un proceso en **tiempo discreto**: en cada
+periodo $t$ en que la paciente sigue en riesgo, el evento ocurre con probabilidad
+$$
+h_{ij}(t)=1-\exp\!\big(-\exp(\alpha_t+\eta_{ij})\big),
+\qquad \eta_{ij}=\beta_1x_{1ij}+\beta_2x_{2ij}+u_j,
+$$
+es decir, un **enlace cloglog** sobre un riesgo base $\alpha_t$ propio de cada periodo
+[@prentice1978; @allison1982]. `ever` es un **subproducto** de ese proceso: vale 1 si el evento
+ocurre en alguno de los $m_i=\min(C_i,T_{\max})$ periodos que la paciente llega a recorrer. Por
+tanto, los valores guardados en `attr(cohorte, "verdad")$binaria` son los del **riesgo por periodo en
+escala cloglog**, no los de un logit sobre `ever`.
+
+Que la diferencia no es cosmética se ve con un poco de álgebra. No tener el evento en los $m_i$
+periodos es sobrevivir a todos ellos, y como el DGP los genera de forma independiente dado
+$\eta_{ij}$, la probabilidad es el producto de los complementarios:
+$$
+\Pr(\text{ever}_i=0)=\prod_{t=1}^{m_i}\big(1-h_{ij}(t)\big)
+=\exp\!\Big(-e^{\eta_{ij}}\sum_{t=1}^{m_i}e^{\alpha_t}\Big),
+$$
+y tomando cloglog a ambos lados,
+$$
+\operatorname{cloglog}\Pr(\text{ever}_i=1)=\eta_{ij}+\log A_{m_i},
+\qquad A_m=\sum_{t\le m}e^{\alpha_t}.
+$$
+El resultado es **exacto** y muy informativo: sobre `ever`, los parámetros del DGP —los mismos
+$\beta$ y el mismo $u_j$— se recuperan **con enlace cloglog** y un **offset** $\log A_{m_i}$, no con
+un logit. El obstáculo práctico es que $m_i$ **no es observable** para quien tuvo el evento (de esa
+paciente conocemos `tiempo`, no su censura $C_i$), de modo que este atajo no se puede ajustar sobre
+la `cohorte` tal cual. El camino correcto es el formato **persona-periodo** de la
+[Unidad 5](#sec-u15), donde los $\alpha_t$ se estiman y no hace falta ningún offset.
+
+### La verdad, traducida a la escala en que hemos estimado
+
+Si no podemos comparar $\hat\beta$ y $\hat\sigma_u$ con los valores del DGP, ¿contra qué los
+comparamos? Contra el valor al que **convergería el modelo que sí hemos ajustado** —el GLMM logístico
+sobre `ever`— si dispusiéramos de datos ilimitados del mismo proceso. Y eso no requiere teoría
+adicional: basta simular una cohorte **grande** con el mismo generador y ajustarle el mismo modelo.
+
+```{r}
+#| label: u14-dgp-escala
+# La misma maquinaria generadora, con centros y pacientes de sobra: lo que sale de
+# aqui es, a efectos practicos, la verdad del DGP expresada en la escala logit(ever),
+# que es en la que ajusta m_int.
+cohorte_grande <- simular_cohorte(n_centros = 150, media_por_centro = 200, semilla = 1)
+m_grande <- glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte_grande)
+
+v          <- attr(cohorte, "verdad")$binaria             # escala cloglog por periodo
+s_u_grande <- as.data.frame(VarCorr(m_grande))$sdcor[1]   # sigma_u en logit(ever)
+s_u_int    <- as.data.frame(VarCorr(m_int))$sdcor[1]      # lo estimado en la cohorte real
+
+comparacion <- data.frame(
+  verdad_cloglog = c(v$beta[["x1"]], v$beta[["x2"]], v$sigma_u),
+  logit_ever     = c(fixef(m_grande)[["x1"]], fixef(m_grande)[["x2"]], s_u_grande),
+  m_int          = c(fixef(m_int)[["x1"]],    fixef(m_int)[["x2"]],    s_u_int),
+  row.names      = c("beta_x1", "beta_x2", "sigma_u")
+)
+comparacion$factor <- comparacion$logit_ever / comparacion$verdad_cloglog
+round(comparacion, 3)
+
+# el mismo contraste, leido como ICC latente
+c(verdad     = v$icc_latente,
+  logit_ever = s_u_grande^2 / (s_u_grande^2 + pi^2/3),
+  m_int      = s_u_int^2    / (s_u_int^2    + pi^2/3))
+```
+
+La columna `factor` dice lo esencial: al pasar del riesgo **por periodo** (cloglog) al riesgo
+**acumulado** sobre `ever` (logit), los tres parámetros se estiran por un factor **muy parecido**
+—$1{,}29$, $1{,}28$ y $1{,}25$—. El cambio de enlace y de horizonte cambia la **unidad de medida**, no el
+orden ni el signo de nada. Conviene no leer ese $\approx1{,}3$ como una constante universal: depende
+del riesgo base $\alpha_t$ y de cuántos periodos se acumulan, es decir, es una propiedad **de este**
+DGP. Y la columna traducida lleva su propio ruido muestral —150 centros son muchos, pero no
+infinitos: unas cinco centésimas en $\sigma_u$—, suficiente para lo que aquí necesitamos.
+
+Con eso, la verdad del DGP **leída en la escala en la que hemos ajustado** es
+$\beta_1\approx1{,}10$, $\beta_2\approx-0{,}83$ y $\sigma_u\approx0{,}87$ (ICC $\approx0{,}19$); no
+$0{,}85$, $-0{,}65$ y $0{,}70$ (ICC $0{,}13$).
+
+### El balance: qué recupera `m_int` y qué no
+
+Contra ese patrón, el ajuste de la `cohorte` se separa en dos lecturas muy distintas:
+
+- **Los efectos fijos se recuperan bien.** $\hat\beta_1=1{,}08$ frente a $1{,}10$ es prácticamente un
+  acierto: la diferencia es una quinta parte de su error estándar ($0{,}102$). $\hat\beta_2=-0{,}66$
+  frente a $-0{,}83$ se queda corto, pero la distancia es del orden de **un** error estándar
+  ($0{,}174$), compatible con el ruido muestral de 877 pacientes. Y adviértase el error que acabamos
+  de esquivar: comparar ese $1{,}08$ con el $0{,}85$ del DGP habría sugerido una sobreestimación que
+  **no existe**.
+- **La varianza entre centros se queda a la mitad.** $\hat\sigma_u=0{,}44$ frente a $0{,}87$, e
+  ICC $0{,}056$ frente a $0{,}19$. Aquí la brecha es demasiado grande para despacharla como ruido.
+
+¿Por qué se queda corta $\hat\sigma_u$? Candidatos no faltan —la aproximación de Laplace con
+respuesta binaria, los apenas 24 centros de la `cohorte`, o sencillamente que la desviación típica de
+esos 24 $u_j$ concretos no tiene por qué coincidir con la del proceso que los generó—, pero **ninguno
+está medido aquí**, y elegir uno sin medirlo sería precisamente el tipo de explicación cómoda que
+conviene evitar. Lo dejamos **planteado**: cuantificarlo exige repetir el diseño muchas veces y mirar
+la **distribución** de $\hat\sigma_u$, un ejercicio de simulación que se sale de esta unidad.
+
+Nada de esto invalida lo concluido en las secciones anteriores: que hay heterogeneidad entre centros,
+que el AIC prefiere el mixto y que los errores estándar del *pooled* eran demasiado optimistas se
+sostiene con los **propios datos**, sin apelar al DGP. Lo que la validación acota es la lectura
+**cuantitativa** del ICC: el $6\,\%$ describe esta muestra, y en un diseño como este puede quedarse
+corto respecto a la heterogeneidad real del proceso. Es también la mejor razón para pasar a la
+[Unidad 5](#sec-u15): allí la respuesta se modela **en la escala en la que fue generada**, y la
+comparación con la verdad deja de necesitar traducción.
 
 ::: {.callout-note}
 ## Puente a la Unidad 5
@@ -933,7 +1092,8 @@ Tareas:
 1. **Reconoce el agrupamiento (RA6).** Ajusta el riesgo de fractura con **intercepto aleatorio por
    centro** (`glmer`, `(1 | centro)`) y compáralo con la versión *pooled* (`glm`): interpreta el
    **ICC** (cuánto pesa la clínica) y explica por qué el *pooled* **atenúa** los efectos (condicional
-   vs marginal), contrastándolos con la **verdad del DGP**.
+   vs marginal). Si quieres contrastar con la **verdad del DGP**, recuerda que está guardada en escala
+   **cloglog del riesgo por periodo** y hay que traducirla antes ([Sección 4.7](#sec-u14-dgp)).
 2. **Centros mejores y peores.** Interpreta el *caterpillar* de los interceptos por centro
    (`ranef`) y el ***shrinkage***: qué clínicas se desvían y por qué las extremas se encogen.
 3. **¿Pendiente aleatoria?** Prueba `(1 + x1 | centro)` y razona —varianza estimada, correlación con

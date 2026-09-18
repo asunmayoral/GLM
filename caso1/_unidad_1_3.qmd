@@ -11,16 +11,16 @@ perfil de covariables son **intercambiables** —para el modelo, ensayos idénti
 **colapsar** cada perfil en una fila que cuente cuántos casos hay en el grupo. Con respuesta
 **binaria**, agrupar convierte la Bernoulli individual ($y\in\{0,1\}$) en una **binomial**,
 $Y\sim\mathrm{Bin}(m,\pi)$ con $m$ el tamaño del grupo: es **el mismo modelo logístico**,
-solo cambia la disposición del dato. Lo vemos en las Secciones [3.1](#sec-u13-binomial) y
-[3.2](#sec-u13-gof-binomial), donde agrupar además **recupera los diagnósticos de ajuste**.
+solo cambia la disposición del dato. Lo vemos en la [Sección 3.1](#sec-u13-binomial), donde agrupar además **recupera los
+diagnósticos de ajuste**.
 
 La segunda es admitir **más de dos categorías**. Si la respuesta es **politómica** —categórica con
 tres o más niveles— y los datos siguen **individualizados**, cada observación es una **multinomial
 de un solo ensayo**, $\mathbf{Y}\sim\mathrm{Mult}(1,\boldsymbol{\pi})$, con
 $\boldsymbol{\pi}=(\pi_1,\dots,\pi_K)$ y $K$ el número de categorías. El logit binario se
 generaliza entonces al **logit de categoría base** cuando no hay orden
-([Sección 3.3](#sec-u13-nominal)) y al de **odds proporcionales** cuando sí lo hay
-([Sección 3.4](#sec-u13-ordinal)).  
+([Sección 3.2](#sec-u13-nominal)) y al de **odds proporcionales** cuando sí lo hay
+([Sección 3.3](#sec-u13-ordinal)).  
 
 ::: {.callout-tip}
 ## Qué se estudia aquí y qué se pospone al Caso 2
@@ -46,7 +46,7 @@ RA implicados (el marco de 1.1–1.2 aplicado a nuevos tipos de respuesta):
 
 ## 3.1 Del dato individual al agrupado: respuesta binomial {#sec-u13-binomial}
 
-Para ejemplificar la implementación de esta versión del modelo binomial, apliquemos una agrupación a GLOW, considerando ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables. Al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia —y es la ganancia de agrupar— lo veremos en la bondad de ajuste ([Sección 3.2](#sec-u13-gof-binomial)).
+Para ejemplificar la implementación de esta versión del modelo binomial, apliquemos una agrupación a GLOW, considerando ahora como predictoras las variables `priorfrac`, `momfrac` y `raterisk`. Como las tres predictoras son **factores**, cada combinación de niveles reúne a mujeres intercambiables. Al colapsarlas, la respuesta pasa de un $0/1$ por sujeto a un **recuento de fracturas sobre el total del grupo** —una binomial—. Lo llamativo es que **el ajuste no cambia** respecto a la logística individual; lo que sí cambia —y es la ganancia de agrupar— lo veremos en la [bondad de ajuste](#sec-u13-gof-binomial).
 
 
 Agrupados los datos en $k$ celdas (perfiles de covariables), en la celda $i$
@@ -116,7 +116,9 @@ las tres celdas basales (`priorfrac = No`, `momfrac = No`) concentran la mayor p
 ($n = 2, 6, 10$). Sus proporciones son muy inestables —la celda `Less` con ambos antecedentes y $n=2$
 cae a 0, y su análoga en `Same` con $n=6$ salta a 0,5—: es **ruido de muestreo** que no conviene
 sobreinterpretar y que, además, es justo el que degrada la aproximación $\chi^2$ del contraste de
-bondad de ajuste cuando hay celdas pequeñas (la cautela de la [Sección 3.2](#sec-u13-gof-binomial)).
+bondad de ajuste cuando hay celdas pequeñas (la cautela de la sección [Bondad de ajuste](#sec-u13-gof-binomial)).
+
+### Ajuste e interpretación
 
 Ahora ajustamos el binomial con la sintaxis `cbind(éxitos, fracasos)` y comprobamos que
 **recupera exactamente** los mismos coeficientes que la logística individual con esas
@@ -212,7 +214,17 @@ La última salida muestra el contraste **celda a celda**, esto es, cómo cambia 
 :::: {.callout-tip}
 ## 🔧 En R. El `glm()` con datos binomiales
 
-El ajuste de datos binomiales es similar al de datos binarios, con la salvedad de cómo se especifica la respuesta aquí, a partir de una matriz con dos columnas: éxitos y fracasos:
+**Agrupar.** De la cohorte individual a la tabla de celdas: contar por combinación de covariables y
+poner los dos resultados en columnas.
+```
+glow_agg <- glow |>
+  count(x1, x2, y) |>
+  tidyr::pivot_wider(names_from = y, values_from = n, values_fill = 0) |>
+  mutate(total = No + Yes)
+```
+
+**Ajuste.** Es similar al de datos binarios, con la salvedad de cómo se especifica la respuesta aquí,
+a partir de una matriz con dos columnas: éxitos y fracasos:
 ```
 glm(cbind(exitos,fracasos) ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)
 ```
@@ -226,6 +238,10 @@ o el promedio tratará cada celda como una sola observación:
 ```
 avg_comparisons(fit_bin, variables = "priorfrac", wts = "total")
 ```
+Sin `avg_`, la misma llamada devuelve el contraste **celda a celda** en lugar de su promedio:
+```
+comparisons(fit_bin, variables = "priorfrac")
+```
 
 **Intervalos de confianza.** En una sola llamada, sobre el coeficiente o sobre el odds ratio:
 ```
@@ -235,7 +251,7 @@ exp(cbind(OR = coef(fit_bin), confint(fit_bin)))        # lo mismo, a mano
 ```
 ::::
 
-## 3.2 Bondad de ajuste y diagnóstico en datos binomiales {#sec-u13-gof-binomial}
+### Bondad de ajuste y diagnóstico {#sec-u13-gof-binomial}
 
 
 En la [Sección 2.5](#sec-u12-inferencia) vimos que, con datos **individuales**, ni la deviance ni el
@@ -243,12 +259,13 @@ estadístico de Pearson sirven como test absoluto de ajuste: el saturado crece c
 $\chi^2$ no se sostiene. Con datos **agrupados** (y $m_i$ suficientemente grandes) esa asintótica
 **se recupera** [@agresti2015; @faraway2016]. También cobran relevancia ciertos residuos comunes en los GLM que no funcionaban en el caso binario. Empezamos, pues, por los **estadísticos globales** —los que responden a «¿ajusta el modelo?»— y
 los descomponemos después celda a celda: de esa descomposición salen los **residuos**, con los que
-localizamos *dónde* falla. La **calibración** y la **sobredispersión** cierran el diagnóstico.
+localizamos *dónde* falla. Cierra el bloque la **sobredispersión**, que pregunta si la varianza
+binomial que el modelo impone es la que de verdad tienen los datos.
 
 Los contrastes entre modelos anidados (LRT, [Sección 2.5](#sec-u12-inferencia)) son
 **idénticos** a los del caso individual. 
 
-### Bondad de ajuste
+#### Estadísticos globales: deviance y Pearson
 
 Dos **estadísticos globales** resumen en un único número el desacuerdo de las $k$ celdas,
 comparando el modelo **ajustado con el saturado** —el mejor ajuste posible—:
@@ -347,7 +364,7 @@ Un $p$ **alto** = no hay evidencia de falta de ajuste. ¿Cuál usar?
   muchos $m_i$ pequeños la aproximación $\chi^2$ se degrada —y la deviance, antes—.
 ::::
 
-### Residuos
+#### Residuos e influencia
 
 Los dos estadísticos anteriores dicen **cuánto** discrepa el modelo en conjunto, pero no **dónde**.
 Para averiguarlo volvemos a sus sumandos: cada celda aporta un término a $X^2$ y otro a $D$, y ese
@@ -473,7 +490,63 @@ cooks.distance(fit_bin)                   # influencia de cada celda
 ```
 ::::
 
-### Calibración 
+#### Sobredispersión
+
+El modelo binomial $y_i \sim Bi(m_i,\pi_i)$, impone que la varianza de cada celda sea exactamente
+$m_i\hat\pi_i(1-\hat\pi_i)=Var(y_i)$. Cuando la varianza real en los datos **excede** ese valor hay **sobredispersión**, 
+y al agrupar pasa a ser **estimable** mediante el cociente de Pearson:
+
+$$
+\hat\phi=\frac{X^2}{k-p}=\frac{1}{k-p}\sum_i r_{P,i}^2 .
+$$
+
+Un $\hat\phi\approx 1$ indica que el binomial basta; $\hat\phi>1$ indica sobredispersión (variación
+*extra-binomial*); $\hat\phi<1$ indica infradispersión (es menos frecuente).
+
+La sobredispersión puede ser debida a cierta **correlación entre los ensayos de una misma celda** (sujetos agrupados que no son del todo independientes), a **heterogeneidad no modelada** o por una **covariable omitida**. Lo que
+importa es su efecto: los coeficientes $\hat\beta$ siguen siendo **consistentes**, pero los **errores estándar se subestiman**, de modo que los contrastes de Wald y LRT resultan **demasiado liberales**, y
+los intervalos **demasiado estrechos**.
+
+El remedio inmediato es el modelo **quasi-binomial**: no cambia las estimaciones puntuales, pero
+**estima $\phi$ de los datos** e **infla los errores estándar** por $\sqrt{\hat\phi}$ (y sustituye los
+contrastes $\chi^2$ por contrastes **F**). Cuando la sobredispersión procede de un efecto de agrupamiento 
+identificable, la alternativa estructural pasa por incluir **efectos aleatorios** ([Unidad 4](#sec-u14)).
+
+```{r}
+#| label: u13-sobredisp
+# Índice de sobredispersión (cociente de Pearson)
+sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
+```
+
+En GLOW, $\hat\phi\approx 0{,}58$: **por debajo de 1**, así que **no hay rastro de sobredispersión**
+—el binomial es de sobra suficiente— y el quasi-binomial no haría falta. Lo mostramos igualmente como
+herramienta para cuando $\hat\phi$ supere con claridad la unidad.
+
+
+::: {.callout-note}
+## ¿Y tratar la sobredispersión binomial con quasi-Poisson?
+
+Hay una excepción a tratar la sobredispersión en el modelo binomial con un **quasi-Poisson**, y es el
+régimen de **sucesos raros** ($m_i$ grande, $\pi_i$ pequeña y $m_i\pi_i$ moderado), donde la binomial
+se aproxima a una Poisson. Ahí sí tiene sentido modelar el **conteo** con una Poisson de enlace log y
+un *offset* $\log(m_i)$ —es decir, modelar una **tasa**—, y un quasi-Poisson o una binomial negativa
+absorberían la variación extra. Pero eso es porque has entrado **deliberadamente** en el dominio
+Poisson, no porque el quasi-Poisson arregle una binomial. Estos modelos los veremos en el Caso 2.
+:::
+
+:::: {.callout-tip}
+## 🔧 En R. Sobredispersión y quasi-binomial
+
+```r
+sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)   # phi; ~1 si basta el binomial
+fit_q <- glm(cbind(Yes, No) ~ priorfrac + momfrac + raterisk,
+             family = quasibinomial, data = glow_agg)   # mismas betas, SE inflados por sqrt(phi)
+summary(fit_q)             # 'Dispersion parameter' = phi estimado
+drop1(fit_q, test = "F")   # comparación de modelos con test F, no chi^2
+```
+::::
+
+### Calibración
 
 Al agrupar, la **calibración** es inmediata —algo que el caso individual no permitía sin recurrir a
 deciles—: cada celda aporta su **probabilidad predicha** y su **proporción observada**, y basta
@@ -526,7 +599,7 @@ puntos porcentuales**. La calibración es **excelente**, como ya decían la figu
 En la [Sección 2.6](#sec-u12-diagnostico) el contraste de calibración fue el de **Hosmer–Lemeshow**; aquí no reaparece porque HL existe para suplir la agrupación que no había en Bernoulli. Ahora las celdas son reales, los estadísticos de Pearson y Deviance resuelven la bondad del ajuste.
 :::
 
-### Discriminación
+### Discriminación y clasificación
 
 Calibración y discriminación son preguntas distintas ([Sección 2.7](#sec-u12-evaluacion)): una
 pregunta si las probabilidades son fiables, la otra si **ordenan** bien a quien se fractura por
@@ -617,52 +690,8 @@ que ese orden no basta para que ninguna probabilidad ajustada llegue a 0,5 salvo
 el aviso de la [Sección 2.7](#sec-u12-evaluacion) repetido: con un evento minoritario, el umbral 0,5
 rara vez es el que interesa.
 
-### Sobredispersión
-
-El modelo binomial $y_i \sim Bi(m_i,\pi_i)$, impone que la varianza de cada celda sea exactamente
-$m_i\hat\pi_i(1-\hat\pi_i)=Var(y_i)$. Cuando la varianza real en los datos **excede** ese valor hay **sobredispersión**, 
-y al agrupar pasa a ser **estimable** mediante el cociente de Pearson:
-
-$$
-\hat\phi=\frac{X^2}{k-p}=\frac{1}{k-p}\sum_i r_{P,i}^2 .
-$$
-
-Un $\hat\phi\approx 1$ indica que el binomial basta; $\hat\phi>1$ indica sobredispersión (variación
-*extra-binomial*); $\hat\phi<1$ indica infradispersión (es menos frecuente).
-
-La sobredispersión puede ser debida a cierta **correlación entre los ensayos de una misma celda** (sujetos agrupados que no son del todo independientes), a **heterogeneidad no modelada** o por una **covariable omitida**. Lo que
-importa es su efecto: los coeficientes $\hat\beta$ siguen siendo **consistentes**, pero los **errores estándar se subestiman**, de modo que los contrastes de Wald y LRT resultan **demasiado liberales**, y
-los intervalos **demasiado estrechos**.
-
-El remedio inmediato es el modelo **quasi-binomial**: no cambia las estimaciones puntuales, pero
-**estima $\phi$ de los datos** e **infla los errores estándar** por $\sqrt{\hat\phi}$ (y sustituye los
-contrastes $\chi^2$ por contrastes **F**). Cuando la sobredispersión procede de un efecto de agrupamiento 
-identificable, la alternativa estructural pasa por incluir **efectos aleatorios** ([Unidad 4](#sec-u14)).
-
-```{r}
-#| label: u13-sobredisp
-# Índice de sobredispersión (cociente de Pearson)
-sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
-```
-
-En GLOW, $\hat\phi\approx 0{,}58$: **por debajo de 1**, así que **no hay rastro de sobredispersión**
-—el binomial es de sobra suficiente— y el quasi-binomial no haría falta. Lo mostramos igualmente como
-herramienta para cuando $\hat\phi$ supere con claridad la unidad.
-
-
-::: {.callout-note}
-## ¿Y tratar la sobredispersión binomial con quasi-Poisson?
-
-Hay una excepción a tratar la sobredispersión en el modelo binomial con un **quasi-Poisson**, y es el
-régimen de **sucesos raros** ($m_i$ grande, $\pi_i$ pequeña y $m_i\pi_i$ moderado), donde la binomial
-se aproxima a una Poisson. Ahí sí tiene sentido modelar el **conteo** con una Poisson de enlace log y
-un *offset* $\log(m_i)$ —es decir, modelar una **tasa**—, y un quasi-Poisson o una binomial negativa
-absorberían la variación extra. Pero eso es porque has entrado **deliberadamente** en el dominio
-Poisson, no porque el quasi-Poisson arregle una binomial. Estos modelos los veremos en el Caso 2.
-:::
-
 :::: {.callout-tip}
-## 🔧 En R. Calibración, discriminación, clasificación y sobredispersión
+## 🔧 En R. Calibración, discriminación y clasificación
 
 Todo parte de la probabilidad predicha de cada celda:
 
@@ -686,7 +715,8 @@ ensayos <- glow_agg |>
   mutate(pred = pi_h) |>
   tidyr::pivot_longer(c(Yes, No), names_to = "fractura", values_to = "n") |>
   tidyr::uncount(n)                                   # un registro por ensayo, con su pred
-pROC::roc(ensayos$fractura == "Yes", ensayos$pred)    # curva; auc() da el área
+pROC::roc(ensayos$fractura == "Yes", ensayos$pred)    # objeto roc; auc() da el área
+ggroc(roc_bin)                                        # la curva, en ggplot
 ```
 
 **Clasificación a un umbral.** Sin desplegar nada: `yardstick` acepta **pesos de caso**.
@@ -702,15 +732,6 @@ metric_set(accuracy, sensitivity, specificity)(
   eval_agg, truth = obs, estimate = pred, case_weights = n, event_level = "second")
 ```
 
-**Sobredispersión.**
-
-```r
-sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)   # phi; ~1 si basta el binomial
-fit_q <- glm(cbind(Yes, No) ~ priorfrac + momfrac + raterisk,
-             family = quasibinomial, data = glow_agg)   # mismas betas, SE inflados por sqrt(phi)
-summary(fit_q)             # 'Dispersion parameter' = phi estimado
-drop1(fit_q, test = "F")   # comparación de modelos con test F, no chi^2
-```
 ::::
 
 En **todo lo demás**, el binomial agrupado se ajusta e interpreta **exactamente igual** que el
@@ -725,7 +746,7 @@ el caso individual no eran válidos.
 
 
 
-## 3.3 Más de dos categorías sin orden: politómica nominal {#sec-u13-nominal}
+## 3.2 Más de dos categorías sin orden: politómica nominal {#sec-u13-nominal}
 
 Cuando seguimos teniendo respuestas individualizadas y la respuesta tiene **más de dos categorías sin orden**, el logit binario se generaliza al **logit de categoría base**: se fija una categoría de referencia y se modela, frente a ella, el
 log-odds de cada una de las demás. 
@@ -769,7 +790,7 @@ $$
 
 Conviene leerla como **dos rectas, una por cada categoría no-referencia**. Fijada `Same` como base, a cada nivel $k\in\{\text{Less},\text{Greater}\}$ le asignamos su **propio predictor lineal** $\eta_{k}$, con **su propia** interceptación y **sus propias** pendientes: una recta describe cómo varían, con la edad y la fractura previa, los log-odds de percibirse en **menor** riesgo frente a «igual» (`Less` vs `Same`); la otra, los de percibirse en **mayor** riesgo frente a «igual» (`Greater` vs `Same`). La categoría base no necesita recta propia: hace de **vara de medir**, con $\eta_{\text{Same}}=0$ por convención. 
 
-Ajustar el modelo nominal equivale, pues, a estimar **a la vez** $K−1=2$ regresiones —`Less|Same` y `Greater|Same`—, cada una con su intercepto $\beta_{0k}+\beta_{2k}\mathbf{I}_{\text{priorfrac}}$ y su pendiente $\beta_{1k}$. Que cada categoría tenga **su propia recta** es lo que da al modelo nominal su flexibilidad —cada nivel puede responder a la edad o a la fractura previa de manera distinta, incluso en **direcciones opuestas**—, frente al ordinal de la [Sección 3.4](#sec-u13-ordinal), que impondrá una **pendiente común** a todos los cortes.
+Ajustar el modelo nominal equivale, pues, a estimar **a la vez** $K−1=2$ regresiones —`Less|Same` y `Greater|Same`—, cada una con su intercepto $\beta_{0k}+\beta_{2k}\mathbf{I}_{\text{priorfrac}}$ y su pendiente $\beta_{1k}$. Que cada categoría tenga **su propia recta** es lo que da al modelo nominal su flexibilidad —cada nivel puede responder a la edad o a la fractura previa de manera distinta, incluso en **direcciones opuestas**—, frente al ordinal de la [Sección 3.3](#sec-u13-ordinal), que impondrá una **pendiente común** a todos los cortes.
 
 Al exponenciar, $e^{\beta_{1k}}$ es un **odds ratio relativo**: el factor por el que se
 multiplican las **odds de pertenecer a la categoría $k$ en lugar de a `Same`** cuando `age`
@@ -790,7 +811,7 @@ Tanto si la respuesta categórica es **individual** (una fila por sujeto, como a
 son los mismos**: mismos estimadores, misma interpretación de coeficientes, y el **contraste
 entre modelos anidados** (LRT) funciona igual. Lo que **no** vale con datos individuales es el contraste
 **$\chi^2$ de bondad de ajuste** ni el análisis de **residuos**: como en el paso Bernoulli→binomial
-([Sección 3.2](#sec-u13-gof-binomial)), solo recuperan su sentido al **agrupar**. Por eso aquí
+([Sección 3.1](#sec-u13-gof-binomial)), solo recuperan su sentido al **agrupar**. Por eso aquí
 valoramos el ajuste mirando las **probabilidades predichas**, no un $\chi^2$.
 :::
 
@@ -802,99 +823,7 @@ siendo un GLM en sentido amplio). En R se ajusta con `nnet::multinom()` —lo qu
 `VGAM::vglm(..., family = multinomial)`; ambas estiman por máxima verosimilitud el **mismo** logit de
 categoría base.
 
-:::: {.callout-tip}
-## 🔧 En R. Ajustar e inspeccionar el multinomial nominal
-
-La respuesta debe ser un **factor** en el que hay que identificar la categoría de referencia.
-
-**Ajuste (dos motores equivalentes).**
-
-```r
-library(nnet)
-m_nom  <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac, data = glow, trace = FALSE)
-
-library(VGAM)
-m_vglm <- vglm(raterisk ~ age + priorfrac,
-               family = multinomial(refLevel = "Same"), data = glow)
-```
-
-**Resúmenes.** 
-
-En `nnet`:
-
-- `summary(m_nom)` da un bloque de coeficientes por categoría no-referencia
-(`Less|Same`, `Greater|Same`) con sus errores estándar; 
-- `multinom` no imprime $p$-valores, así que se sacan con `broom::tidy(m_nom)` (añade $z$ y $p$), y 
-- `exp(coef(m_nom))` da los **odds ratios relativos**, y
-  `broom::tidy(m_nom, exponentiate = TRUE, conf.int = TRUE)` los da **con intervalo de confianza**,
-  un bloque por categoría no-referencia. 
-
-En `vglm`: 
-
-- `summary(m_vglm)` y 
-- `coef(m_vglm, matrix = TRUE)`.
-
-**Bondad de ajuste.** Con datos individuales no hay $\chi^2$ de bondad de ajuste
-([Sección 2.5](#sec-u12-inferencia)); se usan la verosimilitud y los criterios de información: `logLik()`, `AIC()`, `BIC()`,
-`deviance()`. 
-
-**Comparación de modelos.** Modelos **anidados** con el LRT —`lmtest::lrtest(m0, m_nom)` (o `anova()` en `vglm`)—;
-**no anidados**, con AIC/BIC.
-
-**Ajustes y predicciones.** 
-
-En `nnet`:
-```
-fitted(m_nom) # matriz de probabilidades** (una columna por nivel) 
-predict(m_nom, type = "probs") #  predice probabilidades para datos nuevos
-predict(m_nom, type ="class") # da la categoría más probable. 
-ggeffects::ggpredict(m_nom, terms = "age [all]") # para visualizarlas frente a una covariable
-ggeffects::ggpredict(m_nom, terms = c("age [all]", "priorfrac")) # un segundo término: no fija priorfrac en su referencia
-```
-
-En `vglm`:
-```
-fitted(m_vglm)` # equivale a `predict(m_vglm, type = "response")`
-nd <- data.frame(age = 60:90, priorfrac = "No") # datos nuevos
-predict(m_vglm, newdata = nd, type = "response")   # predicción de probabilidades para datos nuevos, matriz n x K
-predict(m_vglm, newdata = nd, type = "link") # predicción de logit frente a referencia
-colnames(p)[max.col(p, ties.method = "first")] # da la categoría más probable
-```
-
-**Contrastes y selección.** El omnibus y la escalera de modelos anidados, con los criterios de
-información:
-```
-m_nulo <- multinom(y ~ 1, data = d, trace = FALSE)
-lmtest::lrtest(m_nulo, m_nom)                 # omnibus: completo contra el nulo
-lmtest::lrtest(m_nulo, m_sin_x, m_nom)        # escalera: cada fila contra la ANTERIOR
-AIC(m_nulo, m_sin_x, m_nom); BIC(m_nulo, m_sin_x, m_nom)
-```
-
-**Evaluación.** No hay ROC (véase arriba); se usa la matriz de confusión. `yardstick::conf_mat()`
-admite cualquier número de clases; el único cuidado es que `truth` y `estimate` tengan **los mismos
-niveles y en el mismo orden**, porque `predict()` los hereda del `relevel()` del ajuste:
-```
-library(yardstick)
-eval_nom <- tibble(obs  = factor(d$y,                         levels = niveles),
-                   pred = factor(predict(m_nom, type = "class"), levels = niveles))
-conf_mat(eval_nom, truth = obs, estimate = pred)   # dnn = c(...) renombra las dimensiones
-accuracy(eval_nom, truth = obs, estimate = pred)   # compárese con max(prop.table(table(d$y)))
-pROC::multiclass.roc(d$y, fitted(m_nom))           # AUC de Hand-Till: solo el número, sin curva
-```
-
-**Calibración por categoría.** Por tramos de riesgo, una vez por nivel: `ntile()` sobre la
-probabilidad predicha de cada categoría, y media predicha frente a frecuencia observada.
-
-**Efectos marginales.** `marginaleffects` devuelve **un efecto por categoría de respuesta**,
-identificada en la columna `group`:
-```
-avg_slopes(m_nom)                                # continuas y factores, por categoría
-avg_comparisons(m_nom, variables = "priorfrac")  # solo el contraste del factor
-avg_slopes(m_nom, variables = "age", by = "priorfrac")   # desglosado por un factor
-```
-::::
-
-### Interpretación
+### Ajuste e interpretación
 
 Ajustamos a continuación este modelo sobre GLOW, utilizando `nnet`.
 
@@ -1067,12 +996,83 @@ son cantidades minúsculas; acumuladas sobre el recorrido observado explican el 
 compatibles con cero.
 
 
-### Bondad de ajuste, diagnóstico y comparación
+:::: {.callout-tip}
+## 🔧 En R. Ajustar, interpretar y predecir con el multinomial nominal
+
+La respuesta debe ser un **factor** en el que hay que identificar la categoría de referencia.
+
+**Ajuste (dos motores equivalentes).**
+
+```r
+library(nnet)
+m_nom  <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac, data = glow, trace = FALSE)
+
+library(VGAM)
+m_vglm <- vglm(raterisk ~ age + priorfrac,
+               family = multinomial(refLevel = "Same"), data = glow)
+```
+
+**Resúmenes.** 
+
+En `nnet`:
+
+- `summary(m_nom)` da un bloque de coeficientes por categoría no-referencia
+(`Less|Same`, `Greater|Same`) con sus errores estándar; 
+- `multinom` no imprime $p$-valores, así que se sacan con `broom::tidy(m_nom)` (añade $z$ y $p$), y 
+- `exp(coef(m_nom))` da los **odds ratios relativos**, y
+  `broom::tidy(m_nom, exponentiate = TRUE, conf.int = TRUE)` los da **con intervalo de confianza**,
+  un bloque por categoría no-referencia. 
+
+En `vglm`: 
+
+- `summary(m_vglm)` y 
+- `coef(m_vglm, matrix = TRUE)`.
+
+**Ajustes y predicciones.** 
+
+En `nnet`:
+```
+fitted(m_nom) # matriz de probabilidades** (una columna por nivel) 
+predict(m_nom, type = "probs") #  predice probabilidades para datos nuevos
+predict(m_nom, type ="class") # da la categoría más probable. 
+ggeffects::ggpredict(m_nom, terms = "age [all]") # para visualizarlas frente a una covariable
+ggeffects::ggpredict(m_nom, terms = c("age [all]", "priorfrac")) # un segundo término: no fija priorfrac en su referencia
+```
+
+Para dibujarlas **con banda de confianza** no sirve `predict()`, que en `multinom` no devuelve el
+error estándar; hay que pasar por `marginaleffects`, que sí lo calcula y trae el nivel de la
+respuesta en la columna `group`:
+```
+predictions(m_nom, newdata = datagrid(age = seq(55, 90, length.out = 100),
+                                      priorfrac = levels(glow$priorfrac)))
+# devuelve estimate, conf.low y conf.high: con ellas se dibuja el geom_ribbon
+```
+
+En `vglm`:
+```
+fitted(m_vglm)` # equivale a `predict(m_vglm, type = "response")`
+nd <- data.frame(age = 60:90, priorfrac = "No") # datos nuevos
+predict(m_vglm, newdata = nd, type = "response")   # predicción de probabilidades para datos nuevos, matriz n x K
+predict(m_vglm, newdata = nd, type = "link") # predicción de logit frente a referencia
+colnames(p)[max.col(p, ties.method = "first")] # da la categoría más probable
+```
+
+**Efectos marginales.** `marginaleffects` devuelve **un efecto por categoría de respuesta**,
+identificada en la columna `group`:
+```
+avg_slopes(m_nom)                                # continuas y factores, por categoría
+avg_comparisons(m_nom, variables = "priorfrac")  # solo el contraste del factor
+avg_slopes(m_nom, variables = "age", by = "priorfrac")   # desglosado por un factor
+```
+::::
+
+### Bondad de ajuste y diagnóstico
 
 Con la respuesta **individual** no disponemos del $\chi^2$ de bondad de ajuste ni de los residuos
-estándar ([Sección 3.2](#sec-u13-gof-binomial)), así que el ajuste se valora por otras vías, que
-recorremos a continuación: el **contraste global** frente al modelo nulo, la **comparación** entre
-modelos anidados, la **calibración** por categoría y el **acierto clasificatorio**.
+estándar ([Sección 3.1](#sec-u13-gof-binomial)), así que el ajuste se valora por otras vías. Aquí,
+las dos que responden a «¿aporta algo el modelo?»: el **contraste global** frente al modelo nulo y la
+**comparación** entre modelos anidados. La calibración y el acierto clasificatorio vienen después,
+cada uno en su sección.
 
 #### ¿Aporta algo el modelo? El contraste omnibus
 
@@ -1148,20 +1148,39 @@ Qué hacer entonces depende del **objetivo**. Si el fin es
 **predecir**, el AIC es el criterio afín y la edad se queda. Si el fin es **explicar** con un modelo
 parsimonioso, el BIC aconseja soltarla. Si es preciso una justificación con significatividad estadística, abogamos por el LRT que coincide con el AIC en esta ocasión.
 
-#### Calibración por categoría
+#### ¿Y los residuos?
 
-Al agrupar, la calibración fue inmediata ([Sección 3.2](#sec-u13-gof-binomial)): cada celda traía su
+Queda una vía que en los demás modelos del curso damos por descontada y que **aquí no está
+disponible**. Conviene decirlo con claridad, porque la tentación de buscarla es grande.
+
+Los residuos simulados de `DHARMa`, que usamos en la [Unidad 2](#sec-u12) para la logística, **no
+sirven**: el paquete cubre `lm`, `glm`, `mgcv::gam` y los mixtos de `lme4` y `glmmTMB`, y ni
+`nnet::multinom` ni `MASS::polr` están entre las clases soportadas. Tampoco los **residuos
+surrogate** de Liu y Zhang [-@liu2018], implementados en el paquete `sure`, que admiten `clm`,
+`glm`, `lrm`, `orm`, `polr` y `vglm` —modelos **ordinales** o binarios—, pero no el multinomial
+nominal.
+
+El motivo no es una carencia de software, sino la naturaleza de la respuesta: un residuo necesita un
+orden en el que «quedarse corto» o «pasarse», y en una respuesta **nominal** ese orden no existe.
+Por eso el diagnóstico del modelo nominal descansa en las vías que recorremos a continuación
+—calibración por categoría y acierto clasificatorio— y no en una gráfica de residuos. En
+el **ordinal** de la [Sección 3.3](#sec-u13-ordinal), donde el orden sí existe, los residuos
+surrogate vuelven a estar disponibles.
+
+### Calibración
+
+Al agrupar, la calibración fue inmediata ([Sección 3.1](#sec-u13-gof-binomial)): cada celda traía su
 proporción observada. Con datos individuales no hay proporción que mirar —cada mujer es un `Less`,
-un `Same` o un `Greater`—, así que se construye por **tramos de riesgo**: se ordenan las
-observaciones por su probabilidad predicha, se agrupan en quintiles y se compara la **media
-predicha** con la **frecuencia observada** dentro de cada tramo. Y aquí el ejercicio se repite
+un `Same` o un `Greater`—, así que se construye por **quintiles de probabilidad predicha**: se
+ordenan las observaciones por la probabilidad que el modelo asigna a ese nivel, se parten en cinco
+grupos y se compara la **media predicha** con la **frecuencia observada** dentro de cada uno. Y aquí el ejercicio se repite
 **tres veces**, una por categoría: el modelo puede estar bien calibrado en una y mal en otra.
 
 ```{r}
 #| label: fig-u13-calib-nominal
 #| fig-width: 8
 #| fig-height: 3.2
-#| fig-cap: "Calibración por categoría del multinomial nominal: dentro de cada nivel de raterisk, probabilidad media predicha frente a frecuencia observada por quintiles de riesgo. El tamaño del punto es el nº de mujeres del tramo; la diagonal marca la calibración perfecta."
+#| fig-cap: "Calibración por categoría del multinomial nominal: dentro de cada nivel de raterisk, probabilidad media predicha frente a frecuencia observada, por quintiles de esa misma probabilidad. El tamaño del punto es el nº de mujeres del quintil; la diagonal marca la calibración perfecta."
 calib_nom <- as_tibble(fitted(m_nom)) |>
   mutate(obs = glow$raterisk) |>
   pivot_longer(-obs, names_to = "nivel", values_to = "pred") |>
@@ -1193,7 +1212,7 @@ igual. Y es coherente con el efecto marginal de `Same`, que salía próximo a ce
 covariables. Guardemos el dato, porque explicará lo que ocurre a continuación con la matriz de
 confusión.
 
-#### Acierto clasificatorio: la matriz de confusión
+### Discriminación y clasificación
 
 Calibrar bien no es lo mismo que **acertar**. Un modelo puede asignar probabilidades honestas y aun
 así clasificar mal casi siempre, si las tres categorías son parecidas de frecuentes y las
@@ -1248,32 +1267,44 @@ plotted»*, sin intervalos de confianza ni contrastes de comparación. Es decir,
 y **se pierde la curva**, que es lo que hacía didáctica a la ROC. Por eso aquí nos quedamos con la
 matriz de confusión y la calibración por categoría.
 
-#### ¿Y los residuos?
+:::: {.callout-tip}
+## 🔧 En R. Bondad de ajuste, calibración y clasificación del nominal
 
-Queda una vía que en los demás modelos del curso damos por descontada y que **aquí no está
-disponible**. Conviene decirlo con claridad, porque la tentación de buscarla es grande.
+**Bondad de ajuste y comparación.** Con datos individuales no hay $\chi^2$ de bondad de ajuste
+([Sección 2.5](#sec-u12-inferencia)) ni residuos estándar; quedan la verosimilitud y los criterios de
+información —`logLik()`, `AIC()`, `BIC()`, `deviance()`—, el LRT para modelos **anidados** (en
+`vglm`, con `anova()`) y AIC/BIC para los **no anidados**. Con ellos se montan el omnibus y la
+escalera:
+```
+m_nulo <- multinom(y ~ 1, data = d, trace = FALSE)
+lmtest::lrtest(m_nulo, m_nom)                 # omnibus: completo contra el nulo
+lmtest::lrtest(m_nulo, m_sin_x, m_nom)        # escalera: cada fila contra la ANTERIOR
+AIC(m_nulo, m_sin_x, m_nom); BIC(m_nulo, m_sin_x, m_nom)
+```
 
-Los residuos simulados de `DHARMa`, que usamos en la [Unidad 2](#sec-u12) para la logística, **no
-sirven**: el paquete cubre `lm`, `glm`, `mgcv::gam` y los mixtos de `lme4` y `glmmTMB`, y ni
-`nnet::multinom` ni `MASS::polr` están entre las clases soportadas. Tampoco los **residuos
-surrogate** de Liu y Zhang [-@liu2018], implementados en el paquete `sure`, que admiten `clm`,
-`glm`, `lrm`, `orm`, `polr` y `vglm` —modelos **ordinales** o binarios—, pero no el multinomial
-nominal.
+**Calibración por categoría.** Por quintiles de probabilidad predicha, una vez por nivel: `ntile()` sobre la
+probabilidad predicha de cada categoría, y media predicha frente a frecuencia observada.
 
-El motivo no es una carencia de software, sino la naturaleza de la respuesta: un residuo necesita un
-orden en el que «quedarse corto» o «pasarse», y en una respuesta **nominal** ese orden no existe.
-Por eso el diagnóstico del modelo nominal descansa en lo que acabamos de hacer —probabilidades
-predichas, calibración por categoría y acierto clasificatorio— y no en una gráfica de residuos. En
-el **ordinal** de la [Sección 3.4](#sec-u13-ordinal), donde el orden sí existe, los residuos
-surrogate vuelven a estar disponibles.
+**Evaluación.** No hay ROC (véase arriba); se usa la matriz de confusión. `yardstick::conf_mat()`
+admite cualquier número de clases; el único cuidado es que `truth` y `estimate` tengan **los mismos
+niveles y en el mismo orden**, porque `predict()` los hereda del `relevel()` del ajuste:
+```
+library(yardstick)
+eval_nom <- tibble(obs  = factor(d$y,                         levels = niveles),
+                   pred = factor(predict(m_nom, type = "class"), levels = niveles))
+conf_mat(eval_nom, truth = obs, estimate = pred)   # dnn = c(...) renombra las dimensiones
+accuracy(eval_nom, truth = obs, estimate = pred)   # compárese con max(prop.table(table(d$y)))
+pROC::multiclass.roc(d$y, fitted(m_nom))           # AUC de Hand-Till: solo el número, sin curva
+```
+::::
 
-## 3.4 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
+## 3.3 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
 
 Consideramos ahora la respuesta individualizada `raterisk`, que **tiene orden** (`Less < Same < Greater`), y el modelo politómico anterior lo ignoraba.
 
 La **componente aleatoria no cambia**: sigue siendo la misma
 $\mathbf{Y}_i\sim\mathrm{Mult}(1,\boldsymbol{\pi}_i)$ que declaramos en la
-[Sección 3.3](#sec-u13-nominal), con sus $K-1$ probabilidades libres. Lo que cambia es la
+[Sección 3.2](#sec-u13-nominal), con sus $K-1$ probabilidades libres. Lo que cambia es la
 **parametrización** de $\boldsymbol{\pi}_i$: en lugar de $K-1$ contrastes contra una categoría
 base —que tratan los niveles como intercambiables—, $K-1$ **cortes acumulados** que sí explotan el
 orden.
@@ -1286,7 +1317,7 @@ $$
 $$
 con $k\in\{\text{Less},\,\text{Same}\},\quad \theta_{\text{Less}}<\theta_{\text{Same}}$.
 
-Frente al nominal de la [Sección 3.3](#sec-u13-nominal) —que estimaba **un vector de efectos por
+Frente al nominal de la [Sección 3.2](#sec-u13-nominal) —que estimaba **un vector de efectos por
 categoría**— aquí hay dos piezas bien diferenciadas:
 
 - los **umbrales** (interceptos ordenados), uno por cada corte entre categorías contiguas.
@@ -1309,19 +1340,31 @@ convención de `MASS::polr`-. No es un capricho: hace que un coeficiente **posit
 categorías **altas**. Si $\beta_1>0$, sube $\eta$, baja $\theta_k-\eta$ y baja $\Pr(Y\le k)$ en
 **todos** los cortes —es decir, sube $\Pr(Y>k)$—. 
 
-Conviene, pues, leer el efecto sobre las **odds de superar un corte**:
-- un año más de edad multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta_1}$ —el **mismo** factor en los dos cortes— y, equivalentemente, $\operatorname{odds}(Y\le k)$ por
-$e^{-\beta_1}$
-- el hecho de que una paciente haya tenido fractura previa frente a que no la haya tenido, resta $\beta_2$ a $\operatorname{logit}\Pr(Y\le k)$, de modo que multiplica por $e^{-\beta_2}$ las odds acumuladas $\operatorname{odds}(Y\le k)$ y por  $e^{+\beta_2}$ las odds de superar el corte $\operatorname{odds}(Y>k)$, y es el mismo factor en los dos cortes.
+Conviene, pues, leer el efecto sobre las **odds de superar un corte**. Tomando exponenciales en la
+ecuación del modelo,
 
-**En GLOW**, los umbrales estimados son $\theta_{\text{Less}}\approx-2{,}06$ y
-$\theta_{\text{Same}}\approx-0{,}44$, y el vector de efectos
-$(\beta_1,\beta_2)\approx(-0{,}023,\ 0{,}90)$. Se lee así: la **fractura
-previa** ($\beta_2>0$, $e^{\beta_2}\approx 2{,}46$) multiplica por $\approx 2{,}5$ las odds de percibirse
-en una categoría **más alta** (más `Greater`, menos `Less`), por igual en ambos cortes; la **edad**
-($\beta_1<0$, $e^{\beta_1}\approx 0{,}98$ por año) empuja levemente hacia categorías **más bajas**
-(`Less`). Ambos efectos coinciden en dirección con los del nominal, señal de que la proporcionalidad
-de odds es razonable aquí.
+$$\operatorname{odds}(Y\le k)=\frac{\Pr(Y\le k)}{\Pr(Y> k)}=e^{\,\theta_k-\eta},
+\qquad
+\operatorname{odds}(Y> k)=\frac{1}{\operatorname{odds}(Y\le k)}=e^{\,\eta-\theta_k}.$$
+
+Si una covariable $x_j$ aumenta en una unidad, $\eta$ pasa a $\eta+\beta_j$; y al comparar las odds
+nuevas con las viejas, **el umbral se cancela**:
+
+$$\frac{\operatorname{odds}_{x_j+1}(Y> k)}{\operatorname{odds}_{x_j}(Y> k)}
+=\frac{e^{\,\eta+\beta_j-\theta_k}}{e^{\,\eta-\theta_k}}=e^{\beta_j},
+\qquad
+\frac{\operatorname{odds}_{x_j+1}(Y\le k)}{\operatorname{odds}_{x_j}(Y\le k)}=e^{-\beta_j}.$$
+
+Que $\theta_k$ desaparezca del cociente es justamente lo que hace que el factor sea **el mismo en
+todos los cortes**: eso es, literalmente, la **proporcionalidad de odds**. En nuestro modelo:
+
+- un año más de edad multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta_1}$ y, equivalentemente,
+  $\operatorname{odds}(Y\le k)$ por $e^{-\beta_1}$;
+
+- tener fractura previa, frente a no tenerla, multiplica $\operatorname{odds}(Y>k)$ por $e^{\beta_2}$
+  y $\operatorname{odds}(Y\le k)$ por $e^{-\beta_2}$.
+
+### Ajuste e interpretación
 
 Se ajusta con `MASS::polr`, que **exige** una respuesta de tipo **factor ordenado**:
 
@@ -1335,13 +1378,38 @@ tidy(m_ord, exponentiate = TRUE, conf.int = TRUE) |>
   filter(coef.type == "coefficient")   # OR acumulados con IC; los umbrales no son OR
 ```
 
-Frente al nominal de 3.3, el ordinal **gana parsimonia**: un solo $\beta$ por covariable en vez de
+**Cómo se lee la tabla.** `tidy()` devuelve **cuatro filas de dos naturalezas distintas**, que la
+columna `coef.type` separa: dos `coefficient` —los efectos $\beta$ de `age` y `priorfrac`— y dos
+`scale` —los umbrales, etiquetados por el corte que definen, `Less|Same` y `Same|Greater`—. La
+segunda llamada exponencia **solo los efectos**, y por eso filtra por `coef.type == "coefficient"`:
+un umbral no es un odds ratio.
+
+**Los efectos.** La **fractura previa** multiplica por **2,46** las odds de percibirse en una
+categoría más alta, con intervalo **[1,65; 3,68]**, que deja el 1 lejos. Y es **un único** odds
+ratio, común a los dos cortes: ahí está la parsimonia frente al nominal, que necesitaba uno por
+categoría. La **edad** va en sentido contrario, **0,977** por año, con intervalo **[0,959; 0,996]**
+que excluye el 1 por poco. Por año es minúscula; acumulada sobre diez años el factor es
+$e^{10\beta_1}\approx0{,}80$, una reducción del 20 % en las odds de percibirse en riesgo alto.
+
+Un aviso sobre la significación: `polr` **no imprime $p$-valores**, y la columna `statistic` es el
+valor $t$. Aquí vale **4,41** para `priorfrac` y **−2,34** para `age`, ambos más allá de
+$\pm1{,}96$, de acuerdo con lo que dicen los intervalos.
+
+**Los umbrales**, en cambio, no se interpretan sustantivamente: $\theta_{\text{Less}}\approx-2{,}06$ y
+$\theta_{\text{Same}}\approx-0{,}44$ son los logits de $\Pr(Y\le k)$ cuando $\eta=0$, es decir, en una
+mujer de **edad cero** sin fractura previa —una extrapolación sin sentido clínico, igual que los
+interceptos del nominal—. De ellos importa que estén **ordenados**, $\theta_{\text{Less}}<\theta_{\text{Same}}$,
+que es lo que garantiza probabilidades no negativas, y que su separación fija la anchura de la
+categoría central.
+
+Frente al nominal de la [Sección 3.2](#sec-u13-nominal), el ordinal **gana parsimonia**: un solo $\beta$ por covariable en vez de
 uno por categoría, a cambio del **supuesto de proporcionalidad de odds** (el mismo efecto en todos
-los cortes), que conviene contrastar (un test de líneas paralelas).
+los cortes), que conviene contrastar (un test de líneas paralelas). Los dos efectos coinciden en
+dirección con los del nominal, primera señal de que ese supuesto es razonable aquí.
 
-### El AME en el ordinal: el mismo reparto, ahora ordenado
+#### El AME en el ordinal: el mismo reparto, ahora ordenado
 
-El efecto medio marginal se pide igual que en el nominal ([Sección 3.3](#sec-u13-nominal)) y cumple
+El efecto medio marginal se pide igual que en el nominal ([Sección 3.2](#sec-u13-nominal)) y cumple
 la misma restricción —**los $K$ efectos de cada predictor suman cero**—, pero el orden le impone una
 forma reconocible. Con un único $\beta$ común a los cortes, subir $\eta$ desplaza **en bloque** toda
 la distribución sobre la escala ordenada: un $\beta>0$ **resta** probabilidad a la categoría más
@@ -1349,6 +1417,35 @@ baja y se la **suma** a la más alta. Las intermedias son el caso interesante: r
 ceden por el otro, de modo que su efecto puede salir en cualquier dirección y no está determinado
 por el signo de $\beta$ —en GLOW, `Same` resulta negativa con ambos predictores, pero eso es un
 hecho de estos datos, no una regla—.
+
+::: {.callout-note collapse="true"}
+## ¿De dónde salen tres efectos distintos si el $\beta$ es uno solo?
+
+Las probabilidades de categoría son diferencias de acumuladas —con $F$ la logística y, para abreviar,
+$\theta_L\equiv\theta_{\text{Less}}$, $\theta_S\equiv\theta_{\text{Same}}$—:
+
+$$\begin{aligned}
+\pi_{\text{Less}}    &= F(\theta_L-\eta),\\
+\pi_{\text{Same}}    &= F(\theta_S-\eta)-F(\theta_L-\eta),\\
+\pi_{\text{Greater}} &= 1-F(\theta_S-\eta).
+\end{aligned}$$
+
+Y al derivar respecto de una covariable, con $f(u)=F(u)\bigl(1-F(u)\bigr)$ la densidad logística:
+
+$$\begin{aligned}
+\frac{\partial\pi_{\text{Less}}}{\partial x}    &= -\beta\,f(\theta_L-\eta),\\
+\frac{\partial\pi_{\text{Same}}}{\partial x}    &= -\beta\bigl[f(\theta_S-\eta)-f(\theta_L-\eta)\bigr],\\
+\frac{\partial\pi_{\text{Greater}}}{\partial x} &= +\beta\,f(\theta_S-\eta).
+\end{aligned}$$
+
+El $\beta$ es el mismo en las tres, pero va multiplicado por la densidad **evaluada en sitios
+distintos**: en el corte bajo para una categoría y en el alto para la otra. De ahí que los extremos
+salgan con signos opuestos y magnitudes parecidas —pero no iguales—, y de ahí también que la central
+reciba una **diferencia** de densidades, que puede ser pequeña o de cualquier signo. Es el mismo
+fenómeno de la logística binaria: $\beta$ constante en la escala del logit, efecto **no** constante
+en la escala de la probabilidad. La proporcionalidad es una propiedad de las **odds**, no de las
+probabilidades.
+:::
 
 Esa es, en una sola tabla, la diferencia con el nominal: allí las $K$ curvas se movían con
 independencia y los efectos podían repartirse de cualquier forma; aquí los dos extremos tienen el
@@ -1363,96 +1460,77 @@ avg_slopes(m_ord) |>
   summarise(suma_efectos = sum(estimate))
 ```
 
-:::: {.callout-tip}
-## 🔧 En R. Ajustar e inspeccionar el ordinal (odds proporcionales)
+**Cómo se lee la tabla.** La **fractura previa** suma **+19,7 puntos** de probabilidad a `Greater` y
+resta **−17,9** a `Less`, ambos con intervalos que excluyen el cero; a `Same` le quita **1,8**, sin
+distinguirse de cero. El trasvase va, pues, de un extremo al otro **pasando por encima** de la
+categoría central. Y las cifras se parecen mucho a las del nominal (**+21,7** y **−16,3**): resumir
+los dos bloques de efectos en uno solo no falsea la lectura.
 
-**Respuesta.** Debe ser un **factor ordenado** (`ordered()` con los niveles en su orden natural):
+La **edad** repite la misma forma, en pequeño: **+0,49** puntos por año a `Less`, **−0,46** a
+`Greater` y **−0,03** a `Same`. Aquí sí hay una diferencia con el nominal, y es informativa: ahora
+**los dos extremos** excluyen el cero, cuando en el nominal solo lo hacía `Greater`. Es la precisión
+que se gana al estimar **un** $\beta$ en lugar de dos, cuando el supuesto que lo permite se sostiene.
 
-```r
-glow$raterisk <- ordered(glow$raterisk, levels = c("Less", "Same", "Greater"))
-```
+La estructura, en fin, es la que anticipaban las derivadas: extremos con **signos opuestos**,
+categoría central diminuta por ser una **diferencia** de densidades, y los tres efectos **sumando
+cero**.
 
-**Ajuste (motores equivalentes).**
-
-```r
-m_ord  <- MASS::polr(raterisk ~ age + priorfrac, data = glow, Hess = TRUE)
-m_clm  <- ordinal::clm(raterisk ~ age + priorfrac, data = glow)
-m_vglm <- VGAM::vglm(raterisk ~ age + priorfrac,
-                     family = cumulative(parallel = TRUE), data = glow)  # parallel = odds proporcionales
-```
-
-**Resúmenes.** 
-
-- `summary(m_ord)` da **un único bloque de pendientes** (común a los cortes) y los
-**umbrales** (`Intercepts` / `zeta`); 
-- `broom::tidy(m_ord)` los ordena (marca `coef.type` =`coefficient` / `scale`)  
-- `exp(coef(m_ord))` da los **odds ratios acumulados**, y
-  `broom::tidy(m_ord, exponentiate = TRUE, conf.int = TRUE)` los acompaña de su intervalo. Conviene
-  filtrar por `coef.type == "coefficient"`: los **umbrales** no son odds ratios. 
-
-`polr` no imprime $p$-valores; se sacan del valor $t$ o con `ordinal::clm` (que sí los da).
-
-**Bondad de ajuste y comparación.** 
-
-- Verosimilitud y criterios: `logLik()`, `AIC()`, `BIC()`, `deviance()`. 
-- **Modelos anidados** con el LRT (`anova`, `lmtest::lrtest`). 
--  Y clave aquí, el **supuesto de proporcionalidad de odds** (líneas paralelas) se contrasta con
-`brant::brant(m_ord)` (Wald: omnibus + una fila por covariable) o
-`ordinal::nominal_test(m_clm)` (LRT, término a término). En ambos, $H_0$ es que el supuesto **se
-cumple**, así que aquí interesa un $p$ **alto**. La versión a mano —las $K-1$ logísticas binarias,
-una por corte— no necesita paquetes:
-```
-d$corte1 <- as.integer(d$y <= "nivel1")
-glm(corte1 ~ x1 + x2, family = binomial, data = d)   # sus coeficientes estiman -beta
-```
-- Si falla en una covariable concreta: `ordinal::clm(y ~ x1 + x2, nominal = ~ x1)` relaja la
-proporcionalidad solo en ella.
-- La **discriminación** se resume con el índice de concordancia ($c$ de Harrell, $D$ de Somers), no
-con un AUC.
-- Comparar con el **nominal** por AIC/BIC indica si compensa la parsimonia.
-
-**Ajustes y predicciones.** 
-
-- `predict(m_ord, type = "probs")` da la **matriz de probabilidades**,
-- `predict(m_ord, type = "class")` la categoría modal, y 
-- `ggeffects::ggpredict(m_ord, terms = "age[all]")` las dibuja.
-
-**Diagnóstico residual.** Con `sure` (requiere instalarlo):
-```
-library(sure)
-set.seed(...)                 # son aleatorios: sin semilla el gráfico cambia en cada ejecución
-r <- resids(m_ord)            # un residuo surrogate por observación
-gof(m_ord, nsim = 100)        # p-valor simulado de bondad de ajuste
-```
-`sure` ofrece además `autoplot(m_ord, what = "qq" / "covariate" / "fitted")`, pero su método S3 no
-siempre queda registrado frente al genérico `autoplot()` de `ggplot2`, que entonces falla con
-«Objects of class polr are not supported». Construir los gráficos a mano sobre el vector `r` evita
-esa dependencia y, de paso, deja a la vista qué se está dibujando.
-
-**Efectos marginales.** Como en el nominal, `marginaleffects` da **un efecto por categoría** en la
-columna `group`:
-```
-avg_slopes(m_ord)                                # efecto de cada predictor sobre cada nivel
-avg_comparisons(m_ord, variables = "priorfrac")  # el factor, como contraste
-```
-Con `MASS::polr` el ajuste debe llevar `Hess = TRUE` para que haya matriz de varianzas con la que
-calcular los errores estándar.
-::::
+Ese desplazamiento en bloque se aprecia mejor dibujado que tabulado. La @fig-u13-pred-ordinal lo
+muestra con los **dos perfiles** de fractura previa, en el mismo formato que la
+@fig-u13-pred-nominal para poder ponerlas una al lado de la otra.
 
 ```{r}
 #| label: fig-u13-pred-ordinal
-#| fig-width: 6.5
-#| fig-height: 4
-#| fig-cap: "Probabilidad predicha de cada nivel de raterisk según la edad (odds proporcionales, priorfrac = No). Las curvas están ligadas por un único efecto de la edad común a todos los cortes."
-library(ggeffects)
-plot(ggpredict(m_ord, terms = "age [all]"))
+#| fig-width: 7
+#| fig-height: 4.5
+#| fig-cap: "Probabilidad predicha de cada nivel de raterisk según la edad, en cada nivel de priorfrac (odds proporcionales), con bandas de confianza al 95 %. Dentro de cada panel las tres curvas suman 1 a cada edad, y las tres están ligadas por un único efecto de la edad común a los dos cortes."
+pred_ord <- predictions(
+  m_ord,
+  newdata = datagrid(age       = seq(min(glow_ord$age), max(glow_ord$age), length.out = 100),
+                     priorfrac = levels(glow_ord$priorfrac))
+) |>
+  mutate(nivel = factor(group, levels = c("Less", "Same", "Greater")))
+
+ggplot(pred_ord, aes(age, estimate, colour = nivel, fill = nivel)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.15, colour = NA) +
+  geom_line(linewidth = 0.8) +
+  facet_wrap(~ priorfrac, labeller = label_both) +
+  labs(x = "Edad (años)", y = "Probabilidad predicha",
+       colour = "raterisk", fill = "raterisk") +
+  ylim(0, NA)
 ```
 
-La @fig-u13-pred-ordinal lo deja ver: frente a las **curvas libres** del nominal
-(@fig-u13-pred-nominal, panel `priorfrac: No`), aquí están **ligadas** por un único efecto de la edad —la categoría
-central (`Same`) forma una joroba y las extremas son monótonas—. Si ambas imágenes se parecen, el
-supuesto de proporcionalidad es razonable y ganamos parsimonia; si difieren mucho, el ordinal
-estaría forzando.
+**Lo que el orden impone se ve en las extremas.** `Less` sube y `Greater` baja en los dos paneles, y
+no podría ser de otro modo: un **único** $\beta$ fija los dos signos a la vez, y la fórmula de las
+derivadas los obliga a ser opuestos. En el nominal las curvas también salen así, pero allí es un
+**hecho de los datos**; aquí es una **consecuencia del modelo**. Esa es la diferencia entre curvas
+libres y curvas ligadas, y no se aprecia mirando una figura sola.
+
+**La central pide un aviso**, porque $\Pr(Y=\texttt{Same})$ es una joroba en $\eta$ —lo vimos al
+derivar— y en los paneles se ven dos tramos monótonos: baja con la edad si no hay fractura previa y
+sube si la hay. No hay contradicción: la cima de la joroba está en $\eta=(\theta_L+\theta_S)/2$, que
+con estos coeficientes cae en torno a los **55 años** en el panel `No` y hacia los **94** en el `Yes`.
+La ventana observada (55 a 90) no llega a contener el vértice, de modo que **cada panel enseña un
+flanco distinto**. La tabla que sigue lo delata: `Same` vale 0,384 a los 55 años sin fractura previa
+y 0,384 a los 90 con ella; las dos, prácticamente la cima.
+
+Para comparar con el nominal con cifras concretas, evaluamos las seis curvas en las **mismas tres
+edades y los mismos dos perfiles** que usamos allí:
+
+```{r}
+#| label: u13-pred-ordinal-tabla
+# nd_tabla es la rejilla de la Sección 3.2: edades 55/70/90 x los dos niveles de priorfrac
+bind_cols(nd_tabla, as_tibble(predict(m_ord, newdata = nd_tabla, type = "probs"))) |>
+  relocate(Less, Same, Greater, .after = priorfrac)
+```
+
+**Y aquí está el argumento de fondo.** Poniendo esta tabla junto a la del nominal, las dieciocho
+probabilidades difieren en **menos de tres puntos** en casi todas las casillas; el máximo es **5,1**,
+en `Same` a los 90 años sin fractura previa (0,335 en el ordinal frente a 0,386 en el nominal).
+Discrepancias muy por debajo de la anchura de las bandas de confianza de cualquiera de las dos
+figuras. Un modelo de **cuatro** parámetros reproduce, a efectos prácticos, lo que uno de **seis**
+predice en todo el rango observado: eso es lo que significa que la proporcionalidad de odds «salga
+barata», y lo contrastaremos formalmente en la sección siguiente.
 
 Con ambos modelos ajustados, la comparación numérica resume las **discrepancias** entre nominal y
 ordinal:
@@ -1483,8 +1561,9 @@ discrepancias
 ```
 
 La tabla resume el contraste. En **ajuste**, el ordinal emplea **4 parámetros** (dos umbrales + dos
-pendientes) frente a los **6** del nominal (dos bloques de tres); si la proporcionalidad de odds se
-sostiene, su `AIC`/`BIC` salen **competitivos o mejores** pese a algo menos de verosimilitud. En
+pendientes) frente a los **6** del nominal (dos bloques de tres), y con casi la misma verosimilitud
+—$-536{,}50$ frente a $-536{,}07$— gana en los **dos** criterios: AIC **1081,0** frente a 1084,1 y BIC
+**1097,9** frente a 1109,4. La proporcionalidad de odds sale, pues, barata. En
 **efectos**, la diferencia estructural es nítida: el nominal estima **un OR por categoría** y el
 ordinal los **colapsa en uno solo, acumulado**. Para `priorfrac`, el nominal da **0,65** sobre `Less`
 y **2,23** sobre `Greater` (frente a `Same`): leídos en el orden, ambos empujan **hacia arriba** (más
@@ -1495,7 +1574,52 @@ la @fig-u13-pred-ordinal se parece a la @fig-u13-pred-nominal; si un OR claramen
 otro $<1$ **incoherentes** con el orden, el ordinal estaría forzando —y el **test de líneas
 paralelas** lo delataría—.
 
-### Contrastar la proporcionalidad de odds
+:::: {.callout-tip}
+## 🔧 En R. Ajustar, interpretar y predecir con el ordinal (odds proporcionales)
+
+**Respuesta.** Debe ser un **factor ordenado** (`ordered()` con los niveles en su orden natural):
+
+```r
+glow$raterisk <- ordered(glow$raterisk, levels = c("Less", "Same", "Greater"))
+```
+
+**Ajuste (motores equivalentes).**
+
+```r
+m_ord  <- MASS::polr(raterisk ~ age + priorfrac, data = glow, Hess = TRUE)
+m_clm  <- ordinal::clm(raterisk ~ age + priorfrac, data = glow)
+m_vglm <- VGAM::vglm(raterisk ~ age + priorfrac,
+                     family = cumulative(parallel = TRUE), data = glow)  # parallel = odds proporcionales
+```
+
+**Resúmenes.** 
+
+- `summary(m_ord)` da **un único bloque de pendientes** (común a los cortes) y los
+**umbrales** (`Intercepts` / `zeta`); 
+- `broom::tidy(m_ord)` los ordena (marca `coef.type` =`coefficient` / `scale`)  
+- `exp(coef(m_ord))` da los **odds ratios acumulados**, y
+  `broom::tidy(m_ord, exponentiate = TRUE, conf.int = TRUE)` los acompaña de su intervalo. Conviene
+  filtrar por `coef.type == "coefficient"`: los **umbrales** no son odds ratios. 
+
+`polr` no imprime $p$-valores; se sacan del valor $t$ o con `ordinal::clm` (que sí los da).
+
+**Ajustes y predicciones.** 
+
+- `predict(m_ord, type = "probs")` da la **matriz de probabilidades**,
+- `predict(m_ord, type = "class")` la categoría modal, y 
+- `ggeffects::ggpredict(m_ord, terms = "age[all]")` las dibuja.
+
+**Efectos marginales.** Como en el nominal, `marginaleffects` da **un efecto por categoría** en la
+columna `group`:
+```
+avg_slopes(m_ord)                                # efecto de cada predictor sobre cada nivel
+avg_comparisons(m_ord, variables = "priorfrac")  # el factor, como contraste
+```
+Con `MASS::polr` el ajuste debe llevar `Hess = TRUE` para que haya matriz de varianzas con la que
+calcular los errores estándar.
+::::
+
+### Proporcionalidad de odds
 
 Hasta aquí el supuesto se ha valorado **por comparación de imágenes y de OR**, que es informativo
 pero no es un contraste. Conviene formularlo de modo que se pueda someter a prueba.
@@ -1588,11 +1712,12 @@ la misma dirección valen más que un único $p$ alto.
 renuncia: relajar la proporcionalidad **solo en la covariable culpable** —el modelo de *odds
 parcialmente proporcionales*, `ordinal::clm(..., nominal = ~ x)`—; cambiar de estructura ordinal,
 como los modelos de **categorías adyacentes** o de **razón de continuación**, que reparten el orden
-de otra manera; o renunciar al orden y volver al **nominal** de la [Sección 3.3](#sec-u13-nominal),
+de otra manera —no los desarrollamos aquí; el tratamiento de referencia es @agresti2010, y `VGAM` los
+ajusta con `acat()` y `cratio()`/`sratio()`—; o renunciar al orden y volver al **nominal** de la [Sección 3.2](#sec-u13-nominal),
 que no impone restricción alguna a cambio de estimar $(K-1)p$ coeficientes.
 
 :::: {.callout-tip}
-## 🔧 En R. Contrastar la proporcionalidad de odds
+## 🔧 En R. Proporcionalidad de odds
 
 **Ojo a la dirección:** en los tres, $H_0$ es que el supuesto **se cumple**. Aquí interesa un $p$
 **alto**, al revés de lo habitual.
@@ -1623,11 +1748,22 @@ ordinal::clm(y ~ x1 + x2, nominal = ~ x1, data = d)
 ```
 ::::
 
-### Diagnóstico con residuos surrogate
+### Bondad de ajuste y diagnóstico
 
-En la [Sección 3.3](#sec-u13-nominal) dejamos pendiente una deuda: allí no había residuos porque la
-respuesta era **nominal**. Aquí el orden existe, y con él vuelve el diagnóstico residual — aunque
-por un camino que conviene entender, porque el ingenuo no funciona.
+**El $\chi^2$ sigue sin estar disponible.** Los datos son **individuales** —una fila por mujer— y
+`age` es continua, así que no hay perfiles que colapsar: el modelo saturado tendría tantos parámetros
+como observaciones y la aproximación de la [Sección 3.1](#sec-u13-gof-binomial) no se sostiene, igual
+que en el nominal. Lo que sí hay aquí, y allí no, son dos vías que el **orden** hace posibles.
+
+La primera ocupa el resto de esta sección: los **residuos surrogate**, que además traen un $p$-valor
+simulado de bondad de ajuste (`sure::gof()`). La segunda solo la dejamos señalada: existen contrastes
+de bondad de ajuste **específicos del ordinal**, del tipo Hosmer–Lemeshow —el de **Lipsitz** y los de
+**Pulkstenis–Robinson**—, que agrupan a los sujetos en tramos de riesgo y comparan observado con
+esperado; el paquete `generalhoslem` los calcula sobre `polr` y `clm` con `lipsitz.test()` y
+`pulkrob.chisq()`, y @agresti2010 los discute.
+
+Vamos, pues, con el diagnóstico residual, por un camino que conviene entender porque el ingenuo no
+funciona.
 
 **El problema.** Un residuo ordinario necesita restar. Con una respuesta en tres categorías,
 cualquier cosa que reste observado menos predicho toma un puñado de valores distintos, así que al
@@ -1716,47 +1852,74 @@ otra semilla es parte del procedimiento, no un lujo.
 El paquete acompaña estos gráficos con `gof()`, que simula el $p$-valor de contrastes de bondad de
 ajuste sobre los residuos surrogate, para quien quiera una cifra junto a la imagen.
 
-:::: {.callout-tip}
-## 🔧 En R. Diagnóstico del modelo ordinal
+### Calibración
 
-**Residuos surrogate** (paquete `sure`). Son **aleatorios**: fijar la semilla no es opcional.
+Como en el nominal ([Sección 3.2](#sec-u13-nominal)), la calibración se examina **una vez por
+categoría**: se ordenan las mujeres por la probabilidad que el modelo asigna a ese nivel, se agrupan
+en **quintiles de probabilidad predicha** y se compara la **media predicha** con la **frecuencia
+observada** dentro de cada quintil. Lo único que cambia es de dónde salen las probabilidades —aquí, de
+`predict(m_ord, type = "probs")`—.
+
+```{r}
+#| fig-width: 8
+#| fig-height: 3.2
+#| label: fig-u13-calib-ordinal
+#| fig-cap: "Calibración por categoría del modelo de odds proporcionales: dentro de cada nivel de raterisk, probabilidad media predicha frente a frecuencia observada, por quintiles de esa misma probabilidad. El tamaño del punto es el nº de mujeres del quintil; la diagonal marca la calibración perfecta."
+calib_ord <- as_tibble(predict(m_ord, type = "probs")) |>
+  mutate(obs = as.character(glow_ord$raterisk)) |>
+  pivot_longer(-obs, names_to = "nivel", values_to = "pred") |>
+  mutate(ocurre = as.integer(obs == nivel)) |>
+  group_by(nivel) |>
+  mutate(tramo = ntile(pred, 5)) |>
+  group_by(nivel, tramo) |>
+  summarise(pred_media = mean(pred), obs_frec = mean(ocurre), n = n(), .groups = "drop") |>
+  mutate(nivel = factor(nivel, levels = c("Less", "Same", "Greater")))
+
+ggplot(calib_ord, aes(pred_media, obs_frec)) +
+  geom_abline(linetype = "dashed") +
+  geom_line(linewidth = 0.3) +
+  geom_point(aes(size = n), alpha = 0.8) +
+  facet_wrap(~ nivel) +
+  labs(x = "Probabilidad media predicha", y = "Frecuencia observada", size = "n del tramo")
 ```
-library(sure)
-set.seed(...)
-r <- resids(m_ord)        # un residuo por observación
-gof(m_ord, nsim = 100)    # p-valor simulado de bondad de ajuste
-```
-`sure` ofrece `autoplot(m_ord, what = "qq" / "covariate" / "fitted")`, pero su método S3 puede no
-registrarse frente al genérico de `ggplot2` y fallar con «Objects of class polr are not supported».
-Dibujarlos a mano sobre `r` evita el problema:
-```
-ggplot(d, aes(sample = r)) + stat_qq(distribution = qlogis) + stat_qq_line(distribution = qlogis)
-ggplot(d, aes(x1, r)) + geom_point() + geom_smooth()      # forma funcional de una continua
-ggplot(d, aes(x2, r)) + geom_boxplot()                     # un factor
-```
-La referencia del Q-Q es la **latente del enlace**: `qlogis` para logit, `qnorm` para probit.
 
-**Ajuste y comparación.** `logLik()`, `AIC()`, `BIC()`, `deviance()`; anidados con
-`anova()` o `lmtest::lrtest()`; frente al **nominal**, por AIC/BIC.
+Los tres paneles repiten el patrón del nominal. En `Less` y en `Greater` los puntos siguen la
+diagonal sin sesgo sistemático y recorren un **rango amplio** de probabilidad predicha: ahí el modelo
+separa perfiles. En `Same` se apiñan en una franja **estrechísima** y oscilan alrededor de la
+diagonal sin desviarse de ella en un sentido concreto. Las probabilidades son, pues, **fiables en
+las tres categorías**, pero en la central el modelo predice casi lo mismo para todas las mujeres.
 
-**Discriminación.** Una ROC por corte sobre $\Pr(Y>k)$ con `pROC::roc()`, y como resumen único el
-**índice de concordancia**, que se calcula comparando todos los pares (véase el chunk anterior) o con
-`Hmisc::rcorr.cens()`.
+Y esto último no es un defecto del ajuste, sino la consecuencia directa de las derivadas de más
+arriba: $\Pr(Y=\texttt{Same})$ apenas se mueve con $\eta$ —su derivada es la **diferencia** de dos
+densidades parecidas—, así que su rango de valores predichos tiene que ser estrecho. El mismo hecho
+que hacía diminuto su efecto marginal explica aquí la franja.
 
-**Calibración.** Por categoría, como en el nominal: tramos de riesgo con `ntile()` sobre la
-probabilidad predicha de cada nivel, y media predicha frente a frecuencia observada.
-::::
-
-### Discriminación en el ordinal: ROC por corte y concordancia
+### Discriminación y clasificación
 
 En el nominal descartamos la ROC porque no había un único score que umbralizar. En el ordinal **sí
 lo hay**: el predictor lineal $\eta$ ordena a todos los sujetos y —esto es justo lo que significa la
 proporcionalidad de odds— los ordena **igual en todos los cortes**. Cada corte $k$ define entonces un
 problema binario, «$Y>k$ frente a $Y\le k$», con su ROC y su AUC.
 
-Los scores de cada corte son $\Pr(Y>k)$, y todos son funciones **crecientes** del mismo $\eta$. Así
-que las dos curvas evalúan **el mismo orden**: lo comprobamos con una correlación de rangos, que
-debe salir exactamente 1.
+Los scores de cada corte son $\Pr(Y>k)=F(\eta-\theta_k)$, y la proporcionalidad de odds los ata de
+forma muy concreta: en la escala del logit, cada score **es** el predictor lineal desplazado por su
+umbral,
+
+$$\operatorname{logit}\bigl[\Pr(Y>\texttt{Less})\bigr]=\eta-\theta_L,\qquad
+\operatorname{logit}\bigl[\Pr(Y>\texttt{Same})\bigr]=\eta-\theta_S,$$
+
+de modo que uno es el otro trasladado una constante —la distancia entre umbrales, aquí $1{,}62$—:
+
+$$\operatorname{logit}(s_{\texttt{Same}})=\operatorname{logit}(s_{\texttt{Less}})-(\theta_S-\theta_L).$$
+
+Una traslación es estrictamente creciente, y el logit también, así que $s_{\texttt{Same}}$ es función
+**estrictamente creciente** de $s_{\texttt{Less}}$: los dos scores producen **el mismo vector de
+rangos**. Y como la correlación de Spearman es la de Pearson calculada **sobre los rangos**, dos
+vectores con rangos idénticos dan **1 exacto**, no aproximado. Lo comprobamos a continuación.
+
+Nótese que hace falta la correlación de **rangos**: la relación entre los dos scores es monótona pero
+**no lineal** —median un logit y su inversa—, así que la de Pearson sobre los scores sin transformar
+saldría alta, pero no 1.
 
 ```{r}
 #| label: fig-u13-roc-ordinal
@@ -1806,14 +1969,18 @@ $$c=\frac{\#\{\text{pares concordantes}\}+\tfrac12\,\#\{\text{empates en el scor
 
 Vale $0{,}5$ si el modelo ordena al azar y $1$ si lo hace perfectamente, igual que el AUC — del que
 es la generalización exacta: con $K=2$ las dos cantidades coinciden. Se relaciona con la $D$ de
-Somers por $D=2c-1$. No necesita paquete: sale de comparar todos los pares.
+Somers [-@somers1962], una medida de asociación entre variables ordinales, por $D=2c-1$: donde $c$
+va de $0{,}5$ a $1$, $D$ va de $0$ a $1$, y el cero marca la ausencia de asociación. No necesita paquete: sale de comparar todos los pares.
 
 ```{r}
 #| label: u13-concordancia
 y_num <- as.integer(glow_ord$raterisk)   # 1 = Less < 2 = Same < 3 = Greater
+# s_same = Pr(Y > Same), el score del segundo corte, definido en el chunk de la ROC
 
-comparable <- outer(y_num,  y_num,  ">")   # pares en que i está por encima de j
-concordante <- outer(s_same, s_same, ">")  # y el modelo le da más score
+# OBSERVADO: el par (i,j) es comparable si i está en una categoría real más alta que j
+comparable  <- outer(y_num,  y_num,  ">")
+# PREDICHO: ¿el modelo le da más score a i que a j?, ¿o se lo da igual?
+concordante <- outer(s_same, s_same, ">")
 empate      <- outer(s_same, s_same, "==")
 
 c(concordancia = (sum(concordante & comparable) + 0.5 * sum(empate & comparable)) /
@@ -1821,24 +1988,142 @@ c(concordancia = (sum(concordante & comparable) + 0.5 * sum(empate & comparable)
   round(4)
 ```
 
-El resultado, **0,594**, cae entre los dos AUC por corte, como corresponde a un resumen que agrupa
-todos los pares comparables en lugar de fijar una frontera. Se lee directamente: de cada cien pares
-de mujeres en categorías distintas, el modelo coloca por delante a la correcta en unas **59**,
-frente a las 50 que acertaría ordenando al azar.
+El resultado, **0,594**, se lee directamente: de cada cien pares de mujeres en categorías distintas,
+el modelo coloca por delante a la correcta en unas **59**, frente a las 50 que acertaría ordenando al
+azar.
 
-Es poco, y **concuerda con todo lo demás** que hemos medido en el Caso 1 sobre `raterisk`: el 42 %
-de acierto frente al 37,2 % de la clase modal y la franja estrechísima de probabilidades predichas
-para `Same`. Tres medidas distintas —clasificación, calibración y ordenación— apuntando a lo
-mismo: la señal existe, el omnibus la detecta con claridad, pero es **débil** para predecir a nivel
-individual. Que un efecto sea real no lo hace
-grande.
+Conviene deshacer aquí una confusión fácil. Aunque el cálculo use `s_same`, el índice **no** mide la
+separación entre $\{\texttt{Less},\texttt{Same}\}$ y $\texttt{Greater}$: eso es el AUC del segundo
+corte, donde los pares comparables son solo los que **cruzan** esa frontera. La concordancia compara
+**todos** los pares de categoría observada distinta —incluidos los `Less`–`Same`, que ningún AUC por
+corte evalúa— y del score usa únicamente el **orden** que induce, nunca su valor. Como `s_same` es
+estrictamente creciente en $\eta$, ese orden es el de $\eta$: con `s_less` saldría idéntico. `s_same`
+entra, pues, como **representante de $\eta$**, no como el score de su corte, y es la proporcionalidad
+de odds —la correlación de rangos igual a 1— la que autoriza esa sustitución.
 
-Cualquier score monótono en $\eta$ da el mismo valor: usamos `s_same`, pero con `s_less` saldría
-idéntico, y esa es precisamente la consecuencia de la proporcionalidad de odds que acabamos de
-comprobar con la correlación de rangos.
+En GLOW, **0,594** queda **entre** los dos AUC por corte (0,589 y 0,624), como corresponde a un
+resumen que agrupa todos los pares comparables en lugar de fijar una frontera.
 
-Es, además, la herramienta que reaparecerá en la [Unidad 5](#sec-u15) con respuestas **censuradas**,
-donde el AUC tampoco sirve y la concordancia sí.
+::: {.callout-note collapse="true"}
+## Qué pares entran en cada medida
+
+Lo que separa al AUC por corte del índice de concordancia **no es el score** —es el mismo $s$ en
+ambos— sino **qué pares van al denominador**.
+
+El AUC del corte `Same` binariza la respuesta con $Z_i=\mathbf 1\{Y_i=\texttt{Greater}\}$ y mide
+
+$$\text{AUC}_{\texttt{Same}}=\Pr\bigl(s_i>s_j \;\big|\; Z_i=1,\ Z_j=0\bigr),$$
+
+mientras que la concordancia no binariza nada:
+
+$$c=\Pr\bigl(s_i>s_j \;\big|\; Y_i>Y_j\bigr).$$
+
+Con 167 `Less`, 186 `Same` y 147 `Greater`, los pares de categoría distinta son de **tres tipos**, y
+cada medida usa unos u otros:
+
+| tipo de par | cuántos | AUC corte `Less` | AUC corte `Same` | $c$ |
+|---|---:|:---:|:---:|:---:|
+| `Greater` sobre `Same` | 27 342 | — | ✓ | ✓ |
+| `Greater` sobre `Less` | 24 549 | ✓ | ✓ | ✓ |
+| `Same` sobre `Less`    | 31 062 | ✓ | — | ✓ |
+| **pares comparables**  | **82 953** | **55 611** | **51 891** | **82 953** |
+
+Los pares `Same`–`Less` son **el grupo más numeroso** y no entran en el AUC del corte `Same`: por eso
+ese AUC mide «separar `Greater` del resto» y $c$ mide «ordenar», sin más.
+
+Llamando $c_{GS}$, $c_{GL}$ y $c_{SL}$ a la proporción de aciertos **dentro** de cada tipo, las tres
+cantidades son medias ponderadas de las mismas piezas:
+
+$$c=\frac{N_{GS}c_{GS}+N_{GL}c_{GL}+N_{SL}c_{SL}}{N_{GS}+N_{GL}+N_{SL}},\qquad
+\text{AUC}_{\texttt{Same}}=\frac{N_{GS}c_{GS}+N_{GL}c_{GL}}{N_{GS}+N_{GL}},\qquad
+\text{AUC}_{\texttt{Less}}=\frac{N_{SL}c_{SL}+N_{GL}c_{GL}}{N_{SL}+N_{GL}}.$$
+
+$c$ promedia los **tres** tipos; cada AUC promedia **dos**. Que $c$ caiga entre ambos es, pues, lo
+habitual, pero **no** una necesidad: si el tipo compartido `Greater`–`Less` fuera mucho más
+concordante que los otros dos, los dos AUC quedarían por encima de $c$.
+:::
+
+Es, además, la herramienta que reaparecerá con respuestas **censuradas** ([Unidad 5](#sec-u15)), y
+allí por una razón distinta de la de aquí: no es que falte un score —lo hay—, sino que la censura
+deja el desenlace **desconocido** para parte de la muestra, de modo que no se puede binarizar la
+respuesta y el AUC ordinario no llega a definirse. La concordancia solo necesita los pares cuyo orden
+**sí** se conoce, y por eso sobrevive a la censura.
+
+**Y el acierto como clasificador.** Igual que en el nominal, asignar a cada mujer su categoría
+**más probable** permite cruzar predicho con observado. Aquí la comparación es doble: contra el
+**37,2 %** de la clase modal, que es el suelo, y contra el **42,0 %** que alcanzó el nominal —porque
+el ordinal usa **la mitad de coeficientes**, y conviene saber si esa parsimonia se paga en acierto.
+
+```{r}
+#| label: u13-confusion-ordinal
+eval_ord <- tibble(
+  obs  = factor(glow_ord$raterisk,              levels = c("Less", "Same", "Greater")),
+  pred = factor(predict(m_ord, type = "class"), levels = c("Less", "Same", "Greater"))
+)
+
+conf_mat(eval_ord, truth = obs, estimate = pred, dnn = c("Predicho", "Observado"))
+
+c(acierto     = accuracy(eval_ord, truth = obs, estimate = pred)$.estimate,
+  clase_modal = max(prop.table(table(glow_ord$raterisk))))
+```
+
+**El ordinal acierta el 39,8 %**: dos puntos por debajo del nominal y apenas dos y medio por encima
+del suelo de la clase modal. La matriz dice de dónde viene la diferencia: el ordinal **se refugia
+menos** en la categoría central —predice `Same` para **253** mujeres, frente a las **291** del
+nominal—, lo que le hace acertar bastantes más `Less` (**61** frente a 46) a costa de acertar menos
+`Same` (**97** frente a 117) y menos `Greater` (**41** frente a 47). El saldo neto queda ligeramente
+en contra.
+
+Conviene leerlo junto a lo anterior, no en su lugar. El ordinal ganaba en **AIC y BIC** con dos
+parámetros menos, y eso sigue siendo cierto; lo que esta tabla añade es que esa ventaja **no se
+traslada al acierto clasificatorio**. Son preguntas distintas —«¿qué modelo describe mejor los datos
+con menos piezas?» frente a «¿cuál acierta más veces la categoría?»— y aquí responden distinto,
+igual que discreparon AIC y BIC ante la edad en el nominal.
+
+Y todo **concuerda**: concordancia de **0,594**, un acierto del **39,8 %** que apenas despega del
+**37,2 %** de la clase modal, y la franja estrechísima de probabilidades predichas para `Same`. Tres
+medidas distintas —ordenación, clasificación y calibración— apuntando a lo mismo: la señal existe, el
+omnibus la detecta con claridad, pero es **débil** para predecir a nivel individual. Que un efecto
+sea real no lo hace grande.
+
+:::: {.callout-tip}
+## 🔧 En R. Diagnóstico y evaluación del ordinal
+
+**Residuos surrogate** (paquete `sure`). Son **aleatorios**: fijar la semilla no es opcional.
+```
+library(sure)
+set.seed(...)
+r <- resids(m_ord)        # un residuo por observación
+gof(m_ord, nsim = 100)    # p-valor simulado de bondad de ajuste
+```
+`sure` ofrece `autoplot(m_ord, what = "qq" / "covariate" / "fitted")`, pero su método S3 puede no
+registrarse frente al genérico de `ggplot2` y fallar con «Objects of class polr are not supported».
+Dibujarlos a mano sobre `r` evita el problema:
+```
+ggplot(d, aes(sample = r)) + stat_qq(distribution = qlogis) + stat_qq_line(distribution = qlogis)
+ggplot(d, aes(x1, r)) + geom_point() + geom_smooth()      # forma funcional de una continua
+ggplot(d, aes(x2, r)) + geom_boxplot()                     # un factor
+```
+La referencia del Q-Q es la **latente del enlace**: `qlogis` para logit, `qnorm` para probit.
+
+**Ajuste y comparación.** `logLik()`, `AIC()`, `BIC()`, `deviance()`; anidados con
+`anova()` o `lmtest::lrtest()`; frente al **nominal**, por AIC/BIC. No hay $\chi^2$ de bondad de
+ajuste (datos individuales), pero sí contrastes propios del ordinal:
+`generalhoslem::lipsitz.test(m_ord)` y `generalhoslem::pulkrob.chisq(m_ord, catvars = "x2")`.
+
+**Discriminación.** Una ROC por corte sobre $\Pr(Y>k)$ con `pROC::roc()`; `ggroc()` acepta una
+**lista** de objetos `roc` y las dibuja juntas, con una leyenda por corte. Conviene comprobar de paso
+que los scores de los distintos cortes ordenan igual —`cor(s1, s2, method = "spearman")` debe dar
+**1** si la proporcionalidad se cumple—. Como resumen único, el
+**índice de concordancia**, que se calcula comparando todos los pares (véase el chunk anterior) o con
+`Hmisc::rcorr.cens()`.
+
+**Calibración.** Por categoría, como en el nominal: quintiles con `ntile()` sobre la
+probabilidad predicha de cada nivel, y media predicha frente a frecuencia observada.
+
+**Clasificación.** `predict(m_ord, type = "class")` da la categoría modal; con ella,
+`yardstick::conf_mat()` y `accuracy()`, realineando los niveles como en el nominal.
+::::
 
 ::: {.callout-note}
 ## Puente a la Unidad 4

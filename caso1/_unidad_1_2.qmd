@@ -1561,7 +1561,7 @@ ajustadas, sin informar del ajuste absoluto [@agresti2015; @hosmer2013].
 
 (i) **agrupar** —si las covariables son categóricas, se
 pasa a binomial: tanto $D$ como el **estadístico de Pearson** $X^2$ **recuperan su sentido** como
-contraste $\chi^2$, y allí los definimos con detalle ([Sección 3.2](#sec-u13-gof-binomial))—; 
+contraste $\chi^2$, y allí los definimos con detalle ([Sección 3.1](#sec-u13-gof-binomial))—; 
 
 (ii) cuando no se
 puede (covariables continuas, como en GLOW), se sustituye el contraste global por herramientas que
@@ -1597,7 +1597,7 @@ Para diagnosticar un GLM **observación a observación** se examinan los **resid
 un GLM son los de **Pearson** y los de **deviance** [@mccullagh1989];
 son informativos cuando hay **suficiente información por observación** —datos agrupados, conteos
 altos—, y los desarrollamos en propiedad (fórmulas, gráfico y variantes —estandarizados, leverage,
-distancia de Cook—) en la [Sección 3.2](#sec-u13-gof-binomial), donde **sí** funcionan.
+distancia de Cook—) en la [Sección 3.1](#sec-u13-gof-binomial), donde **sí** funcionan.
 
 **El problema en binaria.** Con respuesta **binaria individual**, $y_i\in\{0,1\}$: para cada
 $\hat\mu_i$ el residuo crudo solo toma dos valores y se ordena en **dos bandas**, y ni Pearson ni
