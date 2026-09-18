@@ -42,7 +42,7 @@ PAQUETES  <- c(
   nnet = "7.3.20", ordinal = "2025.12.29", pROC = "1.19.0.1",
   patchwork = "1.3.2", performance = "0.17.0", readr = "2.2.0",
   see = "0.14.0", sessioninfo = "1.2.4", sure = "0.2.0", tibble = "3.3.1",
-  tidyr = "1.3.2", tidyverse = "2.0.0")
+  tidyr = "1.3.2", tidyverse = "2.0.0", yardstick = "1.4.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -144,15 +144,22 @@ tidy(fit_bin, exponentiate = TRUE, conf.int = TRUE)
 # [u13-ame-binomial]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.1 Del dato individual al agrupado: respuesta binomial
-#       > Del odds ratio a la probabilidad: el AME con datos agrupados
 # -----------------------------------------------------------------------------
 library(marginaleffects)
-
+cat("AME en el modelo binomial (ponderado por el tamaño de las celdas)")
 avg_comparisons(fit_bin, variables = "priorfrac", wts = "total")  # ponderado por el tamaño de celda
+cat("AME en el modelo Bernoulli")
 avg_comparisons(fit_ind, variables = "priorfrac")                 # el mismo AME, dato individual
-avg_comparisons(fit_bin, variables = "priorfrac")                 # sin ponderar: promedia celdas, no mujeres
 
+cat("Comparación de las probabilidades (Yes-No), celda a celda")
 comparisons(fit_bin, variables = "priorfrac")   # el contraste celda a celda: no es constante
+
+# -----------------------------------------------------------------------------
+# [(sin etiqueta)]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.1 Del dato individual al agrupado: respuesta binomial
+# -----------------------------------------------------------------------------
+avg_predictions(fit_bin, variables = "priorfrac", wts = "total")
 
 # -----------------------------------------------------------------------------
 # [u13-deviance-celda]
@@ -179,7 +186,7 @@ c(suma_d_i = sum(aporta$d_i), deviance = deviance(fit_bin))   # la suma ES la de
 #     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
 #       > Bondad de ajuste
 # -----------------------------------------------------------------------------
-gl <- df.residual(fit_bin)                       # n - p = nº de celdas - nº de parámetros
+gl <- df.residual(fit_bin)                       # k - p = nº de celdas - nº de parámetros
 c(deviance = deviance(fit_bin),
   pearson  = sum(residuals(fit_bin, type = "pearson")^2),
   gl       = gl)
@@ -229,7 +236,7 @@ diag_bin |>
   mutate(p_obs=Yes/total) |>
   select( priorfrac, momfrac, raterisk, m = total, p_obs, pred, w, h, r_std, cook,celda = cell)
 
-c(referencia_cook = 4 / nrow(diag_bin))   # la línea de puntos del panel derecho
+c(referencia_cook = 4 / nrow(diag_bin))   # 4/k: nrow() cuenta CELDAS, no mujeres
 
 # -----------------------------------------------------------------------------
 # [fig-u13-calibracion]
@@ -248,53 +255,64 @@ ggplot(calib_bin, aes(pred, obs, size = total)) +
        size = "n por celda")
 
 # -----------------------------------------------------------------------------
-# [u13-brier-binomial]
+# [u13-ecm-calibracion]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
 #       > Calibración
-#         > Un número para la calibración: el Brier score
+#         > Un número para la calibración
 # -----------------------------------------------------------------------------
-m_i   <- glow_agg$total
-pi_h  <- fitted(fit_bin)
-p_obs <- glow_agg$Yes / m_i
-n     <- sum(m_i)
+m_i  <- calib_bin$total
+pi_h <- calib_bin$pred
+n    <- sum(m_i)
+ecm  <- sum(m_i * (calib_bin$obs - pi_h)^2) / n
 
-c(binomial   = sum(glow_agg$Yes * (1 - pi_h)^2 + (m_i - glow_agg$Yes) * pi_h^2) / n,
-  individual = mean((fitted(fit_ind) - glow$fractura01)^2))
-
-# -----------------------------------------------------------------------------
-# [u13-brier-descomposicion]
-#   3 · Extensión de la respuesta binaria: binomial y politómica
-#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
-#       > Calibración
-#         > Un número para la calibración: el Brier score
-# -----------------------------------------------------------------------------
-c(calibracion = sum(m_i * (p_obs - pi_h)^2) / n,
-  irreducible = sum(m_i * p_obs * (1 - p_obs)) / n,
-  nulo        = mean(glow$fractura01) * (1 - mean(glow$fractura01)))
+c(ecm_calibracion = ecm, raiz = sqrt(ecm))
 
 # -----------------------------------------------------------------------------
 # [fig-u13-roc-binomial]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
-#       > Calibración
-#         > Discriminación: la ROC con datos agrupados
+#       > Discriminación
 # -----------------------------------------------------------------------------
 library(pROC)
 
-# El binomial aplicado mujer a mujer: cada una recibe la probabilidad de su perfil
-p_mujer <- predict(fit_bin, newdata = glow, type = "response")
+# Cada celda aporta sus Yes casos y sus No controles, todos con la misma probabilidad
+# predicha: desplegar la tabla devuelve los ensayos sin recurrir a la cohorte individual
+ensayos <- glow_agg |>
+  mutate(pred = fitted(fit_bin)) |>
+  tidyr::pivot_longer(c(Yes, No), names_to = "fractura", values_to = "n") |>
+  tidyr::uncount(n) |>
+  mutate(y = as.integer(fractura == "Yes"))
 
-roc_bin <- roc(glow$fractura01, p_mujer,            quiet = TRUE)
-roc_ind <- roc(glow$fractura01, fitted(fit_ind),    quiet = TRUE)
+roc_bin <- roc(ensayos$y, ensayos$pred,          quiet = TRUE)
+roc_ind <- roc(glow$fractura01, fitted(fit_ind), quiet = TRUE)
 
-c(auc_binomial            = as.numeric(auc(roc_bin)),
-  auc_individual          = as.numeric(auc(roc_ind)),
-  puntuaciones_distintas  = length(unique(p_mujer)))
+c(ensayos                 = nrow(ensayos),
+  puntuaciones_distintas  = length(unique(ensayos$pred)),
+  auc_agrupado            = as.numeric(auc(roc_bin)),
+  auc_individual          = as.numeric(auc(roc_ind)))
 
 ggroc(roc_bin) +
   geom_abline(intercept = 1, slope = 1, linetype = "dashed") +
   labs(x = "Especificidad", y = "Sensibilidad")
+
+# -----------------------------------------------------------------------------
+# [u13-confusion-binomial]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.2 Bondad de ajuste y diagnóstico en datos binomiales
+#       > Discriminación
+# -----------------------------------------------------------------------------
+library(yardstick)
+
+eval_agg <- glow_agg |>
+  mutate(pred = factor(if_else(fitted(fit_bin) >= 0.5, "Yes", "No"), levels = c("No", "Yes"))) |>
+  tidyr::pivot_longer(c(Yes, No), names_to = "obs", values_to = "n") |>
+  mutate(obs = factor(obs, levels = c("No", "Yes")))
+
+conf_mat(eval_agg, truth = obs, estimate = pred, case_weights = n)
+
+metric_set(accuracy, sensitivity, specificity)(
+  eval_agg, truth = obs, estimate = pred, case_weights = n, event_level = "second")
 
 # -----------------------------------------------------------------------------
 # [u13-sobredisp]
@@ -309,6 +327,7 @@ sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
 # [u13-nominal]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Más de dos categorías sin orden: politómica nominal
+#       > Interpretación
 # -----------------------------------------------------------------------------
 library(nnet)
 m_nom <- multinom(relevel(raterisk, ref = "Same") ~ age + priorfrac,
@@ -321,27 +340,7 @@ tidy(m_nom, exponentiate = TRUE, conf.int = TRUE)   # odds ratios relativos, con
 # [fig-u13-pred-nominal]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Más de dos categorías sin orden: politómica nominal
-# -----------------------------------------------------------------------------
-# `ggeffects` no calcula intervalos para `multinom`; `predictions()` sí, y trae el nivel de la
-# respuesta en la columna `group`.
-pred_nom_No <- predictions(
-  m_nom,
-  newdata = datagrid(age       = seq(min(glow$age), max(glow$age), length.out = 100),
-                     priorfrac = "No")
-) |>
-  mutate(nivel = factor(group, levels = c("Less", "Same", "Greater")))
-
-ggplot(pred_nom_No, aes(age, estimate, colour = nivel, fill = nivel)) +
-  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.15, colour = NA) +
-  geom_line(linewidth = 0.8) +
-  labs(x = "Edad (años)", y = "Probabilidad predicha",
-       colour = "raterisk", fill = "raterisk") +
-  ylim(0, NA)
-
-# -----------------------------------------------------------------------------
-# [fig-u13-pred-nominal-priorfrac]
-#   3 · Extensión de la respuesta binaria: binomial y politómica
-#     > 3.3 Más de dos categorías sin orden: politómica nominal
+#       > Interpretación
 # -----------------------------------------------------------------------------
 # predictions() añade el intervalo de confianza, que predict() no da para multinom.
 # La columna `group` trae el nivel de la respuesta.
@@ -364,6 +363,7 @@ ggplot(pred_nom, aes(age, estimate, colour = nivel, fill = nivel)) +
 # [u13-pred-nominal-tabla]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Más de dos categorías sin orden: politómica nominal
+#       > Interpretación
 # -----------------------------------------------------------------------------
 nd_tabla <- expand.grid(
   age       = c(55, 70, 90),
@@ -377,7 +377,8 @@ bind_cols(nd_tabla, as_tibble(predict(m_nom, newdata = nd_tabla, type = "probs")
 # [u13-ame-nominal]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Más de dos categorías sin orden: politómica nominal
-#       > El AME en el politómico: un efecto por categoría, y suman cero
+#       > Interpretación
+#         > El AME en el politómico: un efecto por categoría, y suman cero
 # -----------------------------------------------------------------------------
 library(marginaleffects)
 
@@ -409,10 +410,17 @@ lmtest::lrtest(m_nulo, m_nom)
 m_sin_age <- multinom(relevel(raterisk, ref = "Same") ~ priorfrac, data = glow, trace = FALSE)
 
 # Cada fila contrasta un modelo contra el ANTERIOR, no contra el nulo
-lrt=lmtest::lrtest(m_nulo, m_sin_age, m_nom)
-aic=AIC(m_nulo, m_sin_age, m_nom)
-bic=BIC(m_nulo, m_sin_age, m_nom)
-cbind(aic,bic,lrt)
+lrt <- lmtest::lrtest(m_nulo, m_sin_age, m_nom)
+
+data.frame(
+  modelo = c("nulo", "sin age", "completo"),
+  par    = lrt$`#Df`,                            # nº de parámetros del modelo
+  AIC    = AIC(m_nulo, m_sin_age, m_nom)$AIC,
+  BIC    = BIC(m_nulo, m_sin_age, m_nom)$BIC,
+  gl     = lrt$Df,                               # gl del contraste con la fila anterior
+  Chisq  = lrt$Chisq,
+  p      = lrt$`Pr(>Chisq)`
+)
 
 # -----------------------------------------------------------------------------
 # [fig-u13-calib-nominal]
@@ -443,32 +451,24 @@ ggplot(calib_nom, aes(pred_media, obs_frec)) +
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Más de dos categorías sin orden: politómica nominal
 #       > Bondad de ajuste, diagnóstico y comparación
-#         > Acierto clasificatorio: matriz de confusión y Brier
+#         > Acierto clasificatorio: la matriz de confusión
 # -----------------------------------------------------------------------------
-pred_clase <- predict(m_nom, type = "class")
+# `predict` hereda los niveles del relevel, así que los realineamos: solo con truth y
+# estimate en el mismo orden los aciertos caen sobre la diagonal
+library(yardstick)
+eval_nom <- tibble(
+  obs  = factor(glow$raterisk,                  levels = c("Less", "Same", "Greater")),
+  pred = factor(predict(m_nom, type = "class"), levels = c("Less", "Same", "Greater"))
+)
 
-table(Predicho = pred_clase, Observado = glow$raterisk)
+conf_mat(eval_nom, truth = obs, estimate = pred, dnn = c("Predicho", "Observado"))
 
-c(acierto      = mean(pred_clase == glow$raterisk),
-  clase_modal  = max(prop.table(table(glow$raterisk))))   # acierto sin modelo
+# En relativo por columna: qué hace el modelo con cada categoría realmente observada
+prop.table(table(Predicho = eval_nom$pred, Observado = eval_nom$obs), margin = 2) |>
+  round(3)
 
-# -----------------------------------------------------------------------------
-# [u13-nominal-brier]
-#   3 · Extensión de la respuesta binaria: binomial y politómica
-#     > 3.3 Más de dos categorías sin orden: politómica nominal
-#       > Bondad de ajuste, diagnóstico y comparación
-#         > Acierto clasificatorio: matriz de confusión y Brier
-# -----------------------------------------------------------------------------
-P   <- fitted(m_nom)                          # n x K; columnas = niveles de la respuesta
-obs <- factor(glow$raterisk, levels = colnames(P))
-Y   <- model.matrix(~ 0 + obs)                # one-hot
-colnames(Y) <- levels(obs)
-
-# Referencia sin covariables: las proporciones marginales para todas
-P0 <- matrix(colMeans(Y), nrow = nrow(Y), ncol = ncol(Y), byrow = TRUE)
-
-c(brier_modelo = mean(rowSums((P  - Y)^2)),
-  brier_nulo   = mean(rowSums((P0 - Y)^2)))
+c(acierto     = accuracy(eval_nom, truth = obs, estimate = pred)$.estimate,
+  clase_modal = max(prop.table(table(glow$raterisk))))   # acierto sin modelo
 
 # -----------------------------------------------------------------------------
 # [u13-ordinal]

@@ -258,7 +258,7 @@ has saltado ninguna de las **tareas que un buen analista** hace en un proyecto. 
 *Evaluación*
 
 - [ ] Diagnosticar: residuos, calibración, separación, bondad de ajuste (χ²), sobredispersión y los supuestos propios del modelo (proporcionalidad de odds en el ordinal, riesgos proporcionales en supervivencia, convergencia y no-singularidad en los mixtos).
-- [ ] Evaluar la capacidad predictiva con la métrica adecuada: AUC y calibración (binaria), Brier multiclase (nominal), hazard/supervivencia por periodo.
+- [ ] Evaluar la capacidad predictiva con la métrica adecuada: AUC y calibración (binaria), matriz de confusión frente a la clase modal (nominal), hazard/supervivencia por periodo.
 - [ ] Seleccionar y comparar modelos con criterios (AIC/BIC) y contrastes (LRT), justificando la elección.
 
 *Resultados*

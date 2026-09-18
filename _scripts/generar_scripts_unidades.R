@@ -10,7 +10,7 @@
 #  depende de tu directorio de trabajo, el resto no):
 #      source("_scripts/generar_scripts_unidades.R")   # define la función
 #      generar_scripts()                # todos los casos que encuentre
-#      generar_scripts(casos = 2)       # solo el caso 2
+#      generar_scripts(casos = 1)       # solo el caso 2
 #      generar_scripts(casos = 3, solo_faltantes = TRUE)   # sin pisar lo existente
 #      generar_scripts(simular = TRUE)  # enseña qué haría, sin escribir nada
 #
