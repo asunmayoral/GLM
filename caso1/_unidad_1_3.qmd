@@ -1661,13 +1661,13 @@ los dos bloques de efectos en uno solo no falsea la lectura.
 La **edad** repite la misma forma, en pequeño: **+0,49** puntos por año a `Less`, **−0,46** a
 `Greater` y **−0,03** a `Same`. Aquí sí hay una diferencia con el nominal, y es informativa: ahora
 **los dos extremos** excluyen el cero, cuando en el nominal solo lo hacía `Greater`. Es la precisión
-que se gana al estimar **un** $\beta$ en lugar de dos, cuando el supuesto que lo permite se sostiene.
+que se gana al estimar **un** $\beta$ en lugar de dos, cuando el supuesto que lo permite se sostiene. 
 
-La estructura, en fin, es la que anticipaban las derivadas: extremos con **signos opuestos**,
+La estructura es la que anticipaban las derivadas: extremos con **signos opuestos**,
 categoría central diminuta por ser una **diferencia** de densidades, y los tres efectos **sumando
 cero**.
 
-Ese desplazamiento en bloque se aprecia mejor dibujado que tabulado. La @fig-u13-pred-ordinal lo
+La @fig-u13-pred-ordinal lo
 muestra con los **dos perfiles** de fractura previa, en el mismo formato que la
 @fig-u13-pred-nominal para poder ponerlas una al lado de la otra.
 
@@ -1695,8 +1695,7 @@ ggplot(pred_ord, aes(age, estimate, colour = nivel, fill = nivel)) +
 **Lo que el orden impone.** `Less` sube y `Greater` baja en los dos paneles, y
 no podría ser de otro modo: un **único** $\beta$ fija los dos signos a la vez, y la fórmula de las
 derivadas los obliga a ser opuestos. En el nominal las curvas también salen así, pero allí es un
-**hecho de los datos**; aquí es una **consecuencia del modelo**. Esa es la diferencia entre curvas
-libres y curvas ligadas, y no se aprecia mirando una figura sola.
+**hecho de los datos**; aquí es una **consecuencia del modelo**.
 
 **La central es un resto.** Las tres curvas suman 1 a cada edad, así que $\pi_{\texttt{Same}}$ es lo
 que los dos extremos dejan libre, $1-\pi_{\texttt{Less}}-\pi_{\texttt{Greater}}$. Si lo que gana
@@ -1790,6 +1789,11 @@ proporcionalidad de odds; el apartado siguiente las pone en la balanza de AIC y 
 
 #### ¿Compensa el ordinal frente al nominal?
 
+La comparación va aquí con **AIC y BIC**, no con un LRT: nominal y ordinal **no están anidados**
+—ninguno se obtiene restringiendo el otro—, y sin anidamiento la diferencia de verosimilitudes no
+sigue una $\chi^2$. Los criterios de información solo exigen la misma muestra y la misma respuesta,
+y eso sí se cumple.
+
 Con ambos modelos ajustados, la comparación numérica resume las **discrepancias** entre nominal y
 ordinal:
 
@@ -1825,9 +1829,11 @@ pendientes) frente a los **6** del nominal (dos bloques de tres), y con casi la 
 **efectos**, la diferencia estructural es nítida: el nominal estima **un OR por categoría** y el
 ordinal los **colapsa en uno solo, acumulado**. Para `priorfrac`, el nominal da **0,65** sobre `Less`
 y **2,23** sobre `Greater` (frente a `Same`): leídos en el orden, ambos empujan **hacia arriba** (más
-`Greater`, menos `Less`), justo lo que resume el OR acumulado **2,46**. Para `age` ocurre lo simétrico
-(**1,01** y **0,98** → empuje **hacia abajo**, hacia `Less`; acumulado **0,98**). Como las dos
-lecturas nominales son **coherentes con el orden** en ambas covariables, el resumen ordinal es fiel y
+`Greater`, menos `Less`), justo lo que resume el OR acumulado **2,46**. Con `age` la estructura se
+repite en **sentido contrario**: **1,01** sobre `Less` y **0,98** sobre `Greater`, es decir, `Less`
+gana terreno y `Greater` lo pierde, de modo que ambos empujan **hacia abajo** en el orden; el OR
+acumulado **0,98** lo resume. Como las dos lecturas nominales son **coherentes con el orden** en
+ambas covariables, el resumen ordinal es fiel y
 la @fig-u13-pred-ordinal se parece a la @fig-u13-pred-nominal; si un OR claramente $>1$ conviviera con
 otro $<1$ **incoherentes** con el orden, el ordinal estaría forzando —y el **test de líneas
 paralelas** lo delataría—.
@@ -1881,8 +1887,11 @@ sí y cercanas a la tercera, el ordinal está resumiendo bien; si una covariable
 —o peor, de signo— entre cortes, es esa covariable la que rompe el supuesto. El diagnóstico es
 **por variable**, no global: puede fallar en una y sostenerse en las demás.
 
-**Los contrastes formales** hacen lo mismo con un estadístico. Hay dos vías, y su relación es la de
-Wald frente a razón de verosimilitudes de la [Sección 2.5](#sec-u12-inferencia):
+**Los contrastes formales** hacen lo mismo con un estadístico. Y aquí el LRT **sí** es legítimo, al
+contrario que en la comparación con el nominal: el modelo de odds proporcionales es el **restringido**
+del no proporcional —es $H_0$ escrito arriba—, así que están anidados y la diferencia de
+verosimilitudes sigue una $\chi^2$. Hay dos vías, y su relación es la de Wald frente a razón de
+verosimilitudes de la [Sección 2.5](#sec-u12-inferencia):
 
 - El **test de Brant** [@brant1990] es de tipo **Wald**: estima los $\boldsymbol\beta_k$ de los
   cortes por separado y mide su discrepancia. Devuelve un contraste **omnibus** y uno por
@@ -2128,14 +2137,8 @@ constante, la distancia entre umbrales, aquí $1{,}62$:
 
 $$\operatorname{logit}(s_{\texttt{Same}})=\operatorname{logit}(s_{\texttt{Less}})-(\theta_S-\theta_L).$$
 
-Una traslación es estrictamente creciente, y el logit también, así que $s_{\texttt{Same}}$ es función
-**estrictamente creciente** de $s_{\texttt{Less}}$: los dos scores producen **el mismo vector de
-rangos**. Y como la correlación de Spearman es la de Pearson calculada **sobre los rangos**, dos
-vectores con rangos idénticos dan **1 exacto**, no aproximado. Lo comprobamos a continuación.
-
-Nótese que hace falta la correlación de **rangos**: la relación entre los dos scores es monótona pero
-**no lineal** —median un logit y su inversa—, así que la de Pearson sobre los scores sin transformar
-saldría alta, pero no 1.
+Una traslación es estrictamente creciente, así que los dos scores ordenan a las 500 mujeres
+exactamente igual: su correlación de **rangos** tiene que valer 1, y el chunk lo comprueba.
 
 ```{r}
 #| label: fig-u13-roc-ordinal
@@ -2159,16 +2162,14 @@ ggroc(list(`Y > Less` = roc_c1, `Y > Same` = roc_c2)) +
   labs(x = "Especificidad", y = "Sensibilidad", colour = "Corte")
 ```
 
-**La correlación de rangos sale exactamente 1**, como tenía que salir: los dos scores son funciones
-crecientes del mismo $\eta$, así que ordenan a las 500 mujeres de forma idéntica. Es la
-proporcionalidad de odds convertida en una cifra comprobable.
-
-Y sin embargo **los dos AUC difieren**: **0,589** en el corte `Less` y **0,624** en el corte `Same`.
-Conviene detenerse aquí, porque parece una contradicción y no lo es. El orden es el mismo; lo que
-cambia es **el suceso que se intenta separar**. Cada corte parte la muestra en dos grupos distintos,
-con prevalencias distintas, y un mismo ordenamiento acierta más o menos según dónde se ponga la
-frontera. Es la prueba de que el AUC no mide solo el modelo: mide el modelo **frente a un problema
-concreto**.
+La correlación sale 1, como tenía que salir. Y sin embargo **los dos AUC difieren**: **0,589** en el
+corte `Less` y **0,624** en el corte `Same`. Conviene detenerse aquí, porque parece una contradicción
+y no lo es. El orden de las 500 mujeres es **el mismo** en los dos casos; lo que cambia es **el
+suceso que se intenta separar**. El primer corte enfrenta a las `Less` contra el resto; el segundo, a
+las `Greater` contra el resto. Son dos particiones distintas de la muestra, con prevalencias
+distintas, y un mismo ordenamiento acierta más o menos según dónde se ponga la frontera. De ahí la
+moraleja: el AUC no mide solo el modelo, mide el modelo **frente a un problema concreto**, y no tiene
+sentido compararlo entre sucesos distintos.
 
 Ambos valores son **modestos** —lejos del 0,8 convencional, y no muy por encima del 0,5 del azar—:
 la edad y la fractura previa ordenan la percepción de riesgo algo mejor que una moneda, poco más.
@@ -2208,56 +2209,12 @@ El resultado, **0,594**, se lee directamente: de cada cien pares de mujeres en c
 el modelo coloca por delante a la correcta en unas **59**, frente a las 50 que acertaría ordenando al
 azar.
 
-Conviene deshacer aquí una confusión fácil. Aunque el cálculo use `s_same`, el índice **no** mide la
-separación entre $\{\texttt{Less},\texttt{Same}\}$ y $\texttt{Greater}$: eso es el AUC del segundo
-corte, donde los pares comparables son solo los que **cruzan** esa frontera. La concordancia compara
-**todos** los pares de categoría observada distinta —incluidos los `Less`–`Same`, que ningún AUC por
-corte evalúa— y del score usa únicamente el **orden** que induce, nunca su valor. Como `s_same` es
-estrictamente creciente en $\eta$, ese orden es el de $\eta$: con `s_less` saldría idéntico. `s_same`
-entra, pues, como **representante de $\eta$**, no como el score de su corte, y es la proporcionalidad
-de odds —la correlación de rangos igual a 1— la que autoriza esa sustitución.
+Una precisión sobre el cálculo: `s_same` entra como **representante de $\eta$**, no como el score de
+su corte. El índice usa del score únicamente el **orden** que induce, y ese orden es el mismo con
+cualquiera de los dos —la correlación de rangos igual a 1—, así que con `s_less` saldría idéntico.
 
 En GLOW, **0,594** queda **entre** los dos AUC por corte (0,589 y 0,624), como corresponde a un
 resumen que agrupa todos los pares comparables en lugar de fijar una frontera.
-
-::: {.callout-note collapse="true"}
-## Qué pares entran en cada medida
-
-Lo que separa al AUC por corte del índice de concordancia **no es el score** —es el mismo $s$ en
-ambos— sino **qué pares van al denominador**.
-
-El AUC del corte `Same` binariza la respuesta con $Z_i=\mathbf 1\{Y_i=\texttt{Greater}\}$ y mide
-
-$$\text{AUC}_{\texttt{Same}}=\Pr\bigl(s_i>s_j \;\big|\; Z_i=1,\ Z_j=0\bigr),$$
-
-mientras que la concordancia no binariza nada:
-
-$$c=\Pr\bigl(s_i>s_j \;\big|\; Y_i>Y_j\bigr).$$
-
-Con 167 `Less`, 186 `Same` y 147 `Greater`, los pares de categoría distinta son de **tres tipos**, y
-cada medida usa unos u otros:
-
-| tipo de par | cuántos | AUC corte `Less` | AUC corte `Same` | $c$ |
-|---|---:|:---:|:---:|:---:|
-| `Greater` sobre `Same` | 27 342 | — | ✓ | ✓ |
-| `Greater` sobre `Less` | 24 549 | ✓ | ✓ | ✓ |
-| `Same` sobre `Less`    | 31 062 | ✓ | — | ✓ |
-| **pares comparables**  | **82 953** | **55 611** | **51 891** | **82 953** |
-
-Los pares `Same`–`Less` son **el grupo más numeroso** y no entran en el AUC del corte `Same`: por eso
-ese AUC mide «separar `Greater` del resto» y $c$ mide «ordenar», sin más.
-
-Llamando $c_{GS}$, $c_{GL}$ y $c_{SL}$ a la proporción de aciertos **dentro** de cada tipo, las tres
-cantidades son medias ponderadas de las mismas piezas:
-
-$$c=\frac{N_{GS}c_{GS}+N_{GL}c_{GL}+N_{SL}c_{SL}}{N_{GS}+N_{GL}+N_{SL}},\qquad
-\text{AUC}_{\texttt{Same}}=\frac{N_{GS}c_{GS}+N_{GL}c_{GL}}{N_{GS}+N_{GL}},\qquad
-\text{AUC}_{\texttt{Less}}=\frac{N_{SL}c_{SL}+N_{GL}c_{GL}}{N_{SL}+N_{GL}}.$$
-
-$c$ promedia los **tres** tipos; cada AUC promedia **dos**. Que $c$ caiga entre ambos es, pues, lo
-habitual, pero **no** una necesidad: si el tipo compartido `Greater`–`Less` fuera mucho más
-concordante que los otros dos, los dos AUC quedarían por encima de $c$.
-:::
 
 Es, además, la herramienta que reaparecerá con respuestas **censuradas** ([Unidad 5](#sec-u15)), y
 allí por una razón distinta de la de aquí: no es que falte un score —lo hay—, sino que la censura
