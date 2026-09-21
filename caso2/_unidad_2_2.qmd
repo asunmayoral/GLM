@@ -163,6 +163,13 @@ los marginales de la zona (los da por dados y modela la probabilidad de daños d
 mientras el log-lineal los modela con su efecto principal. Como ese efecto principal es justo el
 término que el diseño fija, las conclusiones sobre la asociación son las mismas.
 
+El puente no se limita a respuestas binarias. Si el factor-respuesta tiene $K>2$ niveles, el mismo
+argumento lleva al **logit de categoría base**: el log-lineal que satura la interacción
+respuesta × predictoras equivale al **multinomial** de la Unidad 1.3 del Caso 1, y sus
+términos de asociación son los $K-1$ bloques de coeficientes de aquel. Ahí está, por tanto, la
+herramienta que permite ajustar una respuesta politómica **agrupada**, que en el Caso 1 dejamos
+pendiente por necesitar la Poisson.
+
 Esto tiene una consecuencia práctica: **si hay una respuesta clara, usa la logística** —es más directa
 de interpretar y no gasta parámetros en marginales que no te interesan—. El log-lineal gana cuando
 **no hay una respuesta**, sino varias variables cuya estructura de asociación mutua es el objeto del

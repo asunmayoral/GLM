@@ -141,7 +141,7 @@ factores de riesgo basales:
 | `momfrac` | Fractura de cadera en la madre (No/Yes) | Binaria |
 | `armassist` | Necesita los brazos para levantarse de una silla (No/Yes) | Binaria |
 | `smoke` | Fumadora actual o pasada (No/Yes) | Binaria |
-| `raterisk` | Riesgo de fractura autopercibido (Less/Same/Greater) | Ordinal (3) |
+| `raterisk` | Riesgo de fractura autopercibido **frente a otras mujeres de la misma edad** (Less/Same/Greater) | Ordinal (3) |
 | `fracscore` | Puntuación compuesta de riesgo de fractura | Discreta |
 | `sub_id`, `site_id`, `phy_id` | Identificadores de paciente, centro y médico | ID |
 

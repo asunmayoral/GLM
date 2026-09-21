@@ -43,7 +43,7 @@ website:
       # material: desde ahí cuelgan la plantilla de proyecto y los repositorios
       # de los equipos. El repo del material sigue enlazado en el pie.
       - icon: github
-        href: https://github.com/GLM-2026
+        href: https://github.com/asunmayoral/GLM
         aria-label: "Organización del curso en GitHub"
 
   # Barra lateral acoplada. Aparece en las páginas listadas aquí; la PORTADA no
