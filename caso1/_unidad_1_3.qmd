@@ -188,28 +188,58 @@ cat("Comparación de las probabilidades (Yes-No), celda a celda")
 comparisons(fit_bin, variables = "priorfrac")   # el contraste celda a celda: no es constante
 ```
 
+**La tercera salida no promedia nada.** `comparisons()` recorre el banco de datos fila a fila y, para
+cada una, construye **dos mundos contrafactuales** —esa misma fila con `priorfrac = "No"` y con
+`priorfrac = "Yes"`, dejando el resto de covariables como están—, predice la probabilidad en cada uno
+y resta. Cada fila de su salida es, pues, la diferencia entre las dos probabilidades que el modelo
+asigna a un mismo perfil según tenga o no fractura previa:
+
+| Perfil (`momfrac`, `raterisk`) | $\hat\pi$ con `priorfrac = No` | $\hat\pi$ con `priorfrac = Yes` | Salto **absoluto** | Cociente de **odds** |
+|---|---:|---:|---:|---:|
+| `No`, `Less`     | 0,133 | 0,291 | **+0,157** | 2,66 |
+| `No`, `Same`     | 0,197 | 0,395 | **+0,198** | 2,66 |
+| `No`, `Greater`  | 0,232 | 0,445 | **+0,214** | 2,66 |
+| `Yes`, `Less`    | 0,215 | 0,422 | **+0,207** | 2,66 |
+| `Yes`, `Same`    | 0,303 | 0,537 | **+0,234** | 2,66 |
+| `Yes`, `Greater` | 0,349 | 0,588 | **+0,239** | 2,66 |
+
+: Lo que calcula `comparisons()`, perfil a perfil. La columna «salto absoluto» es exactamente su salida; el salto en probabilidad **cambia** según el punto de partida, mientras que el odds ratio **no**. {#tbl-u13-ame-vs-or}
+
+Las **doce** filas que imprime `comparisons()` son estos **seis** valores repetidos dos veces: el
+contraste depende solo de `momfrac` y `raterisk`, así que las dos celdas que comparten esos factores
+dan el mismo salto, tenga cada una el `priorfrac` que tenga. Y el salto va de **15,7** a **23,9**
+puntos, mientras que el odds ratio vale 2,66 en las seis: el modelo impone un efecto **constante en
+la escala del logit**, y al traducirlo a probabilidad cada perfil recibe un salto distinto según
+dónde arranque.
+
+Como vemos al mostrar el AME en el modelo Bernoulli equivalente, los valores y errores coinciden hasta el último
+dígito puesto que dentro de una celda todas las mujeres comparten covariables y, por tanto resuelve **el mismo contraste**: promediar las 500 mujeres una a una equivale exactamente a promediar las 12 celdas pesándolas por su tamaño. 
+
 Así, que el AME de `priorfrac` resulte de 0.19 significa que afecta en unos 19 puntos porcentuales a la probabilidad de fractura: entre dos mujeres iguales en antecedente materno y riesgo autopercibido, la que ya tuvo una fractura tiene,
 en promedio, diecinueve puntos más de probabilidad de fracturarse que la que no tuvo esos antecedentes. Si la predicción promedio de la probabilidad de fractura es de 0.2 cuando no hay fractura previa, la que se obtiene si tiene fractura previa es de 0.39.
+
+**Y `avg_predictions()` hace la otra mitad del camino.** En lugar de restar y luego promediar, promedia
+y luego resta: calcula la probabilidad predicha poniendo **todas** las celdas en `priorfrac = No`
+—ponderando por $m_i$— y repite con todas en `Yes`.
 
 ```{r}
 avg_predictions(fit_bin, variables = "priorfrac", wts = "total")
 ```
 
+Salen **0,200** y **0,393**, las dos probabilidades medias que la frase anterior estaba restando. Y
+no es casualidad que su diferencia sea el AME: promediar las diferencias y restar los promedios son
+la **misma** operación,
+
+$$\frac{1}{n}\sum_i m_i\bigl[\hat\pi_i(\texttt{Yes})-\hat\pi_i(\texttt{No})\bigr]
+=\frac{1}{n}\sum_i m_i\hat\pi_i(\texttt{Yes})-\frac{1}{n}\sum_i m_i\hat\pi_i(\texttt{No}).$$
+
+Restando las cifras impresas sale 0,193 en lugar de 0,194, pero es solo el redondeo a tres cifras de
+cada una; con todos los decimales las dos rutas coinciden. Así, `avg_comparisons()` da el efecto y
+`avg_predictions()` da los **dos niveles** entre los que ocurre, que es lo que hace comunicable la
+cifra.
 
 El OR de 2,66 cuantifica la **fuerza** del efecto en la escala en la que el modelo es lineal, y el AME de 0,19 su
-**impacto absoluto** en la escala en la que se toman las decisiones, esto es, en probabilidades. El OR no depende del punto de partida; el AME sí, y por eso hay que promediarlo, como se ilustra en la siguiente @tbl-u13-ame-vs-or:
-
-| Perfil (`momfrac`, `raterisk`) | $\hat\pi$ sin fractura previa | $\hat\pi$ con fractura previa | Salto **absoluto** | Cociente de **odds** |
-|---|---:|---:|---:|---:|
-| `No`, `Less`     | 0,133 | 0,291 | **+0,157** | 2,66 |
-| `Yes`, `Greater` | 0,349 | 0,588 | **+0,239** | 2,66 |
-
-: Efecto de la fractura previa en dos perfiles extremos. El salto en probabilidad **cambia** según el punto de partida; el odds ratio **no**. {#tbl-u13-ame-vs-or}
-
-Como vemos al mostrar el AME en el modelo Bernoulli equivalente, los valores y errores coinciden hasta el último
-dígito puesto que dentro de una celda todas las mujeres comparten covariables y, por tanto resuelve **el mismo contraste**: promediar las 500 mujeres una a una equivale exactamente a promediar las 12 celdas pesándolas por su tamaño. 
-
-La última salida muestra el contraste **celda a celda**, esto es, cómo cambia la probabilidad de fractura por tener o no una fractura previa (`priorfrac`), y revela lo que el promedio esconde: que el efecto diferencial en términos de probabilidades no es constante. 
+**impacto absoluto** en la escala en la que se toman las decisiones, esto es, en probabilidades. El OR no depende del punto de partida; el AME sí, y por eso hay que promediarlo: es justo lo que enseña la @tbl-u13-ame-vs-or.
 
 :::: {.callout-tip}
 ## 🔧 En R. El `glm()` con datos binomiales
@@ -229,19 +259,27 @@ a partir de una matriz con dos columnas: éxitos y fracasos:
 glm(cbind(exitos,fracasos) ~ x1+x2+x1:x2+...,family=binomial(link = "logit"),data)
 ```
 
-**Efectos marginales.** 
-- `marginaleffects::avg_slopes()` para predictoras continuas y
-- `avg_comparisons()` para factores. 
+**Efectos marginales.** `marginaleffects` ofrece **tres pares** de funciones, y el prefijo `avg_`
+significa siempre «promedia lo anterior»:
 
-Con datos agrupados hay que **ponderar por el tamaño de celda**,
-o el promedio tratará cada celda como una sola observación:
+| qué calcula | una fila por observación | promediado |
+|---|---|---|
+| probabilidad predicha en un escenario | `predictions()` | `avg_predictions()` |
+| diferencia entre niveles de un **factor** | `comparisons()` | `avg_comparisons()` |
+| derivada respecto de una **continua** | `slopes()` | `avg_slopes()` |
+
+La distinción entre las dos últimas filas es la de **diferencia** frente a **derivada**: para un
+factor no existe «una unidad más», así que se comparan niveles; para una continua se deriva.
+`avg_slopes(fit)` sin más argumentos aplica a cada predictor el tratamiento que le corresponde.
+
 ```
-avg_comparisons(fit_bin, variables = "priorfrac", wts = "total")
+comparisons(fit_bin, variables = "priorfrac")                    # pi(Yes) - pi(No), fila a fila
+avg_comparisons(fit_bin, variables = "priorfrac", wts = "total") # su media ponderada: el AME
+avg_predictions(fit_bin, variables = "priorfrac", wts = "total") # las dos medias que se restan
 ```
-Sin `avg_`, la misma llamada devuelve el contraste **celda a celda** en lugar de su promedio:
-```
-comparisons(fit_bin, variables = "priorfrac")
-```
+
+Con datos agrupados hay que **ponderar por el tamaño de celda** con `wts`, o el promedio tratará una
+celda de dos mujeres igual que una de ciento veintisiete.
 
 **Intervalos de confianza.** En una sola llamada, sobre el coeficiente o sobre el odds ratio:
 ```
