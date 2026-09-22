@@ -694,6 +694,16 @@ ggplot(calib_ord, aes(pred_media, obs_frec)) +
   labs(x = "Probabilidad media predicha", y = "Frecuencia observada", size = "n del tramo")
 
 # -----------------------------------------------------------------------------
+# [u13-hl-ordinal]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.3 Categorías ordenadas: el modelo de odds proporcionales
+#       > Calibración
+# -----------------------------------------------------------------------------
+# H0: el modelo ajusta. Interesa un p alto.
+generalhoslem::lipsitz.test(m_ord)                          # agrupa por riesgo predicho (g = 10)
+generalhoslem::pulkrob.chisq(m_ord, catvars = "priorfrac")  # agrupa por patrón categórico
+
+# -----------------------------------------------------------------------------
 # [fig-u13-roc-ordinal]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.3 Categorías ordenadas: el modelo de odds proporcionales
@@ -707,9 +717,8 @@ s_same <- probs_ord[, "Greater"]        # Pr(Y > Same)
 roc_c1 <- roc(as.integer(glow_ord$raterisk > "Less"), s_less, quiet = TRUE)
 roc_c2 <- roc(as.integer(glow_ord$raterisk > "Same"), s_same, quiet = TRUE)
 
-c(auc_corte_Less   = as.numeric(auc(roc_c1)),
-  auc_corte_Same   = as.numeric(auc(roc_c2)),
-  correlacion_rangos = cor(s_less, s_same, method = "spearman"))
+c(auc_corte_Less = as.numeric(auc(roc_c1)),
+  auc_corte_Same = as.numeric(auc(roc_c2)))
 
 ggroc(list(`Y > Less` = roc_c1, `Y > Same` = roc_c2)) +
   geom_abline(intercept = 1, slope = 1, linetype = "dashed") +
@@ -733,6 +742,9 @@ empate      <- outer(s_same, s_same, "==")
 c(concordancia = (sum(concordante & comparable) + 0.5 * sum(empate & comparable)) /
                   sum(comparable)) |>
   round(4)
+
+# Comprobación contra la implementación de referencia
+Hmisc::rcorr.cens(s_same, y_num)[c("C Index", "Relevant Pairs", "Concordant")]
 
 # -----------------------------------------------------------------------------
 # [u13-confusion-ordinal]

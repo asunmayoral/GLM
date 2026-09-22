@@ -1340,6 +1340,12 @@ ordenan las observaciones por la probabilidad que el modelo asigna a ese nivel, 
 grupos y se compara la **media predicha** con la **frecuencia observada** dentro de cada uno. Y aquí el ejercicio se repite
 **tres veces**, una por categoría: el modelo puede estar bien calibrado en una y mal en otra.
 
+Conviene reconocer el recurso: agrupar por probabilidad predicha es, literalmente, el de
+**Hosmer–Lemeshow** [@hosmer1980] —con datos individuales no hay proporciones que mirar, así que se
+fabrican—. La diferencia es que aquí lo usamos para **mirar**, no para **contrastar**: el $p$-valor
+de HL es sensible al número de grupos, y además tendríamos tres contrastes sobre probabilidades que
+suman 1.
+
 ```{r}
 #| label: fig-u13-calib-nominal
 #| fig-width: 8
@@ -1480,9 +1486,15 @@ library(yardstick)
 eval_nom <- tibble(obs  = factor(d$y,                         levels = niveles),
                    pred = factor(predict(m_nom, type = "class"), levels = niveles))
 conf_mat(eval_nom, truth = obs, estimate = pred)   # dnn = c(...) renombra las dimensiones
+prop.table(table(eval_nom$pred, eval_nom$obs), margin = 2)   # por columna: sensibilidad por clase
+prop.table(table(eval_nom$pred, eval_nom$obs), margin = 1)   # por fila: precisión por clase
 accuracy(eval_nom, truth = obs, estimate = pred)   # compárese con max(prop.table(table(d$y)))
+kap(eval_nom, truth = obs, estimate = pred)        # acierto descontando el azar
 pROC::multiclass.roc(d$y, fitted(m_nom))           # AUC de Hand-Till: solo el número, sin curva
 ```
+Ojo con las métricas **por clase** de `yardstick` (`sens`, `spec`, `precision`, `f_meas`…): aceptan
+tres niveles, pero las resuelven **promediando** (`estimator = "macro"` por defecto) y devuelven un
+único número. El desglose por categoría se lee en las dos tablas relativas, no con ellas.
 ::::
 
 ## 3.3 Categorías ordenadas: el modelo de odds proporcionales {#sec-u13-ordinal}
@@ -1526,6 +1538,10 @@ El predictor lineal entra **restado**, $\theta_k-\eta$, con $\eta=\beta_1 \cdot\
 convención de `MASS::polr`-. No es un capricho: hace que un coeficiente **positivo** empuje hacia las
 categorías **altas**. Si $\beta_1>0$, sube $\eta$, baja $\theta_k-\eta$ y baja $\Pr(Y\le k)$ en
 **todos** los cortes —es decir, sube $\Pr(Y>k)$—. 
+
+Mirado desde la perspectiva de los odds de superar un corte, estaríamos formulando el modelo 
+$$logit \,Pr(Y>k|\mathbf{x})=\mathbf{x}'\mathbf{\beta} - \theta_k$$
+con $\eta=\mathbf{x}'\mathbf{\beta}$ el predictor lineal.
 
 Conviene, pues, leer el efecto sobre las **odds de superar un corte**. Tomando exponenciales en la
 ecuación del modelo,
@@ -1841,19 +1857,16 @@ paralelas** lo delataría—.
 #### ¿Se sostiene la proporcionalidad de odds?
 
 Hasta aquí el supuesto se ha valorado **por comparación de imágenes y de OR**, que es informativo
-pero no es un contraste. Conviene formularlo de modo que se pueda someter a prueba.
-
-**El supuesto, en su forma contrastable.** Con $K$ categorías hay $K-1$ cortes. El modelo de odds
+pero no es un contraste. Conviene formularlo de modo que se pueda someter a prueba. Ciertamente lo que estamos planteando en el modelo ordinal sobre la proporcionalidad de odds es básicamente que el predictor lineal $\eta=\mathbf{x}'\mathbf{\beta}$ es el mismo en todos los cortes, y estos sólo intervienen en los umbrales $\theta_k$:
+$$logit \,Pr(Y>k|\mathbf{x})=\mathbf{x}'\mathbf{\beta} - \theta_k$$
+Planteado como **contraste**, y dado que con  Con $K$ categorías hay $K-1$ cortes, el modelo de odds
 proporcionales impone un **único** vector de efectos para todos ellos; el modelo que lo relaja
 —*odds no proporcionales*— estima **un vector por corte**, $\boldsymbol\beta_1,\dots,
 \boldsymbol\beta_{K-1}$. El contraste es, por tanto,
 
 $$H_0:\ \boldsymbol\beta_1=\boldsymbol\beta_2=\dots=\boldsymbol\beta_{K-1},$$
 
-y el modelo ordinal es el **restringido**. Ojo con la dirección de la conclusión, porque se invierte
-respecto a lo habitual: aquí **no rechazar es la buena noticia**. Y, como siempre que se busca
-amparo en un $p$ alto, conviene recordar que no rechazar no demuestra el supuesto —con poca muestra
-el contraste tiene poca potencia y casi nada se rechaza—.
+versus la alternativa de que algún $\beta$ varíe entre cortes, y así el efecto de alguna covariable $x$ varía según el corte $k$. El contraste se resuelve a favor, mejor dicho "no en contra" de la proporcionalidad de odds, cuando no podemos rechazar $H_0$, esto es, cuando el p-valor no resulta significativo por ser demasiado grande ($>0.05$). Conviene recordar que no rechazar no demuestra el supuesto —pues con poca muestra el contraste tiene poca potencia y casi nada se rechaza—; lo prudente sería decir entonces que no hay evidencia en contra de la proporcionalidad, que ya venía apoyada por otros indicios (como los OR nominales coherentes con el orden y los parecidos entre las predicciones del modelo nominal y el ordinal).
 
 **La versión a mano, que es la que se entiende.** Un corte $k$ parte la respuesta en dos: «$\le k$»
 frente a «$>k$». Ajustando una logística **binaria** a cada corte por separado se obtiene un vector
@@ -1923,15 +1936,8 @@ de verosimilitudes— y podrían haber discrepado, como discreparon en §3.1 el 
 intervalo de perfil de `momfrac`. Aquí no: los cuatro $p$-valores están muy lejos de cualquier
 umbral.
 
-Toca, eso sí, aplicar la cautela que anunciamos: **no rechazar no demuestra el supuesto**. Con
-$n=500$ y tres categorías el contraste no es especialmente potente, así que lo prudente es decir que
-**no hay evidencia en contra** de la proporcionalidad, y apoyarse además en lo que ya vimos por otras
-vías: los OR nominales del apartado anterior, coherentes con el orden, las tres filas parecidas de
-la tabla de los cortes y el
-parecido entre la @fig-u13-pred-ordinal y la @fig-u13-pred-nominal. Cuatro indicios que apuntan en
-la misma dirección valen más que un único $p$ alto.
 
-**Y si el supuesto falla.** No hay que tirar el modelo ordinal entero. En orden de menor a mayor
+**Si el supuesto falla.** No hay que tirar el modelo ordinal entero. En orden de menor a mayor
 renuncia: relajar la proporcionalidad **solo en la covariable culpable** —el modelo de *odds
 parcialmente proporcionales*, `ordinal::clm(..., nominal = ~ x)`—; cambiar de estructura ordinal,
 como los modelos de **categorías adyacentes** o de **razón de continuación**, que reparten el orden
@@ -1994,18 +2000,35 @@ dibujarla aparecen **bandas paralelas** en vez de una nube: el gráfico muestra 
 respuesta, no el desajuste del modelo. Es el mismo problema que ya nos obligó, en el caso binario,
 a agrupar o a simular.
 
+:::: {.callout-note}
 **La idea del surrogate** [@liu2018]. El modelo de odds proporcionales supone por detrás una
-variable **latente** continua, partida por los umbrales: observar `Same` significa que la latente
-cayó entre $\theta_{\text{Less}}$ y $\theta_{\text{Same}}$. Conocido el intervalo, se **sortea** un
-valor continuo dentro de él, con la distribución que el modelo supone, y ese valor sustituye a la
-categoría. Sobre él ya se puede restar. El resultado, $R=S-\mathbb{E}[S\mid \mathbf{x}]$, tiene bajo
-un modelo correcto una distribución **conocida y la misma para todos los sujetos**: no depende de
-las covariables. Y eso es justamente lo que un residuo debe cumplir para que los gráficos de siempre
+variable **latente** continua $Z_i=\eta_i+\varepsilon_i$, con $\varepsilon_i$ logística estándar
+—media 0 y escala 1—, partida por los umbrales:
+
+$$Y_i=k \iff \theta_{k-1}<Z_i\le\theta_k,\qquad \theta_0=-\infty,\ \theta_K=+\infty,$$
+
+de modo que observar `Same` significa que la latente cayó entre $\theta_{\text{Less}}$ y
+$\theta_{\text{Same}}$.
+
+La categoría observada fija, pues, un intervalo, y dentro de él se **sortea** un valor continuo:
+$S_i$ se extrae de la $\text{Logística}(\hat\eta_i,1)$ **truncada** a
+$(\hat\theta_{k-1},\hat\theta_k]$. Sobre $S_i$ ya se puede restar, y lo que se resta es su media
+**sin truncar**, $\mathbb{E}[S_i\mid\mathbf{x}_i]=\hat\eta_i$: al promediar los trozos truncados con
+las probabilidades que el modelo asigna a cada categoría, se recompone la logística entera.
+
+El resultado, $R_i=S_i-\hat\eta_i$, tiene una distribución **conocida y la misma para todos los
+sujetos**, la $\text{Logística}(0,1)$. De forma exacta si el modelo es correcto y los parámetros son
+los verdaderos; de forma **aproximada** en la práctica, porque $\hat\eta_i$ y los umbrales son
+estimaciones —la aproximación mejora con $n$, y con 500 mujeres y cuatro parámetros es holgada—. Esa
+distribución común es justamente lo que un residuo debe cumplir para que los gráficos de siempre
 signifiquen algo.
 
+::::
+
 Dos consecuencias prácticas. La primera: como hay un sorteo, **los residuos son aleatorios** y dos
-ejecuciones no dan el mismo gráfico; por eso se promedian varias réplicas con `nsim` y se fija la
-semilla. La segunda: la referencia del Q-Q **no es la normal**, sino la distribución latente del
+ejecuciones no dan el mismo gráfico; por eso se fija la **semilla**, y conviene repetirlo con otra
+antes de dar por buena una forma sugerente. El argumento `nsim` no promedia réplicas —devuelve una
+por columna—, sino que permite **superponerlas** en lugar de juzgar por un solo sorteo. La segunda: la referencia del Q-Q **no es la normal**, sino la distribución latente del
 enlace — **logística** para el logit de `polr`, de ahí el `distribution = qlogis`.
 
 ```{r}
@@ -2044,29 +2067,26 @@ distinto.
 
 - El **Q-Q** contrasta el **enlace**. Si los puntos se separan de la recta en las colas, la latente
   no es logística y convendría probar `probit` o `cloglog`.
-- Los **residuos frente a `age`** contrastan su **forma funcional**. Una curvatura sistemática
-  —una U, una tendencia— dice que la edad no entra bien de forma lineal en el predictor, y pide un
+  > En GLOW El Q-Q sigue la recta en casi todo el recorrido, con una ligera separación en la cola inferior que no llega a sugerir un enlace equivocado: el logit parece adecuado. 
+  
+- Los **residuos frente a las covariables continuas** contrastan su **forma funcional**. Una curvatura sistemática
+  —una U, una tendencia— dice que la covariable no entra bien de forma lineal en el predictor, y pide un
   término cuadrático o una *spline*. Es además donde suele delatarse una violación de la
   proporcionalidad de odds **atribuible a esa variable**, lo que lo convierte en el complemento
   gráfico del contraste del apartado anterior.
-- Los **residuos frente a `priorfrac`**, en forma de caja, hacen lo propio con el factor: las dos
+  > Los residuos frente a la edad forman una nube sin estructura, con el suavizado pegado al
+cero de extremo a extremo.
+
+- Los **residuos frente a las covariables categóricas**, en forma de caja, hacen lo propio con el factor: las dos
   cajas deben estar centradas en cero y tener dispersión parecida. Si una se desplaza, el modelo
   está ajustando peor uno de los dos grupos.
+  >Las dos cajas de `priorfrac` están centradas en cero y tienen dispersión
+parecida, así que el modelo no ajusta peor a uno de los dos grupos.
 
 Con solo dos covariables, mirarlas **una a una** es más informativo que el clásico «residuos frente
-al ajustado», que las mezcla: aquí cubrimos el modelo entero y, si algo falla, sabemos **quién**.
-
-En los tres casos lo que se busca es **ausencia de patrón**: una nube centrada en cero, de anchura
+al ajustado», que las mezcla: aquí cubrimos el modelo entero y, si algo falla, sabemos **quién**. En los tres casos lo que se busca es **ausencia de patrón**: una nube centrada en cero, de anchura
 estable. La lectura es cualitativa, y conviene repetirla con otra semilla antes de dar por buena una
 forma sugerente: con $n$ moderado, el sorteo produce estructuras aparentes que no lo son.
-
-**En GLOW los tres paneles salen limpios.** El Q-Q sigue la recta en casi todo el recorrido, con una
-ligera separación en la cola inferior que no llega a sugerir un enlace equivocado: el logit parece
-adecuado. Los residuos frente a la edad forman una nube sin estructura, con el suavizado pegado al
-cero de extremo a extremo —solo se despega levemente pasados los 85 años, donde quedan muy pocas
-mujeres y la curva es poco fiable—: la edad entra bien de forma lineal, sin pedir términos
-cuadráticos ni *splines*. Y las dos cajas de `priorfrac` están centradas en cero y tienen dispersión
-parecida, así que el modelo no ajusta peor a uno de los dos grupos.
 
 El diagnóstico residual concuerda, pues, con los contrastes de proporcionalidad: no aparece nada que
 corregir. Conviene recordar que esta lectura es **cualitativa** y depende de un sorteo; repetirla con
@@ -2117,6 +2137,33 @@ arriba: $\Pr(Y=\texttt{Same})$ apenas se mueve con $\eta$ —su derivada es la *
 densidades parecidas—, así que su rango de valores predichos tiene que ser estrecho. El mismo hecho
 que hacía diminuto su efecto marginal explica aquí la franja.
 
+**Y aquí, a diferencia del nominal, el gráfico tiene versión contrastada.** Los contrastes de
+**Lipsitz** y **Pulkstenis–Robinson** que señalábamos más arriba hacen exactamente esto —agrupar y
+comparar observado con esperado— pero resumido en un estadístico. Difieren en **cómo agrupan**: el de
+Lipsitz ordena a las mujeres por riesgo predicho y las parte en $g$ tramos —diez por defecto, frente
+a los cinco del gráfico, que son pocos solo por legibilidad—, añade al modelo un indicador por tramo
+y contrasta con un LRT si esos indicadores aportan algo; el de Pulkstenis–Robinson agrupa por
+**patrón de covariables categóricas**, aquí los dos niveles de `priorfrac`. En ambos $H_0$ es que el
+modelo **ajusta**, así que interesa un $p$ **alto**, igual que en el $\chi^2$ de la
+[Sección 3.1](#sec-u13-gof-binomial).
+
+```{r}
+#| label: u13-hl-ordinal
+# H0: el modelo ajusta. Interesa un p alto.
+generalhoslem::lipsitz.test(m_ord)                          # agrupa por riesgo predicho (g = 10)
+generalhoslem::pulkrob.chisq(m_ord, catvars = "priorfrac")  # agrupa por patrón categórico
+```
+
+**Ninguno de los dos detecta problemas.** El de Lipsitz da $\text{LR}=8{,}32$ con 9 gl y
+$p=0{,}50$; el de Pulkstenis–Robinson, $X^2=1{,}71$ con 4 gl y $p=0{,}79$. Concuerdan, pues, con lo
+que muestran los tres paneles.
+
+Con la cautela de siempre —**no rechazar no demuestra el ajuste**— y con un motivo extra para no
+entusiasmarse con el segundo: Pulkstenis–Robinson agrupa por patrón de covariables **categóricas**, y
+solo tenemos una, `priorfrac`, con dos niveles. Son **dos** patrones, una resolución demasiado gruesa
+para detectar gran cosa. El de Lipsitz, con diez tramos de riesgo predicho, es el informativo de los
+dos.
+
 ### Discriminación y clasificación
 
 En el nominal descartamos la ROC porque no había un único score que umbralizar. En el ordinal **sí
@@ -2138,7 +2185,7 @@ constante, la distancia entre umbrales, aquí $1{,}62$:
 $$\operatorname{logit}(s_{\texttt{Same}})=\operatorname{logit}(s_{\texttt{Less}})-(\theta_S-\theta_L).$$
 
 Una traslación es estrictamente creciente, así que los dos scores ordenan a las 500 mujeres
-exactamente igual: su correlación de **rangos** tiene que valer 1, y el chunk lo comprueba.
+exactamente igual: hay **un solo ordenamiento**, no dos.
 
 ```{r}
 #| label: fig-u13-roc-ordinal
@@ -2153,31 +2200,29 @@ s_same <- probs_ord[, "Greater"]        # Pr(Y > Same)
 roc_c1 <- roc(as.integer(glow_ord$raterisk > "Less"), s_less, quiet = TRUE)
 roc_c2 <- roc(as.integer(glow_ord$raterisk > "Same"), s_same, quiet = TRUE)
 
-c(auc_corte_Less   = as.numeric(auc(roc_c1)),
-  auc_corte_Same   = as.numeric(auc(roc_c2)),
-  correlacion_rangos = cor(s_less, s_same, method = "spearman"))
+c(auc_corte_Less = as.numeric(auc(roc_c1)),
+  auc_corte_Same = as.numeric(auc(roc_c2)))
 
 ggroc(list(`Y > Less` = roc_c1, `Y > Same` = roc_c2)) +
   geom_abline(intercept = 1, slope = 1, linetype = "dashed") +
   labs(x = "Especificidad", y = "Sensibilidad", colour = "Corte")
 ```
 
-La correlación sale 1, como tenía que salir. Y sin embargo **los dos AUC difieren**: **0,589** en el
-corte `Less` y **0,624** en el corte `Same`. Conviene detenerse aquí, porque parece una contradicción
-y no lo es. El orden de las 500 mujeres es **el mismo** en los dos casos; lo que cambia es **el
-suceso que se intenta separar**. El primer corte enfrenta a las `Less` contra el resto; el segundo, a
-las `Greater` contra el resto. Son dos particiones distintas de la muestra, con prevalencias
-distintas, y un mismo ordenamiento acierta más o menos según dónde se ponga la frontera. De ahí la
-moraleja: el AUC no mide solo el modelo, mide el modelo **frente a un problema concreto**, y no tiene
-sentido compararlo entre sucesos distintos.
+Que el ordenamiento sea único es la pieza que hacía falta, porque permite leer los dos AUC —**0,589**
+en el corte `Less` y **0,624** en el corte `Same`— como lo que son: **una única capacidad de ordenar,
+evaluada contra dos preguntas distintas**. El primer corte enfrenta a las `Less` contra el resto; el
+segundo, a las `Greater` contra el resto: dos particiones de la muestra, con prevalencias distintas, y
+un mismo orden acierta más o menos según dónde caiga la frontera.
 
 Ambos valores son **modestos** —lejos del 0,8 convencional, y no muy por encima del 0,5 del azar—:
 la edad y la fractura previa ordenan la percepción de riesgo algo mejor que una moneda, poco más.
 
-**El índice de concordancia.** Tener un AUC por corte está bien para diagnosticar, pero como resumen
-es incómodo: son $K-1$ números para una sola capacidad de ordenación. El resumen natural es el
-**índice de concordancia**, la $c$ de Harrell [@harrell2015], que generaliza el AUC a respuestas
-ordinales: de entre todos los pares de sujetos con **categorías distintas**, la proporción en que el
+De ahí dos consecuencias. Ninguno de los dos números es «el AUC del modelo», así que no tiene sentido
+promediarlos ni compararlos entre sí. Y, si la capacidad es una sola, lo razonable es resumirla en un
+solo número.
+
+**El índice de concordancia.** Ese número es la $c$ de Harrell [@harrell2015], que generaliza el AUC
+a respuestas ordinales: de entre todos los pares de sujetos con **categorías distintas**, la proporción en que el
 modelo asigna mayor score a quien de hecho está en la categoría **más alta** —contando los empates
 como medio acierto—.
 
@@ -2185,9 +2230,8 @@ $$c=\frac{\#\{\text{pares concordantes}\}+\tfrac12\,\#\{\text{empates en el scor
 {\#\{\text{pares comparables}\}}$$
 
 Vale $0{,}5$ si el modelo ordena al azar y $1$ si lo hace perfectamente, igual que el AUC — del que
-es la generalización exacta: con $K=2$ las dos cantidades coinciden. Se relaciona con la $D$ de
-Somers [-@somers1962], una medida de asociación entre variables ordinales, por $D=2c-1$: donde $c$
-va de $0{,}5$ a $1$, $D$ va de $0$ a $1$, y el cero marca la ausencia de asociación. No necesita paquete: sale de comparar todos los pares.
+es la generalización exacta: con $K=2$ las dos cantidades coinciden. No necesita paquete: sale de
+comparar todos los pares.
 
 ```{r}
 #| label: u13-concordancia
@@ -2203,24 +2247,21 @@ empate      <- outer(s_same, s_same, "==")
 c(concordancia = (sum(concordante & comparable) + 0.5 * sum(empate & comparable)) /
                   sum(comparable)) |>
   round(4)
+
+# Comprobación contra la implementación de referencia
+Hmisc::rcorr.cens(s_same, y_num)[c("C Index", "Relevant Pairs", "Concordant")]
 ```
 
 El resultado, **0,594**, se lee directamente: de cada cien pares de mujeres en categorías distintas,
 el modelo coloca por delante a la correcta en unas **59**, frente a las 50 que acertaría ordenando al
 azar.
 
-Una precisión sobre el cálculo: `s_same` entra como **representante de $\eta$**, no como el score de
-su corte. El índice usa del score únicamente el **orden** que induce, y ese orden es el mismo con
-cualquiera de los dos —la correlación de rangos igual a 1—, así que con `s_less` saldría idéntico.
+La comprobación cuadra: `C Index` devuelve **0,59427**, el mismo número. Una salvedad de lectura:
+`Relevant Pairs` imprime **165 906**, el doble de los
+82 953 pares que cuenta `sum(comparable)`, porque `rcorr.cens` recorre cada par en las **dos**
+direcciones. El factor 2 aparece igual arriba y abajo, así que el índice no cambia; y el `Concordant`
+que imprime ya incluye el medio punto de los empates, porque $98\,593/165\,906=0{,}59427$.
 
-En GLOW, **0,594** queda **entre** los dos AUC por corte (0,589 y 0,624), como corresponde a un
-resumen que agrupa todos los pares comparables en lugar de fijar una frontera.
-
-Es, además, la herramienta que reaparecerá con respuestas **censuradas** ([Unidad 5](#sec-u15)), y
-allí por una razón distinta de la de aquí: no es que falte un score —lo hay—, sino que la censura
-deja el desenlace **desconocido** para parte de la muestra, de modo que no se puede binarizar la
-respuesta y el AUC ordinario no llega a definirse. La concordancia solo necesita los pares cuyo orden
-**sí** se conoce, y por eso sobrevive a la censura.
 
 **Y el acierto como clasificador.** Igual que en el nominal, asignar a cada mujer su categoría
 **más probable** permite cruzar predicho con observado. Aquí la comparación es doble: contra el
@@ -2280,19 +2321,22 @@ ggplot(d, aes(x2, r)) + geom_boxplot()                     # un factor
 La referencia del Q-Q es la **latente del enlace**: `qlogis` para logit, `qnorm` para probit.
 
 **Ajuste y comparación.** `logLik()`, `AIC()`, `BIC()`, `deviance()`; anidados con
-`anova()` o `lmtest::lrtest()`; frente al **nominal**, por AIC/BIC. No hay $\chi^2$ de bondad de
-ajuste (datos individuales), pero sí contrastes propios del ordinal:
-`generalhoslem::lipsitz.test(m_ord)` y `generalhoslem::pulkrob.chisq(m_ord, catvars = "x2")`.
+`anova()` o `lmtest::lrtest()`; frente al **nominal**, por AIC/BIC —**no** por LRT, porque no están
+anidados—. No hay $\chi^2$ de bondad de ajuste, por ser datos individuales.
 
 **Discriminación.** Una ROC por corte sobre $\Pr(Y>k)$ con `pROC::roc()`; `ggroc()` acepta una
-**lista** de objetos `roc` y las dibuja juntas, con una leyenda por corte. Conviene comprobar de paso
-que los scores de los distintos cortes ordenan igual —`cor(s1, s2, method = "spearman")` debe dar
-**1** si la proporcionalidad se cumple—. Como resumen único, el
+**lista** de objetos `roc` y las dibuja juntas, con una leyenda por corte. Como resumen único, el
 **índice de concordancia**, que se calcula comparando todos los pares (véase el chunk anterior) o con
 `Hmisc::rcorr.cens()`.
 
 **Calibración.** Por categoría, como en el nominal: quintiles con `ntile()` sobre la
-probabilidad predicha de cada nivel, y media predicha frente a frecuencia observada.
+probabilidad predicha de cada nivel, y media predicha frente a frecuencia observada. A diferencia del
+nominal, aquí el gráfico tiene **versión contrastada** —$H_0$: el modelo ajusta, luego interesa un
+$p$ alto—:
+```
+generalhoslem::lipsitz.test(m_ord)                     # agrupa por riesgo predicho (g = 10)
+generalhoslem::pulkrob.chisq(m_ord, catvars = "x2")    # agrupa por patrón de covariables categóricas
+```
 
 **Clasificación.** `predict(m_ord, type = "class")` da la categoría modal; con ella,
 `yardstick::conf_mat()` y `accuracy()`, realineando los niveles como en el nominal.
