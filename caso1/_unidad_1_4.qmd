@@ -116,7 +116,7 @@ grupos* —y lo resume en una varianza—.
 
 Los efectos aleatorios se pueden incorporar en un modelo lineal (generalizado) a través de la interceptación, de la pendiente o de ambas. Veamos sus implicaciones y las modelizaciones asociadas. 
 
-## 4.2 Intercepto aleatorio {#sec-u14-intercepto}
+## 4.2 El GLMM y el intercepto aleatorio {#sec-u14-intercepto}
 
 Cuando hablamos de una afectación en la interceptación, nos estamos refiriendo a la modelización del **nivel de base**. Para tratar este nivel de base, considerando un posible efecto de agrupación relativo a `centro` en nuestra base de datos, hay tres estrategias:
 
@@ -128,11 +128,149 @@ Cuando hablamos de una afectación en la interceptación, nos estamos refiriendo
   distribución**, $u_j\sim\mathcal{N}(0,\sigma_u^2)$; no estimamos cada $u_j$, sino su **varianza**
   $\sigma_u^2$, asumiendo que todos están centrados en torno a una interceptación media global (y por lo tanto estas desviaciones de la interceptación global tienen media cero).
 
-El modelo, para la binaria de la cohorte, es un **GLMM logístico**:
+La tercera es la que desarrollamos aquí. Y conviene escribirla **en general** antes de
+particularizarla: el intercepto aleatorio sobre una binaria es un caso de una familia más amplia, y
+casi todo lo que sigue en esta unidad —el ICC, la distinción condicional/marginal, las dificultades
+de estimación— se deduce de la formulación general.
+
+### El GLMM en general
+
+Un **GLM mixto** (GLMM) se define, como un GLM, por tres piezas; la novedad es que dos de ellas están
+**condicionadas** a un efecto aleatorio. Con observaciones $y_{ij}$ ($i=1,\dots,n_j$ dentro del grupo
+$j=1,\dots,J$):
+
+**(1) Componente aleatoria, condicionada.** Dado $\mathbf u_j$, las observaciones del grupo $j$ son
+**independientes** y siguen una distribución de la familia exponencial:
+$$
+y_{ij}\mid \mathbf u_j\ \sim\ \mathcal F(\mu_{ij},\phi),\qquad
+\mathbb E(y_{ij}\mid \mathbf u_j)=\mu_{ij},\qquad
+\operatorname{Var}(y_{ij}\mid \mathbf u_j)=\frac{\phi\,V(\mu_{ij})}{w_{ij}}.
+$$
+La independencia **condicional** es el supuesto clave: el efecto aleatorio *es* el mecanismo que
+genera la dependencia dentro del grupo. Una vez conocido $\mathbf u_j$, no queda correlación por
+explicar.
+
+**(2) Componente sistemática.** El predictor lineal suma una parte fija y una aleatoria, y se conecta
+con la media por el enlace $g$:
+$$
+g(\mu_{ij})=\eta_{ij}=\mathbf x_{ij}^{\top}\boldsymbol\beta+\mathbf z_{ij}^{\top}\mathbf u_j .
+$$
+
+**(3) Distribución de los efectos aleatorios.**
+$$
+\mathbf u_j\sim\mathcal N_q(\mathbf 0,\mathbf G),\qquad
+\mathbf u_1,\dots,\mathbf u_J \ \text{independientes}.
+$$
+Aquí está el cambio de pregunta de la [Sección 4.1](#sec-u14-que-son): los $\mathbf u_j$ **no son
+parámetros** que estimemos uno a uno, sino variables latentes de las que estimamos su **varianza**
+$\mathbf G$.
+
+Apilando todas las observaciones, esto se escribe en la notación matricial habitual de los modelos
+mixtos, que conviene reconocer desde ya:
+$$
+\boldsymbol\eta=\mathbf{X}\boldsymbol\beta+\mathbf{Z}\mathbf{u},\qquad
+\mathbf{u}\sim\mathcal{N}(\mathbf{0},\mathbf{G}),\qquad g(\boldsymbol\mu)=\boldsymbol\eta,
+$$
+donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**, y
+$\mathbf{Z}$ ($n\times q$) y $\mathbf{u}$ los del término **aleatorio**, con $\mathbf{G}$ su matriz de
+covarianzas. Un GLM es el caso particular $\mathbf G=\mathbf 0$: sin $\mathbf{Z}\mathbf{u}$, todo lo
+demás es idéntico.
+
+**La verosimilitud, y por qué esto no es un GLM más.** La diferencia práctica aparece al estimar.
+Como los $\mathbf u_j$ no son parámetros sino variables latentes, hay que **integrarlos fuera** de la
+verosimilitud:
+$$
+L(\boldsymbol\beta,\boldsymbol\theta,\phi)=\prod_{j=1}^{J}\int_{\mathbb R^{q}}
+\Big[\prod_{i=1}^{n_j} f\big(y_{ij}\mid\mathbf u_j;\boldsymbol\beta,\phi\big)\Big]\,
+\varphi_q\big(\mathbf u_j;\mathbf 0,\mathbf G(\boldsymbol\theta)\big)\,\mathrm d\mathbf u_j ,
+$$
+con $\varphi_q$ la densidad normal $q$-variante y $\boldsymbol\theta$ los parámetros de varianza. Esa
+integral **solo tiene solución cerrada** cuando la respuesta es normal y el enlace la identidad —el
+modelo mixto lineal—. En cualquier otro caso, el nuestro incluido, hay que **aproximarla**:
+**Laplace** (lo que hace `glmer` por defecto, `nAGQ = 1`), **cuadratura de Gauss-Hermite adaptativa**
+(`nAGQ > 1`, disponible solo con un único factor de agrupamiento) o **PQL**. Conviene retener el
+dato, porque las aproximaciones dejan huella: volveremos sobre ella en la
+[Sección 4.7](#sec-u14-dgp).
+
+De esa misma integral salen las **dos consecuencias** que estructuran el resto de esta sección:
+
+- Las observaciones del mismo grupo son independientes **dado** $\mathbf u_j$, pero **no**
+  marginalmente: $\operatorname{Cov}(y_{ij},y_{i'j})\neq0$ para $i\neq i'$. Eso es lo que mide el
+  **ICC**.
+- $\mathbb E(y_{ij})=\int g^{-1}\big(\mathbf x_{ij}^{\top}\boldsymbol\beta+\mathbf z_{ij}^{\top}\mathbf u\big)\varphi(\mathbf u)\,\mathrm d\mathbf u$,
+  que con $g$ **no lineal** es distinto de $g^{-1}(\mathbf x_{ij}^{\top}\boldsymbol\beta)$. De ahí que
+  el efecto **condicional** y el **marginal** no coincidan.
+
+### El caso binario: intercepto aleatorio por centro
+
+Nuestro problema fija cada pieza:
+
+| pieza | en la `cohorte` |
+|---|---|
+| $\mathcal F$ | Bernoulli: $\phi=1$, $V(\mu)=\mu(1-\mu)$, $w_{ij}=1$ |
+| $g$ | logit |
+| $\mathbf z_{ij}$, $q$ | $z_{ij}=1$, $q=1$: solo el **nivel** varía por centro |
+| $\mathbf G$ | $\sigma_u^2$ (un escalar) |
+
+con lo que el modelo queda en un **GLMM logístico**:
 $$
 \operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_j,
 \qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
 $$
+En forma matricial, $\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, $\mathbf{Z}$
+es la matriz **indicadora** que asigna cada paciente a su centro, y
+$\mathbf{G}=\sigma_u^2\,\mathbf{I}_J$. La parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo
+nuevo es el término $\mathbf{Z}\mathbf{u}$.
+
+### Las tres estrategias, en fórmulas
+
+Con el modelo escrito, las tres estrategias del principio se distinguen solo en **cómo estiman el
+término de centro**. Llamemos $\tilde u_j$ a la estimación que daría el *no pooling* —un intercepto
+libre por centro, ajustado únicamente con los datos de $j$— y $I_j$ a la **información** que ese
+centro aporta sobre él. De la pieza (1), $I_j=\sum_{i\in j} w_{ij}/\big(\phi\,V(\mu_{ij})\big)$, que
+en el caso Bernoulli se reduce a
+$$
+I_j=\sum_{i\in j}\hat\pi_i\,(1-\hat\pi_i).
+$$
+No es el número de pacientes, sino su **peso informativo**: una paciente con $\hat\pi$ próximo a
+$0{,}5$ informa mucho sobre el nivel de su centro; otra con $\hat\pi$ cerca de $0$ o de $1$, casi
+nada. Con eso:
+
+| estrategia | término de centro |
+|---|---|
+| *complete pooling* | $\hat u_j=0$ para todos |
+| *no pooling* | $\hat u_j=\tilde u_j$ |
+| *partial pooling* | $\hat u_j\approx\lambda_j\,\tilde u_j$ |
+
+donde $\lambda_j$ es el **factor de encogimiento**
+$$
+\lambda_j=\frac{\sigma^2_u}{\sigma^2_u+1/I_j}=\frac{I_j\,\sigma^2_u}{1+I_j\,\sigma^2_u}\in(0,1).
+$$
+
+Es una media ponderada por **precisión**: el centro aporta $I_j$, la distribución
+$u_j\sim\mathcal N(0,\sigma^2_u)$ aporta $1/\sigma^2_u$, y $\lambda_j$ es la fracción que le
+corresponde al centro. Los dos casos límite son, literalmente, las otras dos estrategias: si el
+centro aporta mucha información ($I_j\sigma^2_u\gg1$), $\lambda_j\to1$ y recuperamos el *no pooling*;
+si aporta poca, o si los centros apenas difieren ($\sigma^2_u\to0$), $\lambda_j\to0$ y volvemos al
+*pooled*. El intercepto aleatorio no es un tercer método arbitrario: es el que **interpola** entre
+los otros dos, centro a centro, según lo que cada uno pueda sostener.
+
+Dos precisiones que en un modelo logístico no son menores:
+
+- La fórmula vive en la **escala del predictor lineal**. Ahí el encogimiento es una media ponderada;
+  al pasar por $\operatorname{logit}^{-1}$ deja de serlo, porque la transformación no es lineal. La
+  probabilidad encogida de un centro **no** es una media ponderada de su proporción observada y la
+  global.
+- Lo que se encoge no es la proporción bruta del centro, sino su desviación **una vez descontados los
+  efectos fijos**: lo que ese centro tiene de particular más allá de la fragilidad y el tratamiento
+  de sus pacientes.
+
+En el caso **gaussiano** todo esto es exacto y $I_j=n_j/\sigma^2_\varepsilon$, de modo que
+$\lambda_j=\sigma^2_u/\big(\sigma^2_u+\sigma^2_\varepsilon/n_j\big)$ y $\tilde u_j$ es literalmente la
+desviación de la **media** del grupo. En un GLMM son la aproximación cuadrática sobre la que se
+construye el propio ajuste.
+
+### La huella del efecto de centro en los datos
 
 Ese término $u_j$ no es una abstracción: ya teníamos su **huella visual** en la cohorte. La
 @fig-u14-prop-centro mostraba que la proporción de fractura **varía de un centro a otro** en un rango
@@ -141,21 +279,6 @@ basales** que $u_j$ recoge, y que en GLOW era mínima. Con una cautela: una prop
 mezcla el nivel basal con la **composición** de covariables de ese centro, y si estas estuvieran
 correladas con `centro` el gráfico estaría confundiendo ambos efectos. Razón de más para estimarlo
 con un modelo, que es lo que hacemos a continuación.
-
-En **forma matricial** —la notación habitual de los modelos mixtos, que conviene reconocer desde
-ya—, el predictor lineal de todas las observaciones se escribe
-$$
-\boldsymbol\eta=\mathbf{X}\boldsymbol\beta+\mathbf{Z}\mathbf{u},\qquad
-\mathbf{u}\sim\mathcal{N}(\mathbf{0},\mathbf{G}),\qquad g(\boldsymbol\mu)=\boldsymbol\eta,
-$$
-donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**;
-$\mathbf{Z}$ ($n\times q$) y $\mathbf{u}$ son el diseño y los efectos **aleatorios**, con $\mathbf{G}$
-su matriz de covarianzas; y $g$ es el enlace (aquí, logit). 
-
-Para el **intercepto aleatorio**, $\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, 
-$\mathbf{Z}$ es la matriz
-**indicadora** que asigna cada observación a su centro, y $\mathbf{G}=\sigma_u^2\,\mathbf{I}_J$. La
-parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo nuevo es el término $\mathbf{Z}\mathbf{u}$.
 
 ### Intercepto aleatorio en `cohorte`
 
@@ -392,11 +515,13 @@ alta**.
 
 ### 3. Encogimiento o *shrinkage* (*partial pooling*).
 
-Los interceptos de centro $\hat{u}_j$  **no** son las
-desviaciones crudas de cada centro (las del *no pooling*), sino un **compromiso** entre los **datos
-del propio centro** y la **media global** —el $0$ hacia el que $u_j\sim\mathcal{N}(0,\sigma_u^2)$ los
-empuja—, ponderado por **cuánta información** aporta el centro: con muchos datos apenas se encoge; con
-pocos, su estimación ruidosa se **arrima a 0**, tomando fuerza prestada del conjunto. 
+La fórmula ya la tenemos: $\hat u_j\approx\lambda_j\,\tilde u_j$, con
+$\lambda_j=I_j\sigma^2_u/(1+I_j\sigma^2_u)$. Lo que toca ahora es **verla actuar**. Los interceptos
+de centro que devuelve `glmer` **no** son las desviaciones crudas del *no pooling*, sino esas mismas
+desviaciones **multiplicadas por $\lambda_j$**: un compromiso entre los datos del propio centro y el
+$0$ hacia el que $u_j\sim\mathcal{N}(0,\sigma_u^2)$ los empuja. Con mucha información el centro
+apenas se encoge; con poca, su estimación ruidosa se **arrima a 0**, tomando fuerza prestada del
+conjunto.
 
 
 :::: {.callout-tip}
@@ -458,6 +583,39 @@ En la @fig-u14-cohorte-caterpillar cada punto es la desviación estimada de un c
 $0$ a los centros con **intervalos más anchos** (menos datos), y la **amplitud** del conjunto es la
 traducción visual de $\hat\sigma_u$. Un centro con dos pacientes no dispara un intercepto extremo: se
 estabiliza.
+
+**Y el encogimiento se puede leer en el propio gráfico.** La varianza condicional que
+`ranef(..., condVar = TRUE)` devuelve en `condsd` es, bajo la misma aproximación cuadrática,
+$\operatorname{Var}(u_j\mid\mathbf y)\approx\big(I_j+1/\sigma^2_u\big)^{-1}$. Sustituyéndola en la
+definición de $\lambda_j$ se llega a una identidad cómoda:
+$$
+\lambda_j=1-\frac{\operatorname{condsd}_j^{2}}{\sigma^2_u}.
+$$
+Es decir: **los bigotes del *caterpillar* codifican el encogimiento**. Bigotes anchos = centro con
+poca información = centro muy encogido hacia $0$. Y como todo está ya en el objeto ajustado, se
+calcula sin estimar nada nuevo —incluida la desviación **cruda** que habría dado el *no pooling*,
+que se recupera deshaciendo el encogimiento, $\tilde u_j=\hat u_j/\lambda_j$—:
+
+```{r}
+#| label: u14-shrinkage
+s2_u <- as.data.frame(VarCorr(m_int))$vcov[1]
+
+shrink <- re_coh |>
+  mutate(n      = as.numeric(table(cohorte$centro)[as.character(grp)]),
+         lambda = 1 - condsd^2 / s2_u,      # fraccion de senal propia que conserva el centro
+         crudo  = condval / lambda) |>      # la desviacion del no pooling, implicita
+  select(centro = grp, n, crudo, lambda, encogido = condval) |>
+  arrange(n)
+
+bind_rows(head(shrink, 3), tail(shrink, 3)) |>   # los 3 centros menores y los 3 mayores
+  mutate(across(where(is.numeric), \(x) round(x, 2)))
+```
+
+<!-- PENDIENTE (redactar tras el render de u14-shrinkage): lectura de la tabla
+     —rango de lambda, como crece con n, y cuanto se encoge el centro mas pequeno
+     frente al mas grande—. Comprobar antes que lambda cae en (0,1) y crece con n;
+     si no, la identidad lambda = 1 - condsd^2/s2_u no se sostiene en glmerMod y
+     hay que retirar este bloque. -->
 
 ---
 
