@@ -12,7 +12,8 @@ tanto en su nivel de partida como en cómo responden a las covariables. Ignorar 
 (o gastarse un parámetro por grupo) lleva a problemas conocidos; los **efectos aleatorios** son la
 vía intermedia: modelar la **variación entre grupos** como una distribución de la que cada grupo
 es una muestra. Es el primero de los dos hilos en espiral del curso —los efectos mixtos—, que
-abrimos aquí sobre el GLMM logístico y reactivaremos en cada caso.
+abrimos aquí sobre el **modelo lineal generalizado mixto** (GLMM, por *generalized linear mixed
+model*) logístico, y reactivaremos en cada caso.
 
 En nuestros datos ese agrupamiento tiene nombre: la variable **`centro`**. Tanto en **GLOW** como en
 la **cohorte** simulada, cada paciente pertenece a un centro hospitalario, y los centros **no son
@@ -72,10 +73,11 @@ variación **entre centros** como **efectos aleatorios** —el objeto de esta un
 
 ::: {.callout-note}
 ## Sobre esta unidad
-RA implicados:
+Resultados de aprendizaje (RA) implicados:
 
-- **RA6 · Efectos aleatorios.** Ajustar e interpretar GLMM (intercepto y pendiente): componentes de
-  varianza, ICC, *shrinkage* y condicional vs marginal.
+- **RA6 · Efectos aleatorios.** Ajustar e interpretar modelos lineales generalizados mixtos (GLMM),
+  con intercepto y pendiente: componentes de varianza, coeficiente de correlación intraclase (ICC),
+  *shrinkage* y condicional vs marginal.
 - **RA4 · Diagnóstico y bondad de ajuste** (del mixto). Residuos simulados (DHARMa), $R^2$
   marginal/condicional y solidez del ajuste.
 
@@ -114,6 +116,66 @@ modela la **dispersión** entre grupos (en nuestro caso, `centros`), no cada gru
 En una frase: el efecto fijo dice *cuánto*; el efecto aleatorio dice *cuánto varía ese cuánto entre
 grupos* —y lo resume en una varianza—.
 
+**¿Dónde aparecen?** El `centro` de nuestra cohorte es solo una de las formas que adopta el
+agrupamiento. Lo que cambia de un diseño a otro es **qué juega el papel de grupo**; la estructura del
+modelo es la misma.
+
+- **Diseños multinivel o jerárquicos.** Pacientes dentro de centros, alumnos dentro de aulas dentro
+  de colegios, viviendas dentro de municipios. El grupo es la unidad del nivel superior, y el
+  **coeficiente de correlación intraclase** (ICC) responde a una pregunta directa: ¿cuánto del
+  resultado depende de *dónde* estás y cuánto de *quién* eres? Es nuestro caso
+  [@gelmanhill2007; @roback2021].
+
+- **Estudios longitudinales y de medidas repetidas.** Un mismo paciente, medido en varias visitas.
+  Aquí el salto conceptual importa: **el grupo es el sujeto**, y $n_j$ es su número de mediciones. El
+  intercepto aleatorio recoge el nivel propio de cada individuo —unos parten más altos que otros— y
+  la pendiente aleatoria, su **ritmo de cambio** particular. Sin efecto aleatorio, las visitas de una
+  misma persona se tratarían como observaciones independientes, que es precisamente lo que no son. En
+  análisis de supervivencia, un efecto aleatorio así recibe nombre propio —**fragilidad**— y con él
+  reaparecerá en la [Unidad 5](#sec-u15).
+
+- **Diseños cruzados (*cross-over*).** Cada sujeto recibe las dos intervenciones, en orden
+  aleatorizado: es su propio control. El efecto aleatorio de sujeto absorbe su nivel individual, de
+  modo que el efecto del tratamiento se estima **dentro** de cada persona y no queda contaminado por
+  las diferencias entre ellas. Es la razón estadística de que estos diseños necesiten menos sujetos.
+
+- **Ensayos aleatorizados por conglomerados.** Lo que se aleatoriza no son individuos sino clínicas,
+  escuelas o pueblos enteros. Aquí el ICC deja de ser un subproducto del análisis y pasa a ser un
+  **parámetro de diseño**: hay que estimarlo *antes* del estudio, porque de él depende el tamaño
+  muestral. Con conglomerados de $m$ individuos, el número efectivo de observaciones no es $n$ sino
+  $n/[1+(m-1)\,\text{ICC}]$: un ICC pequeño multiplicado por conglomerados grandes puede arruinar la
+  potencia de un estudio.
+
+- **Efectos cruzados: sujetos × ítems.** En un test, cada participante responde a varios ítems y cada
+  ítem lo responden varios participantes. Ni los sujetos anidan en los ítems ni al revés: hacen falta
+  **dos** efectos aleatorios a la vez, cruzados. Es la estructura estándar en psicometría y en
+  psicología del lenguaje [@bates2015], y la retomaremos en la
+  [Sección 4.5](#sec-u14-extensiones).
+
+- **Bloques en diseño experimental.** Parcelas de un campo, tandas de laboratorio, lotes de reactivo,
+  camadas de animales. El origen histórico de los componentes de varianza: nadie quiere saber cuánto
+  rinde *el bloque 3*, sino cuánta variabilidad introducen los bloques [@faraway2016].
+
+- **Meta-análisis de efectos aleatorios.** El grupo es **el estudio**. La varianza entre estudios
+  —la $\tau^2$ de la literatura de meta-análisis— es exactamente nuestro $\sigma_u^2$, y la elección
+  entre modelo de efectos aleatorios y de efectos fijos es la misma discusión de esta unidad con otro
+  vocabulario.
+
+**¿Cuándo un factor es aleatorio?** La pregunta no es gramatical sino sustantiva, y se decide por dos
+criterios:
+
+1. **¿Son los niveles observados una muestra de una población de niveles a la que quiero
+   generalizar?** Los 24 centros de la cohorte lo son: nos importan los hospitales en general, no
+   estos veinticuatro. El **brazo de tratamiento**, en cambio, no: «tratada» y «no tratada» agotan la
+   población de niveles, y son justo lo que queremos estimar. Factor **fijo**.
+2. **¿Hay niveles suficientes para estimar una varianza?** Estimar $\sigma_u^2$ con tres grupos es
+   como estimar una desviación típica con tres datos. Con menos de cinco grupos rara vez merece la
+   pena; a partir de diez se trabaja con comodidad. Los **seis** centros de GLOW quedan en esa
+   frontera incómoda, y lo comprobaremos en la [Sección 4.6](#sec-u14-glmm-glow).
+
+Un factor con dos niveles nunca es un buen candidato a efecto aleatorio: gastaríamos un parámetro de
+varianza para describir una única diferencia que un efecto fijo estima mejor y más directamente.
+
 Los efectos aleatorios se pueden incorporar en un modelo lineal (generalizado) a través de la interceptación, de la pendiente o de ambas. Veamos sus implicaciones y las modelizaciones asociadas. 
 
 ## 4.2 El GLMM y el intercepto aleatorio {#sec-u14-intercepto}
@@ -130,8 +192,8 @@ Cuando hablamos de una afectación en la interceptación, nos estamos refiriendo
 
 La tercera es la que desarrollamos aquí. Y conviene escribirla **en general** antes de
 particularizarla: el intercepto aleatorio sobre una binaria es un caso de una familia más amplia, y
-casi todo lo que sigue en esta unidad —el ICC, la distinción condicional/marginal, las dificultades
-de estimación— se deduce de la formulación general.
+casi todo lo que sigue en esta unidad —el coeficiente de correlación intraclase (ICC), la distinción
+condicional/marginal, las dificultades de estimación— se deduce de la formulación general.
 
 ### El GLMM en general
 
@@ -156,14 +218,16 @@ $$
 g(\mu_{ij})=\eta_{ij}=\mathbf x_{ij}^{\top}\boldsymbol\beta+\mathbf z_{ij}^{\top}\mathbf u_j .
 $$
 
-**(3) Distribución de los efectos aleatorios.**
+**(3) Distribución de los efectos aleatorios.** Cada grupo aporta un vector $\mathbf u_j$ de $q$
+efectos —$q=1$ si solo varía el nivel, $q=2$ si varían nivel y pendiente, etc.—, y $\mathbf z_{ij}$
+es el vector que dice **cuáles de ellos afectan** a la observación $ij$:
 $$
-\mathbf u_j\sim\mathcal N_q(\mathbf 0,\mathbf G),\qquad
+\mathbf u_j\sim\mathcal N_q(\mathbf 0,\boldsymbol\Sigma),\qquad
 \mathbf u_1,\dots,\mathbf u_J \ \text{independientes}.
 $$
 Aquí está el cambio de pregunta de la [Sección 4.1](#sec-u14-que-son): los $\mathbf u_j$ **no son
-parámetros** que estimemos uno a uno, sino variables latentes de las que estimamos su **varianza**
-$\mathbf G$.
+parámetros** que estimemos uno a uno, sino variables latentes de las que estimamos su matriz de
+**varianzas y covarianzas** $\boldsymbol\Sigma$ ($q\times q$).
 
 Apilando todas las observaciones, esto se escribe en la notación matricial habitual de los modelos
 mixtos, que conviene reconocer desde ya:
@@ -171,10 +235,16 @@ $$
 \boldsymbol\eta=\mathbf{X}\boldsymbol\beta+\mathbf{Z}\mathbf{u},\qquad
 \mathbf{u}\sim\mathcal{N}(\mathbf{0},\mathbf{G}),\qquad g(\boldsymbol\mu)=\boldsymbol\eta,
 $$
-donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**, y
-$\mathbf{Z}$ ($n\times q$) y $\mathbf{u}$ los del término **aleatorio**, con $\mathbf{G}$ su matriz de
-covarianzas. Un GLM es el caso particular $\mathbf G=\mathbf 0$: sin $\mathbf{Z}\mathbf{u}$, todo lo
-demás es idéntico.
+donde $\mathbf{X}$ ($n\times p$) y $\boldsymbol\beta$ son el diseño y los coeficientes **fijos**;
+$\mathbf{u}=(\mathbf u_1^{\top},\dots,\mathbf u_J^{\top})^{\top}$ apila los efectos aleatorios de
+todos los grupos y $\mathbf{Z}$ ($n\times Jq$) es su matriz de diseño. Como los grupos son
+independientes entre sí y todos comparten la misma $\boldsymbol\Sigma$, la covarianza del conjunto es
+**diagonal por bloques**:
+$$
+\mathbf G=\mathbf I_J\otimes\boldsymbol\Sigma,
+$$
+es decir, $\boldsymbol\Sigma$ repetida $J$ veces en la diagonal y ceros fuera. Un GLM es el caso
+particular $\boldsymbol\Sigma=\mathbf 0$: sin $\mathbf{Z}\mathbf{u}$, todo lo demás es idéntico.
 
 **La verosimilitud, y por qué esto no es un GLM más.** La diferencia práctica aparece al estimar.
 Como los $\mathbf u_j$ no son parámetros sino variables latentes, hay que **integrarlos fuera** de la
@@ -182,21 +252,21 @@ verosimilitud:
 $$
 L(\boldsymbol\beta,\boldsymbol\theta,\phi)=\prod_{j=1}^{J}\int_{\mathbb R^{q}}
 \Big[\prod_{i=1}^{n_j} f\big(y_{ij}\mid\mathbf u_j;\boldsymbol\beta,\phi\big)\Big]\,
-\varphi_q\big(\mathbf u_j;\mathbf 0,\mathbf G(\boldsymbol\theta)\big)\,\mathrm d\mathbf u_j ,
+\varphi_q\big(\mathbf u_j;\mathbf 0,\boldsymbol\Sigma(\boldsymbol\theta)\big)\,\mathrm d\mathbf u_j ,
 $$
 con $\varphi_q$ la densidad normal $q$-variante y $\boldsymbol\theta$ los parámetros de varianza. Esa
 integral **solo tiene solución cerrada** cuando la respuesta es normal y el enlace la identidad —el
 modelo mixto lineal—. En cualquier otro caso, el nuestro incluido, hay que **aproximarla**:
-**Laplace** (lo que hace `glmer` por defecto, `nAGQ = 1`), **cuadratura de Gauss-Hermite adaptativa**
-(`nAGQ > 1`, disponible solo con un único factor de agrupamiento) o **PQL**. Conviene retener el
+**Laplace** (lo que hace `glmer` por defecto, `nAGQ = 1`) o **cuadratura de Gauss-Hermite adaptativa**
+(`nAGQ > 1`, disponible solo con un único factor de agrupamiento). Conviene retener el
 dato, porque las aproximaciones dejan huella: volveremos sobre ella en la
 [Sección 4.7](#sec-u14-dgp).
 
 De esa misma integral salen las **dos consecuencias** que estructuran el resto de esta sección:
 
 - Las observaciones del mismo grupo son independientes **dado** $\mathbf u_j$, pero **no**
-  marginalmente: $\operatorname{Cov}(y_{ij},y_{i'j})\neq0$ para $i\neq i'$. Eso es lo que mide el
-  **ICC**.
+  marginalmente: $\operatorname{Cov}(y_{ij},y_{i'j})\neq0$ para $i\neq i'$. Esa correlación dentro del
+  grupo es lo que mide el **coeficiente de correlación intraclase**, el **ICC**.
 - $\mathbb E(y_{ij})=\int g^{-1}\big(\mathbf x_{ij}^{\top}\boldsymbol\beta+\mathbf z_{ij}^{\top}\mathbf u\big)\varphi(\mathbf u)\,\mathrm d\mathbf u$,
   que con $g$ **no lineal** es distinto de $g^{-1}(\mathbf x_{ij}^{\top}\boldsymbol\beta)$. De ahí que
   el efecto **condicional** y el **marginal** no coincidan.
@@ -205,30 +275,44 @@ De esa misma integral salen las **dos consecuencias** que estructuran el resto d
 
 Nuestro problema fija cada pieza:
 
-| pieza | en la `cohorte` |
-|---|---|
-| $\mathcal F$ | Bernoulli: $\phi=1$, $V(\mu)=\mu(1-\mu)$, $w_{ij}=1$ |
-| $g$ | logit |
-| $\mathbf z_{ij}$, $q$ | $z_{ij}=1$, $q=1$: solo el **nivel** varía por centro |
-| $\mathbf G$ | $\sigma_u^2$ (un escalar) |
+Nuestro problema fija cada pieza:
+
+| pieza | qué es | en la `cohorte` |
+|---|---|---|
+| $\mathcal F$ | distribución condicional | Bernoulli: $\phi=1$, $V(\mu)=\mu(1-\mu)$, $w_{ij}=1$ |
+| $g$ | enlace | logit |
+| $q$ | cuántos efectos aleatorios aporta cada centro | **uno**: su nivel, $u_j$ |
+| $\mathbf z_{ij}$ | cuáles de ellos afectan a la paciente $ij$ | el único que hay, siempre: $z_{ij}=1$ |
+| $\boldsymbol\Sigma$ | varianzas y covarianzas **dentro** de un centro | con un solo efecto no hay covarianzas: el escalar $\sigma_u^2$ |
 
 con lo que el modelo queda en un **GLMM logístico**:
 $$
 \operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_j,
 \qquad u_j\sim\mathcal{N}(0,\sigma_u^2).
 $$
-En forma matricial, $\mathbf{u}=(u_1,\dots,u_J)^\top$ son los $J$ interceptos de centro, $\mathbf{Z}$
-es la matriz **indicadora** que asigna cada paciente a su centro, y
-$\mathbf{G}=\sigma_u^2\,\mathbf{I}_J$. La parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo
-nuevo es el término $\mathbf{Z}\mathbf{u}$.
 
-### Las tres estrategias, en fórmulas
+Y al apilar los 24 centros, las dos matrices grandes quedan así:
 
-Con el modelo escrito, las tres estrategias del principio se distinguen solo en **cómo estiman el
-término de centro**. Llamemos $\tilde u_j$ a la estimación que daría el *no pooling* —un intercepto
+- $\mathbf{u}=(u_1,\dots,u_J)^{\top}$ son los $J$ interceptos de centro, y $\mathbf{Z}$ ($n\times J$)
+  es la matriz **indicadora** que asigna cada paciente a su centro: un $1$ en la columna de su centro
+  y ceros en el resto.
+- $\mathbf{G}=\mathbf I_J\otimes\sigma_u^2=\sigma_u^2\,\mathbf{I}_J$ es **diagonal**: todos los
+  centros comparten la misma varianza y ninguno covaría con otro.
+
+La parte $\mathbf{X}\boldsymbol\beta$ es lo de siempre; lo nuevo es el término $\mathbf{Z}\mathbf{u}$.
+
+### Qué estima cada estrategia: *complete*, *no* y *partial pooling*
+
+Al abrir esta sección distinguíamos tres maneras de tratar el `centro`: **ignorarlo**
+(*complete pooling*), darle **un parámetro libre por centro** (*no pooling*) o modelarlo como
+**efecto aleatorio** (*partial pooling*). Con el modelo ya escrito podemos decir exactamente en qué
+se diferencian, porque es en una sola cosa: en **cómo estiman el término de centro** $u_j$.
+
+Llamemos $\tilde u_j$ a la estimación que daría el *no pooling* —un intercepto
 libre por centro, ajustado únicamente con los datos de $j$— y $I_j$ a la **información** que ese
-centro aporta sobre él. De la pieza (1), $I_j=\sum_{i\in j} w_{ij}/\big(\phi\,V(\mu_{ij})\big)$, que
-en el caso Bernoulli se reduce a
+centro aporta sobre él. Esa información sale de la **componente aleatoria** del modelo general —la
+pieza (1)—: $I_j=\sum_{i\in j} w_{ij}/\big(\phi\,V(\mu_{ij})\big)$, que en el caso Bernoulli se
+reduce a
 $$
 I_j=\sum_{i\in j}\hat\pi_i\,(1-\hat\pi_i).
 $$
@@ -236,7 +320,7 @@ No es el número de pacientes, sino su **peso informativo**: una paciente con $\
 $0{,}5$ informa mucho sobre el nivel de su centro; otra con $\hat\pi$ cerca de $0$ o de $1$, casi
 nada. Con eso:
 
-| estrategia | término de centro |
+| estrategia | cómo estima el término de centro |
 |---|---|
 | *complete pooling* | $\hat u_j=0$ para todos |
 | *no pooling* | $\hat u_j=\tilde u_j$ |
@@ -346,7 +430,7 @@ summary(m_int)
 
 El bloque de **efectos fijos**
 es idéntico al de `glm` —coeficientes con su error estándar, $z$ y $p$, que se interpretan igual
-(log-odds, $e^{\beta}$ = OR)—. 
+(log-odds, y $e^{\beta}$ la **razón de odds**, OR)—.
 
 La novedad es el bloque **`Random effects`**, encima: ahí están las
 **varianzas** y desviaciones típicas de los efectos aleatorios —en `m_int`, una sola fila,
@@ -358,10 +442,11 @@ Con el ajuste delante, recorremos las **tres lecturas** de un intercepto aleator
 
 ### 1. Componentes de varianza
 
-La varianza $\sigma_u^2$ resume cuánto varían los grupos entre sí, y de ella se deriva un índice
-nuevo, común en modelos mixtos: el **coeficiente de correlación intraclase (ICC)**, que mide qué
-fracción de la variación total ocurre **entre** grupos (y no dentro de ellos);
-equivalentemente, es la **correlación** entre dos observaciones del **mismo** grupo. En un modelo
+La varianza $\sigma_u^2$ resume cuánto varían los grupos entre sí, y de ella se deriva el índice que
+anunciábamos al plantear el modelo: el **coeficiente de correlación intraclase**, el **ICC**
+(*intraclass correlation coefficient*). Mide qué fracción de la variación total ocurre **entre**
+grupos (y no dentro de ellos); equivalentemente —y de ahí su nombre—, es la **correlación** entre dos
+observaciones del **mismo** grupo. En un modelo
 con intercepto aleatorio, descompone la varianza en una parte **entre grupos** ($\sigma_u^2$) y una
 parte **dentro** (residual, $\sigma_\varepsilon^2$):
 
@@ -431,7 +516,8 @@ residual latente fija en $\pi^2/3$, un ICC $\approx0{,}056$: hay heterogeneidad 
 **modesta**. Volveremos sobre su lectura al comparar los dos modelos, al cierre de esta sección.
 
 Y como la `cohorte` está **simulada**, cabe preguntarse si estas cifras **recuperan la verdad** con la
-que se generaron los datos. La respuesta exige un cuidado que merece sección propia: el DGP no genera
+que se generaron los datos. La respuesta exige un cuidado que merece sección propia: el **proceso
+generador de datos** (DGP, *data generating process*) no genera
 `ever` con un logit, sino como subproducto de un proceso en **tiempo discreto** con enlace
 **cloglog**, de modo que el `sigma_u` guardado en `attr(cohorte, "verdad")` **no está en la escala**
 en la que acabamos de estimarlo. Lo resolvemos en la [Sección 4.7](#sec-u14-dgp).
@@ -487,7 +573,7 @@ Comparemos pues los coeficientes de los dos modelos, el *pooled* y el mixto, en 
 #| label: fig-u14-glmm-coef
 #| fig-width: 7
 #| fig-height: 3
-#| fig-cap: "Efectos fijos del modelo *pooled* (`glm`) frente al mixto de intercepto aleatorio (`glmer`): punto = coeficiente (log-odds) y bigotes = ±1,96·EE (intervalo de Wald al 95 %). Dos lecturas a la vez: los coeficientes del mixto son algo **mayores en magnitud** (la des-atenuación marginal→condicional) y sus bigotes, **más anchos** —errores estándar honestos que tienen en cuenta el agrupamiento por centro, que el *pooled* ignoraba—."
+#| fig-cap: "Efectos fijos del modelo *pooled* (`glm`) frente al mixto de intercepto aleatorio (`glmer`): punto = coeficiente (log-odds) y bigotes = ±1,96 · error estándar, EE (intervalo de Wald al 95 %). Dos lecturas a la vez: los coeficientes del mixto son algo **mayores en magnitud** (la des-atenuación marginal→condicional) y sus bigotes, **más anchos** —errores estándar honestos que tienen en cuenta el agrupamiento por centro, que el *pooled* ignoraba—."
 sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
 si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
 
@@ -635,11 +721,12 @@ icc       <- s2_u / (s2_u + resid_var)
 c(var_residual = resid_var, ICC = icc)
 # (equivalente con paquete:  performance::icc(m_int)  -> 'adjusted ICC')
 
-# 3) AIC de los dos modelos (menor = mejor)
+# 3) Criterio de informacion de Akaike (AIC) de los dos modelos (menor = mejor)
 AIC(m_pool, m_int)          # data.frame con df y AIC de cada uno
 ```
 
-**¿Por qué preferimos el intercepto aleatorio?** Lo dicen sus propios resultados, sin recurrir a la verdad del proceso generador. El modelo estima una **varianza entre centros no nula**, $\hat\sigma_u^2\approx0{,}19$ ($\hat\sigma_u\approx0{,}44$): hay **heterogeneidad real** entre clínicas, justo lo que el *pooled* da por inexistente ($\sigma_u^2=0$). En la escala latente, esa varianza convive con una **residual fija** $\pi^2/3\approx3{,}29$, de modo que el **ICC** $\approx0{,}06$: alrededor de un **6 %** de la variación del riesgo es **entre** centros y el **94 %** restante, **entre pacientes**. Es una fracción **modesta pero suficiente** para invalidar el supuesto de independencia del *pooled* (de ahí que sus errores estándar fueran demasiado pequeños). Y la comparación formal cierra el argumento: el **AIC del mixto es menor** que el del *pooled* (898.97 frente a 909.66), así que el único parámetro extra —la varianza $\sigma_u^2$— **compensa con creces**. En suma: aunque el grueso del riesgo se juega a nivel de paciente, existe una capa de variación **entre clínicas que es real**; modelarla (mixto) da una descripción más fiel y una inferencia honesta, mientras que ignorarla (*pooled*) infla la precisión.
+**¿Por qué preferimos el intercepto aleatorio?** Lo dicen sus propios resultados, sin recurrir a la verdad del proceso generador. El modelo estima una **varianza entre centros no nula**, $\hat\sigma_u^2\approx0{,}19$ ($\hat\sigma_u\approx0{,}44$): hay **heterogeneidad real** entre clínicas, justo lo que el *pooled* da por inexistente ($\sigma_u^2=0$). En la escala latente, esa varianza convive con una **residual fija** $\pi^2/3\approx3{,}29$, de modo que el **ICC** $\approx0{,}06$: alrededor de un **6 %** de la variación del riesgo es **entre** centros y el **94 %** restante, **entre pacientes**. Es una fracción **modesta pero suficiente** para invalidar el supuesto de independencia del *pooled* (de ahí que sus errores estándar fueran demasiado pequeños). Y la comparación formal cierra el argumento: el **criterio de información de Akaike** (AIC), que
+premia el ajuste y penaliza el número de parámetros, es **menor** en el mixto que en el *pooled* (898.97 frente a 909.66), así que el único parámetro extra —la varianza $\sigma_u^2$— **compensa con creces**. En suma: aunque el grueso del riesgo se juega a nivel de paciente, existe una capa de variación **entre clínicas que es real**; modelarla (mixto) da una descripción más fiel y una inferencia honesta, mientras que ignorarla (*pooled*) infla la precisión.
 
 
 Queda abierta una pregunta: ¿pesa la **fragilidad ósea** lo mismo en todas las clínicas, o su efecto sobre el riesgo de fractura es **más fuerte en unas que en otras**? Lo vemos a continuación la [Sección 4.3](#sec-u14-pendiente).
@@ -750,8 +837,10 @@ Con efectos aleatorios se procede **de menos a más** y se contrasta cada salto:
 
 1. **Empezar por el intercepto** (`(1 | g)`): casi siempre justificado cuando hay agrupamiento.
 2. **Añadir la pendiente** (`(1 + x | g)`) **solo si** mejora el ajuste de forma apreciable.
-3. **Comparar** por criterios de información (**AIC/BIC**, menor es mejor) y por **LRT** (`anova`)
-   entre modelos anidados; vigilar avisos de **ajuste singular** o de no convergencia.
+3. **Comparar** por criterios de información —el **AIC** ya visto y el **criterio de información
+   bayesiano** (BIC), que penaliza más la complejidad; en ambos, menor es mejor— y por el
+   **contraste de razón de verosimilitudes** (LRT, *likelihood ratio test*, en R `anova`) entre
+   modelos anidados; vigilar avisos de **ajuste singular** o de no convergencia.
 4. Ante la duda, **parsimonia**: el modelo más simple que describe bien los datos.
 
 :::: {.callout-tip}
@@ -856,7 +945,7 @@ deviance crudos **no** se leen (el caso individual de la [Sección 2.6](#sec-u12
 solución, ya conocida, son los **residuos simulados** de `DHARMa` [@hartig2022]: el paquete **simula**
 muchas respuestas desde el modelo ajustado y, comparando cada observación con su distribución
 simulada, produce **residuos cuantil escalados** que, bajo un modelo correcto, son **uniformes**
-$U(0,1)$ —y eso vale **igual para un GLMM**—. Estos residuos nos permiten testar uniformidad de los residuos (con Kolmogorov-Smirnov), sobre/infra-dispersión (se testa que el parámetro de dispersión es 1), exceso de valores atípicos y heterocedasticidad.
+$U(0,1)$ —y eso vale **igual para un GLMM**—. Estos residuos nos permiten contrastar su uniformidad (con el test de **Kolmogorov-Smirnov**, KS), la sobre/infradispersión (se contrasta que el parámetro de dispersión sea 1), el exceso de valores atípicos y la heterocedasticidad.
 
 :::: {.callout-tip}
 ## 🔧 En R. Residuos simulados (DHARMa) en modelos mixtos
@@ -907,7 +996,7 @@ residuos por **bootstrap paramétrico** —más exacto con **pocos grupos**, per
 ::::
 
 
-Se revisan pues el **Q–Q** (uniformidad, test KS), los **residuos frente a lo predicho** (patrones, dispersión, *outliers*) y, lo propio de un mixto, los **residuos frente al factor de agrupamiento** para mirar el nivel del efecto aleatorio:
+Se revisan pues el **Q–Q** (uniformidad, test de Kolmogorov-Smirnov), los **residuos frente a lo predicho** (patrones, dispersión, *outliers*) y, lo propio de un mixto, los **residuos frente al factor de agrupamiento** para mirar el nivel del efecto aleatorio:
 
 ```{r}
 #| label: fig-u14-dharma
