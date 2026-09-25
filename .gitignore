@@ -41,3 +41,5 @@ bibliografia/*.pdf
 # --- Sistema ---
 .DS_Store
 Thumbs.db
+
+**/*.quarto_ipynb

@@ -310,7 +310,9 @@ con $u_{kj}=0$ en los coeficientes comunes a todos los grupos. $\beta_k$ es el e
 $x_k$ en la población de grupos, y $\beta_k+u_{kj}$, su efecto en el grupo $j$. Los $u_{kj}$ que no
 son nulos forman el vector $\mathbf u_j$, de dimensión $q$; sus covariables, el vector
 $\mathbf z_{ij}$ de la pieza (2); y $\boldsymbol\Sigma$ recoge en la diagonal **cuánto varía** cada
-coeficiente entre grupos, y fuera de ella **cómo covarían**.
+coeficiente entre grupos, y fuera de ella **cómo covarían**: la covarianza entre los efectos de
+grupo de los coeficientes $k$ y $l$ es $\sigma_{kl}=\rho_{kl}\,\sigma_{u_k}\sigma_{u_l}$, con
+$\rho_{kl}$ su correlación.
 
 Con una única covariable $x$ —el caso $p=1$ de la suma anterior—, dos casos particulares son los
 que nos ocuparán:
@@ -326,10 +328,14 @@ que nos ocuparán:
   $$
   \eta_{ij}=\beta_0+\beta_1x_{ij}+u_{0j}+u_{1j}\,x_{ij},\qquad
   \begin{pmatrix}u_{0j}\\ u_{1j}\end{pmatrix}\sim\mathcal{N}\!\left(\mathbf{0},
-  \begin{pmatrix}\sigma^2_{u_0} & \rho\,\sigma_{u_0}\sigma_{u_1}\\ \rho\,\sigma_{u_0}\sigma_{u_1} & \sigma^2_{u_1}\end{pmatrix}\right).
+  \begin{pmatrix}\sigma^2_{u_0} & \sigma_{01}\\ \sigma_{01} & \sigma^2_{u_1}\end{pmatrix}\right),
+  \qquad
+  \sigma_{01}=\operatorname{Cov}(u_{0j},u_{1j})=\rho_{01}\,\sigma_{u_0}\sigma_{u_1}.
   $$
-  $\sigma^2_{u_1}$ mide cuánto varía la pendiente de $x$ entre grupos, y $\rho$ liga nivel y
-  pendiente: con $\rho>0$, los grupos de nivel más alto tienen también una pendiente mayor.
+  $\sigma^2_{u_1}$ mide cuánto varía la pendiente de $x$ entre grupos. Fuera de la diagonal va la
+  **covarianza** $\sigma_{01}$, que es la que entra en las fórmulas; la **correlación** $\rho_{01}$,
+  sin unidades, es la que se interpreta: liga nivel y pendiente, y con $\rho_{01}>0$ los grupos de
+  nivel más alto tienen también una pendiente mayor.
 
 (Cabe también una pendiente sin intercepto aleatorio, pero rara vez tiene sentido: obliga a todas las
 rectas a cruzarse en $x=0$.)
@@ -533,7 +539,7 @@ distintos.
 ### Intercepto aleatorio {#sec-u14-intercepto}
 
 Planteamos ahora el modelo con intercepto aleatorio:
-$$\\
+$$
 \text{intercepto aleatorio:}\quad  \operatorname{logit}\mu_{ij}=\beta_0+\beta_1x_{1ij}+\beta_2x_{2ij}+u_j, \qquad u_j \sim N(0,\sigma_u^2)
 $$
 Añadimos el nivel propio de cada centro. En `glmer` la sintaxis es la de `glm`, declarando el
@@ -607,7 +613,7 @@ $$
 e^{\hat\sigma_u}=e^{0{,}44}\approx1{,}56 .
 $$
 
-Y como $u_j\sim\mathcal N(0,\sigma_u^2)$,  si $\hat\sigma_u$ fuera el valor verdadero, el 95% de los centros tendrían un efecto aleatorio entre $\pm 1.96 \hat{\sigma}_u^2$, esto es, entre
+Y como $u_j\sim\mathcal N(0,\sigma_u^2)$,  si $\hat\sigma_u$ fuera el valor verdadero, el 95% de los centros tendrían un efecto aleatorio entre $\pm1{,}96\,\hat\sigma_u$, esto es, entre
 
 $$
 e^{-1{,}96\,\hat\sigma_u}\approx0{,}42
@@ -1146,9 +1152,9 @@ varianzas y covarianza), y cada elemento tiene su lectura:
 |---|---|---|---|
 | $\sigma_{u_0}$ (diagonal: $\sigma^2_{u_0}$) | $0{,}534$ | cuánto difieren los centros en su riesgo **para una paciente con $x_1=0$**, de fragilidad media | log-odds |
 | $\sigma_{u_1}$ (diagonal: $\sigma^2_{u_1}$) | $0{,}397$ | cuánto difiere entre centros el **efecto de la fragilidad**: la pendiente del centro $j$ es $\beta_1+u_{1j}$ | log-odds por unidad de $x_1$ |
-| $\rho$ (fuera: $\rho\,\sigma_{u_0}\sigma_{u_1}$) | $-0{,}80$ | si los centros de riesgo alto tienen pendiente mayor o menor; aquí, menor | sin unidades |
+| $\rho_{01}$ (fuera, vía la covarianza: $\sigma_{01}=\rho_{01}\,\sigma_{u_0}\sigma_{u_1}$) | $-0{,}80$ | si los centros de riesgo alto tienen pendiente mayor o menor; aquí, menor | sin unidades |
 
-Una $\rho$ tan alta conviene mirarla de cerca —es la antesala de los ajustes singulares—, pero por
+Una $\rho_{01}$ tan alta conviene mirarla de cerca —es la antesala de los ajustes singulares—, pero por
 sí sola no descarta nada. Y hay una diferencia clave con el intercepto aleatorio: $\sigma_{u_0}$ **no
 es «la» variación entre centros**, sino la del punto $x_1=0$. Por eso no coincide con el
 $\hat\sigma_u=0{,}44$ de `m_int`, y cambiaría si se recentrara la fragilidad.
@@ -1156,13 +1162,32 @@ $\hat\sigma_u=0{,}44$ de `m_int`, y cambiaría si se recentrara la fragilidad.
 **El ICC deja de ser un número.** Con pendiente aleatoria, la varianza entre centros es una
 **función** de $x_1$: dos centros difieren en $u_{0j}+u_{1j}x_1$, cuya varianza es
 $$
-\sigma^2_{\text{centro}}(x_1)=\sigma^2_{u_0}+2\rho\,\sigma_{u_0}\sigma_{u_1}\,x_1+\sigma^2_{u_1}x_1^2,
+\sigma^2_{\text{centro}}(x_1)=\sigma^2_{u_0}+2\sigma_{01}\,x_1+\sigma^2_{u_1}x_1^2,
 \qquad
 \text{ICC}(x_1)=\frac{\sigma^2_{\text{centro}}(x_1)}{\sigma^2_{\text{centro}}(x_1)+\pi^2/3}.
 $$
 «Cuánto pesa el centro» pasa a depender del **perfil** de la paciente. La @fig-u14-icc-x1 lo dibuja
 con las estimaciones de `m_slope`, junto a dos referencias: el ICC que daría **solo la varianza del
 intercepto** de `m_slope`, y el ICC constante de `m_int`.
+
+**Dónde se parecen más los centros.** $\sigma^2_{\text{centro}}(x_1)$ es una parábola en $x_1$ que
+se abre hacia arriba ($\sigma^2_{u_1}>0$), así que tiene un único mínimo, donde se anula su derivada,
+$2\sigma_{01}+2\sigma^2_{u_1}x_1=0$:
+$$
+x_{\min}=-\frac{\sigma_{01}}{\sigma^2_{u_1}},
+\qquad
+\sigma^2_{\text{centro}}(x_{\min})=\sigma^2_{u_0}-\frac{\sigma_{01}^2}{\sigma^2_{u_1}}
+=\sigma^2_{u_0}\big(1-\rho_{01}^2\big).
+$$
+En la escala logit, las rectas de los centros forman un **abanico**, y $x_{\min}$ es su «cintura»: la
+fragilidad en la que las rectas están más juntas y, por tanto, el ICC es mínimo. El signo de la
+covarianza la sitúa: con $\sigma_{01}<0$, los centros de nivel alto tienen menos pendiente, las
+rectas convergen hacia la derecha y $x_{\min}>0$; con $\sigma_{01}>0$, ocurre al revés. Solo si
+$|\rho_{01}|=1$ se cruzan todas en un mismo punto y la varianza mínima es $0$; en otro caso, los
+centros siguen difiriendo también en $x_{\min}$. Y hay una lectura equivalente: si se recentrara la
+fragilidad en $x_{\min}$, intercepto y pendiente aleatorios quedarían **incorrelados**, porque
+$\operatorname{Cov}(u_{0j}+u_{1j}x_{\min},\,u_{1j})=\sigma_{01}+\sigma^2_{u_1}x_{\min}=0$. En el
+código, $\sigma_{01}$ es `S[1, 2]` y $\sigma^2_{u_1}$, `S[2, 2]`.
 
 ```{r}
 #| label: fig-u14-icc-x1
@@ -1176,7 +1201,7 @@ xs    <- seq(-2.5, 2.5, length.out = 200)
 icc_x <- icc_de(S[1, 1] + 2 * S[1, 2] * xs + S[2, 2] * xs^2)
 
 # valores de referencia: en x1 = 0, y donde la varianza entre centros es minima
-x_min <- -S[1, 2] / S[2, 2]
+x_min <- -S[1, 2] / S[2, 2]                          # vertice de la parabola: -sigma_01 / sigma^2_u1
 round(c(ICC_en_0   = icc_de(S[1, 1]),
         x1_minimo  = x_min,
         ICC_minimo = icc_de(S[1, 1] - S[1, 2]^2 / S[2, 2])), 3)
@@ -1204,8 +1229,8 @@ ggplot(icc_df, aes(x1, icc, color = curva, linetype = curva)) +
 
 Según `m_slope`, el peso del centro dependería del perfil de la paciente: en $x_1=0$ el ICC sería
 $0{,}080$ —algo por encima del $0{,}056$ constante del intercepto aleatorio—, alcanzaría su mínimo,
-$0{,}031$, hacia $x_1\approx1{,}07$, y crecería a ambos lados, sobre todo hacia las fragilidades bajas.
-Es la traducción de $\rho<0$: los centros diferirían sobre todo en las pacientes menos frágiles. Pero
+$0{,}031$, en $x_{\min}\approx1{,}07$, y crecería a ambos lados, sobre todo hacia las fragilidades bajas.
+Es la traducción de $\rho_{01}<0$: los centros diferirían sobre todo en las pacientes menos frágiles. Pero
 es lo que *diría* un modelo que la [Sección 4.4](#sec-u14-diagnostico) va a evaluar, y los extremos
 de la curva descansan en pocas pacientes: vale como ilustración de que, con pendiente aleatoria, el
 ICC deja de ser un número, no como hallazgo. La línea punteada muestra, además, que el ICC de la
@@ -1220,7 +1245,7 @@ summary(m_slope)
 ```
 
 El bloque **`Random effects`** tiene ahora dos filas, `(Intercept)` y `x1`, y una columna `Corr` con
-$\rho$: es la misma $\boldsymbol\Sigma$ de la tabla anterior. Lo interesante está en los **efectos
+$\rho_{01}$: es la misma $\boldsymbol\Sigma$ de la tabla anterior. Lo interesante está en los **efectos
 fijos**, comparados con los de `m_int`:
 
 - **$\beta_1$ cambia de significado.** Ya no es *el* efecto de la fragilidad, común a todos los
@@ -1279,7 +1304,7 @@ aleatoria el efecto de la fragilidad también varía de un centro a otro.
 m_slope0 <- glmer(ever ~ x1 + x2 + (0 + x1 | centro), family = binomial, data = cohorte)  # solo pendiente
 m_slope  <- glmer(ever ~ x1 + x2 + (1 + x1 | centro), family = binomial, data = cohorte)  # intercepto + pendiente
 isSingular(m_slope)             # ¿estructura sostenida por los datos?
-VarCorr(m_slope)                # sigma_u0, sigma_u1 y su correlacion rho
+VarCorr(m_slope)                # sigma_u0, sigma_u1 y su correlacion rho_01
 VarCorr(m_slope)$centro         # la matriz Sigma completa, para calcular ICC(x1)
 ```
 
@@ -1348,7 +1373,7 @@ del test. La referencia correcta es una **mezcla a partes iguales** de dos $\chi
 # pooled -> intercepto: se anade sigma_u^2
 chi2_int <- as.numeric(2 * (logLik(m_int) - logLik(m_pool)))
 p_int    <- 0.5 * pchisq(chi2_int, 1, lower.tail = FALSE)
-# intercepto -> pendiente: se anaden sigma_u1^2 y rho
+# intercepto -> pendiente: se anaden sigma_u1^2 y sigma_01
 chi2_pen <- anova(m_int, m_slope)$Chisq[2]
 p_pen    <- 0.5 * pchisq(chi2_pen, 1, lower.tail = FALSE) +
             0.5 * pchisq(chi2_pen, 2, lower.tail = FALSE)
@@ -1366,8 +1391,7 @@ puede invertir la conclusión.
 que no descarta a ninguno: la decisión la toman los criterios. Conviene no confundir las dos
 preguntas: la singularidad diagnostica una estructura aleatoria que los datos **no pueden sostener**
 —el ajuste degenera—; el AIC, el BIC y el LRT deciden si esa estructura **merece la pena**. La
-pendiente, aquí, se sostiene sin problemas; simplemente no hace falta. Y como el DGP **no** incluye
-pendiente aleatoria, ese $\hat\sigma_{u_1}=0{,}40$ era **ruido sobreajustado**.
+pendiente, aquí, se sostiene sin problemas; simplemente no hace falta.
 
 **Conclusión:** nos quedamos con el **intercepto aleatorio**, `m_int`. Mejora con claridad al
 *pooled*, y la pendiente no se justifica. Es el modelo que evaluamos a continuación.
@@ -1529,7 +1553,7 @@ habituales —aunque en la cohorte, con pacientes simplemente agrupadas en centr
 cabida— porque aparecen en cuanto el diseño se complica.
 
 **Correlados vs no correlados.** Al dejar variar intercepto y pendiente, `(1 + x | g)` estima además
-su **correlación** $\rho$. Que $\rho>0$ implicaría que los centros de mayor riesgo basal responden, además, más a `x`. Si esa correlación no interesa o **desestabiliza** el ajuste (correlaciones de $\pm1$, ajustes singulares), la especificación `(1 + x || g)` los deja **independientes** (sin $\rho$), que es un modelo más parco, pero recomendable cuando no tenemos bastante información (datos) para estimarla.
+su **correlación** $\rho_{01}$. Que $\rho_{01}>0$ implicaría que los centros de mayor riesgo basal responden, además, más a `x`. Si esa correlación no interesa o **desestabiliza** el ajuste (correlaciones de $\pm1$, ajustes singulares), la especificación `(1 + x || g)` los deja **independientes** (sin $\rho_{01}$), que es un modelo más parco, pero recomendable cuando no tenemos bastante información (datos) para estimarla.
 
 **Cruzados vs anidados.** Dos agrupamientos pueden combinarse de dos maneras, y la diferencia es **de
 diseño**, no de sintaxis:
@@ -1588,8 +1612,11 @@ m_glow_mix  <- glmer(fracture ~ age + priorfrac + (1 | site_id), family = binomi
 summary(m_glow_mix)
 
 # Varianza entre centros e ICC latente
-vc <- as.data.frame(VarCorr(m_glow_mix))
-c(sigma_u = sqrt(vc$vcov[1]), ICC = vc$vcov[1] / (vc$vcov[1] + pi^2 / 3))
+vc_glow <- as.data.frame(VarCorr(m_glow_mix))
+c(sigma_u = sqrt(vc_glow$vcov[1]), ICC = vc_glow$vcov[1] / (vc_glow$vcov[1] + pi^2 / 3))
+
+# Interceptos aleatorios de los seis centros (ya encogidos)
+round(ranef(m_glow_mix)$site_id, 2)
 
 # Efectos fijos: agrupado (glm) vs mixto (glmer)
 cbind(pooled = coef(m_glow_pool), mixto = fixef(m_glow_mix))
@@ -1707,7 +1734,7 @@ La columna `factor` dice lo esencial: al pasar del riesgo **por periodo** (clogl
 orden ni el signo de nada. Conviene no leer ese $\approx1{,}3$ como una constante universal: depende
 del riesgo base $\alpha_t$ y de cuántos periodos se acumulan, es decir, es una propiedad **de este**
 DGP. Y la columna traducida lleva su propio ruido muestral —150 centros son muchos, pero no
-infinitos: unas cinco centésimas en $\sigma_u$—, suficiente para lo que aquí necesitamos.
+infinitos—, algo que conviene tener presente al leerla.
 
 Con eso, la verdad del DGP **leída en la escala en la que hemos ajustado** es
 $\beta_1\approx1{,}10$, $\beta_2\approx-0{,}83$ y $\sigma_u\approx0{,}87$ (ICC $\approx0{,}19$); no
@@ -1715,7 +1742,7 @@ $0{,}85$, $-0{,}65$ y $0{,}70$ (ICC $0{,}13$).
 
 ### El balance: qué recupera `m_int` y qué no
 
-Contra ese patrón, el ajuste de la `cohorte` se separa en dos lecturas muy distintas:
+Contra ese patrón, el ajuste de la `cohorte` deja tres lecturas muy distintas:
 
 - **Los efectos fijos se recuperan bien.** $\hat\beta_1=1{,}08$ frente a $1{,}10$ es prácticamente un
   acierto: la diferencia es una quinta parte de su error estándar ($0{,}102$). $\hat\beta_2=-0{,}66$
@@ -1725,6 +1752,9 @@ Contra ese patrón, el ajuste de la `cohorte` se separa en dos lecturas muy dist
   **no existe**.
 - **La varianza entre centros se queda a la mitad.** $\hat\sigma_u=0{,}44$ frente a $0{,}87$, e
   ICC $0{,}056$ frente a $0{,}19$. Aquí la brecha es demasiado grande para despacharla como ruido.
+- **La pendiente aleatoria no estaba en el DGP.** El generador solo incluye un intercepto aleatorio
+  por centro, así que el $\hat\sigma_{u_1}=0{,}40$ de `m_slope` era **ruido sobreajustado**: la
+  decisión de la [Sección 4.4](#sec-u14-diagnostico), tomada solo con los datos, era la correcta.
 
 ¿Por qué se queda corta $\hat\sigma_u$? Candidatos no faltan —la aproximación de Laplace con
 respuesta binaria, los apenas 24 centros de la `cohorte`, o sencillamente que la desviación típica de
