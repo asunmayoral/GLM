@@ -408,8 +408,7 @@ Con el enlace logit, los efectos aleatorios se leen en la escala de las **odds**
 - el intercepto de centro **multiplica las odds** de todas sus pacientes por $e^{u_j}$ ($e^{u_{0j}}$
   en el modelo con pendiente): es una razón de odds de centro;
 - la pendiente de centro **cambia la razón de odds** de la fragilidad, de $e^{\beta_1}$ en el centro
-  medio a $e^{\beta_1+u_{1j}}$ en el centro $j$;
-- por eso $\beta_1$ y $\beta_2$ son efectos **condicionales**: comparan pacientes del mismo centro.
+  medio a $e^{\beta_1+u_{1j}}$ en el centro $j$.
 
 Los ajustaremos y leeremos uno a uno; cuál conviene lo decidiremos en la
 [Sección 4.4](#sec-u14-diagnostico), con los tres delante. Pero antes de ajustar ninguno conviene
@@ -514,6 +513,9 @@ decidiremos al comparar los modelos en la [Sección 4.4](#sec-u14-diagnostico).
 
 ### Sin efecto aleatorio: el modelo *pooled*
 
+Planteamos el modelo con efectos fijos:
+$$\text{sin efecto aleatorio:}\quad  \operatorname{logit}\mu_{ij}=\beta_0+\beta_1x_{1ij}+\beta_2x_{2ij},
+$$
 El punto de partida ignora el centro: una sola logística para las 877 pacientes, como si todas
 fueran independientes entre sí.
 
@@ -530,6 +532,10 @@ distintos.
 
 ### Intercepto aleatorio {#sec-u14-intercepto}
 
+Planteamos ahora el modelo con intercepto aleatorio:
+$$\\
+\text{intercepto aleatorio:}\quad  \operatorname{logit}\mu_{ij}=\beta_0+\beta_1x_{1ij}+\beta_2x_{2ij}+u_j, \qquad u_j \sim N(0,\sigma_u^2)
+$$
 Añadimos el nivel propio de cada centro. En `glmer` la sintaxis es la de `glm`, declarando el
 efecto aleatorio con `( ... | grupo )`:
 
@@ -584,14 +590,36 @@ vc$sdcor[1]                                  # desviación típica  sigma_u
 exp(c(mas_1DT = 1, extremo_inf = -1.96, extremo_sup = 1.96) * vc$sdcor[1])
 ```
 
-El modelo estima $\hat\sigma_u\approx0{,}44$ ($\hat\sigma_u^2\approx0{,}20$). Un centro situado **una
-desviación típica** por encima de la media multiplica las odds de fractura por
-$e^{0{,}44}\approx1{,}56$ —a igualdad de fragilidad y tratamiento—, y el 95 % central de los centros
-abarca razones de odds entre $\approx0{,}42$ y $\approx2{,}38$ respecto al centro medio. No es poco.
+El modelo estima $\hat\sigma_u\approx0{,}44$ ($\hat\sigma_u^2\approx0{,}20$). Para dos pacientes con
+la misma fragilidad y el mismo tratamiento, una en el centro $j$ y otra en el centro típico
+($u=0$), el cociente de sus odds de fractura es:
 
-Esa lectura es **absoluta**. La **relativa** —cuánto pesa el centro **frente** a las diferencias
-entre pacientes— la da el **coeficiente de correlación intraclase**, el **ICC** (*intraclass
-correlation coefficient*) que anunciábamos al plantear el modelo. Mide qué fracción de la variación
+$$
+\frac{\text{odds}_j}{\text{odds}_{\text{típico}}}
+=\frac{e^{\,\beta_0+\beta_1x_1+\beta_2x_2+u_j}}{e^{\,\beta_0+\beta_1x_1+\beta_2x_2}}
+=e^{u_j},
+$$
+
+la **razón de odds de centro**. Un centro situado **una desviación típica** por encima del típico,
+$u_j=\hat\sigma_u$, multiplica así las odds de sus pacientes por
+
+$$
+e^{\hat\sigma_u}=e^{0{,}44}\approx1{,}56 .
+$$
+
+Y como $u_j\sim\mathcal N(0,\sigma_u^2)$,  si $\hat\sigma_u$ fuera el valor verdadero, el 95% de los centros tendrían un efecto aleatorio entre $\pm 1.96 \hat{\sigma}_u^2$, esto es, entre
+
+$$
+e^{-1{,}96\,\hat\sigma_u}\approx0{,}42
+\qquad\text{y}\qquad
+e^{1{,}96\,\hat\sigma_u}\approx2{,}38,
+$$
+
+que da un **intervalo de predicción** de un rango considerable, y dice cuánto difieren los centros **entre sí**.
+
+Cuánto pesan las diferencias entre centros **frente** a las diferencias
+entre pacientes lo dice el **coeficiente de correlación intraclase**, el **ICC** (*intraclass
+correlation coefficient*). Mide qué fracción de la variación
 total ocurre **entre** grupos (y no dentro de ellos); equivalentemente —y de ahí su nombre—, es la
 **correlación** entre dos observaciones del **mismo** grupo. En un modelo con intercepto aleatorio,
 descompone la varianza en una parte **entre grupos** ($\sigma_u^2$) y una parte **dentro**
@@ -599,8 +627,9 @@ descompone la varianza en una parte **entre grupos** ($\sigma_u^2$) y una parte 
 $$
 \text{ICC}=\frac{\sigma_u^2}{\sigma_u^2+\sigma_\varepsilon^2}\in[0,1].
 $$
-$\text{ICC}\to 0$ indica grupos prácticamente indistinguibles (el agrupamiento apenas importa);
-$\text{ICC}\to 1$, grupos muy heterogéneos y observaciones fuertemente correladas dentro de cada uno.
+
+Un $\text{ICC}\to 0$ indica grupos prácticamente indistinguibles (el agrupamiento apenas importa);
+$\text{ICC}\to 1$, implica grupos muy heterogéneos y observaciones fuertemente correladas dentro de cada uno.
 
 En un **GLMM logístico** no hay una varianza residual libre: en la **escala latente**, el término de
 error sigue una logística estándar, cuya varianza es **fija**, $\pi^2/3\approx 3{,}29$. Por eso el
@@ -616,7 +645,7 @@ vc$vcov[1] / (vc$vcov[1] + pi^2 / 3)         # ICC latente (logit)
 ```
 
 El ICC latente vale $\approx0{,}056$: alrededor de un **6 %** de la variación del riesgo, en la escala
-latente, ocurre **entre** centros, y el **94 %** restante, **entre pacientes**. Es una fracción
+latente (logit), ocurre **entre** centros, y el **94 %** restante, **entre pacientes**. Es una fracción
 modesta, pero no nula, y basta para que las pacientes de un mismo centro no sean independientes, que
 es justo lo que el *pooled* da por supuesto.
 
@@ -643,9 +672,9 @@ round(efectos_centro, 3)
 ```
 
 `fixef` devuelve los tres coeficientes globales que ya aparecían en `summary`
-($\hat\beta_0=-0{,}90$, $\hat\beta_1=1{,}08$, $\hat\beta_2=-0{,}66$). `ranef` da la desviación de cada
+($\hat\beta_0=-0{,}90$, $\hat\beta_1=1{,}08$, $\hat\beta_2=-0{,}66$). `ranef` da la desviación $u_j$ de cada
 centro en log-odds: positiva si su riesgo basal está por encima del de un centro medio, negativa si
-está por debajo. Y `coef`, la suma de ambos. En la tabla se ve la estructura del modelo: la columna del
+está por debajo. Y `coef`, la suma de ambos $\hat\beta_0+\hat u_j$. En la tabla se ve la estructura del modelo: la columna del
 intercepto cambia de un centro a otro, $\hat\beta_0+\hat u_j$, mientras que las de `x1` y `x2` son
 **idénticas** en todos, porque con intercepto aleatorio solo varía el nivel. El centro 5 es el que
 más se aparta: $\hat u_5=1{,}19$, cuando los demás quedan entre $-0{,}55$ y $0{,}42$. Sus pacientes
@@ -654,18 +683,27 @@ fragilidad y tratamiento. Estas estimaciones
 existen solo para los centros **observados**; para uno nuevo no hay $\hat u_j$, y se predice como
 veremos al final de este apartado.
 
-Cada nivel se lee a su manera: los efectos fijos son **condicionales** al centro, y los de centro,
-**encogidos** hacia la media.
+Cada parte hace un trabajo distinto:
 
-**El nivel global: efectos condicionales.** Con un enlace **no lineal** como el logit, el efecto de una
-covariable admite **dos lecturas que no coinciden**. El efecto **condicional** compara pacientes del
-**mismo centro**; el **marginal** compara el riesgo medio de la **población**, promediando sobre los
-centros. En un modelo lineal serían el mismo número, porque promediar rectas paralelas da una recta
-con la misma pendiente; en el logit, promediar sigmoides da una sigmoide **más plana**.
-Geométricamente se ve en la @fig-u14-cond-marg: cada centro tiene su propia curva logística con la
-**misma pendiente** —la condicional, que es la que estima `glmer`— pero **desplazada** por su
-intercepto $u_j$; su promedio sobre la población de centros es la curva marginal, cuya pendiente es
-**menor en magnitud**. En la cohorte (izquierda), con una $\hat\sigma_u$ pequeña, ambas casi
+- Los **efectos fijos** describen el efecto de las covariables **dentro de cualquier centro**:
+  $\hat\beta_1$ dice cuánto cambian los log-odds de fractura de una paciente si aumenta su fragilidad,
+  sin cambiarla de clínica. Es el mismo número en todos los centros.
+- Los **efectos aleatorios** dicen **dónde está cada centro**: cuánto sube o baja su nivel de riesgo ($\hat\beta_0 \rightarrow \hat\beta_0+\hat u_j$)
+  respecto al centro típico. Y lo dicen con prudencia: están **encogidos** hacia 0, tanto más cuanto
+  menos información aporta el centro.
+
+Y hay una tercera cantidad que no es ni una cosa ni otra: el efecto **marginal**, o poblacional. No es
+una parte del modelo, sino algo que se **deriva** de él, combinando las dos: los efectos fijos dan la
+curva de un centro, la distribución de los aleatorios dice cómo se reparten los centros, y
+promediando sobre ella se obtiene el efecto en la población de clínicas.
+
+**Lo que dicen los efectos fijos, y lo que no.** Como $\hat\beta_1$ compara pacientes de una misma
+clínica, no es exactamente el efecto de la fragilidad sobre el riesgo medio de toda la población, que
+mezcla todas las clínicas. En un modelo lineal daría igual: promediar rectas paralelas da una recta
+con la misma pendiente. Con el logit, no: promediar curvas logísticas desplazadas da una curva **más
+plana**. Se ve en la @fig-u14-cond-marg: cada centro tiene su curva, con la **misma pendiente** —la
+que estima `glmer`— pero **desplazada** por su $u_j$; su promedio sobre los centros, la curva
+**marginal**, sube más despacio. En la cohorte (izquierda), con una $\hat\sigma_u$ pequeña, ambas casi
 coinciden; el panel de la derecha exagera $\sigma_u$ para que se vea el mecanismo.
 
 ```{r}
@@ -718,11 +756,10 @@ ggplot(curvas_cm, aes(x, p, group = grupo, color = tipo, linewidth = tipo)) +
 :::: {.callout-note collapse="true"}
 ## ¿Curva de los efectos fijos o curva marginal?
 
-La curva de los efectos fijos, $\operatorname{logit}^{-1}(\hat\beta_0+\hat\beta_1x_1)$, es la **azul**: la
-del **centro típico**, con $u=0$. No es el riesgo medio de la población, sino el de un centro
-concreto, el mediano. El riesgo medio se obtiene **promediando** las curvas de todos los centros
-posibles —la **naranja**—, y como $\operatorname{logit}^{-1}$ no es lineal, ese promedio no coincide
-con la curva del centro medio.
+La curva de los efectos fijos, $\operatorname{logit}^{-1}(\hat\beta_0+\hat\beta_1x_1)$ —la **azul**—, es
+la de un centro concreto, el típico ($u=0$), no el riesgo medio de la población. Ese riesgo medio es
+el **promedio** de las curvas de todos los centros —la **naranja**—, y como $\operatorname{logit}^{-1}$
+no es lineal, no coincide con la curva del centro típico.
 
 La curva marginal es, por definición, una integral sobre $u$:
 $$
@@ -746,7 +783,7 @@ En nuestros datos, la comparación de los coeficientes del *pooled* y del mixto 
 #| label: fig-u14-glmm-coef
 #| fig-width: 7
 #| fig-height: 3
-#| fig-cap: "Efectos fijos del modelo *pooled* (`glm`) frente al mixto de intercepto aleatorio (`glmer`): punto = coeficiente (log-odds) y bigotes = ±1,96 · error estándar, EE (intervalo de Wald al 95 %). Los coeficientes del mixto son algo **mayores en magnitud** (la des-atenuación marginal→condicional); el intervalo solo se ensancha de forma apreciable en el intercepto."
+#| fig-cap: "Coeficientes de los efectos fijos, en log-odds. *Pooled* (`glm`): efectos **marginales**, que comparan pacientes promediando sobre los centros. Mixto (`glmer`): efectos **condicionales**, que comparan pacientes del mismo centro. Punto = coeficiente; bigotes = ±1,96 · error estándar, EE (intervalo de Wald al 95 %). El desplazamiento vertical entre los dos modelos solo evita que los puntos se solapen."
 sp <- coef(summary(m_pool))   # tabla de efectos fijos del pooled
 si <- coef(summary(m_int))    # tabla de efectos fijos del mixto
 
@@ -764,37 +801,33 @@ ggplot(coefs, aes(estimate, term, color = modelo)) +
   labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
 ```
 
-`m_int` da $\hat\beta_1=1{,}08$ y $\hat\beta_2=-0{,}66$, algo **mayores** en magnitud que el *pooled*
-($1{,}02$ y $-0{,}63$): la atenuación marginal→condicional, leve aquí porque $\sigma_u$ es pequeño,
-$\beta_{\text{marg}}\approx\beta_{\text{cond}}/\sqrt{1+0{,}346\,\sigma_u^2}$ [@zeger1988]. En cuanto a la
-precisión, el **intercepto** —una cantidad de centro— sí la pierde: su error estándar pasa de
+Los coeficientes del mixto son algo mayores **en valor absoluto** en las tres filas: se alejan más
+del 0, hacia la derecha en `x1`, que es positivo, y hacia la izquierda en el intercepto y en `x2`,
+negativos ($\hat\beta_1=1{,}08$ frente a $1{,}02$; $\hat\beta_2=-0{,}66$ frente a $-0{,}63$). Es la
+des-atenuación marginal→condicional, de apenas un 4-6 % porque $\sigma_u$ es pequeño,
+$\beta_{\text{marg}}\approx\beta_{\text{cond}}/\sqrt{1+0{,}346\,\sigma_u^2}$ [@zeger1988]. En la
+precisión, solo el **intercepto** —una cantidad de centro— pierde de verdad: su error estándar pasa de
 $0{,}106$ a $0{,}142$, porque el *pooled* ignoraba el agrupamiento. En `x1` y `x2`, que varían dentro
-de cada centro, el cambio es despreciable: los errores estándar crecen al compás de los coeficientes
-y sus $z$ apenas se mueven. Aquí el valor del mixto no está en esa inferencia, sino en describir cuánto
-difieren los centros.
+de cada centro, los errores estándar crecen al compás de los coeficientes y sus $z$ apenas se mueven.
+Aquí el valor del mixto no está en esa inferencia, sino en describir cuánto difieren los centros.
 
-**El nivel de centro: efectos encogidos.** Los $\hat u_j$ de la tabla no son las desviaciones
-crudas de cada centro, sino versiones **encogidas** de ellas. La idea es la de la fórmula gaussiana de la [Sección 4.2](#sec-u14-formulacion),
-ahora de forma aproximada y en la escala logit. Si $\tilde u_j$ es la desviación cruda del centro
-—la que daría el *no pooling*, ajustando el centro solo con sus datos—, `glmer` devuelve
-$$
-\hat u_j\approx\lambda_j\,\tilde u_j,\qquad
-\lambda_j=\frac{I_j\,\sigma^2_u}{1+I_j\,\sigma^2_u}\in(0,1),\qquad
-I_j=\sum_{i\in j}\hat\pi_{ij}\,(1-\hat\pi_{ij}),
-$$
-donde $I_j$, la **información** que aporta el centro, hace el papel de $n_j/\sigma^2_\varepsilon$: una
-paciente con $\hat\pi$ próximo a $0{,}5$ informa mucho sobre su centro, y otra con $\hat\pi$ cerca de
-$0$ o de $1$, casi nada. Cada intercepto de centro es, pues, un compromiso entre los datos del propio centro y el $0$ hacia el que
-$u_j\sim\mathcal{N}(0,\sigma_u^2)$ los empuja. Con mucha información el centro apenas se encoge; con
-poca, su estimación ruidosa se **arrima a 0**, tomando fuerza prestada del conjunto. El
-*caterpillar* o gráfico de oruga de la @fig-u14-cohorte-caterpillar lo hace visible:
+#### Lo que hacen los efectos aleatorios: el encogimiento
+
+Los $\hat u_j$ de la tabla no son las desviaciones **crudas** de cada centro —las que daría estimarlo
+solo con sus propios datos—, sino versiones **encogidas** hacia $0$. Es la idea de la fórmula
+gaussiana de la [Sección 4.2](#sec-u14-formulacion): cada centro es un compromiso entre lo que dicen
+sus datos y el centro típico. Si el centro aporta mucha **información** —muchas pacientes, con riesgos
+no demasiado extremos—, apenas se encoge; si aporta poca, su estimación ruidosa se **arrima a 0**,
+tomando fuerza prestada del conjunto.
+
+El *caterpillar* o gráfico de oruga de la @fig-u14-cohorte-caterpillar lo hace visible:
 
 ```{r}
 #| label: fig-u14-cohorte-caterpillar
 #| fig-width: 7
 #| fig-height: 6
 #| out-width: "85%"
-#| fig-cap: "Efecto de centro modelizado en la cohorte: interceptos aleatorios de los 24 centros (desviación en log-odds respecto al riesgo medio) con su intervalo del 95 % (± 1,96 · condsd), ordenados. La dispersión del conjunto es lo que el mixto resume en sigma_u; los centros cuyo intervalo no cruza el 0 se separan del promedio."
+#| fig-cap: "Efecto de centro modelizado en la cohorte: interceptos aleatorios de los 24 centros (desviación en log-odds respecto al centro típico) con su intervalo del 95 %, ordenados. La dispersión del conjunto es lo que el mixto resume en sigma_u; los centros cuyo intervalo no cruza el 0 se separan del centro típico."
 re_coh <- as.data.frame(ranef(m_int, condVar = TRUE))   # columnas: grp, condval, condsd
 ggplot(re_coh, aes(reorder(grp, condval), condval)) +
   geom_hline(yintercept = 0, linetype = "dashed") +
@@ -804,42 +837,55 @@ ggplot(re_coh, aes(reorder(grp, condval), condval)) +
   labs(x = "Centro", y = "Intercepto aleatorio (log-odds)")
 ```
 
+Cada fila es un centro, ordenados de menor a mayor efecto. El **punto** es su $\hat u_j$, el mismo de la
+tabla: cuánto se aparta, en log-odds, del centro típico, que es la línea discontinua en $0$. Los
+**bigotes** muestran la **incertidumbre** que queda sobre ese efecto después de ver los datos del
+centro: un intervalo del 95 %. Si el intervalo de un centro no cruza el $0$, ese centro se aparta del
+típico; la amplitud del conjunto es la traducción visual de $\hat\sigma_u$.
+
+Y el gráfico permite **leer el encogimiento**: bigotes anchos indican un centro con poca información,
+cuyo efecto se conoce mal y, por eso mismo, se ha encogido mucho hacia $0$; bigotes estrechos, un centro
+bien informado que conserva casi toda su desviación. La tabla siguiente lo cuantifica para los centros
+más pequeños y más grandes: `lambda` es la fracción de su desviación cruda que conserva cada uno, y
+`crudo`, la desviación que habría tenido sin encoger.
+
 :::: {.callout-note collapse="true"}
-## Cómo se construye el *caterpillar*
+## Cómo se construye el *caterpillar* y de dónde sale el encogimiento
 
-`ranef(m_int, condVar = TRUE)` devuelve, para cada centro, dos cantidades, que
-`as.data.frame()` coloca en columnas:
+**El encogimiento, en fórmula.** Si $\tilde u_j$ es la desviación cruda del centro —la del *no
+pooling*—, `glmer` devuelve aproximadamente
+$$
+\hat u_j\approx\lambda_j\,\tilde u_j,\qquad
+\lambda_j=\frac{I_j\,\sigma^2_u}{1+I_j\,\sigma^2_u}\in(0,1),\qquad
+I_j=\sum_{i\in j}\hat\pi_{ij}\,(1-\hat\pi_{ij}),
+$$
+donde la **información** del centro, $I_j$, hace el papel de $n_j/\sigma^2_\varepsilon$ en el caso
+gaussiano: crece con el número de pacientes, y cada una aporta más cuanto más cerca de $0{,}5$ está su
+riesgo.
 
-- **`condval`**, el **efecto aleatorio estimado** $\hat u_j$: la desviación del centro respecto al
-  riesgo medio, en log-odds, ya encogida. Es el **punto** del gráfico.
-- **`condsd`**, su **desviación típica condicional**: cuánta incertidumbre queda sobre $u_j$ una vez
-  vistos los datos del centro. Hace con $\hat u_j$ lo que el error estándar con un coeficiente, y es
-  mayor cuanto menos información aporta el centro.
+**Qué devuelve `ranef(m_int, condVar = TRUE)`.** Para cada centro, dos cantidades que
+`as.data.frame()` coloca en columnas (junto a `grpvar`, `term` y `grp`, el número de centro):
 
-Los **bigotes** son $\hat u_j\pm1{,}96\cdot\text{condsd}$, un intervalo aproximado del 95 % para el
-efecto de ese centro, y los centros se **ordenan** de menor a mayor $\hat u_j$. La línea discontinua
-en $0$ es el centro medio: si el intervalo de un centro no la cruza, ese centro se aparta del promedio.
+- **`condval`**, el efecto aleatorio estimado $\hat u_j$, ya encogido: el **punto** del gráfico;
+- **`condsd`**, su **desviación típica condicional**, $\sqrt{\operatorname{Var}(u_j\mid\mathbf y)}$:
+  la incertidumbre sobre $u_j$ una vez vistos los datos del centro. Hace con $\hat u_j$ lo que el error
+  estándar con un coeficiente. Los **bigotes** son $\hat u_j\pm1{,}96\cdot\text{condsd}_j$.
 
-Dos matices. Como $u_j$ es una variable aleatoria y no un parámetro, en rigor es un intervalo de
-**predicción** de su efecto más que un intervalo de confianza. Y trata $\hat{\boldsymbol\beta}$ y
-$\hat\sigma_u$ como conocidos, así que es algo optimista.
+**Por qué los bigotes codifican el encogimiento.** Bajo la misma aproximación,
+$\operatorname{Var}(u_j\mid\mathbf y)\approx\big(I_j+1/\sigma^2_u\big)^{-1}$, y sustituyéndola en
+$\lambda_j$:
+$$
+\lambda_j=1-\frac{\text{condsd}_j^{2}}{\sigma^2_u}.
+$$
+El cociente $\text{condsd}_j^2/\sigma_u^2$ es la fracción de la incertidumbre inicial —la de toda la
+población de centros, $\sigma_u^2$— que los datos del centro no han conseguido eliminar, y coincide con
+lo que se encoge, $1-\lambda_j$. De ahí también la desviación cruda de la tabla, que se recupera
+deshaciendo el encogimiento: $\tilde u_j=\hat u_j/\lambda_j$.
+
+**Dos matices.** Como $u_j$ es una variable aleatoria y no un parámetro, los bigotes son en rigor un
+intervalo de **predicción** de su efecto, no un intervalo de confianza. Y tratan $\hat{\boldsymbol\beta}$ y
+$\hat\sigma_u$ como conocidos, así que son algo optimistas.
 ::::
-
-El gráfico añade a la tabla la incertidumbre de cada centro: el **encogimiento** acerca más a $0$ a
-los de **intervalos más anchos** (menos información), y la **amplitud** del conjunto es la traducción
-visual de $\hat\sigma_u$.
-
-Y el encogimiento **se puede leer en el propio gráfico**. El cuadrado de `condsd` es la varianza
-condicional de $u_j$, que bajo la misma aproximación cuadrática vale
-$\operatorname{Var}(u_j\mid\mathbf y)\approx\big(I_j+1/\sigma^2_u\big)^{-1}$. Sustituyéndola en la
-definición de $\lambda_j$ se llega a una identidad cómoda:
-$$
-\lambda_j=1-\frac{\operatorname{condsd}_j^{2}}{\sigma^2_u}.
-$$
-Es decir: **los bigotes del *caterpillar* codifican el encogimiento**. Bigotes anchos = centro con
-poca información = centro muy encogido hacia $0$. Y como todo está ya en el objeto ajustado, se
-calcula sin estimar nada nuevo —incluida la desviación **cruda** que habría dado el *no pooling*,
-que se recupera deshaciendo el encogimiento, $\tilde u_j=\hat u_j/\lambda_j$—:
 
 ```{r}
 #| label: u14-shrinkage
@@ -856,18 +902,109 @@ bind_rows(head(shrink, 3), tail(shrink, 3)) |>   # los 3 centros menores y los 3
   mutate(across(where(is.numeric), \(x) round(x, 2)))
 ```
 
-La tabla confirma la identidad: $\lambda_j$ cae entre $0$ y $1$ y, en los centros de la tabla, crece
+La tabla lo confirma: $\lambda_j$ cae entre $0$ y $1$ y, en los centros de la tabla, crece
 con el tamaño, de $0{,}45$ en el más pequeño (26 pacientes) a $0{,}65$ en el más grande (45). Ninguno
 conserva toda su señal: con una $\hat\sigma_u$ modesta, incluso el centro más informado se queda con
 unos dos tercios de su desviación cruda. El centro 5, el que más se apartaba, lo ilustra: con solo sus datos, su
 log-odds se apartaría $1{,}85$ del riesgo medio; el modelo lo rebaja a $1{,}19$.
 
+#### Efectos en probabilidad: el efecto marginal medio (AME)
+
+Los coeficientes hablan en log-odds. El **efecto marginal medio** (AME, *average marginal effect*) los
+traduce a **puntos de probabilidad**: el cambio medio en el riesgo -probabilidad de fractura- por una unidad más de fragilidad,
+o por recibir el tratamiento, promediado sobre las pacientes. En un modelo mixto hay que decidir,
+además, **con qué efecto de centro** se calcula el riesgo de cada paciente, y cada opción responde a
+una pregunta distinta:
+
+- **centros observados**: cada paciente con el $\hat u_j$ de su centro; es el efecto en *estos* 24
+  centros;
+- **centro típico** ($u=0$): el efecto en una clínica mediana;
+- **poblacional**: promediando también sobre la distribución de centros,
+  $u\sim\mathcal N(0,\hat\sigma_u^2)$; es el efecto medio en la población de clínicas.
+
+Las dos primeras las da `marginaleffects`, que pasa el argumento `re.form` a `predict()`. Ojo con el
+vocabulario: la documentación de `lme4` y `marginaleffects` llama «poblacional» a `re.form = NA`, pero
+eso es el centro típico; aquí reservamos «poblacional» para el promedio sobre centros, que, como la
+curva marginal de la @fig-u14-cond-marg, exige **integrar** sobre $u$. Como referencia, añadimos el
+AME del *pooled*. Cada AME lleva su error estándar y su intervalo al 95 %, por el **método delta**:
+`marginaleffects` lo aplica solo, y para la versión poblacional lo aplicamos a mano, con el gradiente
+numérico del AME respecto a los efectos fijos. En todos, $\hat\sigma_u$ se trata como conocida:
+
+```{r}
+#| label: u14-ame-int
+library(marginaleffects)
+
+# centros observados (re.form por defecto), centro típico (re.form = NA) y pooled:
+# marginaleffects da estimación, EE e IC por el método delta
+fila_me <- \(me, efecto, version)
+  data.frame(efecto, version, estimate = me$estimate, se = me$std.error,
+             conf.low = me$conf.low, conf.high = me$conf.high)
+ames <- rbind(
+  fila_me(avg_slopes(m_int,  variables = "x1"),               "fragilidad", "observados"),
+  fila_me(avg_slopes(m_int,  variables = "x1", re.form = NA), "fragilidad", "típico"),
+  fila_me(avg_slopes(m_pool, variables = "x1"),               "fragilidad", "pooled"),
+  fila_me(avg_comparisons(m_int,  variables = list(x2 = 0:1)),               "tratamiento", "observados"),
+  fila_me(avg_comparisons(m_int,  variables = list(x2 = 0:1), re.form = NA), "tratamiento", "típico"),
+  fila_me(avg_comparisons(m_pool, variables = list(x2 = 0:1)),               "tratamiento", "pooled"))
+
+# poblacional: se integra sobre u ~ N(0, sigma_u^2) el riesgo de cada paciente
+trat    <- cohorte$x2
+X_int   <- model.matrix(m_int)
+media_u <- \(f) integrate(\(u) f(u) * dnorm(u, 0, s_int), -Inf, Inf)$value
+ame_pob <- function(b) {                          # AME poblacional para unos efectos fijos b
+  eta <- drop(X_int %*% b)                        # predictor lineal sin efecto de centro
+  c(fragilidad  = mean(sapply(eta, \(e) media_u(\(u) b[["x1"]] * dlogis(e + u)))),
+    tratamiento = mean(mapply(\(e, t) media_u(\(u) plogis(e + b[["x2"]] * (1 - t) + u) -
+                                                     plogis(e - b[["x2"]] * t + u)),
+                              eta, trat)))
+}
+
+# su EE, también por el método delta: gradiente numérico respecto a los efectos fijos
+ee_delta <- function(f, b, V, h = 1e-4) {
+  J <- sapply(seq_along(b), \(k) {
+    sube <- baja <- b; sube[k] <- sube[k] + h; baja[k] <- baja[k] - h
+    (f(sube) - f(baja)) / (2 * h)
+  })
+  sqrt(diag(J %*% V %*% t(J)))
+}
+fila_pob <- \(est, se)
+  data.frame(efecto = names(est), version = "poblacional", estimate = est, se = se,
+             conf.low = est - 1.96 * se, conf.high = est + 1.96 * se)
+
+est_pob <- ame_pob(b_int)
+ames <- rbind(ames, fila_pob(est_pob, ee_delta(ame_pob, b_int, as.matrix(vcov(m_int)))))
+
+# presentación: agrupado por versión, en puntos porcentuales y en una tabla compacta
+etiquetas_v <- c(observados  = "centros observados",
+                 "típico"    = "centro típico (u = 0)",
+                 poblacional = "poblacional",
+                 pooled      = "pooled (glm)")
+presenta_ame <- function(d) d |>
+  mutate(`versión` = factor(etiquetas_v[version], levels = etiquetas_v),
+         efecto    = ifelse(efecto == "fragilidad", "fragilidad (+1 DT)", "tratamiento (sí / no)"),
+         across(c(estimate, se, conf.low, conf.high), \(x) 100 * x),
+         ic        = sprintf("[%.1f, %.1f]", conf.low, conf.high)) |>
+  arrange(`versión`, efecto) |>
+  select(`versión`, efecto, `AME (puntos %)` = estimate, EE = se, `IC 95 %` = ic) |>
+  knitr::kable(digits = 1, row.names = FALSE)
+
+presenta_ame(ames)
+```
+
+En probabilidad, cada desviación típica más de fragilidad eleva el riesgo de fractura en unos
+**18 puntos porcentuales** de media, y el tratamiento lo reduce en unos **11 puntos**. Las tres
+versiones del mixto casi coinciden —de $17{,}7$ a $18{,}0$ puntos para la fragilidad, de $-10{,}7$ a
+$-10{,}8$ para el tratamiento—, como ocurría con las curvas azul y naranja: con una $\hat\sigma_u$ pequeña,
+elegir con qué efecto de centro se calcula apenas cambia el resultado. Y la versión poblacional se
+parece a la del *pooled* ($17{,}7$ frente a $17{,}4$ puntos; $-10{,}7$ en ambos), porque las dos miden un
+efecto promediado sobre la población de centros. Con más heterogeneidad entre clínicas, las
+versiones se separarían y habría que elegir la que responde a la pregunta.
+
 #### Predecir para un centro nuevo {#sec-u14-nuevo-centro}
 
-Tratar los centros como una muestra de una población de centros
-([Sección 4.1](#sec-u14-que-son)) tiene una consecuencia práctica: el modelo permite predecir para
-un centro que **no** está en los datos. Pero conviene precisar qué se predice, porque ahí se cruzan
-las dos ideas de este apartado.
+Como los centros son una muestra de una población de centros, el modelo permite predecir también
+para uno que **no** está en los datos. Conviene precisar qué se predice, porque ahí se cruzan las
+dos ideas de este apartado.
 
 Para un centro **observado**, la predicción incorpora su efecto estimado, ya encogido:
 $\operatorname{logit}^{-1}(\mathbf x^\top\hat{\boldsymbol\beta}+\hat u_j)$. Para un centro **nuevo**
@@ -968,16 +1105,19 @@ ggplot(re, aes(reorder(grp, condval), condval)) +
   predicción marginal `integrate(\(u) plogis(eta + u) * dnorm(u, 0, s_u), -Inf, Inf)`, y rango del
   95 % de centros `plogis(eta + c(-1.96, 1.96) * s_u)`.
 - Incertidumbre completa de la predicción, incluida la de la estimación: `lme4::bootMer()`.
+- **AME** con `marginaleffects`: `avg_slopes(m, variables = "x1")` para una covariable continua y
+  `avg_comparisons(m, variables = list(x2 = 0:1))` para una binaria, con su error estándar e IC; por
+  defecto, en los centros observados, y con `re.form = NA`, en el centro típico. El AME poblacional
+  se integra (o se simula) aparte.
 - Salida ordenada con `broom.mixed::tidy(m)` y `broom.mixed::augment(m)`.
 ::::
 
-### Pendiente aleatoria {#sec-u14-pendiente}
+### Intercepto y pendiente aleatorias {#sec-u14-pendiente}
 
 El intercepto aleatorio deja que el **nivel** cambie por centro, pero asume que el **efecto** de
 cada covariable es el mismo en todos. A menudo no lo es: la fragilidad ósea, por ejemplo, podría
 pesar más en unos centros que en otros. Eso se modela con una **pendiente aleatoria**, añadiendo una
-desviación de grupo al coeficiente. Es la segunda estructura de la
-[Sección 4.2](#sec-u14-formulacion), donde se ve también la lectura de $\sigma^2_{u_1}$ y $\rho$:
+desviación de grupo al coeficiente —la segunda estructura de la [Sección 4.2](#sec-u14-formulacion)—:
 
 $$
 \operatorname{logit}\Pr(\text{ever}_{ij}=1)=\beta_0+\beta_1 x_{1ij}+\beta_2 x_{2ij}+u_{0j}+u_{1j}\,x_{1ij},
@@ -985,10 +1125,9 @@ $$
 \begin{pmatrix}u_{0j}\\ u_{1j}\end{pmatrix}\sim\mathcal{N}(\mathbf{0},\boldsymbol\Sigma).
 $$
 
-Las pendientes aleatorias son **más exigentes** con los datos —necesitan suficientes grupos y
-variación de $x_1$ dentro de cada uno—, y es frecuente que el ajuste no converja o resulte
-**singular**. La exploración de la @fig-u14-curvas-centro planteaba la
-pregunta; ajustamos ahora la forma estándar y comprobamos, como pedía el aviso de convergencia del
+
+La exploración de la @fig-u14-curvas-centro planteaba la pregunta. Como las pendientes aleatorias
+son exigentes con los datos, tras ajustar comprobamos, como pedía el aviso de convergencia del
 [intercepto aleatorio](#sec-u14-intercepto), que el ajuste se sostiene:
 
 ```{r}
@@ -999,27 +1138,37 @@ isSingular(m_slope)     # ¿sostienen los datos la estructura?
 VarCorr(m_slope)        # sigma_u0, sigma_u1 y su correlacion
 ```
 
-El ajuste converge sin avisos y **no** es singular. `VarCorr` da una desviación de pendiente
-$\hat\sigma_{u_1}\approx0{,}40$ y una **correlación alta** entre los dos efectos aleatorios,
-$\rho\approx-0{,}80$: los centros con mayor riesgo basal tendrían un efecto de la fragilidad **más
-débil**. Una $\rho$ así conviene mirarla de cerca —es la antesala de los ajustes singulares—, pero por
-sí sola no descarta nada.
+El ajuste converge sin avisos y **no** es singular. `VarCorr(m_slope)` muestra la matriz
+$\boldsymbol\Sigma$ como desviaciones típicas y correlación (`VarCorr(m_slope)$centro` la da como
+varianzas y covarianza), y cada elemento tiene su lectura:
 
-**El ICC deja de ser un número.** Con pendiente aleatoria, la varianza entre centros **depende de
-$x_1$**: dos centros difieren en $u_{0j}+u_{1j}x_1$, cuya varianza es
+| elemento | valor | qué mide | unidades |
+|---|---|---|---|
+| $\sigma_{u_0}$ (diagonal: $\sigma^2_{u_0}$) | $0{,}534$ | cuánto difieren los centros en su riesgo **para una paciente con $x_1=0$**, de fragilidad media | log-odds |
+| $\sigma_{u_1}$ (diagonal: $\sigma^2_{u_1}$) | $0{,}397$ | cuánto difiere entre centros el **efecto de la fragilidad**: la pendiente del centro $j$ es $\beta_1+u_{1j}$ | log-odds por unidad de $x_1$ |
+| $\rho$ (fuera: $\rho\,\sigma_{u_0}\sigma_{u_1}$) | $-0{,}80$ | si los centros de riesgo alto tienen pendiente mayor o menor; aquí, menor | sin unidades |
+
+Una $\rho$ tan alta conviene mirarla de cerca —es la antesala de los ajustes singulares—, pero por
+sí sola no descarta nada. Y hay una diferencia clave con el intercepto aleatorio: $\sigma_{u_0}$ **no
+es «la» variación entre centros**, sino la del punto $x_1=0$. Por eso no coincide con el
+$\hat\sigma_u=0{,}44$ de `m_int`, y cambiaría si se recentrara la fragilidad.
+
+**El ICC deja de ser un número.** Con pendiente aleatoria, la varianza entre centros es una
+**función** de $x_1$: dos centros difieren en $u_{0j}+u_{1j}x_1$, cuya varianza es
 $$
 \sigma^2_{\text{centro}}(x_1)=\sigma^2_{u_0}+2\rho\,\sigma_{u_0}\sigma_{u_1}\,x_1+\sigma^2_{u_1}x_1^2,
 \qquad
 \text{ICC}(x_1)=\frac{\sigma^2_{\text{centro}}(x_1)}{\sigma^2_{\text{centro}}(x_1)+\pi^2/3}.
 $$
 «Cuánto pesa el centro» pasa a depender del **perfil** de la paciente. La @fig-u14-icc-x1 lo dibuja
-con las estimaciones de `m_slope`, frente al ICC constante del intercepto aleatorio.
+con las estimaciones de `m_slope`, junto a dos referencias: el ICC que daría **solo la varianza del
+intercepto** de `m_slope`, y el ICC constante de `m_int`.
 
 ```{r}
 #| label: fig-u14-icc-x1
 #| fig-width: 6.5
 #| fig-height: 3.8
-#| fig-cap: "ICC latente en función de la fragilidad ósea según el modelo con pendiente aleatoria (curva), frente al ICC constante del modelo de intercepto aleatorio (línea discontinua). Es lo que diría m_slope si lo aceptáramos; la Sección 4.4 decide si hay motivo para hacerlo."
+#| fig-cap: "ICC latente en función de la fragilidad ósea según el modelo con pendiente aleatoria (línea continua). Referencias: el ICC que daría solo la varianza del intercepto de m_slope, que coincide con la curva en x1 = 0 (punteada), y el ICC constante del modelo de intercepto aleatorio (discontinua). Es lo que diría m_slope si lo aceptáramos; la Sección 4.4 decide si hay motivo para hacerlo."
 S      <- VarCorr(m_slope)$centro                    # matriz Sigma (2 x 2)
 icc_de <- \(s2) s2 / (s2 + pi^2 / 3)                 # ICC latente de una varianza entre centros
 
@@ -1032,11 +1181,25 @@ round(c(ICC_en_0   = icc_de(S[1, 1]),
         x1_minimo  = x_min,
         ICC_minimo = icc_de(S[1, 1] - S[1, 2]^2 / S[2, 2])), 3)
 
-ggplot(tibble(x1 = xs, icc = icc_x), aes(x1, icc)) +
-  geom_line(linewidth = 1.1, color = "#2c7fb8") +
-  geom_hline(yintercept = icc_de(vc$vcov[1]),        # ICC constante de m_int
-             linetype = "dashed", color = "grey40") +
-  labs(x = "Fragilidad ósea (x1, en z)", y = "ICC latente")
+niveles <- c("m_slope: ICC según x1",
+             "m_slope: solo la varianza del intercepto",
+             "m_int: ICC constante")
+icc_df <- bind_rows(
+  tibble(x1 = xs, icc = icc_x,                curva = niveles[1]),
+  tibble(x1 = xs, icc = icc_de(S[1, 1]),      curva = niveles[2]),
+  tibble(x1 = xs, icc = icc_de(vc$vcov[1]),   curva = niveles[3])
+) |> mutate(curva = factor(curva, levels = niveles))
+
+ggplot(icc_df, aes(x1, icc, color = curva, linetype = curva)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("#2c7fb8", "grey40", "#e6810a")) +
+  scale_linetype_manual(values = c("solid", "dotted", "dashed")) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(x = "Fragilidad ósea (x1, en z)",
+       y = "ICC latente (fracción de la variación\ndebida al centro)",
+       color = NULL, linetype = NULL) +
+  guides(color = guide_legend(ncol = 1)) +
+  theme(legend.position = "top")
 ```
 
 Según `m_slope`, el peso del centro dependería del perfil de la paciente: en $x_1=0$ el ICC sería
@@ -1045,7 +1208,69 @@ $0{,}031$, hacia $x_1\approx1{,}07$, y crecería a ambos lados, sobre todo hacia
 Es la traducción de $\rho<0$: los centros diferirían sobre todo en las pacientes menos frágiles. Pero
 es lo que *diría* un modelo que la [Sección 4.4](#sec-u14-diagnostico) va a evaluar, y los extremos
 de la curva descansan en pocas pacientes: vale como ilustración de que, con pendiente aleatoria, el
-ICC deja de ser un número, no como hallazgo.
+ICC deja de ser un número, no como hallazgo. La línea punteada muestra, además, que el ICC de la
+varianza del intercepto sola no es una referencia del modelo: es un punto de la curva, el de
+$x_1=0$.
+
+El resumen completo del ajuste reúne las dos partes del modelo:
+
+```{r}
+#| label: u14-glmm-slope-summary
+summary(m_slope)
+```
+
+El bloque **`Random effects`** tiene ahora dos filas, `(Intercept)` y `x1`, y una columna `Corr` con
+$\rho$: es la misma $\boldsymbol\Sigma$ de la tabla anterior. Lo interesante está en los **efectos
+fijos**, comparados con los de `m_int`:
+
+- **$\beta_1$ cambia de significado.** Ya no es *el* efecto de la fragilidad, común a todos los
+  centros, sino su efecto **medio**: $1{,}15$ frente a $1{,}08$ (OR $e^{1{,}15}\approx3{,}2$ por cada
+  desviación típica de fragilidad). Y su error estándar **crece**, de $0{,}102$ a $0{,}137$: si el
+  efecto varía entre centros, estimar su media arrastra la incertidumbre de qué centros han entrado
+  en la muestra. Es lo mismo que le ocurría al intercepto al pasar del *pooled* a `m_int`.
+- **$\beta_2$ apenas cambia** ($-0{,}69$ frente a $-0{,}66$; error estándar $0{,}175$ frente a
+  $0{,}174$): el tratamiento no tiene pendiente aleatoria, y su efecto se estima igual.
+
+Si las pendientes variaran de verdad, ese error estándar mayor de $\beta_1$ sería el honesto; si no,
+el modelo estaría pagando incertidumbre de más. La cabecera trae los criterios —AIC $898{,}1$,
+BIC $926{,}7$— con los que la [Sección 4.4](#sec-u14-diagnostico) decide cuál de los dos casos es el
+nuestro.
+
+Con pendiente aleatoria, el AME se calcula igual, con una diferencia en la versión poblacional: ahora
+cada centro aporta **dos** efectos, $(u_{0j},u_{1j})$, y la integral pasa a ser doble. En lugar de
+integrar, la **simulamos**: sorteamos muchos centros de $\mathcal N(\mathbf 0,\hat{\boldsymbol\Sigma})$,
+calculamos el riesgo de cada paciente en cada uno y promediamos.
+
+```{r}
+#| label: u14-ame-slope
+# poblacional: 2000 centros simulados de N(0, Sigma), los mismos para todo el cálculo
+set.seed(SEMILLA_CURSO)
+U   <- MASS::mvrnorm(2000, mu = c(0, 0), Sigma = matrix(S, 2, 2))
+X_s <- model.matrix(m_slope)
+ame_pob_s <- function(b) {                        # AME poblacional para unos efectos fijos b
+  lin <- outer(drop(X_s %*% b), U[, 1], "+") + outer(cohorte$x1, U[, 2])  # paciente x centro
+  c(fragilidad  = mean(sweep(dlogis(lin), 2, b[["x1"]] + U[, 2], "*")),
+    tratamiento = mean(plogis(lin + b[["x2"]] * (1 - trat)) - plogis(lin - b[["x2"]] * trat)))
+}
+
+b_s <- fixef(m_slope)
+est_pob_s <- ame_pob_s(b_s)
+
+rbind(
+  fila_me(avg_slopes(m_slope, variables = "x1"),               "fragilidad", "observados"),
+  fila_me(avg_slopes(m_slope, variables = "x1", re.form = NA), "fragilidad", "típico"),
+  fila_me(avg_comparisons(m_slope, variables = list(x2 = 0:1)),               "tratamiento", "observados"),
+  fila_me(avg_comparisons(m_slope, variables = list(x2 = 0:1), re.form = NA), "tratamiento", "típico"),
+  fila_pob(est_pob_s, ee_delta(ame_pob_s, b_s, as.matrix(vcov(m_slope))))) |>
+  presenta_ame()
+```
+
+El resultado apenas cambia respecto a `m_int`: la fragilidad sigue sumando unos **18 puntos** de
+riesgo por desviación típica y el tratamiento restando unos **11**. Es un contraste instructivo con la
+tabla de coeficientes: $\hat\beta_1$ subía de $1{,}08$ a $1{,}15$ al añadir la pendiente, pero en la
+escala de la probabilidad el efecto medio es prácticamente el mismo. Lo único que cambia es que las
+tres versiones se separan algo más —de $17{,}3$ a $18{,}4$ puntos para la fragilidad—, porque con pendiente
+aleatoria el efecto de la fragilidad también varía de un centro a otro.
 
 :::: {.callout-tip}
 ## 🔧 En R. Añadir una pendiente aleatoria

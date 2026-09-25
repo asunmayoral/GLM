@@ -36,13 +36,13 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", GGally = "2.4.0", MASS = "7.3.65", MuMIn = "1.48.19",
-  aplore3 = "0.9", arm = "1.15.3", brant = "0.3.0", broom = "1.0.13",
-  lmtest = "0.9.40", marginaleffects = "0.32.0", nnet = "7.3.20",
-  ordinal = "2025.12.29", pROC = "1.19.0.1", patchwork = "1.3.2",
-  performance = "0.17.0", readr = "2.2.0", see = "0.14.0",
-  sessioninfo = "1.2.4", sure = "0.2.0", tibble = "3.3.1", tidyr = "1.3.2",
-  tidyverse = "2.0.0", yardstick = "1.4.0")
+  DHARMa = "0.5.0", GGally = "2.4.0", Hmisc = "5.2.6", MASS = "7.3.65",
+  MuMIn = "1.48.19", aplore3 = "0.9", arm = "1.15.3", brant = "0.3.0",
+  broom = "1.0.13", generalhoslem = "1.3.4", lmtest = "0.9.40",
+  marginaleffects = "0.32.0", nnet = "7.3.20", ordinal = "2025.12.29",
+  pROC = "1.19.0.1", patchwork = "1.3.2", performance = "0.17.0",
+  readr = "2.2.0", see = "0.14.0", sessioninfo = "1.2.4", sure = "0.2.0",
+  tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", yardstick = "1.4.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
