@@ -198,11 +198,24 @@ completo de un tirón, sin ir desplegando bloque a bloque.
 
 | Caso | Carpeta de scripts | Qué contiene |
 |:--|:--|:--|
+| **Antes de empezar · Paquetes de R** | [`_scripts/instalar_paquetes.R`](https://github.com/asunmayoral/GLM/blob/master/_scripts/instalar_paquetes.R) | Instala los paquetes de R que faltan para ejecutar los scripts de los tres casos |
 | **Caso 1 · Respuestas binarias** | [`caso1/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso1/scripts) | Un `.R` por unidad (1.1 a 1.6) y el del documento completo |
 | **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) | Un `.R` por unidad (2.1 a 2.8) y el del documento completo |
 | **Caso 3 · Continuas positivas** | [`caso3/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso3/scripts) | Un `.R` por unidad (3.1 a 3.8) y el del documento completo |
 
-: Código R de la teoría de cada caso, por unidades. {.striped .hover tbl-colwidths="[28,26,46]"}
+: Código R de la teoría de cada caso, por unidades, y script de instalación de paquetes. {.striped .hover tbl-colwidths="[28,26,46]"}
+
+**Antes de ejecutar ningún script, instala los paquetes.** No hace falta descargar el fichero de
+instalación: copia esta línea en la consola de R (en RStudio, el panel *Console*) y pulsa Intro.
+
+```r
+source("https://raw.githubusercontent.com/asunmayoral/GLM/master/_scripts/instalar_paquetes.R")
+```
+
+El script te dice cuántos paquetes tienes ya, instala solo los que faltan (no actualiza los que tienes)
+y, al terminar, te avisa si alguno no se ha podido instalar. Basta con ejecutarlo una vez; si más
+adelante un script se detiene con un error del tipo `there is no package called ...`, vuelve a
+ejecutarlo.
 
 Y antes de bajar al código: al **inicio de cada caso**, en el *Mapa del caso*, hay una **caja de
 herramientas de R** —una tabla con los paquetes y funciones que se usan en el caso, unidad por

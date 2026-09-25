@@ -1,5 +1,7 @@
 # Paquetes de R que necesitan los cuadernos del curso (casos 1, 2 y 3).
-# Ejecutar una vez, desde la raíz del proyecto, antes del primer render:
+# Ejecutar una vez, antes del primer script o render. Sin descargar nada:
+#   source("https://raw.githubusercontent.com/asunmayoral/GLM/master/_scripts/instalar_paquetes.R")
+# o, desde la raíz del proyecto:
 #   source("_scripts/instalar_paquetes.R")
 # Instala solo los que faltan; no actualiza los que ya están.
 
