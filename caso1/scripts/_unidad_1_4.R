@@ -37,10 +37,11 @@ leer_datos_glm <- function(ruta) {
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
   DHARMa = "0.5.0", GGally = "2.4.0", MASS = "7.3.65", MuMIn = "1.48.19",
-  aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13", lme4 = "2.0.1",
-  marginaleffects = "0.32.0", pROC = "1.19.0.1", patchwork = "1.3.2",
-  performance = "0.17.0", readr = "2.2.0", see = "0.14.0",
-  sessioninfo = "1.2.4", tidyr = "1.3.2", tidyverse = "2.0.0")
+  aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13", knitr = "1.51",
+  lme4 = "2.0.1", lmtest = "0.9.40", marginaleffects = "0.32.0",
+  pROC = "1.19.0.1", patchwork = "1.3.2", performance = "0.17.0",
+  readr = "2.2.0", see = "0.14.0", sessioninfo = "1.2.4", tidyr = "1.3.2",
+  tidyverse = "2.0.0", varTestnlme = "1.3.5")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -514,16 +515,25 @@ rbind(
 # -----------------------------------------------------------------------------
 AIC(m_pool, m_int, m_slope)   # los tres, de menos a más estructura aleatoria
 BIC(m_pool, m_int, m_slope)
-# LRT de cada salto (p sin corregir). El mixto va primero: con el glm delante,
-# anova() aplicaría el método de glm e ignoraría al mixto
-anova(m_int, m_pool)           # pooled -> intercepto aleatorio
-anova(m_slope, m_int)          # intercepto -> pendiente aleatoria
+
+# -----------------------------------------------------------------------------
+# [u14-lrt-secuencial]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > Qué modelo: la comparación de los tres
+#         > El LRT de una varianza: la corrección de frontera
+# -----------------------------------------------------------------------------
+# lrtest avisa de que compara un glm con un glmer: es inocuo, porque las dos
+# verosimilitudes son la binomial completa y, por tanto, comparables
+library(lmtest)
+lrtest(m_pool, m_int, m_slope)   # LRT secuencial: pooled -> intercepto -> pendiente
 
 # -----------------------------------------------------------------------------
 # [u14-lrt-frontera]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
 #       > Qué modelo: la comparación de los tres
+#         > El LRT de una varianza: la corrección de frontera
 # -----------------------------------------------------------------------------
 library(varTestnlme)
 varCompTest(m_int, m_pool, output = FALSE)    # H0: sigma_u^2 = 0
@@ -536,13 +546,29 @@ varCompTest(m_slope, m_int, output = FALSE)   # H0: sigma_u1^2 = 0 (y, con ella,
 #       > ¿Cuánto explica? $R^2$ marginal y condicional
 # -----------------------------------------------------------------------------
 performance::r2(m_int)     # R2 marginal (fijos) y condicional (fijos + aleatorios)
-performance::icc(m_int)    # icc no ajustado = R2(cond)-R2(marg)
+performance::icc(m_int)    # ICC ajustado y no ajustado
+
+# -----------------------------------------------------------------------------
+# [u14-r2-manual]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Cuánto explica? $R^2$ marginal y condicional
+# -----------------------------------------------------------------------------
+s2_f <- var(drop(model.matrix(m_int) %*% fixef(m_int)))   # efectos fijos
+s2_u <- as.data.frame(VarCorr(m_int))$vcov[1]             # entre centros
+s2_e <- pi^2 / 3                                          # residual latente (logit)
+total <- s2_f + s2_u + s2_e
+round(c(s2_f            = s2_f,
+        R2_marginal     = s2_f / total,
+        R2_condicional  = (s2_f + s2_u) / total,
+        ICC_ajustado    = s2_u / (s2_u + s2_e),
+        ICC_no_ajustado = s2_u / total), 3)
 
 # -----------------------------------------------------------------------------
 # [u14-evaluacion]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
-#       > ¿Qué tal predice? Calibración y discriminación
+#       > ¿Qué tal predice? Calibración, discriminación y clasificación
 # -----------------------------------------------------------------------------
 library(pROC)
 # la misma paciente, predicha con el efecto de su centro y como si viniera de un centro nuevo
@@ -577,7 +603,7 @@ calib_mix |>
 # [fig-u14-calibracion]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
-#       > ¿Qué tal predice? Calibración y discriminación
+#       > ¿Qué tal predice? Calibración, discriminación y clasificación
 # -----------------------------------------------------------------------------
 ggplot(calib_mix, aes(pred, obs, colour = prediccion)) +
   geom_abline(linetype = "dashed") +
@@ -585,6 +611,24 @@ ggplot(calib_mix, aes(pred, obs, colour = prediccion)) +
   coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
   labs(x = "Probabilidad ajustada (media por decil)", y = "Frecuencia observada",
        colour = "Centro")
+
+# -----------------------------------------------------------------------------
+# [u14-clasificacion]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Qué tal predice? Calibración, discriminación y clasificación
+# -----------------------------------------------------------------------------
+pred_eval |>
+  mutate(clase = as.integer(p >= 0.5)) |>
+  group_by(prediccion) |>
+  summarise(VP = sum(clase == 1 & y == 1), FP = sum(clase == 1 & y == 0),
+            FN = sum(clase == 0 & y == 1), VN = sum(clase == 0 & y == 0)) |>
+  mutate(exactitud     = (VP + VN) / (VP + FP + FN + VN),
+         sensibilidad  = VP / (VP + FN),
+         especificidad = VN / (VN + FP),
+         precision     = VP / (VP + FP),
+         F1            = 2 * precision * sensibilidad / (precision + sensibilidad),
+         across(exactitud:F1, \(v) round(v, 3)))
 
 # -----------------------------------------------------------------------------
 # [fig-u14-dharma]
@@ -622,7 +666,7 @@ testQuantiles(sim, predictor = cohorte$x1, plot = FALSE)   # el mismo contraste,
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
 #       > ¿Se cumplen los supuestos? Diagnóstico
-#         > Nivel de centro: homogeneidad, dispersión y normalidad
+#         > Nivel de centro: homogeneidad y normalidad
 # -----------------------------------------------------------------------------
 # factor: con el código numérico del centro, DHARMa lo trataría como una covariable continua
 tc <- testCategorical(sim, catPred = factor(cohorte$centro))
@@ -630,21 +674,11 @@ min(tc$uniformity$p.value.cor)   # el KS más desfavorable de los 24, ya ajustad
 tc$homogeneity                   # Levene: ¿misma varianza en todos los centros?
 
 # -----------------------------------------------------------------------------
-# [u14-dispersion-centro]
-#   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.4 Comparación, evaluación y diagnóstico
-#       > ¿Se cumplen los supuestos? Diagnóstico
-#         > Nivel de centro: homogeneidad, dispersión y normalidad
-# -----------------------------------------------------------------------------
-sim_centro <- recalculateResiduals(sim, group = cohorte$centro)
-testDispersion(sim_centro, plot = FALSE)
-
-# -----------------------------------------------------------------------------
 # [fig-u14-qq-ranef]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
 #       > ¿Se cumplen los supuestos? Diagnóstico
-#         > Nivel de centro: homogeneidad, dispersión y normalidad
+#         > Nivel de centro: homogeneidad y normalidad
 # -----------------------------------------------------------------------------
 ggplot(re_coh, aes(sample = condval)) +
   stat_qq() +
@@ -657,7 +691,7 @@ shapiro.test(re_coh$condval)
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.4 Comparación, evaluación y diagnóstico
 #       > ¿Se cumplen los supuestos? Diagnóstico
-#         > Nivel de centro: homogeneidad, dispersión y normalidad
+#         > Nivel de centro: homogeneidad y normalidad
 # -----------------------------------------------------------------------------
 extremo <- which.max(abs(re_coh$condval))
 re_coh[extremo, c("grp", "condval")]        # el centro más alejado del típico

@@ -2,58 +2,34 @@
      Chunks prefijados u15-. Usa la cohorte simulada y su expansión pp.
      Esta unidad absorbe la fundamentación que antes vivía en el apéndice. -->
 
-# 5 · Supervivencia: del hazard al GLM en tiempo discreto {#sec-u15}
+# 5 · Supervivencia: el tiempo hasta el evento como GLM {#sec-u15}
 
 
-Las unidades anteriores respondían a *«¿ocurre el evento?»*: una fractura, sí o no, modelada con la
-logística. Pero a esa pregunta le falta otra —*«¿y **cuándo**?»*—. Pasar de la ocurrencia al
-**tiempo hasta el evento** abre el **análisis de supervivencia**, el segundo hilo en espiral del
-curso. Sin salir del marco GLM, el tiempo-a-evento en **tiempo discreto** se reescribe como una
-regresión binomial con enlace `cloglog`, y nos permitirá integrar efectos de agrupación con modelos mixtos como los que ya vimos en la [Unidad 4](#sec-u14)—.
+Las unidades anteriores respondían a una pregunta: *¿se fractura la paciente?* Ahora, con la
+misma cohorte de la [Unidad 4](#sec-u14) (las mismas mujeres, clínicas y covariables `x1`, `x2`
+y `centro`), preguntamos **cuándo**.
 
-**Los datos: un seguimiento por periodos.**
+**Qué queremos.**
 
-GLOW se queda corto aquí: registra si hubo fractura en el primer año, pero no **cuándo** ni a
-quién se dejó de observar. Por eso trabajamos con una [**cohorte simulada**](#sec-datos-cohorte)
-—inspirada en el mismo contexto clínico (fracturas en mujeres seguidas en varias clínicas) y
-descrita al detalle, con todas sus variables y su proceso generador, en la Presentación del caso—
-que añade justo lo que falta: **el tiempo**.
+1. Saber **en qué momento del seguimiento** se producen las fracturas: si se concentran en los
+   primeros años o se vuelven más frecuentes con el paso del tiempo.
+2. Saber cuánto **adelantan o retrasan** la fractura la fragilidad (`x1`) y el tratamiento (`x2`).
+3. Aprovechar para ello a **todas** las pacientes, también a las que terminan su seguimiento sin
+   fracturarse, aunque de ellas solo sepamos que no se fracturaron mientras las observamos.
 
-Y lo añade de una forma muy concreta que conviene fijar desde el principio, porque determina toda
-la teoría que sigue: a cada mujer no la observamos de forma continua, sino en una serie de
-revisiones $t=1,2,\dots,6$ (una al año). En cada revisión a la que llega sin haberse
-fracturado —es decir, mientras sigue *en riesgo*— anotamos una sola cosa: ¿fractura en este
-periodo, sí o no? La secuencia continúa hasta que ocurre una de dos cosas: o registramos la
-fractura (y ahí termina el seguimiento), o la mujer sale del estudio sin haberla tenido
-(**censura**). Dicho de otro modo, el dato de cada paciente es una secuencia de respuestas
-binarias, periodo a periodo: eso es, literalmente, un **proceso estocástico en tiempo discreto**,
-y es la materia prima con la que construiremos el modelo.
+**En qué se diferencia de antes.** Hasta ahora la respuesta era `ever` (sí/no) y el tiempo no
+contaba. Una fractura en el primer año pesaba lo mismo que una en el sexto. Y una paciente seguida
+tres años sin fractura contaba igual que una seguida seis. Ahora la respuesta la forman dos
+variables de la cohorte que habíamos dejado de lado:
 
-Resumido en variables, de cada paciente tenemos:
+| Variable | Significado |
+|---|---|
+| `tiempo` | Revisión anual (de 1 a 6) en la que termina el seguimiento de la paciente |
+| `evento` | Cómo termina: 1 = con una fractura detectada en esa revisión; 0 = sin fractura |
 
-- el **tiempo hasta la fractura o salida del estudio —por finalización sin rotura—** (`tiempo`, la
-revisión en que se detecta), 
-- si llegamos a observar el evento o no (`evento`: 1 = fractura
-observada; 0 = **censura**, p. ej. fin administrativo del seguimiento) 
-- y sus **covariables de base** —constantes a lo largo del seguimiento—, con lectura clínica: `x1` es un marcador de **fragilidad ósea** (baja densidad mineral, estandarizada en puntuación z), un factor de riesgo continuo —a mayor valor, hueso más frágil y más riesgo a fractura ($\beta_1>0$)—; `x2` es un
-**factor binario protector** —recibir o no un tratamiento preventivo, $\beta_2<0$—; y `centro` es la
-**clínica** a la que pertenece cada paciente —el agrupamiento que trataremos como **fragilidad
-inicial**, con una interceptación aleatoria—. Al ser simulada, conocemos la verdad del proceso
-generador y podremos comprobar que el ajuste la recupera.
-
-**Qué cambia respecto a antes.** 
-
-Hasta ahora estimábamos la **probabilidad** de un desenlace binario. Ahora el objeto es **dinámico**, e interesa:
-
-- el **riesgo (*hazard*) a lo largo del tiempo**: ¿qué
-riesgo de fracturar hay en cada periodo, entre quienes llegan sin fractura?, 
-- la **curva de  supervivencia** $S(t)$: ¿qué fracción de la muestra/población sigue sin fractura pasado $t$?
-- y cómo las covariables **aceleran o retrasan** el evento (los *hazard ratios*). 
-
-Y además, aparece un ingrediente nuevo, la **censura**: hay que aprovechar la información de las pacientes a las que **no** vimos fracturar en
-la ventana de observación, sin sesgarla. Todo ello, como veremos, cabe dentro del GLM.
-
-Comenzaremos definiendo y describiendo los conceptos básicos en el análisis de supervivencia, y seguiremos implementando este análisis de un modo no paramétrico y después a través de un modelo lineal generalizado binario.
+Responder a este tipo de preguntas es el objeto del **análisis de supervivencia**, el segundo hilo
+en espiral del curso. Veremos que cabe dentro del GLM y que el `centro` vuelve a entrar como efecto
+aleatorio, igual que en la [Unidad 4](#sec-u14).
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -120,9 +96,35 @@ sujeto "falla" (evento) o "sobrevive" ese periodo. Una paciente **censurada** es
 seguimiento sin haber tenido una fractura (se acaba el periodo de observación); la censura no
 está vinculada al riesgo de fractura.
 
-Disponer los datos con **una fila por sujeto y periodo en riesgo** (persona-periodo) convierte el
-problema en una **secuencia de ensayos de Bernoulli** con probabilidad $h_t$. La verosimilitud de
-supervivencia se **factoriza** exactamente como un producto de Bernoulli sobre los periodos,
+Disponer los datos con **una fila por sujeto y periodo en riesgo** (formato **persona-periodo**)
+convierte el problema en una **secuencia de ensayos de Bernoulli** con probabilidad $h_t$. Veámoslo
+sobre la `cohorte`. En su forma original tiene **una fila por mujer**, con sus covariables de base
+(`x1`, `x2`, `centro`), el periodo en que termina su seguimiento (`tiempo`) y cómo termina
+(`evento`: 1 = fractura, 0 = censura):
+
+```{r}
+#| label: u15-cohorte-head
+head(cohorte[, c("id", "centro", "x1", "x2", "tiempo", "evento")])
+```
+
+La función `expandir_persona_periodo()`, definida en la Presentación del caso, la reorganiza. Para
+cada mujer genera una fila por revisión en la que siguió en riesgo, hasta la última observada. La
+nueva respuesta binaria `y` vale 1 solo en la revisión en que se detecta la fractura:
+
+```{r}
+#| label: u15-pp
+pp <- expandir_persona_periodo(cohorte)
+pp[pp$id %in% c(2, 4), ]   # una mujer que fractura y otra censurada
+```
+
+La paciente 2 fractura en su tercera revisión y pasa a ser **tres filas**, con `y = 0, 0, 1`. La
+paciente 4 termina su seguimiento en la cuarta revisión sin fractura y aporta **cuatro filas**, todas
+con `y = 0`. La **censura encaja sin esfuerzo**: la paciente censurada aporta los periodos que sí se
+observaron y deja de aportar después, sin que haya que inventarle un valor de $T$. Cada fila es el
+**ensayo de Bernoulli** de un periodo.
+
+La verosimilitud de supervivencia se **factoriza** exactamente como un producto de Bernoulli sobre
+los periodos,
 
 $$ P(T=t)=\begin{cases}
 h_t \prod_{s<t} (1-h_s) & \text{ si evento en } t\\
@@ -171,15 +173,6 @@ terreno de los métodos **no paramétricos**: en lugar de estimar los parámetro
 leen la curva directamente de los datos, con el mínimo de supuestos. Su herramienta de
 referencia —y casi siempre el primer paso de cualquier análisis de supervivencia— es el
 estimador de **Kaplan–Meier**.
-
-Antes de nada, conviene **ver la forma de los datos**. La `cohorte` tiene **una fila por mujer**:
-sus covariables de base (`x1`, `x2`, `centro`), el **periodo** en que se observa el desenlace
-(`tiempo`) y si este fue **fractura o censura** (`evento`: 1 = fractura, 0 = censura).
-
-```{r}
-#| label: u15-cohorte-head
-head(cohorte[, c("id", "centro", "x1", "x2", "tiempo", "evento")])
-```
 
 El estimador de **Kaplan–Meier** [@kaplan1958] reconstruye la curva de supervivencia **sin
 imponer ninguna forma funcional**: en cada instante con eventos multiplica la fracción que
@@ -419,27 +412,9 @@ h_t=\Pr(T=t\mid T\ge t)
 $$
 Esto es así porque descompone la historia de cada paciente en una **secuencia de preguntas binarias**: en cada revisión a la que llega, ¿fractura, sí o no? Y una secuencia de respuestas 'sí/no' es justo lo que un GLM binomial sabe modelar.
 
-Esa descomposición nos pide **reorganizar los datos**. En la `cohorte` tenemos una fila por mujer
-—su `tiempo` y su `evento`—; el hazard por periodo, en cambio, vive en el **formato
-persona-periodo** que anticipamos en la [Sección 5.1](#sec-u15-hazard): **una fila por paciente y
-revisión en riesgo**, con una respuesta binaria `y = 1` solo en la revisión donde se detecta la
-fractura. La **censura encaja sin esfuerzo**: una paciente censurada aporta las filas de los
-periodos que sí se observaron (en todas, `y = 0`) y deja de aportar después —no hay que inventarle
-un valor de $T$—.
-
-La transformación la hace `expandir_persona_periodo()` (definida en la Presentación del caso):
-recorre cada mujer y genera sus filas, periodo a periodo, hasta el último que se observó.
-
-```{r}
-#| label: u15-pp
-pp <- expandir_persona_periodo(cohorte)   # de 1 fila por mujer a 1 fila por mujer y periodo en riesgo
-head(pp, 8)
-```
-
-Compárese con la `cohorte` de antes: una mujer que fractura en su tercera revisión pasa a ser
-**tres filas** (`y = 0, 0, 1`); una censurada en el cuarto periodo sin fractura, **cuatro filas**
-todas con `y = 0`. Cada fila es el **ensayo de Bernoulli** de un periodo, y sobre este banco
-ajustamos el GLM.
+Esa secuencia es la que recoge el banco persona-periodo `pp` que construimos en la
+[Sección 5.1](#sec-u15-hazard): una fila por paciente y revisión en riesgo, con `y = 1` solo en la
+revisión de la fractura. Sobre él ajustamos el GLM.
 
 **Qué asumimos**:
 

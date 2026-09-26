@@ -57,30 +57,30 @@ website:
       - section: "Caso 1 · Respuestas binarias"
         href: caso1/caso1_binaria.qmd
         contents:
-          - text: "1.1 · Cuando la recta no llega"
+          - text: "1.1 · Del dato binario al GLM"
             href: caso1/caso1_binaria.qmd#sec-u11
-          - text: "1.2 · Logística: ajuste e interpretación"
+          - text: "1.2 · Formulación de los GLM"
             href: caso1/caso1_binaria.qmd#sec-u12
-          - text: "1.3 · Más de dos categorías"
+          - text: "1.3 · Binomial y politómica"
             href: caso1/caso1_binaria.qmd#sec-u13
-          - text: "1.4 · Sujetos agrupados (GLMM)"
+          - text: "1.4 · Efectos aleatorios (GLMM)"
             href: caso1/caso1_binaria.qmd#sec-u14
-          - text: "1.5 · ¿Y cuándo ocurre? Supervivencia"
+          - text: "1.5 · Supervivencia como GLM"
             href: caso1/caso1_binaria.qmd#sec-u15
           - text: "1.6 · Estudio de caso"
             href: caso1/caso1_binaria.qmd#sec-u16
       - section: "Caso 2 · Conteos y tasas"
         href: caso2/caso2_conteos.qmd
         contents:
-          - text: "2.1 · Poisson, tasas e IRR"
+          - text: "2.1 · Poisson y log-lineales"
             href: caso2/caso2_conteos.qmd#sec-u21
           - text: "2.2 · Log-lineales para tablas"
             href: caso2/caso2_conteos.qmd#sec-u22
           - text: "2.3 · Sobredispersión"
             href: caso2/caso2_conteos.qmd#sec-u23
-          - text: "2.4 · Exceso de ceros"
+          - text: "2.4 · Demasiados ceros"
             href: caso2/caso2_conteos.qmd#sec-u24
-          - text: "2.5 · Conteos agrupados"
+          - text: "2.5 · GLMM de Poisson"
             href: caso2/caso2_conteos.qmd#sec-u25
           - text: "2.6 · Del conteo al reloj"
             href: caso2/caso2_conteos.qmd#sec-u26
@@ -101,9 +101,9 @@ website:
             href: caso3/caso3_continuas_positivas.qmd#sec-u34
           - text: "3.5 · AFT: del coste al tiempo"
             href: caso3/caso3_continuas_positivas.qmd#sec-u35
-          - text: "3.6 · Cox como frontera"
+          - text: "3.6 · Cox: del tiempo al riesgo"
             href: caso3/caso3_continuas_positivas.qmd#sec-u36
-          - text: "3.7 · Más allá: las tres lentes"
+          - text: "3.7 · Las tres lentes"
             href: caso3/caso3_continuas_positivas.qmd#sec-u37
           - text: "3.8 · Estudio de caso"
             href: caso3/caso3_continuas_positivas.qmd#sec-u38
