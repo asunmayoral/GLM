@@ -1045,14 +1045,8 @@ La sintaxis de estructuras más ricas —cruzadas, anidadas— en la [Sección 4
 - `VarCorr(m)` — **varianza** del efecto aleatorio ($\sigma_u^2$ y $\sigma_u$).
 - `confint(m, method = "Wald")` — IC de los $\beta$; con `method = "profile"` (más fiable) o
   `"boot"`, también el de $\sigma_u$.
-- **ICC**, a mano desde `VarCorr` —`s2_u / (s2_u + pi^2 / 3)` con
-  `s2_u <- as.data.frame(VarCorr(m))$vcov[1]`— o directo con `performance::icc(m)`, que devuelve dos
-  versiones:
-    - `ICC_adjusted` (**ajustado**): $\sigma_u^2/(\sigma_u^2+\sigma^2_{\text{resid}})$, solo efectos
-      aleatorios. Es el que coincide con la fórmula manual.
-    - `ICC_unadjusted` (**no ajustado**): mete además la varianza de los **efectos fijos** en el
-      denominador, así que sale **menor**. Versiones antiguas de `performance` lo rotulaban
-      *Conditional ICC*; es el mismo número.
+- **ICC** latente, a mano desde `VarCorr`: `s2_u / (s2_u + pi^2 / 3)`, con
+  `s2_u <- as.data.frame(VarCorr(m))$vcov[1]`.
 
 *Efectos aleatorios de cada grupo:*
 
@@ -1335,53 +1329,72 @@ Con efectos aleatorios se procede **de menos a más**, y cada salto se contrasta
 2. Contrastar cada salto con **criterios de información** —el **criterio de información de Akaike**
    (AIC), que premia el ajuste y penaliza el número de parámetros, y el **criterio de información
    bayesiano** (BIC), que penaliza más la complejidad; en ambos, menor es mejor— y con el
-   **contraste de razón de verosimilitudes** (LRT, *likelihood ratio test*) entre modelos anidados.
+   **contraste de razón de verosimilitudes** (LRT, *likelihood ratio test*) entre modelos anidados,
+   con la corrección de frontera que exige contrastar una varianza (abajo).
 3. Descartar cualquier estructura con ajuste **singular** o sin convergencia (el aviso de la
    [Sección 4.3](#sec-u14-intercepto)).
 4. Ante la duda, **parsimonia**: el modelo más simple que describe bien los datos.
+
+Ninguno de los dos ajustes mixtos era singular ([Sección 4.3](#sec-u14-modelos)), así que los tres
+candidatos siguen en pie y se procede a compararlos.
 
 ```{r}
 #| label: u14-glmm-comparacion
 AIC(m_pool, m_int, m_slope)   # los tres, de menos a más estructura aleatoria
 BIC(m_pool, m_int, m_slope)
-# LRT de cada salto (p sin corregir). El mixto va primero: con el glm delante,
-# anova() aplicaría el método de glm e ignoraría al mixto
-anova(m_int, m_pool)           # pooled -> intercepto aleatorio
-anova(m_slope, m_int)          # intercepto -> pendiente aleatoria
 ```
 
-Los números **deciden**, aunque no por unanimidad.
+Los criterios de información **deciden**, aunque no por unanimidad.
 
 - **Del *pooled* al intercepto aleatorio**, el AIC baja de $909{,}66$ a $898{,}97$: el único parámetro
-  añadido —la varianza $\sigma_u^2$— **compensa con creces**, y el LRT lo respalda ($\chi^2=12{,}69$,
-  1 g.l.).
+  añadido —la varianza $\sigma_u^2$— **compensa con creces**.
 - **Del intercepto a la pendiente**, en cambio, el AIC apenas se mueve ($898{,}97\to898{,}05$): baja,
   pero menos de un punto, dentro de lo que el AIC no distingue y lejos del respaldo que justificaría
-  dos parámetros más. El LRT no alcanza significación ($\chi^2=4{,}92$, 2 g.l., $p=0{,}086$), aunque
-  ese $p$ hay que corregirlo (recuadro siguiente).
+  dos parámetros más.
 - El **BIC**, que penaliza más la complejidad, lo dice sin ambigüedad: prefiere el intercepto
   aleatorio ($918{,}1$) tanto al *pooled* ($924{,}0$) como a la pendiente ($926{,}7$).
 
-:::: {.callout-important}
-## Cómo contrastar una varianza: el LRT con corrección de frontera
+#### El LRT de una varianza: la corrección de frontera
 
-El $p$ que imprime `anova()` compara el estadístico con una $\chi^2$ estándar, y **no es el correcto**
-cuando lo que se contrasta es una **varianza**: bajo $H_0$ vale $0$, el **borde** de su espacio de
-parámetros —una varianza no puede ser negativa—, y ahí fallan las condiciones de regularidad del
-test. La referencia pasa a ser una **mezcla de $\chi^2$** [@selfliang1987; @stramlee1994], y el $p$
-de `anova()` resulta **conservador**: demasiado grande.
+El LRT compara dos modelos anidados con el estadístico
+$$
+\Lambda=2\bigl(\log L_1-\log L_0\bigr),
+$$
+y, en condiciones regulares, lo refiere a una $\chi^2$ con tantos grados de libertad como parámetros
+añade el modelo mayor. Es lo que calculan `anova()` y `lmtest::lrtest()`. Pero aquí cada salto añade
+una **varianza**, y la hipótesis nula la fija en $0$: el **borde** de su espacio de parámetros, porque
+una varianza no puede ser negativa. En el borde fallan las condiciones de regularidad, y la
+distribución de $\Lambda$ bajo $H_0$ deja de ser una $\chi^2$: pasa a ser una **mezcla** de
+$\chi^2$ [@selfliang1987; @stramlee1994]. En los dos saltos de esta sección:
 
-**Cómo proceder:**
+- **al añadir el intercepto aleatorio** ($H_0:\sigma_u^2=0$), $\tfrac12\chi^2_0+\tfrac12\chi^2_1$, donde
+  $\chi^2_0$ es una masa en el $0$. En la práctica, el $p$ correcto es **la mitad** del de una
+  $\chi^2_1$;
+- **al añadir la pendiente con su covarianza** ($H_0:\sigma_{u_1}^2=0$, y con ella $\sigma_{01}=0$),
+  $\tfrac12\chi^2_1+\tfrac12\chi^2_2$.
 
-1. **Estadístico.** El LRT de `anova()` (o de `lmtest::lrtest()`), como en el chunk anterior.
-2. **$p$ corregido.** `varTestnlme::varCompTest(m1, m0)` [@baeykuhn2023] identifica la mezcla que
-   corresponde y devuelve su $p$. `m1` es el modelo con el efecto aleatorio y `m0` el modelo sin él
-   —un `glm` cuando no tiene ningún efecto aleatorio—.
-3. **Decidir** con el $p$ corregido, junto con el AIC y el BIC.
+La consecuencia práctica es directa: **el estadístico de `anova()` o `lrtest()` es correcto, pero su
+$p$ no**. Lo calculan contra la $\chi^2$ estándar, que en el borde es **conservadora**: da un $p$
+demasiado grande. El procedimiento correcto tiene, pues, dos pasos:
 
-En los dos saltos de esta sección la mezcla es sencilla: $\tfrac12\chi^2_0+\tfrac12\chi^2_1$ al añadir
-el intercepto aleatorio —**la mitad** del $p$ de una $\chi^2_1$—, y $\tfrac12\chi^2_1+\tfrac12\chi^2_2$ al
-añadir la pendiente con su covarianza.
+1. **El estadístico**, con `lmtest::lrtest()`, que admite la secuencia completa de modelos anidados
+   —también el `glm` sin efectos aleatorios— en una sola llamada.
+2. **El $p$ corregido**, con `varTestnlme::varCompTest(m1, m0)` [@baeykuhn2023], que identifica la
+   mezcla que corresponde a cada contraste. `m1` es el modelo con el efecto aleatorio y `m0` el
+   modelo sin él (un `glm` cuando no tiene ninguno).
+
+```{r}
+#| label: u14-lrt-secuencial
+#| warning: false
+# lrtest avisa de que compara un glm con un glmer: es inocuo, porque las dos
+# verosimilitudes son la binomial completa y, por tanto, comparables
+library(lmtest)
+lrtest(m_pool, m_int, m_slope)   # LRT secuencial: pooled -> intercepto -> pendiente
+```
+
+Los dos estadísticos son $\Lambda=12{,}69$ (1 g.l.) al añadir el intercepto aleatorio y $\Lambda=4{,}92$
+(2 g.l.) al añadir la pendiente. Los $p$ de la tabla, $0{,}00037$ y $0{,}086$, son los de la $\chi^2$
+estándar, **sin corregir**. Los correctos:
 
 ```{r}
 #| label: u14-lrt-frontera
@@ -1390,17 +1403,17 @@ varCompTest(m_int, m_pool, output = FALSE)    # H0: sigma_u^2 = 0
 varCompTest(m_slope, m_int, output = FALSE)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
 ```
 
-El salto al intercepto aleatorio es contundente: el $p$ corregido es $0{,}0002$. El de la pendiente
-baja de $0{,}086$ a $0{,}056$: sigue sin alcanzar el $5\,\%$, pero **por poco**, de modo que el
-contraste por sí solo no la descarta con holgura. Con un estadístico algo mayor, la corrección
-**sí** invertiría la conclusión.
-::::
+| Salto | $\Lambda$ | g.l. | $p$ sin corregir ($\chi^2$) | $p$ corregido (mezcla) |
+|---|---|---|---|---|
+| *pooled* → intercepto | $12{,}69$ | 1 | $0{,}00037$ | $0{,}00018$ |
+| intercepto → pendiente | $4{,}92$ | 2 | $0{,}086$ | $0{,}056$ |
 
-¿Y la singularidad? Ninguno de los dos ajustes mixtos lo era ([Sección 4.3](#sec-u14-modelos)), así
-que no descarta a ninguno: la decisión la toman los criterios. Conviene no confundir las dos
-preguntas: la singularidad diagnostica una estructura aleatoria que los datos **no pueden sostener**
-—el ajuste degenera—; el AIC, el BIC y el LRT deciden si esa estructura **merece la pena**. La
-pendiente, aquí, se sostiene sin problemas; simplemente no hace falta.
+El primer $p$ corregido es exactamente la mitad del sin corregir, como anticipaba la mezcla
+$\tfrac12\chi^2_0+\tfrac12\chi^2_1$. El salto al intercepto aleatorio es contundente con cualquiera de
+los dos. El de la pendiente baja de $0{,}086$ a $0{,}056$: sigue sin alcanzar el $5\,\%$, pero **por
+poco**, así que el contraste, por sí solo, no la descarta con holgura. Con un estadístico algo mayor,
+la corrección **sí** invertiría la conclusión: por eso, con varianzas, el $p$ sin corregir no se usa
+para decidir.
 
 **Conclusión:** nos quedamos con el **intercepto aleatorio**, `m_int`. Mejora con claridad al
 *pooled*; la pendiente, en cambio, no se justifica: el LRT corregido queda en el límite, el AIC apenas
@@ -1413,36 +1426,77 @@ continuación.
 ```r
 AIC(m_pool, m_int, m_slope)     # menor = mejor
 BIC(m_pool, m_int, m_slope)     # penaliza más la complejidad
-anova(m_int, m_pool)            # LRT, p sin corregir; el mixto SIEMPRE primero
-lmtest::lrtest(m_pool, m_int)   # el mismo LRT, en cualquier orden
+lmtest::lrtest(m_pool, m_int, m_slope)   # estadístico LRT de cada salto (su p, sin corregir)
 
 # p corregido por la frontera (m1 = con el efecto aleatorio, m0 = sin él)
 varTestnlme::varCompTest(m_int, m_pool, output = FALSE)
+varTestnlme::varCompTest(m_slope, m_int, output = FALSE)
 ```
 
-Con el `glm` delante, `anova(m_pool, m_int)` no da error: devuelve la tabla secuencial del `glm` e
-ignora al mixto sin avisar.
+`anova()` también da el estadístico entre un mixto y un `glm`, pero solo con el mixto **delante**:
+`anova(m_pool, m_int)` no da error, sino que devuelve la tabla secuencial del `glm` e ignora al
+mixto sin avisar.
 ::::
 
 ### ¿Cuánto explica? $R^2$ marginal y condicional
 
-En un modelo mixto la varianza explicada se parte en dos [@nakagawa2013]: el $R^2$ **marginal** —solo
-los **efectos fijos**— y el $R^2$ **condicional** —fijos **más** aleatorios—. La **diferencia**
-$R^2_{\text{condicional}}-R^2_{\text{marginal}}=\dfrac{\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}$
-**es el ICC no ajustado**: la fracción de la varianza total que aporta el **agrupamiento** (los
-centros) más allá de los efectos fijos. Es justo el `ICC_unadjusted` que devuelve
-`performance::icc(m)`, la segunda de las dos versiones del ICC que vimos al ajustar el intercepto
-aleatorio ([Sección 4.3](#sec-u14-intercepto)).
+En un modelo mixto, la varianza de la respuesta en la escala latente (logit) se reparte en tres
+componentes [@nakagawa2013; @nakagawa2017]:
+
+- $\sigma^2_f=\operatorname{Var}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta})$, la de los **efectos fijos**:
+  cuánto varía el predictor lineal entre pacientes;
+- $\sigma^2_u$, la de los **efectos aleatorios**: entre centros;
+- $\sigma^2_\varepsilon=\pi^2/3\approx3{,}29$, la **residual** de la escala latente, fija en el enlace
+  logit ([Sección 4.3](#sec-u14-intercepto)).
+
+Con ellas se construyen dos $R^2$ y dos ICC, que conviene ver juntos:
+
+$$
+\begin{aligned}
+R^2_{\text{marginal}}&=\frac{\sigma^2_f}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
+&&\text{lo que explican los efectos fijos,}\\[4pt]
+R^2_{\text{condicional}}&=\frac{\sigma^2_f+\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
+&&\text{lo que explican fijos y aleatorios juntos,}\\[4pt]
+\text{ICC}_{\text{ajustado}}&=\frac{\sigma^2_u}{\sigma^2_u+\sigma^2_\varepsilon}
+&&\text{el peso del centro, descontados los efectos fijos,}\\[4pt]
+\text{ICC}_{\text{no ajustado}}&=\frac{\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
+=R^2_{\text{condicional}}-R^2_{\text{marginal}}
+&&\text{el peso del centro sobre la varianza total.}
+\end{aligned}
+$$
+
+Las cuatro comparten ingredientes, y eso explica cómo se relacionan. Los dos $R^2$ tienen el **mismo
+denominador**, la varianza total, y se diferencian en si el numerador incluye $\sigma^2_u$; su
+diferencia es, por tanto, el ICC no ajustado. El ICC **ajustado** es el de la
+[Sección 4.3](#sec-u14-intercepto): quita $\sigma^2_f$ del denominador —«ajusta» por los efectos
+fijos—, así que siempre es **mayor** que el no ajustado. Los cuatro los calcula `performance`:
 
 ```{r}
 #| label: u14-r2
 performance::r2(m_int)     # R2 marginal (fijos) y condicional (fijos + aleatorios)
-performance::icc(m_int)    # icc no ajustado = R2(cond)-R2(marg)
+performance::icc(m_int)    # ICC ajustado y no ajustado
+```
+
+Y se reproducen a mano con las tres varianzas, lo que confirma qué hay en cada fórmula:
+
+```{r}
+#| label: u14-r2-manual
+s2_f <- var(drop(model.matrix(m_int) %*% fixef(m_int)))   # efectos fijos
+s2_u <- as.data.frame(VarCorr(m_int))$vcov[1]             # entre centros
+s2_e <- pi^2 / 3                                          # residual latente (logit)
+total <- s2_f + s2_u + s2_e
+round(c(s2_f            = s2_f,
+        R2_marginal     = s2_f / total,
+        R2_condicional  = (s2_f + s2_u) / total,
+        ICC_ajustado    = s2_u / (s2_u + s2_e),
+        ICC_no_ajustado = s2_u / total), 3)
 ```
 
 En la cohorte, $R^2_{\text{marginal}}=0{,}27$ y $R^2_{\text{condicional}}=0{,}31$: los efectos fijos
 (`x1`, `x2`) explican el **grueso** (≈ 27 %) y la estructura de centro **añade unos 4 puntos** (hasta
-el 31 %) —una contribución **modesta**, coherente con el ICC pequeño—.
+el 31 %), que son el ICC no ajustado ($0{,}041$). El ICC ajustado es mayor, $0{,}056$, porque ya no
+cuenta la varianza que explican `x1` y `x2` ($\sigma^2_f=1{,}29$). Los dos dicen lo mismo con distinta
+referencia: la contribución del centro es **modesta**.
 
 :::: {.callout-tip}
 ## 🔧 En R. Varianza explicada y resumen global
@@ -1456,14 +1510,20 @@ summary(m_int)                   # todo junto: efectos fijos + bloque 'Random ef
 AIC(m_int); BIC(m_int); logLik(m_int); deviance(m_int)
 broom.mixed::glance(m_int)       # medidas globales en una fila
 ```
+
+`performance::icc(m)` devuelve los dos ICC: `ICC_adjusted` (**ajustado**, sin $\sigma^2_f$ en el
+denominador; coincide con el cálculo a mano de la [Sección 4.3](#sec-u14-intercepto)) e
+`ICC_unadjusted` (**no ajustado**, con $\sigma^2_f$; igual a $R^2_{\text{condicional}}-R^2_{\text{marginal}}$).
+Versiones antiguas de `performance` rotulaban el no ajustado *Conditional ICC*; es el mismo número.
 ::::
 
-### ¿Qué tal predice? Calibración y discriminación
+### ¿Qué tal predice? Calibración, discriminación y clasificación
 
 Las herramientas son las del modelo logístico. La **calibración** —¿son fiables las probabilidades?—
 se mira con la curva por deciles de riesgo y el contraste de Hosmer–Lemeshow
 ([Sección 2.6](#sec-u12-diagnostico)); la **discriminación** —¿asigna más riesgo a quien se fractura
-que a quien no?— con el AUC ([Sección 2.7](#sec-u12-evaluacion)). Lo nuevo es que un GLMM ofrece
+que a quien no?— con el AUC, y la **clasificación** a un umbral con la matriz de confusión y sus
+métricas ([Sección 2.7](#sec-u12-evaluacion)). Lo nuevo es que un GLMM ofrece
 **dos predicciones** para la misma paciente ([Predecir para un centro nuevo](#sec-u14-nuevo-centro)):
 
 - **Centro conocido**, $\operatorname{logit}^{-1}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta}+\hat u_j)$:
@@ -1534,6 +1594,33 @@ En la @fig-u14-calibracion, las dos curvas siguen la diagonal. Las mayores separ
 los deciles altos, en sentidos opuestos de un decil al siguiente: es el ruido de estimar una
 proporción con unas 90 pacientes por decil, no un sesgo sistemático.
 
+**Clasificación.** Fijado el umbral habitual de $0{,}5$, cada predicción se convierte en un
+clasificador, y la matriz de confusión y sus métricas se calculan como en la
+[Sección 2.7](#sec-u12-evaluacion):
+
+```{r}
+#| label: u14-clasificacion
+pred_eval |>
+  mutate(clase = as.integer(p >= 0.5)) |>
+  group_by(prediccion) |>
+  summarise(VP = sum(clase == 1 & y == 1), FP = sum(clase == 1 & y == 0),
+            FN = sum(clase == 0 & y == 1), VN = sum(clase == 0 & y == 0)) |>
+  mutate(exactitud     = (VP + VN) / (VP + FP + FN + VN),
+         sensibilidad  = VP / (VP + FN),
+         especificidad = VN / (VN + FP),
+         precision     = VP / (VP + FP),
+         F1            = 2 * precision * sensibilidad / (precision + sensibilidad),
+         across(exactitud:F1, \(v) round(v, 3)))
+```
+
+La tabla traduce la ganancia del AUC a términos concretos. Conociendo el centro, el clasificador
+detecta **9 fracturas más** de las 254 (de 95 a 104 verdaderos positivos) a cambio de **3 falsas
+alarmas más** (de 37 a 40): la sensibilidad sube de $0{,}374$ a $0{,}409$ y el F1 de $0{,}492$ a
+$0{,}523$, mientras la exactitud apenas cambia ($0{,}777$ frente a $0{,}783$). Es la misma conclusión
+que el AUC —una ganancia real, pero modesta—, ahora contada en pacientes. Con cualquiera de las dos
+predicciones, la sensibilidad es baja porque la fractura es minoritaria; elegir otro umbral sigue la
+lógica de la [Sección 2.7](#sec-u12-evaluacion) (callout siguiente).
+
 :::: {.callout-tip}
 ## 🔧 En R. Evaluar un GLMM: calibración, discriminación y clasificación
 
@@ -1573,20 +1660,23 @@ Para la curva, se representan `pred` frente a `obs` con la diagonal de referenci
 
 ### ¿Se cumplen los supuestos? Diagnóstico
 
-El GLMM de intercepto aleatorio hace supuestos en **dos niveles**
-([Sección 4.2](#sec-u14-formulacion)), y el diagnóstico los recorre en orden:
+El GLMM de intercepto aleatorio hace supuestos en **dos niveles** ([Sección 4.2](#sec-u14-formulacion)),
+y cada uno pide sus propios contrastes:
 
-| Nivel | Supuesto | Cómo se comprueba |
-|---|---|---|
-| Paciente | Dado su centro, $y_{ij}$ es Bernoulli, con logit lineal en `x1` y `x2` | Residuos simulados: uniformidad (Q–Q y KS) y ausencia de patrón frente a lo predicho y frente a `x1` |
-| Centro | Los centros difieren solo en su nivel $u_j$ | Homogeneidad de los residuos entre centros: KS por centro y test de Levene |
-| Centro | $\sigma_u^2$ recoge toda la variación entre centros | Dispersión de los residuos agregados por centro |
-| Centro | $u_j\sim N(0,\sigma_u^2)$ | Q–Q de los $\hat u_j$ |
-
-Como en la [Sección 2.6](#sec-u12-diagnostico), con respuesta binaria individual los residuos de
-Pearson y deviance no se leen, y los sustituyen los **residuos simulados** de `DHARMa`
-[@hartig2022]: uniformes $U(0,1)$ bajo un modelo correcto, también en un GLMM, donde se calculan
-condicionando a los $\hat u_j$.
+- **Nivel de paciente.** Dado su centro, cada respuesta $y_{ij}$ es una Bernoulli cuyo logit es
+  lineal en `x1` y `x2`. Como en la [Sección 2.6](#sec-u12-diagnostico), con respuesta binaria
+  individual los residuos de Pearson y deviance no se leen, y los sustituyen los **residuos
+  simulados** de `DHARMa` [@hartig2022], uniformes $U(0,1)$ bajo un modelo correcto también en un
+  GLMM, donde se calculan condicionando a los $\hat u_j$. Si la distribución es la adecuada, los
+  residuos serán **uniformes** (gráfico Q–Q y test KS); si la forma funcional lo es, no mostrarán
+  **patrón** ni frente a lo predicho ni frente a la covariable continua, `x1` (gráficos de residuos
+  con sus cuantiles y el test de cuantiles de `DHARMa`).
+- **Nivel de centro.** El modelo supone que los centros difieren **solo** en su nivel, $u_j$, y que
+  esos niveles siguen una $N(0,\sigma_u^2)$. De ahí dos comprobaciones. Si el nivel de cada centro
+  basta, los residuos se repartirán **igual** en todos (**homogeneidad**; gráfico de cajas de los
+  residuos por centro): uniformes dentro de cada centro (un test KS por centro, con los $p$
+  ajustados por multiplicidad) y con la misma varianza entre centros (test de Levene). Y los
+  $\hat u_j$ deberán ser compatibles con una **normal** (Q–Q y test de Shapiro–Wilk).
 
 #### Nivel de paciente: residuos simulados
 
@@ -1627,11 +1717,14 @@ testQuantiles(sim, predictor = cohorte$x1, plot = FALSE)   # el mismo contraste,
 Tampoco frente a `x1` hay patrón ($p=0{,}933$): el efecto lineal de la fragilidad en el logit es
 adecuado. **A nivel de paciente, el modelo ajusta bien.**
 
-La dispersión no se contrasta a este nivel: la varianza de una Bernoulli, $\pi(1-\pi)$, queda fijada
-por su media, y con respuesta $0/1$ la sobredispersión solo se detecta **agregando**
-([Sección 3.1](#sec-u13-gof-binomial)). Se contrasta a nivel de centro, a continuación.
+¿Y la sobredispersión? Con respuesta $0/1$ no procede: la varianza de una Bernoulli, $\pi(1-\pi)$,
+queda fijada por su media, así que no hay dispersión que contrastar. Es un diagnóstico de la
+respuesta **binomial agrupada** (éxitos sobre ensayos), donde se mide con el cociente de Pearson
+$\hat\phi=X^2/\text{gl}$ de la [Sección 3.1](#sec-u13-gof-binomial) o, con residuos simulados, con
+`testDispersion(sim)`. Aquí, además, la variación
+extra entre centros es justamente la que modela el intercepto aleatorio.
 
-#### Nivel de centro: homogeneidad, dispersión y normalidad
+#### Nivel de centro: homogeneidad y normalidad
 
 **Homogeneidad.** Si el modelo recoge bien el efecto de centro, los residuos deben repartirse igual
 en todos: uniformes dentro de cada centro (un KS por centro, con los $p$ ajustados por
@@ -1650,19 +1743,6 @@ tc$homogeneity                   # Levene: ¿misma varianza en todos los centros
 
 Ningún centro se aparta: el KS más desfavorable, ya ajustado por multiplicidad, tiene $p=0{,}63$, y
 el Levene no detecta diferencias de varianza ($F=0{,}58$, $p=0{,}943$).
-
-**Dispersión.** Agregando los residuos por centro, cada centro pasa a ser una binomial con muchos
-ensayos, y ahí la sobredispersión sí es identificable: un exceso indicaría variación entre centros
-que $\sigma_u^2$ no recoge.
-
-```{r}
-#| label: u14-dispersion-centro
-sim_centro <- recalculateResiduals(sim, group = cohorte$centro)
-testDispersion(sim_centro, plot = FALSE)
-```
-
-El cociente es $1{,}43$ con $p=0{,}12$: los residuos agregados varían algo más de lo que simula el
-modelo, pero sin evidencia de sobredispersión. $\sigma_u^2$ recoge la variación entre centros.
 
 **Normalidad de los efectos de centro.** Se comprueba sobre los $\hat u_j$ del *caterpillar*
 ([Sección 4.3](#sec-u14-intercepto)), con una cautela doble: están **encogidos** hacia 0, lo que
@@ -1702,12 +1782,12 @@ extrema; lo que sí piden es **examinarlo** —¿criterios de registro distintos
 antes de dar por buena su estimación.
 
 **Conclusión del diagnóstico.** El modelo cumple sus supuestos en los dos niveles —residuos
-uniformes y sin patrón, centros homogéneos, sin sobredispersión—, con una salvedad localizada: el
+uniformes y sin patrón, centros homogéneos—, con una salvedad localizada: el
 centro 5, que se aparta del resto.
 
 Si algún paso fallara, el nivel en que falla orienta el remedio: un patrón a nivel de paciente
-apunta a una **covariable omitida** o a una **forma funcional** inadecuada; la heterogeneidad o la
-sobredispersión entre centros, a una **estructura aleatoria** insuficiente (una pendiente aleatoria,
+apunta a una **covariable omitida** o a una **forma funcional** inadecuada; la heterogeneidad entre
+centros, a una **estructura aleatoria** insuficiente (una pendiente aleatoria,
 o una varianza distinta por grupo, que `glmmTMB` modela con `dispformula`); y unos $\hat u_j$ no
 normales, a examinar los centros que se apartan, como acabamos de hacer con el centro 5.
 
@@ -1720,19 +1800,17 @@ Se simula una vez y se reutiliza el objeto; funciona igual para `glmer`/`glmmTMB
 library(DHARMa)
 sim <- simulateResiduals(m)                  # m = modelo glmer/glmmTMB
 
-# nivel de observación
+# nivel de paciente (observación)
 plot(sim)                                    # Q-Q (uniformidad) + residuos vs predicho
 testUniformity(sim)                          # KS
 testQuantiles(sim)                           # ¿cuantiles planos frente a lo predicho?
 plotResiduals(sim, form = datos$x1)          # forma funcional frente a una covariable
 testQuantiles(sim, predictor = datos$x1)     # el mismo contraste, en texto
 
-# nivel de grupo
+# nivel de centro (grupo): homogeneidad
 testCategorical(sim, catPred = factor(datos$centro))       # KS por grupo + Levene
-sim_g <- recalculateResiduals(sim, group = datos$centro)   # un residuo por grupo
-testDispersion(sim_g)                                      # sobredispersión entre grupos
 
-# normalidad de los efectos aleatorios estimados
+# nivel de centro (grupo): normalidad de los efectos aleatorios estimados
 re <- as.data.frame(ranef(m))
 qqnorm(re$condval); qqline(re$condval)
 shapiro.test(re$condval)
@@ -1740,8 +1818,8 @@ extremo <- which.max(abs(re$condval))        # si rechaza: ¿lo decide un solo g
 shapiro.test(re$condval[-extremo])
 ```
 
-Con respuesta **binaria**, `testDispersion(sim)` sobre los residuos individuales es poco informativo:
-la dispersión se contrasta sobre los residuos agregados. `simulateResiduals(m, refit = TRUE)` calcula
+`testDispersion(sim)` contrasta la sobredispersión en respuestas **binomiales agrupadas** o de
+**conteo**; con respuesta $0/1$ no procede. `simulateResiduals(m, refit = TRUE)` calcula
 los residuos por *bootstrap* paramétrico, más fiable con **pocos grupos**, pero lento.
 ::::
 
