@@ -5,19 +5,19 @@
 #  Propósito
 #  ---------
 #  Generar una cohorte con "verdad conocida" que sirve de columna vertebral a
-#  los hilos del Caso 1. De un único proceso generador salen CUATRO respuestas:
+#  los hilos del Caso 1. De un único proceso generador salen TRES bloques de respuesta:
 #
 #    (1) BINARIA / TIEMPO-A-EVENTO  (ever, tiempo, evento)
 #        Riesgo en tiempo discreto con enlace cloglog e intercepto aleatorio por
-#        centro -> GLMM logístico (Unidad 1.3) y supervivencia discreta (1.4).
+#        centro -> GLMM logístico (Unidad 1.4) y supervivencia discreta (1.5).
 #
 #    (2) NOMINAL  (clase_nom: A/B/C, sin orden)
 #        Logit de categoría base (multinomial), SOLO efectos fijos x1, x2 ->
-#        multinomial logit de efectos fijos con nnet::multinom (Unidad 1.3).
+#        multinomial logit de efectos fijos con nnet::multinom (tarea de la Unidad 1.3).
 #
 #    (3) ORDINAL  (sever_ord: Leve < Moderado < Grave)
 #        Cumulative logit (odds proporcionales) con intercepto aleatorio por
-#        centro -> modelo ordinal mixto con ordinal::clmm (Unidad 1.3).
+#        centro -> modelo ordinal mixto con ordinal::clmm (tarea de la Unidad 1.3).
 #
 #  Las respuestas categóricas (2) y (3) son INDEPENDIENTES del reloj de
 #  supervivencia (opción de diseño: evitan los riesgos competitivos, fuera del
@@ -29,7 +29,8 @@
 #  Nominal:         log(P(C=k)/P(C=A)) = g0_k + g1_k*x1 + g2_k*x2,  k in {B,C}
 #  Ordinal:         logit P(S<=k) = theta_k - (bo1*x1 + bo2*x2 + w_j),  w_j~N(0,sw^2)
 #
-#  Toda la "verdad" (parámetros generadores) se adjunta en attr(.,"verdad").
+#  Toda la "verdad" (parámetros generadores y, en la binaria, los u_j sorteados
+#  de cada centro) se adjunta en attr(.,"verdad").
 # =============================================================================
 
 # Semilla del curso: fija toda la cadena generadora -> reproducibilidad total.
@@ -128,7 +129,9 @@ simular_cohorte <- function(n_centros        = 24L,
   )
 
   attr(d, "verdad") <- list(
-    binaria = list(beta = beta, sigma_u = sigma_u, alpha_base = alpha_base, Tmax = Tmax,
+    binaria = list(beta = beta, sigma_u = sigma_u,
+                   u = u,   # efectos de centro sorteados: la verdad de ESTA muestra de centros
+                   alpha_base = alpha_base, Tmax = Tmax,
                    icc_latente = unname(sigma_u^2 / (sigma_u^2 + pi^2 / 3))),
     nominal = list(gamma_B = gamma_nom$B, gamma_C = gamma_nom$C, ref = "A"),
     ordinal = list(theta = theta_ord, beta = beta_ord, sigma_w = sigma_w,
@@ -139,7 +142,7 @@ simular_cohorte <- function(n_centros        = 24L,
 }
 
 #' Expandir a formato persona-periodo (una fila por individuo y periodo en riesgo)
-#' para el ajuste de supervivencia discreta (Unidad 1.4).
+#' para el ajuste de supervivencia discreta (Unidad 1.5).
 expandir_persona_periodo <- function(d) {
   Tmax <- d |> attr("verdad") |> (\(v) v$binaria$Tmax)()
   do.call(rbind, lapply(seq_len(nrow(d)), function(i) {

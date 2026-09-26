@@ -36,8 +36,9 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", GGally = "2.4.0", MuMIn = "1.48.19", aplore3 = "0.9",
-  arm = "1.15.3", broom = "1.0.13", lme4 = "2.0.1", patchwork = "1.3.2",
+  DHARMa = "0.5.0", GGally = "2.4.0", MASS = "7.3.65", MuMIn = "1.48.19",
+  aplore3 = "0.9", arm = "1.15.3", broom = "1.0.13", lme4 = "2.0.1",
+  marginaleffects = "0.32.0", pROC = "1.19.0.1", patchwork = "1.3.2",
   performance = "0.17.0", readr = "2.2.0", see = "0.14.0",
   sessioninfo = "1.2.4", tidyr = "1.3.2", tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
@@ -95,30 +96,14 @@ head(cohorte)
 # [fig-u14-prop-centro]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 # -----------------------------------------------------------------------------
-lims     <- c(0, 0.62)
-col_coh  <- "#2c7fb8"   # azul  → cohorte
-col_glow <- "#e6810a"   # naranja → GLOW
-
 prop_coh <- cohorte |>
   group_by(centro) |>
-  summarise(prop = mean(ever), n = n(), .groups = "drop")
-p_coh <- ggplot(prop_coh, aes(reorder(factor(centro), prop), prop)) +
+  summarise(prop = mean(ever), .groups = "drop")
+ggplot(prop_coh, aes(reorder(factor(centro), prop), prop)) +
   geom_hline(yintercept = mean(cohorte$ever), linetype = "dashed", color = "grey50") +
-  geom_col(fill = col_coh) +
-  coord_flip() + scale_y_continuous(limits = lims) +
-  labs(x = "Centro", y = "Proporción de fractura (ever)", title = "Cohorte (24 centros)")
-
-prop_glow <- glow |>
-  mutate(frac01 = as.integer(fracture == "Yes")) |>
-  group_by(site_id) |>
-  summarise(prop = mean(frac01), n = n(), .groups = "drop")
-p_glow <- ggplot(prop_glow, aes(reorder(factor(site_id), prop), prop)) +
-  geom_hline(yintercept = mean(glow$fracture == "Yes"), linetype = "dashed", color = "grey50") +
-  geom_col(fill = col_glow) +
-  coord_flip() + scale_y_continuous(limits = c(0,0.35)) +
-  labs(x = "Centro (site_id)", y = "Proporción de fractura", title = "GLOW (6 centros)")
-
-p_coh + p_glow
+  geom_col(fill = "#2c7fb8") +
+  coord_flip() +
+  labs(x = "Centro", y = "Proporción de fractura (ever)")
 
 # -----------------------------------------------------------------------------
 # [u14-eda-prop]
@@ -325,7 +310,7 @@ ggplot(coefs, aes(estimate, term, color = modelo)) +
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Tres modelos para el efecto de centro
 #       > Intercepto aleatorio
-#         > Dos niveles de estimación: global y por centro
+#         > Lo que hacen los efectos aleatorios: el encogimiento
 # -----------------------------------------------------------------------------
 re_coh <- as.data.frame(ranef(m_int, condVar = TRUE))   # columnas: grp, condval, condsd
 ggplot(re_coh, aes(reorder(grp, condval), condval)) +
@@ -340,7 +325,7 @@ ggplot(re_coh, aes(reorder(grp, condval), condval)) +
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Tres modelos para el efecto de centro
 #       > Intercepto aleatorio
-#         > Dos niveles de estimación: global y por centro
+#         > Lo que hacen los efectos aleatorios: el encogimiento
 # -----------------------------------------------------------------------------
 s2_u <- as.data.frame(VarCorr(m_int))$vcov[1]
 
@@ -353,6 +338,71 @@ shrink <- re_coh |>
 
 bind_rows(head(shrink, 3), tail(shrink, 3)) |>   # los 3 centros menores y los 3 mayores
   mutate(across(where(is.numeric), \(x) round(x, 2)))
+
+# -----------------------------------------------------------------------------
+# [u14-ame-int]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.3 Tres modelos para el efecto de centro
+#       > Intercepto aleatorio
+#         > Efectos en probabilidad: el efecto marginal medio (AME)
+# -----------------------------------------------------------------------------
+library(marginaleffects)
+
+# centros observados (re.form por defecto), centro típico (re.form = NA) y pooled:
+# marginaleffects da estimación, EE e IC por el método delta
+fila_me <- \(me, efecto, version)
+  data.frame(efecto, version, estimate = me$estimate, se = me$std.error,
+             conf.low = me$conf.low, conf.high = me$conf.high)
+ames <- rbind(
+  fila_me(avg_slopes(m_int,  variables = "x1"),               "fragilidad", "observados"),
+  fila_me(avg_slopes(m_int,  variables = "x1", re.form = NA), "fragilidad", "típico"),
+  fila_me(avg_slopes(m_pool, variables = "x1"),               "fragilidad", "pooled"),
+  fila_me(avg_comparisons(m_int,  variables = list(x2 = 0:1)),               "tratamiento", "observados"),
+  fila_me(avg_comparisons(m_int,  variables = list(x2 = 0:1), re.form = NA), "tratamiento", "típico"),
+  fila_me(avg_comparisons(m_pool, variables = list(x2 = 0:1)),               "tratamiento", "pooled"))
+
+# poblacional: se integra sobre u ~ N(0, sigma_u^2) el riesgo de cada paciente
+trat    <- cohorte$x2
+X_int   <- model.matrix(m_int)
+media_u <- \(f) integrate(\(u) f(u) * dnorm(u, 0, s_int), -Inf, Inf)$value
+ame_pob <- function(b) {                          # AME poblacional para unos efectos fijos b
+  eta <- drop(X_int %*% b)                        # predictor lineal sin efecto de centro
+  c(fragilidad  = mean(sapply(eta, \(e) media_u(\(u) b[["x1"]] * dlogis(e + u)))),
+    tratamiento = mean(mapply(\(e, t) media_u(\(u) plogis(e + b[["x2"]] * (1 - t) + u) -
+                                                     plogis(e - b[["x2"]] * t + u)),
+                              eta, trat)))
+}
+
+# su EE, también por el método delta: gradiente numérico respecto a los efectos fijos
+ee_delta <- function(f, b, V, h = 1e-4) {
+  J <- sapply(seq_along(b), \(k) {
+    sube <- baja <- b; sube[k] <- sube[k] + h; baja[k] <- baja[k] - h
+    (f(sube) - f(baja)) / (2 * h)
+  })
+  sqrt(diag(J %*% V %*% t(J)))
+}
+fila_pob <- \(est, se)
+  data.frame(efecto = names(est), version = "poblacional", estimate = est, se = se,
+             conf.low = est - 1.96 * se, conf.high = est + 1.96 * se)
+
+est_pob <- ame_pob(b_int)
+ames <- rbind(ames, fila_pob(est_pob, ee_delta(ame_pob, b_int, as.matrix(vcov(m_int)))))
+
+# presentación: agrupado por versión, en puntos porcentuales y en una tabla compacta
+etiquetas_v <- c(observados  = "centros observados",
+                 "típico"    = "centro típico (u = 0)",
+                 poblacional = "poblacional",
+                 pooled      = "pooled (glm)")
+presenta_ame <- function(d) d |>
+  mutate(`versión` = factor(etiquetas_v[version], levels = etiquetas_v),
+         efecto    = ifelse(efecto == "fragilidad", "fragilidad (+1 DT)", "tratamiento (sí / no)"),
+         across(c(estimate, se, conf.low, conf.high), \(x) 100 * x),
+         ic        = sprintf("[%.1f, %.1f]", conf.low, conf.high)) |>
+  arrange(`versión`, efecto) |>
+  select(`versión`, efecto, `AME (puntos %)` = estimate, EE = se, `IC 95 %` = ic) |>
+  knitr::kable(digits = 1, row.names = FALSE)
+
+presenta_ame(ames)
 
 # -----------------------------------------------------------------------------
 # [u14-prediccion-nuevo]
@@ -376,7 +426,7 @@ round(c(tipico = p_tipico, marginal = p_marginal,
 # [u14-glmm-slope]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Tres modelos para el efecto de centro
-#       > Pendiente aleatoria
+#       > Intercepto y pendiente aleatorias
 # -----------------------------------------------------------------------------
 m_slope <- glmer(ever ~ x1 + x2 + (1 + x1 | centro), family = binomial, data = cohorte)
 
@@ -387,7 +437,7 @@ VarCorr(m_slope)        # sigma_u0, sigma_u1 y su correlacion
 # [fig-u14-icc-x1]
 #   4 · Efectos Aleatorios y Modelos Mixtos
 #     > 4.3 Tres modelos para el efecto de centro
-#       > Pendiente aleatoria
+#       > Intercepto y pendiente aleatorias
 # -----------------------------------------------------------------------------
 S      <- VarCorr(m_slope)$centro                    # matriz Sigma (2 x 2)
 icc_de <- \(s2) s2 / (s2 + pi^2 / 3)                 # ICC latente de una varianza entre centros
@@ -396,16 +446,65 @@ xs    <- seq(-2.5, 2.5, length.out = 200)
 icc_x <- icc_de(S[1, 1] + 2 * S[1, 2] * xs + S[2, 2] * xs^2)
 
 # valores de referencia: en x1 = 0, y donde la varianza entre centros es minima
-x_min <- -S[1, 2] / S[2, 2]
+x_min <- -S[1, 2] / S[2, 2]                          # vertice de la parabola: -sigma_01 / sigma^2_u1
 round(c(ICC_en_0   = icc_de(S[1, 1]),
         x1_minimo  = x_min,
         ICC_minimo = icc_de(S[1, 1] - S[1, 2]^2 / S[2, 2])), 3)
 
-ggplot(tibble(x1 = xs, icc = icc_x), aes(x1, icc)) +
-  geom_line(linewidth = 1.1, color = "#2c7fb8") +
-  geom_hline(yintercept = icc_de(vc$vcov[1]),        # ICC constante de m_int
-             linetype = "dashed", color = "grey40") +
-  labs(x = "Fragilidad ósea (x1, en z)", y = "ICC latente")
+niveles <- c("m_slope: ICC según x1",
+             "m_slope: solo la varianza del intercepto",
+             "m_int: ICC constante")
+icc_df <- bind_rows(
+  tibble(x1 = xs, icc = icc_x,                curva = niveles[1]),
+  tibble(x1 = xs, icc = icc_de(S[1, 1]),      curva = niveles[2]),
+  tibble(x1 = xs, icc = icc_de(vc$vcov[1]),   curva = niveles[3])
+) |> mutate(curva = factor(curva, levels = niveles))
+
+ggplot(icc_df, aes(x1, icc, color = curva, linetype = curva)) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("#2c7fb8", "grey40", "#e6810a")) +
+  scale_linetype_manual(values = c("solid", "dotted", "dashed")) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(x = "Fragilidad ósea (x1, en z)",
+       y = "ICC latente (fracción de la variación\ndebida al centro)",
+       color = NULL, linetype = NULL) +
+  guides(color = guide_legend(ncol = 1)) +
+  theme(legend.position = "top")
+
+# -----------------------------------------------------------------------------
+# [u14-glmm-slope-summary]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.3 Tres modelos para el efecto de centro
+#       > Intercepto y pendiente aleatorias
+# -----------------------------------------------------------------------------
+summary(m_slope)
+
+# -----------------------------------------------------------------------------
+# [u14-ame-slope]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.3 Tres modelos para el efecto de centro
+#       > Intercepto y pendiente aleatorias
+# -----------------------------------------------------------------------------
+# poblacional: 2000 centros simulados de N(0, Sigma), los mismos para todo el cálculo
+set.seed(SEMILLA_CURSO)
+U   <- MASS::mvrnorm(2000, mu = c(0, 0), Sigma = matrix(S, 2, 2))
+X_s <- model.matrix(m_slope)
+ame_pob_s <- function(b) {                        # AME poblacional para unos efectos fijos b
+  lin <- outer(drop(X_s %*% b), U[, 1], "+") + outer(cohorte$x1, U[, 2])  # paciente x centro
+  c(fragilidad  = mean(sweep(dlogis(lin), 2, b[["x1"]] + U[, 2], "*")),
+    tratamiento = mean(plogis(lin + b[["x2"]] * (1 - trat)) - plogis(lin - b[["x2"]] * trat)))
+}
+
+b_s <- fixef(m_slope)
+est_pob_s <- ame_pob_s(b_s)
+
+rbind(
+  fila_me(avg_slopes(m_slope, variables = "x1"),               "fragilidad", "observados"),
+  fila_me(avg_slopes(m_slope, variables = "x1", re.form = NA), "fragilidad", "típico"),
+  fila_me(avg_comparisons(m_slope, variables = list(x2 = 0:1)),               "tratamiento", "observados"),
+  fila_me(avg_comparisons(m_slope, variables = list(x2 = 0:1), re.form = NA), "tratamiento", "típico"),
+  fila_pob(est_pob_s, ee_delta(ame_pob_s, b_s, as.matrix(vcov(m_slope))))) |>
+  presenta_ame()
 
 # -----------------------------------------------------------------------------
 # [u14-glmm-comparacion]
@@ -415,7 +514,10 @@ ggplot(tibble(x1 = xs, icc = icc_x), aes(x1, icc)) +
 # -----------------------------------------------------------------------------
 AIC(m_pool, m_int, m_slope)   # los tres, de menos a más estructura aleatoria
 BIC(m_pool, m_int, m_slope)
-anova(m_int, m_slope)          # LRT de la pendiente (referencia chi2 sin corregir)
+# LRT de cada salto (p sin corregir). El mixto va primero: con el glm delante,
+# anova() aplicaría el método de glm e ignoraría al mixto
+anova(m_int, m_pool)           # pooled -> intercepto aleatorio
+anova(m_slope, m_int)          # intercepto -> pendiente aleatoria
 
 # -----------------------------------------------------------------------------
 # [u14-lrt-frontera]
@@ -423,35 +525,9 @@ anova(m_int, m_slope)          # LRT de la pendiente (referencia chi2 sin correg
 #     > 4.4 Comparación, evaluación y diagnóstico
 #       > Qué modelo: la comparación de los tres
 # -----------------------------------------------------------------------------
-# pooled -> intercepto: se anade sigma_u^2
-chi2_int <- as.numeric(2 * (logLik(m_int) - logLik(m_pool)))
-p_int    <- 0.5 * pchisq(chi2_int, 1, lower.tail = FALSE)
-# intercepto -> pendiente: se anaden sigma_u1^2 y rho
-chi2_pen <- anova(m_int, m_slope)$Chisq[2]
-p_pen    <- 0.5 * pchisq(chi2_pen, 1, lower.tail = FALSE) +
-            0.5 * pchisq(chi2_pen, 2, lower.tail = FALSE)
-round(c(chi2_int = chi2_int, p_int = p_int, chi2_pen = chi2_pen, p_pen = p_pen), 4)
-
-# -----------------------------------------------------------------------------
-# [fig-u14-dharma]
-#   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.4 Comparación, evaluación y diagnóstico
-#       > ¿Ajusta bien el modelo elegido? Residuos simulados
-# -----------------------------------------------------------------------------
-sim <- simulateResiduals(m_int)
-plot(sim)
-
-# -----------------------------------------------------------------------------
-# [u14-dharma-tests]
-#   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.4 Comparación, evaluación y diagnóstico
-#       > ¿Ajusta bien el modelo elegido? Residuos simulados
-# -----------------------------------------------------------------------------
-# plot = FALSE: el grafico ya lo da fig-u14-dharma; aqui solo queremos el contraste
-testUniformity(sim, plot = FALSE)            # KS: ¿residuos uniformes? (ajuste global)
-testDispersion(sim, plot = FALSE)            # sobre/infradispersión
-testOutliers(sim, plot = FALSE)              # exceso de valores atípicos
-plotResiduals(sim, form = cohorte$centro)    # residuos frente al factor de agrupamiento
+library(varTestnlme)
+varCompTest(m_int, m_pool, output = FALSE)    # H0: sigma_u^2 = 0
+varCompTest(m_slope, m_int, output = FALSE)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
 
 # -----------------------------------------------------------------------------
 # [u14-r2]
@@ -463,66 +539,137 @@ performance::r2(m_int)     # R2 marginal (fijos) y condicional (fijos + aleatori
 performance::icc(m_int)    # icc no ajustado = R2(cond)-R2(marg)
 
 # -----------------------------------------------------------------------------
-# [u14-glow-mixto]
+# [u14-evaluacion]
 #   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.6 El modelo mixto sobre datos reales: GLOW por centro
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Qué tal predice? Calibración y discriminación
 # -----------------------------------------------------------------------------
-glow_m <- glow |> mutate(site_id = factor(site_id))
+library(pROC)
+# la misma paciente, predicha con el efecto de su centro y como si viniera de un centro nuevo
+pred_eval <- tibble(
+  y        = cohorte$ever,
+  conocido = fitted(m_int),
+  nuevo    = predict(m_int, re.form = NA, type = "response")
+) |>
+  pivot_longer(c(conocido, nuevo), names_to = "prediccion", values_to = "p")
 
-m_glow_pool <- glm  (fracture ~ age + priorfrac,                 family = binomial, data = glow_m)
-m_glow_mix  <- glmer(fracture ~ age + priorfrac + (1 | site_id), family = binomial, data = glow_m)
+# deciles de riesgo de cada predicción: observados (O) y esperados (E), como en la Sección 2.6
+calib_mix <- pred_eval |>
+  group_by(prediccion) |>
+  mutate(decil = ntile(p, 10)) |>
+  group_by(prediccion, decil) |>
+  summarise(n = n(), O = sum(y), E = sum(p), pred = mean(p), obs = mean(y), .groups = "drop")
 
-summary(m_glow_mix)
+auc_mix <- pred_eval |>
+  group_by(prediccion) |>
+  summarise(AUC = as.numeric(auc(roc(y, p, quiet = TRUE))))
 
-# Varianza entre centros e ICC latente
-vc <- as.data.frame(VarCorr(m_glow_mix))
-c(sigma_u = sqrt(vc$vcov[1]), ICC = vc$vcov[1] / (vc$vcov[1] + pi^2 / 3))
-
-# Efectos fijos: agrupado (glm) vs mixto (glmer)
-cbind(pooled = coef(m_glow_pool), mixto = fixef(m_glow_mix))
+calib_mix |>
+  group_by(prediccion) |>
+  summarise(prop_observada = sum(O) / sum(n),
+            prop_predicha  = sum(E) / sum(n),
+            HL             = sum((O - E)^2 / (n * pred * (1 - pred))),
+            p_HL           = pchisq(HL, df = 10 - 2, lower.tail = FALSE)) |>
+  left_join(auc_mix, by = "prediccion") |>
+  mutate(across(where(is.numeric), \(v) round(v, 3)))
 
 # -----------------------------------------------------------------------------
-# [fig-u14-glow-caterpillar]
+# [fig-u14-calibracion]
 #   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.6 El modelo mixto sobre datos reales: GLOW por centro
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Qué tal predice? Calibración y discriminación
 # -----------------------------------------------------------------------------
-re_glow <- as.data.frame(ranef(m_glow_mix, condVar = TRUE))   # grp, condval, condsd
-ggplot(re_glow, aes(reorder(grp, condval), condval)) +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_pointrange(aes(ymin = condval - 1.96 * condsd,
-                      ymax = condval + 1.96 * condsd)) +
-  coord_flip() +
-  labs(x = "Centro (site_id)", y = "Intercepto aleatorio (log-odds)")
+ggplot(calib_mix, aes(pred, obs, colour = prediccion)) +
+  geom_abline(linetype = "dashed") +
+  geom_line() + geom_point(size = 1.8) +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  labs(x = "Probabilidad ajustada (media por decil)", y = "Frecuencia observada",
+       colour = "Centro")
 
 # -----------------------------------------------------------------------------
-# [u14-dgp-escala]
+# [fig-u14-dharma]
 #   4 · Efectos Aleatorios y Modelos Mixtos
-#     > 4.7 Validación contra el DGP: ¿recuperamos la verdad?
-#       > La verdad, traducida a la escala en que hemos estimado
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de paciente: residuos simulados
 # -----------------------------------------------------------------------------
-# La misma maquinaria generadora, con centros y pacientes de sobra: lo que sale de
-# aqui es, a efectos practicos, la verdad del DGP expresada en la escala logit(ever),
-# que es en la que ajusta m_int.
-cohorte_grande <- simular_cohorte(n_centros = 150, media_por_centro = 200, semilla = 1)
-m_grande <- glmer(ever ~ x1 + x2 + (1 | centro), family = binomial, data = cohorte_grande)
+set.seed(SEMILLA_CURSO)   # los residuos se simulan: la semilla los hace reproducibles
+sim <- simulateResiduals(m_int)
+plot(sim)
 
-v          <- attr(cohorte, "verdad")$binaria             # escala cloglog por periodo
-s_u_grande <- as.data.frame(VarCorr(m_grande))$sdcor[1]   # sigma_u en logit(ever)
-s_u_int    <- as.data.frame(VarCorr(m_int))$sdcor[1]      # lo estimado en la cohorte real
+# -----------------------------------------------------------------------------
+# [u14-dharma-uniformidad]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de paciente: residuos simulados
+# -----------------------------------------------------------------------------
+testUniformity(sim, plot = FALSE)   # Q-Q: ¿residuos uniformes?
+testQuantiles(sim, plot = FALSE)    # panel derecho: ¿cuantiles planos frente a lo predicho?
 
-comparacion <- data.frame(
-  verdad_cloglog = c(v$beta[["x1"]], v$beta[["x2"]], v$sigma_u),
-  logit_ever     = c(fixef(m_grande)[["x1"]], fixef(m_grande)[["x2"]], s_u_grande),
-  m_int          = c(fixef(m_int)[["x1"]],    fixef(m_int)[["x2"]],    s_u_int),
-  row.names      = c("beta_x1", "beta_x2", "sigma_u")
-)
-comparacion$factor <- comparacion$logit_ever / comparacion$verdad_cloglog
-round(comparacion, 3)
+# -----------------------------------------------------------------------------
+# [fig-u14-dharma-x1]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de paciente: residuos simulados
+# -----------------------------------------------------------------------------
+plotResiduals(sim, form = cohorte$x1)
+testQuantiles(sim, predictor = cohorte$x1, plot = FALSE)   # el mismo contraste, en texto
 
-# el mismo contraste, leido como ICC latente
-c(verdad     = v$icc_latente,
-  logit_ever = s_u_grande^2 / (s_u_grande^2 + pi^2/3),
-  m_int      = s_u_int^2    / (s_u_int^2    + pi^2/3))
+# -----------------------------------------------------------------------------
+# [fig-u14-dharma-centro]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de centro: homogeneidad, dispersión y normalidad
+# -----------------------------------------------------------------------------
+# factor: con el código numérico del centro, DHARMa lo trataría como una covariable continua
+tc <- testCategorical(sim, catPred = factor(cohorte$centro))
+min(tc$uniformity$p.value.cor)   # el KS más desfavorable de los 24, ya ajustado
+tc$homogeneity                   # Levene: ¿misma varianza en todos los centros?
+
+# -----------------------------------------------------------------------------
+# [u14-dispersion-centro]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de centro: homogeneidad, dispersión y normalidad
+# -----------------------------------------------------------------------------
+sim_centro <- recalculateResiduals(sim, group = cohorte$centro)
+testDispersion(sim_centro, plot = FALSE)
+
+# -----------------------------------------------------------------------------
+# [fig-u14-qq-ranef]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de centro: homogeneidad, dispersión y normalidad
+# -----------------------------------------------------------------------------
+ggplot(re_coh, aes(sample = condval)) +
+  stat_qq() +
+  stat_qq_line(linetype = "dashed") +
+  labs(x = "Cuantil teórico N(0, 1)", y = "Intercepto aleatorio estimado (log-odds)")
+shapiro.test(re_coh$condval)
+
+# -----------------------------------------------------------------------------
+# [u14-ranef-atipico]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.4 Comparación, evaluación y diagnóstico
+#       > ¿Se cumplen los supuestos? Diagnóstico
+#         > Nivel de centro: homogeneidad, dispersión y normalidad
+# -----------------------------------------------------------------------------
+extremo <- which.max(abs(re_coh$condval))
+re_coh[extremo, c("grp", "condval")]        # el centro más alejado del típico
+shapiro.test(re_coh$condval[-extremo])      # el contraste, sin él
+
+# -----------------------------------------------------------------------------
+# [u14-zcp]
+#   4 · Efectos Aleatorios y Modelos Mixtos
+#     > 4.5 Extensiones: estructuras aleatorias más ricas
+# -----------------------------------------------------------------------------
+m_zcp <- glmer(ever ~ x1 + x2 + (1 + x1 || centro), family = binomial, data = cohorte)
+anova(m_zcp, m_slope)   # LRT de rho_01 = 0
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

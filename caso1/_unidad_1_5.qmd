@@ -62,6 +62,8 @@ RA implicados:
 - **RA7 · Tiempo-a-evento y censura.** Reformular la supervivencia en tiempo discreto como un GLM
   `cloglog` persona-periodo, tratar la censura y predecir hazard y supervivencia.
 - **RA3 · Interpretación en la escala correcta** (vía hazard ratios).
+- **RA4 · Diagnóstico y bondad de ajuste**: proporcionalidad, forma funcional, calibración y
+  discriminación en supervivencia.
 
 [@dobson2018, cap. de supervivencia; @prentice1978; @allison1982; @cox1972;
 @aitkin1980]
@@ -142,7 +144,7 @@ de identificar con tan pocos periodos por sujeto.
 :::
 
 
-## 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox {#sec-u15-ph}
+## 5.2 Kaplan–Meier y riesgos proporcionales {#sec-u15-ph}
 
 El análisis de supervivencia tiene un instrumental **propio**, anterior al GLM, que conviene
 conocer antes de construir el nuestro: aporta el contexto y el vocabulario. Lo recorremos de lo más
@@ -151,9 +153,8 @@ descriptivo a lo más estructurado.
 Primero, **Kaplan–Meier**: la forma no paramétrica de *dejar hablar a los datos*, que dibuja la
 curva de supervivencia y compara grupos sin suponer nada sobre el riesgo. Después, los **modelos de
 riesgos proporcionales**, el marco común que permite pasar de *describir* a *explicar* —cómo las
-covariables modulan el riesgo— y del que cuelga nuestro GLM. Su versión clásica en tiempo continuo
-es el **modelo de Cox**, que aquí solo presentamos como referencia: su desarrollo queda para el
-Caso 3.
+covariables modulan el riesgo— y del que cuelga nuestro GLM. (Su versión clásica en tiempo
+continuo, el **modelo de Cox**, queda para el Caso 3.)
 
 Con estos precedentes tendremos el vocabulario para construir, en la [Sección 5.3](#sec-u15-glm),
 un GLM que —al ser la cohorte simulada— podremos **validar contra la verdad del proceso
@@ -358,9 +359,8 @@ ggsurvplot(km, data = cohorte, fun = "cloglog",
 ```
 
 Para la covariable **continua** `x1`, Kaplan–Meier no sirve directamente (habría que
-**categorizarla** en grupos); ahí el chequeo general son los **residuos de Schoenfeld** del modelo
-ajustado —una tendencia temporal en ellos delata la no-proporcionalidad—, que dejamos para cuando
-tengamos el ajuste.
+**categorizarla** en grupos); su proporcionalidad se contrasta sobre el modelo ajustado, con una
+interacción covariable × periodo ([Sección 5.4](#sec-u15-ph-test)).
 
 :::: {.callout-tip}
 ## 🔧 En R. Estimar y dibujar la curva de Kaplan–Meier
@@ -379,19 +379,6 @@ A la derecha de `~` va la variable de grupo (aquí `x2`), y `evento` debe codifi
 0 = censura; con `fun = "cloglog"` se obtiene el diagrama log–log de arriba.
 ::::
 
-
-### Cox: el mismo supuesto en tiempo continuo {#sec-u15-cox}
-
-El supuesto de riesgos proporcionales que acabamos de escribir en tiempo discreto tiene una versión
-célebre en **tiempo continuo**: el **modelo de Cox** [@cox1972], el estándar del análisis de
-supervivencia. Aquí **no** entramos en su maquinaria —la verosimilitud parcial y su carácter
-semiparamétrico se ven en detalle en el Caso 3—; aquí nos basta una idea: nuestro GLM binario es su
-contrapartida en tiempo discreto y comparte con él la lectura de los efectos como *hazard ratios*.
-Reencontraremos a Cox, ya con su maquinaria, en el Caso 3.
-
-Con Kaplan–Meier para describir y el marco de riesgos proporcionales para explicar, ya tenemos todo
-lo que necesitamos. En la [Sección 5.3](#sec-u15-glm) construimos nuestro modelo dentro del GLM, lo
-ajustamos, comprobamos que recupera la verdad del simulador y derivamos las conclusiones clínicas.
 
 ## 5.3 La modelización GLM del problema de supervivencia {#sec-u15-glm}
 
@@ -535,8 +522,9 @@ Los coeficientes de `periodo` son los **interceptos por periodo** $\alpha_t$, y 
 ($0.39,\ 0.50,\ \dots,\ 0.78$ sobre el periodo 1): el modelo recupera el **riesgo base
 creciente** del DGP. Los de `x1` y `x2`, exponenciados, son **hazard ratios**: `x1` da
 $\widehat{\text{HR}}\approx2.32$, que **clava** la verdad ($e^{0.85}\approx2.34$), y `x2` da
-$\approx0.64$, algo **atenuado** frente a su verdad ($e^{-0.65}\approx0.52$) —el efecto
-protector se queda corto, en parte por omitir la fragilidad—. La **censura** no exige nada extra:
+$\approx0.64$, algo **atenuado** frente a su verdad ($e^{-0.65}\approx0.52$) —a unos $1.5$
+errores estándar de ella (`summary(m_pp)`), una distancia compatible con el ruido muestral; añadir la
+fragilidad, más abajo, apenas la reduce—. La **censura** no exige nada extra:
 un sujeto censurado simplemente **deja de aportar filas** tras su último periodo en riesgo, sin un
 `y = 1`; aporta lo que se observó (que no falló mientras estuvo) y nada más.
 
@@ -575,13 +563,15 @@ Y, como pedíamos, se ajusta **sin bayesiana**, con `lme4`:
 library(lme4)
 m_frail <- glmer(y ~ periodo + x1 + x2 + (1 | centro),
                  family = binomial("cloglog"), data = pp)
-VarCorr(m_frail)               # sigma de la fragilidad (verdad del DGP: 0.70)
+VarCorr(m_frail)               # sigma de la fragilidad (la del proceso en el DGP: 0.70)
 fixef(m_frail)[c("x1", "x2")]  # efectos fijos, ahora condicionales al centro
 ```
 
-`VarCorr` estima la **varianza de la fragilidad**: $\hat\sigma_u\approx0.37$, **por debajo** de la
-verdad ($0.70$) —la misma subestimación de las varianzas que con datos binarios y pocos grupos
-(24 centros)—; mide cuánto varía el riesgo base de unas clínicas a otras. Al **condicionar al
+`VarCorr` estima la **desviación típica de la fragilidad**, que mide cuánto varía el riesgo base de
+unas clínicas a otras: $\hat\sigma_u\approx0.37$. Queda por debajo del $0.70$ del DGP, pero
+esa distancia no mide solo el sesgo del estimador: el $0.70$ es la dispersión del **proceso** del que
+se sortean los centros, y una muestra de 24 centros puede salir, por puro azar, más o menos dispersa
+que él. Al **condicionar al
 centro**, los efectos crecen algo en magnitud ($x_1: 0.84\!\to\!0.89$;
 $x_2: -0.45\!\to\!-0.47$): es el salto marginal→condicional de 1.4, ahora sobre el hazard,
 aunque leve porque $\hat\sigma_u$ es pequeño.
@@ -661,6 +651,149 @@ elección no es indiferente: nos quedamos con el `cloglog` por lo que significa 
 que preserva los riesgos proporcionales y, por tanto, el que reproduce a Cox y permite leer
 los efectos como hazard ratios—. El `logit` sería la opción si quisiéramos razonar en odds.
 
+## 5.4 Evaluación y diagnóstico {#sec-u15-diagnostico}
+
+El modelo `m_pp` reproduce bien lo que vemos, pero hay que comprobar sus supuestos y
+medir cómo predice. Seguimos el esquema de la [Unidad 2](#sec-u12-diagnostico) y de la
+[Unidad 4](#sec-u14-diagnostico). Hay una particularidad: los datos persona-periodo son
+binarios, así que la *deviance* no sirve como medida de bondad de ajuste
+([Sección 2.5](#sec-u12-inferencia)). Los chequeos útiles son contrastes entre modelos
+anidados y comparaciones agregadas de lo observado frente a lo predicho.
+
+### ¿Hace falta un parámetro por periodo? {#sec-u15-base}
+
+El factor `periodo` no impone ninguna forma al riesgo base, pero cuesta cinco parámetros.
+Lo comparamos con dos alternativas de un solo parámetro: una tendencia lineal en $t$ y
+otra en $\log t$.
+
+```{r}
+#| label: u15-base
+pp$t <- as.integer(pp$periodo)   # el periodo como número, para las tendencias
+m_lin <- update(m_pp, . ~ . - periodo + t)
+m_log <- update(m_pp, . ~ . - periodo + log(t))
+anova(m_lin, m_pp, test = "LRT")
+AIC(m_pp, m_lin, m_log)
+```
+
+El LRT no rechaza la tendencia lineal ($p=0.58$), y el AIC prefiere los modelos de un solo
+parámetro: $1650.1$ con $\log t$ y $1651.7$ con $t$, frente a $1656.8$ con el factor. Con
+seis periodos, los datos apenas distinguen entre las tres formas. Mantenemos el factor
+porque no presupone nada, y dejamos anotado que un riesgo base creciente y cóncavo
+($\log t$) resume igual de bien la cohorte con menos parámetros.
+
+### ¿Se sostiene la proporcionalidad? {#sec-u15-ph-test}
+
+En el GLM, la proporcionalidad se contrasta directamente: si el efecto de una covariable
+cambiara con el tiempo, lo captaría una interacción covariable × periodo [@allison1982].
+Este contraste vale también para la `x1` continua, que Kaplan–Meier no podía examinar.
+
+```{r}
+#| label: u15-ph-test
+m_ph <- update(m_pp, . ~ . + x1:t + x2:t)   # ¿cambian los efectos con el periodo?
+anova(m_pp, m_ph, test = "LRT")
+```
+
+No hay evidencia de que los efectos cambien con el periodo ($p=0.72$). Esto confirma lo que
+sugería el diagrama log–log para `x2` y lo extiende a `x1`: un único *hazard ratio* por
+covariable describe bien los seis periodos.
+
+### ¿Es lineal el efecto de la fragilidad? Residuos de martingala {#sec-u15-martingala}
+
+Para cada paciente comparamos lo observado con lo esperado: su `evento` (0 o 1) frente al
+riesgo acumulado que predice el modelo mientras estuvo en riesgo, $\sum_t \hat h_{it}$. Es la
+versión discreta del **residuo de martingala** [@therneau2000]. Si el efecto de `x1` está
+bien especificado en la escala cloglog, estos residuos no deben mostrar ninguna tendencia
+frente a `x1`.
+
+```{r}
+#| label: fig-u15-martingala
+#| code-fold: true
+#| code-summary: "Código de la figura"
+#| fig-width: 7
+#| fig-height: 3.8
+#| fig-cap: "Residuos de martingala (observado − esperado por paciente) frente a la fragilidad x1, con un suavizado loess. Las dos bandas de puntos corresponden a las pacientes con fractura (arriba) y a las censuradas (abajo). Si la relación está bien especificada, el suavizado debe quedar plano en torno a 0."
+pp$h <- fitted(m_pp)   # hazard ajustado de cada fila persona-periodo
+res <- data.frame(x1   = cohorte$x1,
+                  mart = cohorte$evento - tapply(pp$h, pp$id, sum)[as.character(cohorte$id)])
+ggplot(res, aes(x1, mart)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess", formula = y ~ x) +
+  labs(x = "Fragilidad (x1)", y = "Residuo de martingala")
+```
+
+```{r}
+#| label: u15-cuadratico
+anova(m_pp, update(m_pp, . ~ . + I(x1^2)), test = "LRT")
+```
+
+El suavizado es plano y su banda de confianza contiene al 0 en todo el rango de `x1`.
+El término cuadrático no mejora el ajuste ($p=0.13$). Basta con el efecto lineal.
+
+### Calibración: supervivencia observada frente a predicha {#sec-u15-calibracion}
+
+Hay una comparación tentadora que no sirve: fracturas observadas frente a esperadas en
+cada periodo. Con un intercepto por periodo, las ecuaciones de verosimilitud obligan a que
+esas sumas coincidan exactamente, así que la coincidencia no dice nada del ajuste. La
+comparación informativa es **entre grupos de riesgo**. Formamos terciles según la
+supervivencia predicha a los seis periodos y, dentro de cada uno, comparamos la curva de
+Kaplan–Meier con la media de las predicciones del modelo.
+
+```{r}
+#| label: u15-calibracion
+Tmax <- nlevels(pp$periodo)
+rej  <- data.frame(id = rep(cohorte$id, each = Tmax),       # cada paciente, en todos los periodos
+                   x1 = rep(cohorte$x1, each = Tmax),
+                   x2 = rep(cohorte$x2, each = Tmax),
+                   periodo = factor(rep(seq_len(Tmax), nrow(cohorte)), levels = levels(pp$periodo)))
+rej$h <- predict(m_pp, newdata = rej, type = "response")
+S_fin <- tapply(1 - rej$h, rej$id, prod)[as.character(cohorte$id)]   # S predicha al final
+tercil <- cut(S_fin, quantile(S_fin, 0:3 / 3), include.lowest = TRUE,
+              labels = c("alto", "medio", "bajo"))                  # menor S, más riesgo
+km_t <- summary(survfit(Surv(tiempo, evento) ~ tercil, data = cohorte), times = Tmax)
+data.frame(riesgo = levels(tercil), KM = km_t$surv, GLM = tapply(S_fin, tercil, mean))
+```
+
+Las predicciones reproducen bien el gradiente de riesgo. En el tercil de riesgo alto
+predicen $0.356$ frente a $0.385$ observado; en el bajo, $0.840$ frente a $0.855$. La mayor
+desviación está en el tercil medio: $0.659$ predicho frente a $0.616$ observado, es decir,
+el modelo sobreestima algo la supervivencia de ese grupo.
+
+### Discriminación: índice C y AUC por periodo {#sec-u15-discriminacion}
+
+¿Ordena bien el modelo a las pacientes según su riesgo? En supervivencia, la pregunta se
+responde con el **índice C de Harrell** [@harrell2015]. Mide la proporción de pares
+comparables en los que fractura antes la paciente con mayor predictor lineal
+$\mathbf{x}'\hat{\boldsymbol\beta}$. Periodo a periodo, entre las pacientes que siguen en
+riesgo, el problema vuelve a ser la clasificación binaria de la
+[Sección 2.7](#sec-u12-evaluacion), y la medida es el AUC.
+
+```{r}
+#| label: u15-discriminacion
+lp <- drop(as.matrix(cohorte[, c("x1", "x2")]) %*% coef(m_pp)[c("x1", "x2")])
+concordance(Surv(tiempo, evento) ~ lp, data = cohorte, reverse = TRUE)  # mayor lp, antes el evento
+sapply(split(pp, pp$periodo), \(s) as.numeric(pROC::auc(s$y, s$h, quiet = TRUE)))
+```
+
+El índice C es $0.73$ (EE $0.017$) y el AUC se mantiene entre $0.71$ y $0.77$ en los seis
+periodos. La discriminación es aceptable y estable en el tiempo, como corresponde a unos
+efectos proporcionales.
+
+### ¿Hace falta la fragilidad de centro? {#sec-u15-frail-test}
+
+Aplicamos el mismo LRT con corrección de frontera que en la [Unidad 4](#sec-u14-diagnostico).
+
+```{r}
+#| label: u15-frail-test
+lrt <- as.numeric(2 * (logLik(m_frail) - logLik(m_pp)))
+c(LRT = lrt, p = 0.5 * pchisq(lrt, df = 1, lower.tail = FALSE))  # H0 en la frontera: sigma_u = 0
+```
+
+Obtenemos $\text{LRT}=15.7$ y $p<0.001$: la variación entre clínicas es real y el modelo
+debe incluirla.
+
+## 5.5 Qué aporta el modelo y qué implica en la práctica clínica {#sec-u15-conclusiones}
+
 ### Qué aporta el GLM en supervivencia {#sec-u15-comparativa}
 
 Merece la pena recoger lo que hemos ganado al plantear la supervivencia como un GLM binomial con
@@ -678,10 +811,8 @@ enlace `cloglog`, sin salir del marco que ya manejábamos:
 
 Todo ello leyendo los efectos como *hazard ratios*, la escala del estándar clínico. Ese estándar es
 el modelo de Cox, la versión en tiempo continuo del mismo supuesto de riesgos proporcionales, que
-desarrollaremos —y compararemos formalmente con este GLM— en el Caso 3. Aquí la validación la da el
-propio simulador: los *hazard ratios* estimados recuperan los valores verdaderos del DGP
-($\approx 2{,}3$ y $0{,}64$ frente a $e^{0{,}85}$ y $e^{-0{,}65}$), que es cuanto necesitamos para
-confiar en el modelo.
+desarrollaremos —y compararemos formalmente con este GLM— en el Caso 3. La validación contra el
+simulador se hace en la [Sección 5.6](#sec-u15-dgp).
 
 ### Conclusiones para la práctica clínica {#sec-u15-clinica}
 
@@ -752,6 +883,31 @@ Estas conclusiones son didácticas —descansan en una cohorte simulada—, pero
 real: de los hazard ratios y la curva de supervivencia a una recomendación accionable. Con datos
 reales, el mismo modelo daría las cifras sobre las que decidir.
 
+## 5.6 Validación contra el DGP: ¿recuperamos la verdad? {#sec-u15-dgp}
+
+Hasta aquí hemos trabajado a ciegas. Como la cohorte es simulada, cerramos comparando las
+estimaciones con los valores del proceso generador. El efecto de centro del simulador es
+condicional, así que la comparación natural es con el GLMM.
+
+```{r}
+#| label: u15-dgp
+v  <- attr(cohorte, "verdad")$binaria
+ic <- confint(m_frail, parm = c("x1", "x2"), method = "Wald")
+data.frame(verdad = v$beta, glm = coef(m_pp)[c("x1", "x2")],
+           glmm = fixef(m_frail)[c("x1", "x2")], ic)
+c(verdad = v$sigma_u, glmm = attr(VarCorr(m_frail)$centro, "stddev"))
+cbind(verdad = v$alpha_base,                                   # riesgo base (escala cloglog)
+      glmm   = fixef(m_frail)[1] + c(0, fixef(m_frail)[2:Tmax]))
+```
+
+- **Efectos.** Los dos valores verdaderos caen dentro de los IC al 95 % del GLMM:
+  $0.85\in[0.75,\,1.03]$ para `x1` y $-0.65\in[-0.73,\,-0.21]$ para `x2`.
+- **Riesgo base.** Los $\hat\alpha_t$ recorren de $-3.07$ a $-2.22$, frente a los valores
+  verdaderos de $-3.0$ a $-2.2$. Recuperan la forma creciente y cóncava del simulador, la
+  misma que el AIC favorecía con $\log t$ en la [Sección 5.4](#sec-u15-base).
+- **Fragilidad.** $\hat\sigma_u=0.37$ queda muy por debajo de $0.70$. Es la subestimación de
+  varianzas con 24 centros ya comentada en la [Sección 5.3](#sec-u15-lab).
+
 ::: {.callout-important}
 ## Tarea del estudiante (1.5) — resuelve la Pregunta 2 del caso
 Responde la **Pregunta 2** del cliente ([Unidad 6](#sec-u16)) sobre la cohorte de tu equipo: 
@@ -772,6 +928,9 @@ Tareas:
 5. **Predicción y respuesta.** Traza la **supervivencia** (o el riesgo acumulado $1-S_t$) para un par
    de perfiles (fragilidad alta/media, con y sin tratamiento), di si el tratamiento **retrasa** la
    fractura y responde al cliente.
+6. **Diagnóstico (RA4).** Antes de responder, contrasta la proporcionalidad (`x:t`), revisa la forma
+   de `x1` con los residuos de martingala, compara Kaplan–Meier y predicción por terciles de riesgo e
+   informa del índice C ([Sección 5.4](#sec-u15-diagnostico)).
 
 *Control de calidad:* contrasta tus estimaciones con la **verdad del DGP** (`attr(cohorte, "verdad")`)
 —ajusta a ciegas y valida al final—.

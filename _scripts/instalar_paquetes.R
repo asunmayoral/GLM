@@ -17,7 +17,7 @@ paquetes <- c(
   # separación y respuestas binarias, ordinales y nominales
   "logistf", "ordinal", "brant", "nnet",
   # efectos mixtos
-  "lme4", "glmmTMB",
+  "lme4", "glmmTMB", "varTestnlme",
   # conteos
   "pscl", "AER", "vcd", "vcdExtra",
   # regularización

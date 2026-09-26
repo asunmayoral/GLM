@@ -37,10 +37,10 @@ leer_datos_glm <- function(ruta) {
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
   DHARMa = "0.5.0", GGally = "2.4.0", MuMIn = "1.48.19", aplore3 = "0.9",
-  arm = "1.15.3", broom = "1.0.13", lme4 = "2.0.1", patchwork = "1.3.2",
-  performance = "0.17.0", readr = "2.2.0", scales = "1.4.0", see = "0.14.0",
-  sessioninfo = "1.2.4", survival = "3.8.6", survminer = "0.5.2",
-  tidyr = "1.3.2", tidyverse = "2.0.0")
+  arm = "1.15.3", broom = "1.0.13", lme4 = "2.0.1", pROC = "1.19.0.1",
+  patchwork = "1.3.2", performance = "0.17.0", readr = "2.2.0",
+  scales = "1.4.0", see = "0.14.0", sessioninfo = "1.2.4", survival = "3.8.6",
+  survminer = "0.5.2", tidyr = "1.3.2", tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -95,7 +95,7 @@ head(cohorte)
 # -----------------------------------------------------------------------------
 # [u15-cohorte-head]
 #   5 · Supervivencia: del hazard al GLM en tiempo discreto
-#     > 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox
+#     > 5.2 Kaplan–Meier y riesgos proporcionales
 #       > Kaplan–Meier: dejar hablar a los datos
 # -----------------------------------------------------------------------------
 head(cohorte[, c("id", "centro", "x1", "x2", "tiempo", "evento")])
@@ -103,7 +103,7 @@ head(cohorte[, c("id", "centro", "x1", "x2", "tiempo", "evento")])
 # -----------------------------------------------------------------------------
 # [fig-u15-km]
 #   5 · Supervivencia: del hazard al GLM en tiempo discreto
-#     > 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox
+#     > 5.2 Kaplan–Meier y riesgos proporcionales
 #       > Kaplan–Meier: dejar hablar a los datos
 # -----------------------------------------------------------------------------
 library(survival)
@@ -118,7 +118,7 @@ ggsurvplot(km, data = cohorte, conf.int = TRUE, pval = TRUE,
 # -----------------------------------------------------------------------------
 # [fig-u15-ph-ilustra]
 #   5 · Supervivencia: del hazard al GLM en tiempo discreto
-#     > 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox
+#     > 5.2 Kaplan–Meier y riesgos proporcionales
 #       > Riesgos proporcionales, en tiempo discreto
 # -----------------------------------------------------------------------------
 beta <- log(2)                                  # efecto de la covariable: HR = exp(beta) = 2
@@ -147,7 +147,7 @@ base |>
 # -----------------------------------------------------------------------------
 # [fig-u15-km-loglog]
 #   5 · Supervivencia: del hazard al GLM en tiempo discreto
-#     > 5.2 Precedentes en clave de supervivencia: Kaplan–Meier y Cox
+#     > 5.2 Kaplan–Meier y riesgos proporcionales
 #       > Riesgos proporcionales, en tiempo discreto
 # -----------------------------------------------------------------------------
 ggsurvplot(km, data = cohorte, fun = "cloglog",
@@ -219,7 +219,7 @@ pH + pS
 library(lme4)
 m_frail <- glmer(y ~ periodo + x1 + x2 + (1 | centro),
                  family = binomial("cloglog"), data = pp)
-VarCorr(m_frail)               # sigma de la fragilidad (verdad del DGP: 0.70)
+VarCorr(m_frail)               # sigma de la fragilidad (la del proceso en el DGP: 0.70)
 fixef(m_frail)[c("x1", "x2")]  # efectos fijos, ahora condicionales al centro
 
 # -----------------------------------------------------------------------------
@@ -258,9 +258,90 @@ ggplot(pred2, aes(t, S, color = enlace)) +
   labs(x = "Periodo", y = "Supervivencia base S(t)", color = "Enlace")
 
 # -----------------------------------------------------------------------------
+# [u15-base]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > ¿Hace falta un parámetro por periodo?
+# -----------------------------------------------------------------------------
+pp$t <- as.integer(pp$periodo)   # el periodo como número, para las tendencias
+m_lin <- update(m_pp, . ~ . - periodo + t)
+m_log <- update(m_pp, . ~ . - periodo + log(t))
+anova(m_lin, m_pp, test = "LRT")
+AIC(m_pp, m_lin, m_log)
+
+# -----------------------------------------------------------------------------
+# [u15-ph-test]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > ¿Se sostiene la proporcionalidad?
+# -----------------------------------------------------------------------------
+m_ph <- update(m_pp, . ~ . + x1:t + x2:t)   # ¿cambian los efectos con el periodo?
+anova(m_pp, m_ph, test = "LRT")
+
+# -----------------------------------------------------------------------------
+# [fig-u15-martingala]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > ¿Es lineal el efecto de la fragilidad? Residuos de martingala
+# -----------------------------------------------------------------------------
+pp$h <- fitted(m_pp)   # hazard ajustado de cada fila persona-periodo
+res <- data.frame(x1   = cohorte$x1,
+                  mart = cohorte$evento - tapply(pp$h, pp$id, sum)[as.character(cohorte$id)])
+ggplot(res, aes(x1, mart)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess", formula = y ~ x) +
+  labs(x = "Fragilidad (x1)", y = "Residuo de martingala")
+
+# -----------------------------------------------------------------------------
+# [u15-cuadratico]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > ¿Es lineal el efecto de la fragilidad? Residuos de martingala
+# -----------------------------------------------------------------------------
+anova(m_pp, update(m_pp, . ~ . + I(x1^2)), test = "LRT")
+
+# -----------------------------------------------------------------------------
+# [u15-calibracion]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > Calibración: supervivencia observada frente a predicha
+# -----------------------------------------------------------------------------
+Tmax <- nlevels(pp$periodo)
+rej  <- data.frame(id = rep(cohorte$id, each = Tmax),       # cada paciente, en todos los periodos
+                   x1 = rep(cohorte$x1, each = Tmax),
+                   x2 = rep(cohorte$x2, each = Tmax),
+                   periodo = factor(rep(seq_len(Tmax), nrow(cohorte)), levels = levels(pp$periodo)))
+rej$h <- predict(m_pp, newdata = rej, type = "response")
+S_fin <- tapply(1 - rej$h, rej$id, prod)[as.character(cohorte$id)]   # S predicha al final
+tercil <- cut(S_fin, quantile(S_fin, 0:3 / 3), include.lowest = TRUE,
+              labels = c("alto", "medio", "bajo"))                  # menor S, más riesgo
+km_t <- summary(survfit(Surv(tiempo, evento) ~ tercil, data = cohorte), times = Tmax)
+data.frame(riesgo = levels(tercil), KM = km_t$surv, GLM = tapply(S_fin, tercil, mean))
+
+# -----------------------------------------------------------------------------
+# [u15-discriminacion]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > Discriminación: índice C y AUC por periodo
+# -----------------------------------------------------------------------------
+lp <- drop(as.matrix(cohorte[, c("x1", "x2")]) %*% coef(m_pp)[c("x1", "x2")])
+concordance(Surv(tiempo, evento) ~ lp, data = cohorte, reverse = TRUE)  # mayor lp, antes el evento
+sapply(split(pp, pp$periodo), \(s) as.numeric(pROC::auc(s$y, s$h, quiet = TRUE)))
+
+# -----------------------------------------------------------------------------
+# [u15-frail-test]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.4 Evaluación y diagnóstico
+#       > ¿Hace falta la fragilidad de centro?
+# -----------------------------------------------------------------------------
+lrt <- as.numeric(2 * (logLik(m_frail) - logLik(m_pp)))
+c(LRT = lrt, p = 0.5 * pchisq(lrt, df = 1, lower.tail = FALSE))  # H0 en la frontera: sigma_u = 0
+
+# -----------------------------------------------------------------------------
 # [fig-u15-clinica]
 #   5 · Supervivencia: del hazard al GLM en tiempo discreto
-#     > 5.3 La modelización GLM del problema de supervivencia
+#     > 5.5 Qué aporta el modelo y qué implica en la práctica clínica
 #       > Conclusiones para la práctica clínica
 # -----------------------------------------------------------------------------
 arquetipos <- tibble(
@@ -289,6 +370,19 @@ ggplot(grid, aes(t, riesgo_acum, color = arquetipo)) +
   labs(x = "Periodo de revisión", y = "Riesgo acumulado de fractura (1 - S)",
        color = NULL) +
   theme(legend.position = "top")
+
+# -----------------------------------------------------------------------------
+# [u15-dgp]
+#   5 · Supervivencia: del hazard al GLM en tiempo discreto
+#     > 5.6 Validación contra el DGP: ¿recuperamos la verdad?
+# -----------------------------------------------------------------------------
+v  <- attr(cohorte, "verdad")$binaria
+ic <- confint(m_frail, parm = c("x1", "x2"), method = "Wald")
+data.frame(verdad = v$beta, glm = coef(m_pp)[c("x1", "x2")],
+           glmm = fixef(m_frail)[c("x1", "x2")], ic)
+c(verdad = v$sigma_u, glmm = attr(VarCorr(m_frail)$centro, "stddev"))
+cbind(verdad = v$alpha_base,                                   # riesgo base (escala cloglog)
+      glmm   = fixef(m_frail)[1] + c(0, fixef(m_frail)[2:Tmax]))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------
