@@ -495,8 +495,17 @@ mean(v$u)   # media de los 24 efectos de centro sorteados
 # -----------------------------------------------------------------------------
 c(proceso = v$sigma_u, muestra = sd(v$u),                   # DT del proceso y de los 24 sorteados
   glmm = attr(VarCorr(m_frail)$centro, "stddev"))
-u_hat <- ranef(m_frail)$centro[, "(Intercept)"]             # centros en el orden 1, ..., 24
-c(correlacion = cor(v$u, u_hat), pendiente = unname(coef(lm(u_hat ~ v$u))[2]))
+
+# -----------------------------------------------------------------------------
+# [u15-dgp-uj]
+#   5 · Supervivencia: el tiempo hasta el evento como GLM
+#     > 5.4 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La comparación
+# -----------------------------------------------------------------------------
+u_hat <- ranef(m_frail)$centro[, "(Intercept)"]             # predicción de cada clínica, 1, ..., 24
+c(correlacion = cor(v$u, u_hat),                            # cuánto ruido: 1 = ninguno
+  pendiente   = unname(coef(lm(u_hat ~ v$u))[2]),           # cuánto encoge: 1 = nada
+  fracturas_por_clinica = sum(cohorte$evento) / nlevels(cohorte$centro))
 
 # -----------------------------------------------------------------------------
 # [fig-u15-dgp-centros]
@@ -506,11 +515,11 @@ c(correlacion = cor(v$u, u_hat), pendiente = unname(coef(lm(u_hat ~ v$u))[2]))
 # -----------------------------------------------------------------------------
 tibble(u = v$u, u_hat = u_hat) |>
   ggplot(aes(u, u_hat)) +
-  geom_abline(linetype = 2) +
-  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "#2c7fb8") +
+  geom_abline(linetype = 2) +                                             # igualdad
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "#2c7fb8") +   # regresión
   geom_point(size = 2.5) +
   coord_equal() +
-  labs(x = "Efecto verdadero u_j", y = "Predicción del GLMM")
+  labs(x = "Efecto verdadero u_j", y = "Predicción del GLMM û_j")
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

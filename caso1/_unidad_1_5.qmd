@@ -125,7 +125,12 @@ seguimiento), y el indicador de censura, `evento` (1 = fractura, 0 = censura):
 ```{r}
 #| label: u15-cohorte-head
 head(cohorte[, c("id", "centro", "x1", "x2", "tiempo", "evento")])
+table(tiempo = cohorte$tiempo, evento = cohorte$evento)   # cómo termina cada seguimiento
 ```
+
+La tabla cruzada muestra el diseño descrito en la introducción: hay fracturas en todas las
+revisiones, pero las censuras (`evento = 0`) solo aparecen a partir de la tercera, porque cada mujer
+tuvo al menos tres revisiones antes del cierre del estudio.
 
 La función `expandir_persona_periodo()`, definida en la Presentación del caso, la reorganiza. Para
 cada mujer genera una fila por revisión en la que siguió en riesgo, hasta la última observada. La
@@ -146,9 +151,9 @@ observaron y deja de aportar después, sin que haya que inventarle un valor de $
 La verosimilitud de supervivencia se **factoriza** exactamente como un producto de Bernoulli sobre
 los periodos,
 
-$$ P(T=t)=\begin{cases}
-h_t \prod_{s<t} (1-h_s) & \text{ si evento en } t\\
-\prod_{s \leq c} (1-h_s) & \text{ si censura}
+$$ L_i=\begin{cases}
+h_t \prod_{s<t} (1-h_s) & \text{ si fractura en } t\\
+\prod_{s \leq c} (1-h_s) & \text{ si censura en } c
 \end{cases}$$
 
 así que un **GLM binomial ordinario** (con enlace cloglog, [Sección 5.3](#sec-u15-glm))
@@ -221,8 +226,16 @@ ggsurvplot(km, data = cohorte, conf.int = TRUE, pval = TRUE,
 ```
 
 En la cohorte el patrón es el esperado: las tratadas (`x2` = Sí) se mantienen por encima
-de las no tratadas y la separación crece con los periodos —arrancan casi juntas y, al sexto,
-la supervivencia ronda $0.73$ frente a $\approx0.56$—.
+de las no tratadas y la separación crece con los periodos. Los valores de la curva en la primera y
+la sexta revisión lo confirman:
+
+```{r}
+#| label: u15-km-valores
+summary(km, times = c(1, 6))   # supervivencia de Kaplan–Meier en la 1.ª y la 6.ª revisión
+```
+
+Arrancan casi juntas ($0.939$ sin tratamiento y $0.946$ con él) y, en la sexta revisión, la
+supervivencia es de $0.561$ frente a $0.695$.
 
 **¿Es esa separación real o podría ser ruido muestral?** 
 
@@ -238,11 +251,14 @@ mide el tamaño del efecto ni ajusta por covariables: solo responde *sí/no* a "
 En R, el $p$-valor que `ggsurvplot(..., pval = TRUE)` imprime sobre la curva es justo el del
 log-rank; el contraste explícito se obtiene con `survdiff`:
 
-```r
+```{r}
+#| label: u15-logrank
 survdiff(Surv(tiempo, evento) ~ x2, data = cohorte)
 ```
 
-Sobre la cohorte da $p=0.0027$: la ventaja de las tratadas **no** es ruido.
+Las no tratadas tienen más fracturas de las esperadas si las dos curvas fueran iguales (168
+observadas frente a 145 esperadas) y las tratadas, menos (86 frente a 109). El estadístico vale
+$9.0$ con 1 grado de libertad, $p=0.003$: la ventaja de las tratadas **no** es ruido.
 
 Con todo, KM **describe** y **compara**, pero se queda como una primera herramienta descriptiva:
 **no ajusta por covariables**, no admite predictores **continuos** (la fragilidad `x1` se queda
@@ -265,7 +281,7 @@ $$
 Así, lo que cae la supervivencia **en escala logarítmica** al pasar del periodo $t-1$ al $t$ es
 exactamente el sumando de ese periodo:
 $$
-\log \frac{S_{t-1}}{S_t}=\log S_{t-1}-\log S_t=\log\frac{S_{t-1}}{S_t}=-\log(1-h_t)\;\ge 0.
+\log S_{t-1}-\log S_t=\log\frac{S_{t-1}}{S_t}=-\log(1-h_t)\;\ge 0.
 $$
 No es la caída absoluta, $S_{t-1}-S_t=S_{t-1}\,h_t$, que depende de cuánta supervivencia quedaba,
 sino la **caída relativa** medida en logaritmos, que solo depende de $h_t$ (y para $h_t$ pequeño es
@@ -472,8 +488,8 @@ tibble(eta = seq(-4, 4, by = 0.02)) |>
   labs(x = expression(eta), y = expression(p == g^{-1}(eta)), color = "Enlace")
 ```
 
-El modelo descansa en tres supuestos, que la [evaluación y el diagnóstico](#sec-u15-comparacion)
-someterán a prueba cuando se pueda:
+El modelo descansa en cuatro supuestos; los dos últimos se contrastan en el
+[diagnóstico](#sec-u15-diagnostico):
 
 - **Independencia condicional.** Las filas de una misma paciente son ensayos independientes dadas
   las covariables y el periodo, por la factorización de la verosimilitud
@@ -482,6 +498,8 @@ someterán a prueba cuando se pueda:
   fractura, como vimos en la introducción. No se puede contrastar con los datos.
 - **Riesgos proporcionales.** Cada *hazard ratio* es constante en el tiempo
   ([Sección 5.2](#sec-u15-prop)).
+- **Efecto lineal de la fragilidad** en la escala cloglog: cada desviación típica de `x1` suma lo
+  mismo al predictor lineal, sea cual sea el nivel de partida.
 
 ### Ajuste e interpretación {#sec-u15-lab}
 
@@ -547,7 +565,7 @@ mismo vale para el resto de curvas de supervivencia de la unidad:
 #| label: fig-u15-hazard-base
 #| fig-width: 10
 #| fig-height: 4
-#| fig-cap: "Riesgo base estimado por periodo (h0t, evaluado en x1 = x2 = 0) y la supervivencia base St = prod(1 - h0k) que implica. Como el riesgo base tiende a crecer, la supervivencia cae cada vez más deprisa."
+#| fig-cap: "Riesgo base estimado por periodo (h0t, evaluado en x1 = x2 = 0) y la supervivencia base St = prod(1 - h0k) que implica. El riesgo base tiende a crecer con el seguimiento, con un pequeño retroceso en la cuarta revisión."
 base <- tibble(periodo = factor(levels(pp$periodo), levels = levels(pp$periodo)),
                x1 = 0, x2 = 0)
 base$h0 <- predict(m_pp, newdata = base, type = "response")   # hazard base por periodo
@@ -678,7 +696,6 @@ $$
 \gamma_0+\gamma_1\log t & \text{(tendencia logarítmica, } m_{log}: 2)\\
 \alpha_t\ \text{libre} & \text{(factor, } m_{pp}: 6)
 \end{cases}
-
 $$
 Traducido al aporte de riesgo base, $-\log(1-h_{0t})=e^{\alpha_t}$:
 
@@ -1038,10 +1055,10 @@ mart <- cohorte$evento - tapply(fitted(m), pp$id, sum)[as.character(cohorte$id)]
 - **Frontera**: al contrastar una varianza, el $p$ de `lrtest()` no vale; el correcto lo da
   `varCompTest(modelo_con, modelo_sin)`, que con una sola varianza es la mitad.
 - **Calibración**: comparar en cada grupo de riesgo la supervivencia de Kaplan–Meier (`survfit` más
-  `summary(..., times = )`) con la media de las $\hat S_t$ predichas. La comparación periodo a
-  periodo coincide por construcción y no sirve.
-- **Discriminación**: `lp` es el predictor lineal sin el riesgo base, $\mathbf{x}'\hat{\boldsymbol\beta}$;
-  `reverse = TRUE` indica que un `lp` mayor anticipa el evento.
+  `summary(..., times = )`) con la media de las $\hat S_i(t)$ predichas para sus pacientes.
+- **Discriminación**: `lp` es una puntuación de riesgo por paciente, el predictor lineal en $t=1$
+  (`predict(m, newdata = transform(cohorte, t = 1))`); `reverse = TRUE` indica que un `lp` mayor
+  anticipa el evento.
 - **Martingala**: se representa `mart` frente a la covariable con un suavizado
   (`geom_smooth(method = "loess")`); una tendencia sugiere que su efecto no es lineal.
 ::::
@@ -1349,21 +1366,23 @@ Responde la **Pregunta 2** del cliente ([Unidad 6](#sec-u16)) sobre la cohorte d
 Tareas:
 
 1. **Prepara y ajusta (RA7).** Reconoce que es un problema de **tiempo-a-evento con censura**,
-   expande a **persona-periodo** (`pp`) y ajusta el GLM con enlace **cloglog**; reporta los **hazard
-   ratios** de `x1` y `x2` (con su IC).
+   expande a **persona-periodo** (`pp`) y ajusta el GLM con enlace **cloglog**; compara las formas
+   del riesgo base (factor, tendencia lineal, logarítmica) y reporta los **hazard ratios** de `x1` y
+   `x2` (con su IC).
 2. **Cuándo, y cada cuánto revisar.** Representa el **hazard base por periodo** ($\hat h_{0t}$) y la
    **supervivencia** $S_t$; a partir de su forma (¿riesgo creciente?, ¿se acelera la caída?), propón
    al cliente un **calendario de revisiones**.
 3. **Censura.** Explica por qué, siendo **no informativa**, no sesga la estimación: qué aporta —y qué
    no— una paciente censurada.
-4. **Fragilidad de centro.** Añade `(1 | centro)` y comenta qué cambia (o no) en los efectos fijos y
-   sus errores estándar.
+4. **Fragilidad de centro.** Añade `(1 | centro)`, contrasta si hace falta (con la corrección de
+   frontera de `varCompTest`) y comenta qué cambia (o no) en los efectos fijos y sus errores
+   estándar.
 5. **Predicción y respuesta.** Traza la **supervivencia** (o el riesgo acumulado $1-S_t$) para un par
    de perfiles (fragilidad alta/media, con y sin tratamiento), di si el tratamiento **retrasa** la
    fractura y responde al cliente.
 6. **Diagnóstico (RA4).** Antes de responder, contrasta la proporcionalidad (`x:t`), revisa la forma
    de `x1` con los residuos de martingala, compara Kaplan–Meier y predicción por terciles de riesgo e
-   informa del índice C ([Sección 5.3](#sec-u15-comparacion)).
+   informa del índice C ([evaluación](#sec-u15-comparacion) y [diagnóstico](#sec-u15-diagnostico)).
 
 *Control de calidad:* contrasta tus estimaciones con la **verdad del DGP** (`attr(cohorte, "verdad")`)
 —ajusta a ciegas y valida al final—.
