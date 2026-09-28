@@ -1258,15 +1258,56 @@ una clínica con $u_j=0$, mientras que el intercepto del GLMM se refiere al cent
 muestra**, y los 24 efectos sorteados tienen media $-0.05$. El resto es la aproximación logarítmica:
 el riesgo base verdadero es creciente y cóncavo, como $\log t$, pero no exactamente logarítmico.
 
-**Efectos de centro.**
+**Efectos de centro.** Aquí caben dos comparaciones distintas: la dispersión del conjunto de
+clínicas, que resume $\sigma_u$, y el efecto de cada clínica, una a una.
+
+*La dispersión entre clínicas.*
 
 ```{r}
 #| label: u15-dgp-centros
 c(proceso = v$sigma_u, muestra = sd(v$u),                   # DT del proceso y de los 24 sorteados
   glmm = attr(VarCorr(m_frail)$centro, "stddev"))
-u_hat <- ranef(m_frail)$centro[, "(Intercept)"]             # centros en el orden 1, ..., 24
-c(correlacion = cor(v$u, u_hat), pendiente = unname(coef(lm(u_hat ~ v$u))[2]))
 ```
+
+$\hat\sigma_u=0.37$ queda por debajo del $0.70$ del proceso, pero esa distancia no mide solo el sesgo
+del estimador: el $0.70$ es la dispersión del **proceso** del que se sortean las clínicas, y una
+muestra de 24 puede salir, por puro azar, menos dispersa. Aquí los 24 efectos sorteados tienen una
+desviación típica de $0.42$, mucho más cerca de la estimación.
+
+*Clínica a clínica.* El simulador guardó el efecto verdadero de cada clínica, $u_j$. El GLMM no
+estima esos efectos como parámetros, sino que los **predice** una vez ajustado: `ranef(m_frail)`
+devuelve, para cada clínica, el valor más plausible de su efecto, $\hat u_j$, combinando lo que dicen
+sus propios datos con la distribución $\mathcal N(0,\hat\sigma_u^2)$ de la que se supone que procede.
+Como vimos en la [Unidad 4](#sec-u14), esa combinación **encoge** la desviación que sugieren los
+datos de la clínica, $\tilde u_j$, hacia 0:
+$$
+\hat u_j\approx\lambda_j\,\tilde u_j,\qquad 0<\lambda_j<1 .
+$$
+Y lo que sugieren los datos de la clínica es su efecto verdadero más un error de estimación, porque
+cada clínica aporta pocas fracturas: $\tilde u_j=u_j+e_j$. Juntando las dos piezas,
+$\hat u_j\approx\lambda_j\,(u_j+e_j)$, y eso anticipa lo que debemos ver al comparar $\hat u_j$ con
+$u_j$:
+
+- la **pendiente** de la recta de regresión de $\hat u_j$ sobre $u_j$ estima el encogimiento medio,
+  $\lambda$: sería 1 sin encogimiento;
+- la **correlación** entre ambos es menor que 1 por el error $e_j$: mide cuánto ruido queda en la
+  predicción de cada clínica.
+
+El chunk extrae los $\hat u_j$, en el mismo orden de clínicas (1 a 24) que los $u_j$ del simulador,
+y calcula las dos cantidades, junto con el número medio de fracturas por clínica:
+
+```{r}
+#| label: u15-dgp-uj
+u_hat <- ranef(m_frail)$centro[, "(Intercept)"]             # predicción de cada clínica, 1, ..., 24
+c(correlacion = cor(v$u, u_hat),                            # cuánto ruido: 1 = ninguno
+  pendiente   = unname(coef(lm(u_hat ~ v$u))[2]),           # cuánto encoge: 1 = nada
+  fracturas_por_clinica = sum(cohorte$evento) / nlevels(cohorte$centro))
+```
+
+La @fig-u15-dgp-centros lo muestra. Cada punto es una clínica: en horizontal, su efecto verdadero
+$u_j$; en vertical, su predicción $\hat u_j$. La línea discontinua es la igualdad $\hat u_j=u_j$,
+donde caerían todos los puntos si el modelo acertara exactamente; la línea azul es la recta de
+mínimos cuadrados de $\hat u_j$ sobre $u_j$, cuya pendiente es la del chunk.
 
 ```{r}
 #| label: fig-u15-dgp-centros
@@ -1274,24 +1315,25 @@ c(correlacion = cor(v$u, u_hat), pendiente = unname(coef(lm(u_hat ~ v$u))[2]))
 #| code-summary: "Código de la figura"
 #| fig-width: 5.5
 #| fig-height: 4.5
-#| fig-cap: "Efecto verdadero de cada clínica (u_j, sorteado por el simulador) frente a su predicción en el GLMM. La línea discontinua es la igualdad; la continua, la recta de regresión, más plana por el encogimiento."
+#| fig-cap: "Efecto verdadero de cada clínica (u_j, sorteado por el simulador) frente a su predicción en el GLMM (û_j). La línea discontinua es la igualdad; la azul, la recta de regresión de û_j sobre u_j, más plana que la diagonal por el encogimiento."
 tibble(u = v$u, u_hat = u_hat) |>
   ggplot(aes(u, u_hat)) +
-  geom_abline(linetype = 2) +
-  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "#2c7fb8") +
+  geom_abline(linetype = 2) +                                             # igualdad
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "#2c7fb8") +   # regresión
   geom_point(size = 2.5) +
   coord_equal() +
-  labs(x = "Efecto verdadero u_j", y = "Predicción del GLMM")
+  labs(x = "Efecto verdadero u_j", y = "Predicción del GLMM û_j")
 ```
 
-$\hat\sigma_u=0.37$ queda por debajo del $0.70$ del proceso, pero esa distancia no mide solo el sesgo
-del estimador: el $0.70$ es la dispersión del **proceso** del que se sortean las clínicas, y una
-muestra de 24 puede salir, por puro azar, menos dispersa. Aquí los 24 efectos sorteados tienen una
-desviación típica de $0.42$, mucho más cerca de la estimación. Clínica a clínica, las predicciones
-$\hat u_j$ siguen a los efectos verdaderos (correlación $0.72$), pero **encogidas** hacia 0: la
-pendiente es $0.50$, de modo que el modelo recoge aproximadamente la mitad de cada desviación. Es el
-encogimiento que vimos en la [Unidad 4](#sec-u14), más fuerte cuanto menos información aporta cada
-clínica.
+**Lectura.** La correlación es $0.72$: el modelo **ordena** bien las clínicas, y las de más riesgo
+verdadero reciben, en general, predicciones más altas. La pendiente es $0.50$: en promedio, las
+predicciones recogen la **mitad** de la desviación verdadera. Por eso la recta azul es más plana que
+la diagonal, y la mayoría de las clínicas con efecto positivo quedan por debajo de ella y las de
+efecto negativo, por encima: todas se acercan a 0. Ese encogimiento no es un fallo del modelo, sino
+su forma de protegerse del ruido: con unas diez fracturas por clínica, la desviación que sugieren los
+datos de cada una es poco fiable, y el modelo la modera tomando fuerza del conjunto, como vimos en la
+Unidad 4. La consecuencia práctica es que $\hat u_j$ sirve para ordenar las clínicas y detectar las
+que se apartan claramente, pero subestima el tamaño de su efecto.
 
 **Conclusión.** El modelo final recupera la verdad del simulador en todo lo que puede recuperar:
 los dos efectos, dentro de sus intervalos; la forma del riesgo base, con desviaciones pequeñas y en

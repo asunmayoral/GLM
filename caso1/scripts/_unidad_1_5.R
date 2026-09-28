@@ -468,15 +468,49 @@ exp(attr(VarCorr(m_frail)$centro, "stddev"))              # centro a +1 DT frent
 # [u15-dgp]
 #   5 · Supervivencia: el tiempo hasta el evento como GLM
 #     > 5.4 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La comparación
 # -----------------------------------------------------------------------------
-v  <- attr(cohorte, "verdad")$binaria
+v  <- attr(cohorte, "verdad")$binaria   # la verdad que guardó el simulador
 ic <- confint(m_frail, parm = c("x1", "x2"), method = "Wald")
 data.frame(verdad = v$beta, glm = coef(m_log)[c("x1", "x2")],
            glmm = fixef(m_frail)[c("x1", "x2")], ic)
-c(proceso = v$sigma_u, muestra = sd(v$u),                     # DT del proceso y de los 24 centros sorteados
+
+# -----------------------------------------------------------------------------
+# [u15-dgp-base]
+#   5 · Supervivencia: el tiempo hasta el evento como GLM
+#     > 5.4 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La comparación
+# -----------------------------------------------------------------------------
+tibble(t      = seq_len(Tmax),
+       verdad = v$alpha_base,
+       glmm   = fixef(m_frail)[1] + fixef(m_frail)["log(t)"] * log(seq_len(Tmax))) |>
+  mutate(diferencia = glmm - verdad)
+mean(v$u)   # media de los 24 efectos de centro sorteados
+
+# -----------------------------------------------------------------------------
+# [u15-dgp-centros]
+#   5 · Supervivencia: el tiempo hasta el evento como GLM
+#     > 5.4 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La comparación
+# -----------------------------------------------------------------------------
+c(proceso = v$sigma_u, muestra = sd(v$u),                   # DT del proceso y de los 24 sorteados
   glmm = attr(VarCorr(m_frail)$centro, "stddev"))
-cbind(verdad = v$alpha_base,                                   # riesgo base (escala cloglog)
-      glmm   = fixef(m_frail)[1] + fixef(m_frail)["log(t)"] * log(seq_len(Tmax)))
+u_hat <- ranef(m_frail)$centro[, "(Intercept)"]             # centros en el orden 1, ..., 24
+c(correlacion = cor(v$u, u_hat), pendiente = unname(coef(lm(u_hat ~ v$u))[2]))
+
+# -----------------------------------------------------------------------------
+# [fig-u15-dgp-centros]
+#   5 · Supervivencia: el tiempo hasta el evento como GLM
+#     > 5.4 Validación contra el DGP: ¿recuperamos la verdad?
+#       > La comparación
+# -----------------------------------------------------------------------------
+tibble(u = v$u, u_hat = u_hat) |>
+  ggplot(aes(u, u_hat)) +
+  geom_abline(linetype = 2) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "#2c7fb8") +
+  geom_point(size = 2.5) +
+  coord_equal() +
+  labs(x = "Efecto verdadero u_j", y = "Predicción del GLMM")
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

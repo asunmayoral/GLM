@@ -303,17 +303,15 @@ que nos ocuparán:
   $$
   \eta_{ij}=\beta_0+\beta_1x_{ij}+u_{0j}+u_{1j}\,x_{ij},\qquad
   \begin{pmatrix}u_{0j}\\ u_{1j}\end{pmatrix}\sim\mathcal{N}\!\left(\mathbf{0},
-  \begin{pmatrix}\sigma^2_{u_0} & \sigma_{01}\\ \sigma_{01} & \sigma^2_{u_1}\end{pmatrix}\right),
-  \qquad
-  \sigma_{01}=\operatorname{Cov}(u_{0j},u_{1j})=\rho_{01}\,\sigma_{u_0}\sigma_{u_1}.
+  \begin{pmatrix}\sigma^2_{u_0} & \sigma_{01}\\ \sigma_{01} & \sigma^2_{u_1}\end{pmatrix}\right)
   $$
-  $\sigma^2_{u_1}$ mide cuánto varía la pendiente de $x$ entre grupos. Fuera de la diagonal va la
+  
+con $\sigma_{01}=\operatorname{Cov}(u_{0j},u_{1j})=\rho_{01}\,\sigma_{u_0}\sigma_{u_1}$.  $\sigma^2_{u_1}$ mide cuánto varía la pendiente de $x$ entre grupos, y $\sigma^2_{u_0}$ cuánto varían los interceptos del predictor lineal en $x=0$. Fuera de la diagonal va la
   **covarianza** $\sigma_{01}$, que es la que entra en las fórmulas; la **correlación** $\rho_{01}$,
   sin unidades, es la que se interpreta: liga nivel y pendiente, y con $\rho_{01}>0$ los grupos de
   nivel más alto tienen también una pendiente mayor.
 
-(Cabe también una pendiente sin intercepto aleatorio, pero rara vez tiene sentido: obliga a todas las
-rectas a cruzarse en $x=0$.)
+>Cabe también una pendiente sin intercepto aleatorio, pero rara vez tiene sentido: obliga a todas las rectas a cruzarse en $x=0$.
 
 Con $p$ covariables, las piezas del modelo general quedan así:
 
