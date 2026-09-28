@@ -536,8 +536,8 @@ lrtest(m_pool, m_int, m_slope)   # LRT secuencial: pooled -> intercepto -> pendi
 #         > El LRT de una varianza: la corrección de frontera
 # -----------------------------------------------------------------------------
 library(varTestnlme)
-varCompTest(m_int, m_pool, output = FALSE)    # H0: sigma_u^2 = 0
-varCompTest(m_slope, m_int, output = FALSE)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
+varCompTest(m_int, m_pool)    # H0: sigma_u^2 = 0
+varCompTest(m_slope, m_int)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
 
 # -----------------------------------------------------------------------------
 # [u14-r2]

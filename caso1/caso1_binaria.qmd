@@ -212,7 +212,11 @@ que **termina la observación** de cada mujer —bien porque se le detecta
 una fractura (`evento` = 1) o porque el seguimiento acaba sin ella
 (`evento` = 0, **censura**)—. `tiempo` = 1 significa que el desenlace
 ocurre en la **primera** revisión; `tiempo` = 6, que llega a la **sexta
-y última**. La expansión **persona-periodo** convierte a cada mujer en
+y última**. Las pacientes no se incorporaron todas a la vez: quien entró
+más tarde tuvo menos revisiones antes del cierre del estudio (entre tres
+y seis; el simulador sortea ese número con independencia del riesgo de
+cada mujer). Por eso `tiempo` es el **reloj de cada paciente**, contado
+desde su incorporación, y no el calendario del estudio. La expansión **persona-periodo** convierte a cada mujer en
 una fila por cada revisión a la que llega sin fractura, con `y` = 1 solo
 en aquella donde se detecta.
 

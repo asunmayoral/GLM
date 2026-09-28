@@ -1399,8 +1399,8 @@ estándar, **sin corregir**. Los correctos:
 ```{r}
 #| label: u14-lrt-frontera
 library(varTestnlme)
-varCompTest(m_int, m_pool, output = FALSE)    # H0: sigma_u^2 = 0
-varCompTest(m_slope, m_int, output = FALSE)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
+varCompTest(m_int, m_pool)    # H0: sigma_u^2 = 0
+varCompTest(m_slope, m_int)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
 ```
 
 | Salto | $\Lambda$ | g.l. | $p$ sin corregir ($\chi^2$) | $p$ corregido (mezcla) |
@@ -1429,8 +1429,8 @@ BIC(m_pool, m_int, m_slope)     # penaliza más la complejidad
 lmtest::lrtest(m_pool, m_int, m_slope)   # estadístico LRT de cada salto (su p, sin corregir)
 
 # p corregido por la frontera (m1 = con el efecto aleatorio, m0 = sin él)
-varTestnlme::varCompTest(m_int, m_pool, output = FALSE)
-varTestnlme::varCompTest(m_slope, m_int, output = FALSE)
+varTestnlme::varCompTest(m_int, m_pool)
+varTestnlme::varCompTest(m_slope, m_int)
 ```
 
 `anova()` también da el estadístico entre un mixto y un `glm`, pero solo con el mixto **delante**:

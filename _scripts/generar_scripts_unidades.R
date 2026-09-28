@@ -10,9 +10,16 @@
 #  depende de tu directorio de trabajo, el resto no):
 #      source("_scripts/generar_scripts_unidades.R")   # define la función
 #      generar_scripts()                # todos los casos que encuentre
-#      generar_scripts(casos = 1)       # solo el caso 2
+#      generar_scripts(casos = 1)       # solo el caso 1
 #      generar_scripts(casos = 3, solo_faltantes = TRUE)   # sin pisar lo existente
 #      generar_scripts(simular = TRUE)  # enseña qué haría, sin escribir nada
+#
+#      # Solo UNA unidad (p. ej. la 1.5): se excluyen los scripts de las demás.
+#      # `excluir` recibe nombres de scripts de destino, sin ruta. La ruta de
+#      # list.files() supone que el directorio de trabajo es la raíz del proyecto.
+#      todos <- list.files("caso1/scripts", pattern = "^_unidad_.*\\.R$")
+#      generar_scripts(casos = 1, maestro_tambien = FALSE,
+#                      excluir = setdiff(todos, "_unidad_1_5.R"))
 #
 #  QUÉ HACE, por caso:
 #    · localiza el documento maestro (el .qmd que no empieza por `_unidad_`);
