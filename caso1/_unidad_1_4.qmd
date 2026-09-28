@@ -1158,15 +1158,14 @@ x_{\min}=-\frac{\sigma_{01}}{\sigma^2_{u_1}},
 \sigma^2_{\text{centro}}(x_{\min})=\sigma^2_{u_0}-\frac{\sigma_{01}^2}{\sigma^2_{u_1}}
 =\sigma^2_{u_0}\big(1-\rho_{01}^2\big).
 $$
-En la escala logit, las rectas de los centros forman un **abanico**, y $x_{\min}$ es su «cintura»: la
-fragilidad en la que las rectas están más juntas y, por tanto, el ICC es mínimo. El signo de la
-covarianza la sitúa: con $\sigma_{01}<0$, los centros de nivel alto tienen menos pendiente, las
-rectas convergen hacia la derecha y $x_{\min}>0$; con $\sigma_{01}>0$, ocurre al revés. Solo si
-$|\rho_{01}|=1$ se cruzan todas en un mismo punto y la varianza mínima es $0$; en otro caso, los
-centros siguen difiriendo también en $x_{\min}$. Y hay una lectura equivalente: si se recentrara la
-fragilidad en $x_{\min}$, intercepto y pendiente aleatorios quedarían **incorrelados**, porque
-$\operatorname{Cov}(u_{0j}+u_{1j}x_{\min},\,u_{1j})=\sigma_{01}+\sigma^2_{u_1}x_{\min}=0$. En el
-código, $\sigma_{01}$ es `S[1, 2]` y $\sigma^2_{u_1}$, `S[2, 2]`.
+En $x_{\min}$ los centros son lo más parecidos posible entre sí: es la fragilidad en la que el ICC
+es mínimo. Tiene además una lectura sencilla: si se recentrara la fragilidad en ese punto, usando
+$x_1-x_{\min}$ como covariable, el nuevo intercepto aleatorio, $u_{0j}+u_{1j}x_{\min}$, quedaría
+**incorrelado** con la pendiente, porque
+$$
+\operatorname{Cov}(u_{0j}+u_{1j}x_{\min},\,u_{1j})=\sigma_{01}+\sigma^2_{u_1}x_{\min}=0 .
+$$
+En el código, $\sigma_{01}$ es `S[1, 2]` y $\sigma^2_{u_1}$, `S[2, 2]`.
 
 ```{r}
 #| label: fig-u14-icc-x1
@@ -1452,14 +1451,14 @@ Con ellas se construyen dos $R^2$ y dos ICC, que conviene ver juntos:
 $$
 \begin{aligned}
 R^2_{\text{marginal}}&=\frac{\sigma^2_f}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
-&&\text{lo que explican los efectos fijos,}\\[4pt]
+\rightarrow \text{lo que explican los efectos fijos,}\\[4pt]
 R^2_{\text{condicional}}&=\frac{\sigma^2_f+\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
-&&\text{lo que explican fijos y aleatorios juntos,}\\[4pt]
+\rightarrow\text{lo que explican fijos y aleatorios juntos,}\\[4pt]
 \text{ICC}_{\text{ajustado}}&=\frac{\sigma^2_u}{\sigma^2_u+\sigma^2_\varepsilon}
-&&\text{el peso del centro, descontados los efectos fijos,}\\[4pt]
+\rightarrow\text{el peso del centro, descontados los efectos fijos,}\\[4pt]
 \text{ICC}_{\text{no ajustado}}&=\frac{\sigma^2_u}{\sigma^2_f+\sigma^2_u+\sigma^2_\varepsilon}
 =R^2_{\text{condicional}}-R^2_{\text{marginal}}
-&&\text{el peso del centro sobre la varianza total.}
+\rightarrow\text{el peso del centro sobre la varianza total.}
 \end{aligned}
 $$
 
@@ -1522,27 +1521,38 @@ se mira con la curva por deciles de riesgo y el contraste de Hosmer–Lemeshow
 ([Sección 2.6](#sec-u12-diagnostico)); la **discriminación** —¿asigna más riesgo a quien se fractura
 que a quien no?— con el AUC, y la **clasificación** a un umbral con la matriz de confusión y sus
 métricas ([Sección 2.7](#sec-u12-evaluacion)). Lo nuevo es que un GLMM ofrece
-**dos predicciones** para la misma paciente ([Predecir para un centro nuevo](#sec-u14-nuevo-centro)):
+**tres predicciones** para la misma paciente, las de
+[Predecir para un centro nuevo](#sec-u14-nuevo-centro):
 
 - **Centro conocido**, $\operatorname{logit}^{-1}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta}+\hat u_j)$:
   incorpora el efecto estimado de su centro. Es `fitted(m_int)`, y solo existe para los 24 centros
   de la muestra.
-- **Centro nuevo**, $\operatorname{logit}^{-1}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta})$: el centro
-  típico ($u=0$), lo único que el modelo puede decir de una clínica que no ha visto. Es
-  `predict(m_int, re.form = NA, type = "response")`.
+- **Centro típico**, $\operatorname{logit}^{-1}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta})$: el de
+  efecto nulo, $u=0$. Es `predict(m_int, re.form = NA, type = "response")`.
+- **Promedio sobre centros** (marginal),
+  $\int\operatorname{logit}^{-1}(\mathbf x_{ij}^\top\hat{\boldsymbol\beta}+u)\,\varphi(u;0,\hat\sigma_u^2)\,du$:
+  el riesgo de una paciente de una clínica **cualquiera**, que no conocemos. Es la predicción
+  adecuada para una clínica nueva.
 
-Evaluar las dos responde a una pregunta práctica: **cuánto gana la predicción por conocer el centro**.
+Evaluar las tres responde a dos preguntas prácticas: **cuánto gana la predicción por conocer el
+centro** y **qué predicción conviene usar cuando no se conoce**. La integral de la marginal la
+aproximamos, para cada paciente, promediando el riesgo sobre 1000 valores de $u$ repartidos según
+$\mathcal N(0,\hat\sigma_u^2)$ (los cuantiles `qnorm(ppoints(1000))`, escalados por $\hat\sigma_u$).
 
 ```{r}
 #| label: u14-evaluacion
 library(pROC)
-# la misma paciente, predicha con el efecto de su centro y como si viniera de un centro nuevo
+# la misma paciente, predicha de tres formas: su centro, el centro típico y el promedio sobre centros
+eta_i <- predict(m_int, re.form = NA)                         # predictor lineal sin efecto de centro
+s_u   <- as.data.frame(VarCorr(m_int))$sdcor[1]
+z     <- qnorm(ppoints(1000))                                  # cuadratura sobre u ~ N(0, s_u^2)
 pred_eval <- tibble(
   y        = cohorte$ever,
   conocido = fitted(m_int),
-  nuevo    = predict(m_int, re.form = NA, type = "response")
+  tipico   = plogis(eta_i),
+  marginal = sapply(eta_i, \(e) mean(plogis(e + s_u * z)))
 ) |>
-  pivot_longer(c(conocido, nuevo), names_to = "prediccion", values_to = "p")
+  pivot_longer(c(conocido, tipico, marginal), names_to = "prediccion", values_to = "p")
 
 # deciles de riesgo de cada predicción: observados (O) y esperados (E), como en la Sección 2.6
 calib_mix <- pred_eval |>
@@ -1565,21 +1575,26 @@ calib_mix |>
   mutate(across(where(is.numeric), \(v) round(v, 3)))
 ```
 
-Las dos predicciones **calibran bien**: la probabilidad predicha media reproduce casi exactamente la
-proporción observada ($0{,}289$ y $0{,}284$ frente a $0{,}290$), y el Hosmer–Lemeshow no detecta
-desajuste en ninguna ($p=0{,}488$ y $p=0{,}235$). La del centro típico queda ligeramente por debajo,
-como cabe esperar: el centro típico no es el centro medio (la curva marginal de la
-[Sección 4.3](#sec-u14-modelos)). La diferencia está en la **discriminación**: el AUC pasa de $0{,}751$
-con el centro típico a $0{,}783$ conociendo el centro. Conocer el centro mejora la ordenación unas
-**tres centésimas**, una ganancia modesta, en línea con los 4 puntos de $R^2$ que aporta el
-agrupamiento.
+Las tres predicciones **calibran bien**, y el Hosmer–Lemeshow no detecta desajuste en ninguna
+($p=0{,}488$ con el centro conocido, $0{,}266$ con la marginal y $0{,}235$ con el centro típico).
+Pero la probabilidad predicha media solo reproduce la proporción observada, $0{,}290$, con el centro
+conocido y con la marginal ($0{,}289$ en ambas); la del centro típico queda algo por debajo
+($0{,}284$), como cabe esperar: el centro típico no es el centro medio (la curva marginal de la
+[Sección 4.3](#sec-u14-modelos)). Por eso, para una clínica desconocida, la predicción adecuada es la
+marginal.
+
+En **discriminación**, el centro típico y la marginal tienen exactamente el mismo AUC, $0{,}751$:
+las dos son funciones crecientes de $\mathbf x^\top\hat{\boldsymbol\beta}$, así que ordenan a las
+pacientes igual y solo difieren en el nivel del riesgo. Es un buen ejemplo de que calibrar y
+discriminar son preguntas distintas. Conociendo el centro, el AUC sube a $0{,}783$: una ganancia
+de unas **tres centésimas**, modesta, en línea con los 4 puntos de $R^2$ que aporta el agrupamiento.
 
 ```{r}
 #| label: fig-u14-calibracion
 #| fig-width: 5.5
 #| fig-height: 5
 #| out-width: "60%"
-#| fig-cap: "Curva de calibración del GLMM de intercepto aleatorio por deciles de riesgo, con las dos predicciones: centro conocido (con el efecto estimado de su centro) y centro nuevo (centro típico, u = 0). La diagonal discontinua marca la calibración perfecta."
+#| fig-cap: "Curva de calibración del GLMM de intercepto aleatorio por deciles de riesgo, con las tres predicciones: centro conocido (con el efecto estimado de su centro), centro típico (u = 0) y promedio sobre centros (marginal). La diagonal discontinua marca la calibración perfecta."
 ggplot(calib_mix, aes(pred, obs, colour = prediccion)) +
   geom_abline(linetype = "dashed") +
   geom_line() + geom_point(size = 1.8) +
@@ -1588,7 +1603,8 @@ ggplot(calib_mix, aes(pred, obs, colour = prediccion)) +
        colour = "Centro")
 ```
 
-En la @fig-u14-calibracion, las dos curvas siguen la diagonal. Las mayores separaciones aparecen en
+En la @fig-u14-calibracion, las tres curvas siguen la diagonal; la del centro típico y la marginal
+casi se superponen, porque con una $\hat\sigma_u$ pequeña apenas difieren. Las mayores separaciones aparecen en
 los deciles altos, en sentidos opuestos de un decil al siguiente: es el ruido de estimar una
 proporción con unas 90 pacientes por decil, no un sesgo sistemático.
 
@@ -1615,18 +1631,22 @@ La tabla traduce la ganancia del AUC a términos concretos. Conociendo el centro
 detecta **9 fracturas más** de las 254 (de 95 a 104 verdaderos positivos) a cambio de **3 falsas
 alarmas más** (de 37 a 40): la sensibilidad sube de $0{,}374$ a $0{,}409$ y el F1 de $0{,}492$ a
 $0{,}523$, mientras la exactitud apenas cambia ($0{,}777$ frente a $0{,}783$). Es la misma conclusión
-que el AUC —una ganancia real, pero modesta—, ahora contada en pacientes. Con cualquiera de las dos
-predicciones, la sensibilidad es baja porque la fractura es minoritaria; elegir otro umbral sigue la
+que el AUC —una ganancia real, pero modesta—, ahora contada en pacientes. La marginal y la del
+centro típico clasifican exactamente igual a este umbral: el pequeño ajuste de nivel de la marginal
+no hace cruzar el $0{,}5$ a ninguna paciente. Con cualquiera de las predicciones, la sensibilidad es baja porque la fractura es minoritaria; elegir otro umbral sigue la
 lógica de la [Sección 2.7](#sec-u12-evaluacion) (callout siguiente).
 
 :::: {.callout-tip}
 ## 🔧 En R. Evaluar un GLMM: calibración, discriminación y clasificación
 
-Todo parte de las dos predicciones:
+Todo parte de las tres predicciones:
 
 ```r
 p_conocido <- fitted(m_int)                                     # con el u_j estimado de su centro
-p_nuevo    <- predict(m_int, re.form = NA, type = "response")  # centro típico, u = 0
+eta_i      <- predict(m_int, re.form = NA)                      # predictor lineal, u = 0
+p_tipico   <- plogis(eta_i)                                     # centro típico
+s_u        <- as.data.frame(VarCorr(m_int))$sdcor[1]
+p_marginal <- sapply(eta_i, \(e) mean(plogis(e + s_u * qnorm(ppoints(1000)))))  # promedio sobre u
 ```
 
 A partir de ahí, las funciones son las del logístico, cambiando `fitted(fit_glm)` por la predicción
@@ -1698,6 +1718,21 @@ testQuantiles(sim, plot = FALSE)    # panel derecho: ¿cuantiles planos frente a
 
 Los residuos son uniformes —el KS no detecta desviación, $D=0{,}024$, $p=0{,}706$— y se reparten sin
 patrón frente a lo predicho ($p=0{,}941$).
+
+::: {.callout-note collapse="true"}
+## Qué contrasta `testQuantiles()`
+Si el modelo es correcto, los residuos simulados son Uniforme(0, 1) **para cualquier valor** de la
+predicción. En todo tramo de riesgo predicho, el 25 % de los residuos debería quedar por debajo de
+0,25, la mitad por debajo de 0,5 y el 75 % por debajo de 0,75: dibujados frente a lo predicho, esos
+tres cuantiles serían **líneas horizontales** en 0,25, 0,5 y 0,75.
+
+`testQuantiles()` lo comprueba ajustando una regresión cuantílica suave de los residuos frente a lo
+predicho para cada uno de los tres cuantiles, y contrastando si alguna curva se aparta de su línea
+horizontal. Devuelve un único $p$ para los tres. Es el contraste del panel derecho de `plot(sim)`,
+donde DHARMa pinta en rojo las curvas que se desvían. Un $p$ pequeño señala que el ajuste no es
+igual de bueno en todo el rango de riesgo; con `predictor = x1`, que la relación con esa covariable
+está mal especificada.
+:::
 
 La forma funcional se comprueba frente a la covariable continua, `x1`: una curvatura en los cuantiles
 indicaría que su efecto no es lineal en el logit.
