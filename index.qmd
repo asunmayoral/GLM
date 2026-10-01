@@ -151,7 +151,7 @@ Se espera de ti que mejores tu razonamiento crítico, tu intuición ante los dat
 
 **Qué se espera de ti.** Este curso funcionará de modo óptimo si eres proactivo/a y tienes ganas sinceras de aprender. No funcionará si esperas que tu equipo trabaje por ti y no motivas tu curiosidad para cuestionarte todo lo que vamos abarcando. Durante el curso irás asumiendo distintos roles en el equipo, para promover tu capacidad de adaptación al trabajo en equipo y el desarrollo de distintas habilidades (coordinador, revisor, portavoz, programador, escéptico, escriba, ...); aprovecha las oportunidades.
 
-**Herramientas.** Trabajamos todo el curso con R+RStudio y [Github](https://github.com) como plataforma de programación colaborativa. También pruedes trabajar con otras plataformas colaborativas y comunicativas de la suite de Google, y por supuesto, con LLMs. La generación de código y redacción de informes la realizamos con cuadernos de Quarto Markdown. Para la creación de presentaciones puedes utilizar otras herramientas específicas asistidas con IA como NotebookLM, Gamma, ... u otros LLMs.
+**Herramientas.** Trabajamos todo el curso con R+RStudio y [Github](https://github.com) como plataforma de programación colaborativa. También puedes trabajar con otras plataformas colaborativas y comunicativas de la suite de Google, y por supuesto, con LLMs. La generación de código y redacción de informes la realizamos con cuadernos de Quarto Markdown. Para la creación de presentaciones puedes utilizar otras herramientas específicas asistidas con IA como NotebookLM, Gamma, ... u otros LLMs.
 
 **El papel de la IA.** Es una herramienta de trabajo legítima y esperamos que la uses. Las condiciones —saber qué hace tu código, justificar el uso y verificar las respuestas— están en el apartado 9.
 
@@ -218,7 +218,7 @@ Cada proyecto se desarrolla en un formato distinto para que domines las situacio
 
 **Infraestructura**
 
-El trabajo de cada proyecto se desarroolará en un **repositorio de GitHub del equipo**, creado a
+El trabajo de cada proyecto se desarrollará en un **repositorio de GitHub del equipo**, creado a
 partir de esta plantilla: [`GLM-2026/proy-plantilla`](https://github.com/GLM-2026/proy-plantilla).
 Allí alojáis todo lo que genera el proyecto —datos, `.qmd` ejecutables, informe y presentación—, y
 desde allí se entrega y se revisa.
