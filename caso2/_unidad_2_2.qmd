@@ -1,11 +1,15 @@
 <!-- Partial · Incluir con {{< include _unidad_2_2.qmd >}}. Sin YAML. Chunks u22-.
-     AMPLIACIÓN de la Unidad 2.1: modelos log-lineales para tablas. NO consume horas de
-     teoría del cronograma (sem. 6): es material de laboratorio y de apoyo autónomo a las
-     preguntas Q4, Q5, Q18 y Q19 del estudio de caso (Unidad 2.8). El enganche con esas
-     preguntas se declara SOLO en la "Tarea del estudiante" del final, no en la entradilla.
-     Estructura espejo de las demás unidades: Contexto · Modelización · Interpretación ·
-     Inferencia y selección · Diagnóstico.
-     Datos: `cartera` de teoría (R/dgp_conteos.R, contexto "auto"), la misma de 2.1 y 2.3-2.7.
+     Modelos log-lineales para tablas. Dos bloques, cada uno con su pregunta de la dirección:
+       A · Asociación (tablas de contingencia): 2.1 de la póliza a la celda · 2.2 dos vías ·
+           2.3 tres vías (jerarquía con GRAFOS de asociación, diagnóstico, Simpson con Berkeley) ·
+           2.4 más de tres vías (AMPLIACIÓN: laboratorio / trabajo autónomo).
+       B · Cambio (tabla cuadrada del bonus-malus): 2.5.
+     Respuesta de la tabla: indicador de ALGUNA ASISTENCIA (n_asistencia > 0), la misma respuesta
+     de la Unidad 2.1. Los proxies del factor prohibido se tratan en la Unidad 2.7.
+     Cifras verificadas (13-oct-2026, cartera_auto_20252026.rds): % con asistencia urbana 37.4 /
+     mixta 31.9 / rural 31.2; independencia 2 vías G2 = 11.43 (2 gl, p = 0.0033); 3 vías con tipo:
+     mutua p = 0.0058, condicional p = 0.33; 4 vías (+uso) orden 1 p = 0.079. Berkeley: OR marginal
+     1.84; condicional no ajusta (dev 21.7, 6 gl); sin el depto. A sí (p = 0.75).
      Capítulos de Agresti (2013, 3.ª ed.) VERIFICADOS contra el apéndice de software del
      propio autor (alanagresti.com/cda/R_web.pdf, organizado por capítulo de esa edición):
        caps. 2-3 tablas de dos vías · cap. 4 GLM · caps. 5-7 logística · cap. 8 multinomial ·
@@ -14,25 +18,34 @@
      OJO: en Christensen (2025) la simetría y la cuasi-simetría están en los EJERCICIOS del
      cap. 2 (pp. 80-81), no en el texto principal: no citarlo como fuente de esa exposición. -->
 
-# 2 · Modelos log-lineales para tablas {#sec-u22}
+# 2 · Modelos log-lineales: cuando el dato es la celda {#sec-u22}
 
 En la [Unidad 2.1](#sec-u21) el dato era la **póliza**: una fila por sujeto, un conteo por fila. Ahora
-el dato es la **celda**: hemos cruzado dos o más variables categóricas y lo único que queda es
-*cuántos casos caen en cada combinación*. Cambia el objeto, cambia la lógica inferencial —modelos
-anidados y grados de libertad— y cambia la escala de lectura —**odds ratios**, no IRR—. Lo que **no**
-cambia es la maquinaria: sigue siendo `glm(family = poisson)`.
+el dato es la **celda**: cruzamos dos o más variables categóricas y lo único que queda es *cuántos casos
+caen en cada combinación*. Cambia el objeto, cambia la lógica inferencial —modelos anidados y grados de
+libertad— y cambia la escala de lectura —**odds ratios**, no IRR—. Lo que **no** cambia es la
+maquinaria: sigue siendo `glm(family = poisson)`.
 
-Esta unidad desarrolla lo que la 2.1 solo dejó apuntado.
+La dirección de la aseguradora nos trae dos preguntas de este tipo, y la unidad se organiza en torno a
+ellas:
+
+- **Asociación.** *¿Se asocia la zona de circulación con que una póliza pida asistencia en carretera?*
+  Y si metemos más factores en juego, *¿quién se asocia con quién?* (bloque A, secciones 2.1 a 2.4).
+- **Cambio.** *El nivel de bonus-malus se reevalúa cada año: ¿cómo se mueven las pólizas de un nivel a
+  otro?* (bloque B, sección 2.5).
 
 ::: {.callout-note}
 ## Sobre esta unidad
-**Ampliación** de la Unidad 2.1 (RA2). No introduce familia nueva: reinterpreta el Poisson cuando la
-respuesta son **frecuencias de celda**. Cubre los esquemas de muestreo, la **jerarquía** de modelos en
-tablas de tres o más vías, la paradoja de **Simpson**, el diagnóstico de tablas y los modelos de
-**tablas cuadradas** (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal), y termina
-aplicándolos a la detección de variables ***proxy***.
+Objetivo general: **modelos log-lineales** (RA2) — el Poisson cuando la respuesta son **frecuencias de
+celda**. No introduce familia nueva. Recorrido:
 
-No consume sesión de teoría propia: se trabaja en **laboratorio** y de forma autónoma.
+| Bloque | Sección | Pregunta | Herramienta |
+|:--|:--|:--|:--|
+| A · Asociación | [2.1](#sec-u22-contexto) | ¿Qué es una tabla como dato? | esquemas de muestreo, grados de libertad |
+| | [2.2](#sec-u22-dosvias) | ¿Zona y asistencia son independientes? | independencia frente a saturado, odds ratio |
+| | [2.3](#sec-u22-tresvias) | ¿Quién se asocia con quién? | jerarquía, grafos de asociación, Simpson |
+| | [2.4](#sec-u22-orden-superior) *(ampliación)* | ¿Y con cuatro factores o más? | orden de interacción, celdas escasas |
+| B · Cambio | [2.5](#sec-u22-cuadradas) | ¿Cómo se mueve el bonus-malus? | simetría, cuasi-simetría, asociación ordinal |
 
 Fuentes: @agresti2015 (cap. 7, el texto de referencia del caso para conteos) y @mccullagh1989 (cap. 6)
 para el marco; @dunnsmyth2018 (§10.4, pp. 378–397) para el desarrollo con R; @christensen2025
@@ -40,29 +53,40 @@ para el marco; @dunnsmyth2018 (§10.4, pp. 378–397) para el desarrollo con R; 
 tablas de contingencia, cap. 11 para tablas cuadradas) como tratamiento profundo.
 :::
 
-## 2.1 Contexto: cuando el dato es la celda {#sec-u22-contexto}
+## 2.1 De la póliza a la celda {#sec-u22-contexto}
 
-### De la ficha a la tabla
+### La tabla zona × asistencia
 
-Partimos siempre del mismo fichero —una fila por póliza—, pero podemos mirarlo de dos maneras. Con
-`n_danos` como respuesta y la zona como predictor, cada póliza aporta una fila. Si en cambio solo nos
-interesa **si** hubo daños y **en qué zona**, toda la información relevante cabe en una tabla de
-$3\times 2$ frecuencias:
+Partimos del mismo fichero de siempre —una fila por póliza—, pero lo miramos de otra manera. Si lo único
+que nos interesa es **si** una póliza ha pedido alguna asistencia y **en qué zona** circula, toda la
+información relevante cabe en una tabla de $3\times 2$ frecuencias:
 
 ```{r}
 #| label: u22-de-ficha-a-tabla
-# Trabajamos sobre una copia con el indicador de daños; no modificamos `cartera`, que las
+# Trabajamos sobre una copia con el indicador de asistencia; no modificamos `cartera`, que las
 # unidades siguientes siguen usando tal cual. El nivel "con" va segundo: será el "éxito".
-cart_tab <- cartera |> dplyr::mutate(danos = factor(ifelse(n_danos > 0, "con", "sin"),
-                                                    levels = c("sin", "con")))
-tab2 <- xtabs(~ zona_circulacion + danos, data = cart_tab)
+cart_tab <- cartera |>
+  dplyr::mutate(asistencia = factor(ifelse(n_asistencia > 0, "con", "sin"), levels = c("sin", "con")))
+tab2 <- xtabs(~ zona_circulacion + asistencia, data = cart_tab)
 addmargins(tab2)
 ```
 
-De unas 3.000 filas hemos pasado a **6 números**. No es una pérdida: si lo único que preguntamos es sobre
-la relación entre esas dos variables, la tabla es un **estadístico suficiente**. Y como sus entradas
-son conteos, el modelo natural vuelve a ser la Poisson —solo que ahora la unidad de observación es la
-celda—.
+De `r nrow(cartera)` filas hemos pasado a **6 números**. No es una pérdida: si lo único que preguntamos es
+la relación entre esas dos variables, la tabla es un **estadístico suficiente**. Y como sus entradas son
+conteos, el modelo natural vuelve a ser la Poisson —solo que ahora la unidad de observación es la
+celda—. Antes de modelar, la lectura descriptiva, en porcentaje por fila (@tbl-u22-pct-fila):
+
+```{r}
+#| label: tbl-u22-pct-fila
+#| tbl-cap: "Porcentaje de pólizas con y sin alguna asistencia, dentro de cada zona de circulación."
+round(100 * prop.table(tab2, margin = 1), 1) |>
+  as.data.frame.matrix() |>
+  tibble::rownames_to_column("zona")
+```
+
+La proporción de pólizas con alguna asistencia **baja** al pasar de la zona urbana a la mixta y a la
+rural. ¿Es una diferencia real o fruto del azar? Para contestarlo necesitamos un modelo, y antes, dos
+ideas sobre qué clase de dato es una tabla.
 
 ### Los tres esquemas de muestreo (y por qué da igual)
 
@@ -110,7 +134,7 @@ interacción de dos factores, $(I-1)(J-1)$; una de tres, $(I-1)(J-1)(K-1)$.
 ```{r}
 #| label: u22-gl
 d2 <- as.data.frame(tab2)                                   # una fila por celda; columna Freq
-m_ind <- glm(Freq ~ zona_circulacion + danos, family = poisson, data = d2)
+m_ind <- glm(Freq ~ zona_circulacion + asistencia, family = poisson, data = d2)
 c(celdas = nrow(d2), parametros = length(coef(m_ind)), gl_residuales = df.residual(m_ind))
 ```
 
@@ -118,25 +142,58 @@ Seis celdas, cuatro parámetros ($1 + 2 + 1$), **2 gl** residuales: exactamente 
 grados de libertad del clásico $\chi^2$ de independencia. El log-lineal no es una alternativa a ese
 contraste: es el marco que lo contiene.
 
-## 2.2 Dos vías: independencia, asociación y el puente con la logística {#sec-u22-dosvias}
+## 2.2 Dos vías: ¿independientes o asociadas? {#sec-u22-dosvias}
 
-### El modelo y su lectura
+### Qué significa «independencia» en una tabla
 
-Con dos factores $A$ (zona) y $B$ (daños), el modelo saturado es
+Si zona y asistencia fueran **independientes**, la probabilidad de cada celda sería el producto de las
+probabilidades de su fila y de su columna. En frecuencias: lo esperado en cada celda sería
+$\hat\mu_{ij}=n_{i\cdot}\,n_{\cdot j}/n$ —total de la fila por total de la columna, dividido por el gran
+total—. Lo calculamos a mano y lo ponemos junto a lo observado (@tbl-u22-esperadas):
+
+```{r}
+#| label: tbl-u22-esperadas
+#| tbl-cap: "Frecuencias observadas y esperadas bajo independencia (total de fila × total de columna / n). Las esperadas coinciden con los valores ajustados del log-lineal de independencia."
+esperadas <- outer(rowSums(tab2), colSums(tab2)) / sum(tab2)
+cbind(as.data.frame.matrix(tab2), round(esperadas, 1)) |>
+  setNames(c("obs_sin", "obs_con", "esp_sin", "esp_con")) |>
+  tibble::rownames_to_column("zona") |>
+  dplyr::mutate(ajustado_glm_con = round(fitted(m_ind)[d2$asistencia == "con"], 1))
+```
+
+En la zona urbana hay **más** pólizas con asistencia de las que habría si zona y asistencia fueran
+independientes, y en las zonas mixta y rural, **menos**. La última columna muestra que el log-lineal de
+independencia `m_ind` reproduce exactamente esas esperadas: el modelo **es** la hipótesis de
+independencia escrita como un GLM.
+
+### Del modelo saturado al contraste
+
+El log-lineal de independencia solo lleva los efectos principales. Si le añadimos la interacción, el
+modelo pasa a ser **saturado** —tantos parámetros como celdas, ajuste perfecto—:
 
 $$\log \mu_{ij} = \lambda + \lambda^A_i + \lambda^B_j + \lambda^{AB}_{ij},$$
 
-y toda la asociación vive en $\lambda^{AB}_{ij}$. Anularlo da el modelo de **independencia**: las
-frecuencias esperadas se reconstruyen a partir de los marginales, $\hat\mu_{ij}=n_{i\cdot}n_{\cdot j}/n$.
+con $A$ = zona y $B$ = asistencia. Toda la asociación vive en $\lambda^{AB}_{ij}$ (seguimos la notación
+clásica de los log-lineales: aquí $\lambda$ designa sus parámetros, no la tasa de la
+[Unidad 2.1](#sec-u21-modelizacion)). Contrastar la independencia es contrastar si esos términos sobran,
+y eso es un LRT entre los dos modelos:
 
 ```{r}
 #| label: u22-dosvias-fit
-m_sat <- glm(Freq ~ zona_circulacion * danos, family = poisson, data = d2)
-anova(m_ind, m_sat, test = "LRT")     # H0: independencia
+m_sat <- glm(Freq ~ zona_circulacion * asistencia, family = poisson, data = d2)
+anova(m_ind, m_sat, test = "LRT")         # H0: independencia (estadístico G2 de razón de verosimilitudes)
+chisq.test(tab2, correct = FALSE)         # el chi-cuadrado clásico de Pearson, para comparar
 ```
 
+Se **rechaza la independencia**: la zona y la asistencia están asociadas. El LRT (la deviance $G^2$) y
+el $\chi^2$ de Pearson son dos versiones del mismo contraste y dan prácticamente lo mismo, con los mismos
+2 grados de libertad que contamos en la [Sección 2.1](#sec-u22-contexto).
+
+### Leer la asociación: odds ratios
+
 La interacción se lee como un **odds ratio**. Para una tabla $2\times 2$ el coeficiente de interacción
-*es* el log-odds ratio; con más niveles, cada coeficiente compara una celda con las de referencia:
+*es* el log-odds ratio; con más niveles, cada coeficiente compara una fila con la de referencia (aquí, la
+zona urbana):
 
 ```{r}
 #| label: u22-dosvias-or
@@ -145,21 +202,24 @@ broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::select(term, estimate, conf.low, conf.high)
 ```
 
+Las odds de tener alguna asistencia son menores en las zonas mixta y rural que en la urbana (OR por
+debajo de 1, con intervalos que no contienen el 1).
+
 ### El puente con la logística
 
-Cuando uno de los factores es claramente la **respuesta** —aquí, tener o no daños— el log-lineal
+Cuando uno de los factores es claramente la **respuesta** —aquí, tener o no alguna asistencia— el log-lineal
 saturado y la **logística** de ese factor sobre el otro son el **mismo modelo** reparametrizado
 [@dunnsmyth2018, §10.4.6; @christensen2025, §2.5]. Los coeficientes de asociación coinciden:
 
 ```{r}
 #| label: u22-puente-logit
-m_logit <- glm(danos ~ zona_circulacion, family = binomial, data = cart_tab)
+m_logit <- glm(asistencia ~ zona_circulacion, family = binomial, data = cart_tab)
 rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
       logistica = coef(m_logit)[-1]) |> round(4)
 ```
 
 Idénticos hasta el redondeo. La diferencia está en **qué se considera fijo**: la logística condiciona a
-los marginales de la zona (los da por dados y modela la probabilidad de daños dentro de cada una),
+los marginales de la zona (los da por dados y modela la probabilidad de asistencia dentro de cada una),
 mientras el log-lineal los modela con su efecto principal. Como ese efecto principal es justo el
 término que el diseño fija, las conclusiones sobre la asociación son las mismas.
 
@@ -173,14 +233,14 @@ pendiente por necesitar la Poisson.
 Esto tiene una consecuencia práctica: **si hay una respuesta clara, usa la logística** —es más directa
 de interpretar y no gasta parámetros en marginales que no te interesan—. El log-lineal gana cuando
 **no hay una respuesta**, sino varias variables cuya estructura de asociación mutua es el objeto del
-estudio. Es exactamente la situación de Q4.
+estudio. Es exactamente la situación de P4.
 
 ::: {.callout-tip}
 ## 🔧 En R. Construir y ajustar una tabla
 - **`xtabs(~ a + b + c, data = d)`** construye la tabla de contingencia; **`as.data.frame(tab)`** la
   pasa a formato largo con una fila por celda y la columna de frecuencias llamada **`Freq`** (es el
   formato que necesita `glm`). `count(a, b, c)` de dplyr hace lo mismo, pero **omite las celdas con
-  cero**: usa `xtabs` si quieres conservarlas (ver [2.4](#sec-u22-diagnostico)).
+  cero**: usa `xtabs` si quieres conservarlas (ver la [Sección 2.4](#sec-u22-escasez)).
 - **`addmargins(tab)`** añade los totales; **`prop.table(tab, margin = 1)`** da porcentajes por fila.
 - **`glm(Freq ~ ..., family = poisson, data = ...)`** ajusta el log-lineal. **Sin `offset`**: aquí no
   hay exposición, las celdas no son tasas.
@@ -191,25 +251,102 @@ estudio. Es exactamente la situación de Q4.
   $\phi = 1$, así que el contraste es $\chi^2$ y no $F$.
 :::
 
-## 2.3 Tres vías: la jerarquía de modelos {#sec-u22-tresvias}
+### Dónde está la asociación: residuos ajustados
+
+El contraste global dice *que* hay asociación; los **residuos** dicen *dónde*. El residuo de Pearson de
+una celda, $e_{ij} = (n_{ij}-\hat\mu_{ij})/\sqrt{\hat\mu_{ij}}$, mide cuánto se aparta lo observado de lo
+esperado bajo el modelo; dividido por su error estándar da el **residuo ajustado**, que se compara con
+una normal estándar: por encima de $|2|$ la celda merece atención, y por encima de $|3|$ es una
+discrepancia clara [@christensen2025, §6.7].
+
+```{r}
+#| label: u22-residuos-2v
+d2 |> dplyr::mutate(esperado = round(fitted(m_ind), 1),
+                    r_ajustado = round(rstandard(m_ind, type = "pearson"), 2))
+```
+
+La discrepancia más fuerte está en la zona **urbana**: más pólizas con asistencia, y menos sin ella, de
+las que la independencia predice. Es el mismo mensaje que los porcentajes de la @tbl-u22-pct-fila, ahora
+con una medida de cuánto se aleja cada celda.
+
+::: {.callout-note}
+## Lo que hemos aprendido (dos vías)
+- **Independencia** = frecuencias esperadas como producto de marginales; en log-lineal, solo efectos
+  principales.
+- La **asociación** es la interacción; contrastarla es un LRT frente al saturado (el $\chi^2$ de siempre).
+- Se lee como **odds ratio**, y coincide con la **logística** cuando hay una respuesta clara.
+- Los **residuos ajustados** dicen dónde está la asociación.
+:::
+
+## 2.3 Tres vías: ¿quién se asocia con quién? {#sec-u22-tresvias}
 
 Con dos factores solo hay dos posibilidades —independencia o asociación—. Con tres hay una **jerarquía**,
 y ahí está el interés: la pregunta deja de ser *«¿están asociados?»* y pasa a ser *«¿quién con quién, y
 condicionado a qué?»*.
 
-Cruzamos zona, tipo de vehículo y daños:
+### La tabla zona × tipo × asistencia
+
+Añadimos el tipo de vehículo:
 
 ```{r}
 #| label: u22-tab3
-tab3 <- xtabs(~ zona_circulacion + tipo_vehiculo + danos, data = cart_tab)
+tab3 <- xtabs(~ zona_circulacion + tipo_vehiculo + asistencia, data = cart_tab)
 d3   <- as.data.frame(tab3)
 ftable(tab3)
 ```
 
-### Los cinco modelos
+### Un modelo, un grafo
+
+Con tres factores caben cinco modelos jerárquicos, y la forma más clara de distinguirlos es **dibujarlos**.
+En un **grafo de asociación** cada factor es un nodo, y dos nodos se unen con una arista si el modelo
+permite que esos dos factores estén asociados (@fig-u22-grafos). La regla de lectura es sencilla:
+**dos factores sin arista que los una directamente son independientes dado lo que hay entre ellos**; si
+no hay ningún camino que los conecte, son independientes sin más.
+
+```{r}
+#| label: fig-u22-grafos
+#| fig-cap: "Grafos de asociación de los cinco modelos jerárquicos para tres factores (A = zona, B = tipo de vehículo, C = asistencia: la misma notación de la tabla de modelos que sigue). Una arista indica que el modelo permite asociación entre esos dos factores. En el saturado, el triángulo relleno representa además la interacción de tres vías: la asociación entre dos factores cambia según el nivel del tercero."
+#| fig-width: 10
+#| fig-height: 3
+# Posiciones fijas de los nodos: el mismo triángulo en todos los paneles, para comparar a simple vista
+nodos_abc <- tibble::tibble(nodo = c("A", "B", "C"), x = c(0, 1, 0.5), y = c(0, 0, 0.87))
+dibuja_grafo <- function(aristas, titulo, triple = FALSE, nodos = nodos_abc) {
+  seg <- purrr::map_dfr(aristas, \(par) tibble::tibble(
+    x = nodos$x[nodos$nodo == par[1]], y = nodos$y[nodos$nodo == par[1]],
+    xend = nodos$x[nodos$nodo == par[2]], yend = nodos$y[nodos$nodo == par[2]]))
+  g <- ggplot()
+  if (triple) g <- g + geom_polygon(data = nodos, aes(x, y), fill = "steelblue", alpha = 0.2)
+  if (nrow(seg) > 0) g <- g + geom_segment(data = seg, aes(x, y, xend = xend, yend = yend), linewidth = 1)
+  g + geom_point(data = nodos, aes(x, y), size = 11, colour = "steelblue") +
+    geom_text(data = nodos, aes(x, y, label = nodo), colour = "white", fontface = "bold") +
+    coord_equal(xlim = c(-0.25, 1.25), ylim = c(-0.25, 1.1)) +
+    labs(title = titulo) + theme_void() + theme(plot.title = element_text(size = 10, hjust = 0.5))
+}
+patchwork::wrap_plots(
+  dibuja_grafo(list(), "Mutua [A][B][C]"),
+  dibuja_grafo(list(c("A", "B")), "Conjunta [AB][C]"),
+  dibuja_grafo(list(c("A", "C"), c("B", "C")), "Condicional [AC][BC]"),
+  dibuja_grafo(list(c("A", "B"), c("A", "C"), c("B", "C")), "Homogénea [AB][AC][BC]"),
+  dibuja_grafo(list(c("A", "B"), c("A", "C"), c("B", "C")), "Saturado [ABC]", triple = TRUE),
+  nrow = 1)
+```
+
+Leídos de izquierda a derecha, cada grafo añade estructura:
+
+- **Mutua**: ninguna arista. Los tres factores son independientes entre sí.
+- **Conjunta**: zona y tipo se asocian, pero la asistencia va por libre: es independiente del **par**
+  (zona, tipo).
+- **Condicional**: zona y tipo no están unidos directamente; solo se conectan **a través de** la
+  asistencia. Por eso son independientes **dada** la asistencia.
+- **Homogénea**: las tres parejas están asociadas, pero cada asociación es la misma en todos los niveles
+  del tercer factor.
+- **Saturado**: además, la asociación entre dos factores **cambia** según el nivel del tercero
+  (el triángulo relleno).
+
+### Ajustar los cinco modelos y elegir
 
 Notación abreviada: $[AB]$ significa «incluye la interacción de $A$ y $B$ (y sus efectos
-principales)». Con $A$ = zona ($I=3$), $B$ = tipo ($J=3$), $C$ = daños ($K=2$) tenemos $18$ celdas.
+principales)». Con $A$ = zona ($I=3$), $B$ = tipo ($J=3$), $C$ = asistencia ($K=2$) tenemos $18$ celdas.
 
 | Modelo | Fórmula en R | Notación | Qué afirma | gl |
 |:--|:--|:--|:--|--:|
@@ -223,11 +360,11 @@ principales)». Con $A$ = zona ($I=3$), $B$ = tipo ($J=3$), $C$ = daños ($K=2$)
 #| label: u22-jerarquia
 f <- function(fml) glm(fml, family = poisson, data = d3)
 mods <- list(
-  mutua       = f(Freq ~ zona_circulacion + tipo_vehiculo + danos),
-  conjunta    = f(Freq ~ zona_circulacion * tipo_vehiculo + danos),
-  condicional = f(Freq ~ zona_circulacion * danos + tipo_vehiculo * danos),
-  homogenea   = f(Freq ~ (zona_circulacion + tipo_vehiculo + danos)^2),
-  saturado    = f(Freq ~ zona_circulacion * tipo_vehiculo * danos))
+  mutua       = f(Freq ~ zona_circulacion + tipo_vehiculo + asistencia),
+  conjunta    = f(Freq ~ zona_circulacion * tipo_vehiculo + asistencia),
+  condicional = f(Freq ~ zona_circulacion * asistencia + tipo_vehiculo * asistencia),
+  homogenea   = f(Freq ~ (zona_circulacion + tipo_vehiculo + asistencia)^2),
+  saturado    = f(Freq ~ zona_circulacion * tipo_vehiculo * asistencia))
 
 purrr::map_dfr(names(mods), ~ {
   m <- mods[[.x]]; gl <- df.residual(m)
@@ -242,10 +379,9 @@ purrr::map_dfr(names(mods), ~ {
 
 La columna `p_ajuste` contrasta cada modelo **contra el saturado**: un $p$ grande significa que el
 modelo reproduce la tabla razonablemente bien y no hace falta complicarlo. Aquí el modelo de
-**independencia condicional** $[AC][BC]$ ajusta: zona y tipo están asociados con los daños, pero **no
-entre sí** una vez fijados los daños. Es exactamente lo que dice el DGP —los predictores categóricos se
-sortean de forma independiente y cada uno influye en el riesgo—, así que el modelo correcto es el que
-el diseño puso ahí.
+**independencia condicional** $[AC][BC]$ ajusta: zona y tipo están asociados con la asistencia, pero
+**no entre sí** una vez fijada la asistencia Es el grafo **condicional** de la @fig-u22-grafos (lo
+contrastaremos con el DGP en la [validación](#sec-u22-validacion)).
 
 ::: {.callout-note}
 ## Ajuste absoluto: aquí sí, y por qué
@@ -256,7 +392,7 @@ que la aproximación necesita. Es una de las pocas veces en el curso en que la b
 **absoluta** de un GLM es directamente utilizable.
 
 El límite está en las celdas escasas: con esperadas por debajo de ~5 la aproximación se degrada. Lo
-tratamos en [2.4](#sec-u22-diagnostico).
+tratamos en la [Sección 2.4](#sec-u22-escasez).
 :::
 
 ### La selección, término a término
@@ -267,48 +403,189 @@ importar:
 ```{r}
 #| label: u22-lrt-jerarquia
 anova(mods$homogenea, mods$saturado, test = "LRT")        # ¿hay interacción de 3 vías?
-anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dados los daños?
+anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dada la asistencia?
 ```
 
 El primero pregunta si la asociación entre dos factores **cambia** con el nivel del tercero (el término
 de tres vías). El segundo, si sobra el término $[AB]$. Rechazar el primero es raro y difícil de
 interpretar; no rechazarlo es lo habitual y justifica quedarse en la asociación homogénea o por debajo.
 
-### Simpson: la asociación marginal puede mentir
+### Traducir el modelo a una frase
 
-La razón de fondo para trabajar con tres vías y no con pares es que **colapsar una tabla puede invertir
-la conclusión**. Es la paradoja de Simpson [@christensen2025, §3.1; @dunnsmyth2018, §10.4.5]. El
-mecanismo se ve mejor en un ejemplo mínimo con proceso generador explícito:
+El modelo elegido se comunica como un enunciado de independencia condicional, que es lo que entiende la
+dirección: *«la zona y el tipo de vehículo influyen, cada uno por su lado, en que una póliza pida
+asistencia; pero entre las pólizas que la piden —y entre las que no— la zona no dice nada sobre el tipo
+de vehículo»*. El grafo condicional es exactamente eso: dos aristas que llegan a la asistencia y ninguna
+entre zona y tipo.
 
-```{r}
-#| label: u22-simpson
-# DGP explícito: Z está asociado a la vez con X y con Y. En z1 son raros tanto X=sí como
-# Y=sí; en z2 son frecuentes los dos. Dentro de CADA estrato X protege levemente (OR < 1),
-# pero al colapsar sobre Z la mezcla desigual invierte el signo.
-toy <- expand.grid(Z = c("z1", "z2"), X = c("no", "si"), Y = c("no", "si"))
-toy$Freq <- c(900,  50,  150, 300,      # Y = no
-              225, 200,   15, 480)      # Y = sí
-tt <- xtabs(Freq ~ X + Y + Z, data = toy)
+### Diagnóstico: residuos y mosaico
 
-or <- function(m) (m[1,1] * m[2,2]) / (m[1,2] * m[2,1])
-round(c(condicional_z1 = or(tt[, , "z1"]),
-        condicional_z2 = or(tt[, , "z2"]),
-        marginal       = or(margin.table(tt, c(1, 2)))), 3)
-```
-
-Dentro de cada estrato la asociación es **protectora** —y la misma en los dos, $\text{OR}=0{,}40$—, y al
-colapsar sobre $Z$ se vuelve **de riesgo**, $\text{OR}=2{,}46$. No es que el efecto se atenúe: **cambia
-de signo**, y por un factor de seis. Cualquier conclusión sacada de la tabla marginal habría sido la
-contraria de la verdadera.
-
-Con el modelo log-lineal el diagnóstico es inmediato —la asociación condicional existe y se detecta sin
-ambigüedad—:
+Los mismos residuos ajustados de la [Sección 2.2](#sec-u22-dosvias), ahora sobre el modelo elegido de
+tres vías:
 
 ```{r}
-#| label: u22-simpson-modelos
-anova(glm(Freq ~ X*Z + Y*Z, family = poisson, data = toy),    # X _||_ Y | Z
-      glm(Freq ~ (X + Y + Z)^2, family = poisson, data = toy), test = "LRT")
+#| label: u22-residuos
+d3$r_aj <- rstandard(mods$condicional, type = "pearson")   # residuos AJUSTADOS
+d3 |>
+  dplyr::mutate(esperado = round(fitted(mods$condicional), 1), r_aj = round(r_aj, 2)) |>
+  dplyr::arrange(dplyr::desc(abs(r_aj))) |>
+  head(6)
 ```
+
+El mayor residuo apenas llega a $|2|$ —furgonetas de zona urbana con asistencia, algo por encima de lo
+esperado—, y ninguno se acerca a $|3|$. Con **18 celdas**, esperar algún residuo por
+encima de 2 es lo normal: al 5 % tocaría casi uno por puro azar. Es la misma cautela de siempre con las
+comparaciones múltiples, y la razón de no leer el máximo de una lista como si fuera un contraste. La
+lectura correcta es la conjunta: la deviance global ajusta ($p=0{,}33$) y ningún residuo destaca más de
+lo que cabe esperar por azar, así que el modelo de independencia condicional describe bien la tabla.
+
+Cuando un modelo **sí** falla, este listado señala **exactamente qué combinación** lo rompe, y eso
+suele ser el hallazgo que se comunica al cliente —más útil que el $p$-valor global—.
+
+### El mosaico
+
+La versión gráfica de lo anterior. En un mosaico el área de cada baldosa es proporcional a la frecuencia
+observada y el color codifica el residuo de Pearson **respecto a un modelo concreto**: azul donde hay más
+casos de los que ese modelo espera, rojo donde hay menos, gris donde cuadra.
+
+Ese «respecto a un modelo concreto» es la clave, y el descuido más habitual: si no se especifica nada,
+`vcd::mosaic()` **no** contrasta el modelo que acabas de elegir, sino la **independencia mutua**. Aquí
+tenemos las dos vistas (@fig-u22-mosaico-mutua y @fig-u22-mosaico-condicional), y comparadas cuentan la historia de la jerarquía mejor que la tabla de
+deviances.
+
+```{r}
+#| label: fig-u22-mosaico-mutua
+#| fig-cap: "Mosaico bajo INDEPENDENCIA MUTUA (el modelo por defecto de `vcd::mosaic`). La baldosa de las furgonetas de zona urbana con asistencia sale en azul: hay más de las que ese modelo espera. El resto de la falta de ajuste se reparte en desviaciones pequeñas; el propio gráfico da el p-valor del modelo."
+#| fig-width: 7.5
+#| fig-height: 5
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,   # por defecto: ~ zona + tipo + asistencia
+            main = "Independencia mutua",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
+```
+
+```{r}
+#| label: fig-u22-mosaico-condicional
+#| fig-cap: "Mosaico bajo INDEPENDENCIA CONDICIONAL (zona ⊥ tipo | asistencia), el modelo seleccionado. Todas las baldosas quedan en gris: el modelo reproduce la tabla, y lo que faltaba en la figura anterior era precisamente la asociación de la zona y del tipo con la asistencia, que este modelo ya incorpora."
+#| fig-width: 7.5
+#| fig-height: 5
+vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
+            expected = ~ zona_circulacion * asistencia + tipo_vehiculo * asistencia,
+            main = "Independencia condicional",
+            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
+```
+
+La baldosa coloreada de la primera figura **desaparece** en la segunda. No es que los datos hayan
+cambiado: es que el modelo condicional ya explica lo que la independencia mutua dejaba sin explicar —la
+asociación de la zona y del tipo con la asistencia—. Un mosaico no dice si una tabla «tiene estructura»: dice
+qué estructura le **falta al modelo que le pases**. Sin declarar el modelo, la figura no significa nada
+concreto.
+
+::: {.callout-note}
+## Pearson frente a ajustados
+El sombreado de `vcd` usa residuos de **Pearson**; el listado anterior usaba los **ajustados**
+(`rstandard`). Los ajustados son los correctos para juzgar celda a celda, porque los de Pearson tienen
+varianza menor que 1 y hacen parecer menores las discrepancias. Para localizar visualmente el problema
+el mosaico basta; para cuantificarlo, usa los ajustados.
+:::
+
+### Colapsar una tabla: la paradoja de Simpson
+
+¿Para qué tanto esfuerzo con tres vías, si podríamos mirar las tablas de dos en dos? Porque **colapsar
+una tabla puede invertir la conclusión**. Es la paradoja de Simpson [@christensen2025, §3.1;
+@dunnsmyth2018, §10.4.5], y el ejemplo clásico es real: las admisiones de posgrado de la Universidad de
+California en Berkeley en 1973 [@bickel1975], que vienen incluidas en R como `UCBAdmissions` (sexo del
+solicitante × admitido o no × departamento, para los seis departamentos más grandes).
+
+Mirada en conjunto, la tabla parece mostrar un sesgo contra las mujeres:
+
+```{r}
+#| label: u22-berkeley-marginal
+ucb <- UCBAdmissions                                     # Admit × Gender × Dept
+or2 <- function(m) (m[1, 1] * m[2, 2]) / (m[1, 2] * m[2, 1])
+round(100 * prop.table(margin.table(ucb, c(2, 1)), 1), 1)   # % admitido por sexo
+c(OR_marginal_hombres_vs_mujeres = round(or2(margin.table(ucb, c(1, 2))), 2))
+```
+
+Las odds de ser admitido son casi el doble para los hombres. Pero si miramos **departamento a
+departamento**, el sesgo desaparece:
+
+```{r}
+#| label: u22-berkeley-condicional
+round(apply(ucb, 3, or2), 2)                                # OR hombres vs mujeres dentro de cada departamento
+```
+
+En cuatro de los seis departamentos el odds ratio está por debajo de 1 —ligeramente a favor de las
+mujeres—, y el más marcado, el del departamento A, **favorece a las mujeres**. ¿Cómo puede el
+conjunto decir lo contrario que las partes? Mirando cómo se reparten las solicitudes:
+
+```{r}
+#| label: u22-berkeley-mecanismo
+round(100 * prop.table(margin.table(ucb, c(2, 3)), 1), 1)  # a qué departamentos solicita cada sexo (% por fila)
+round(100 * prop.table(margin.table(ucb, c(1, 3)), 2)[1, ], 1)   # % admitido en cada departamento
+```
+
+Los hombres solicitaron sobre todo los departamentos A y B, que admiten a la mayoría de sus candidatos;
+las mujeres, sobre todo los departamentos C a F, mucho más selectivos. El **departamento** está asociado
+**a la vez** con el sexo (quién solicita dónde) y con la admisión (dónde es fácil entrar), y al
+colapsar sobre él esa doble asociación se cuela en la comparación entre sexos. En términos de grafos
+(@fig-u22-berkeley-grafo), el sexo y la admisión se conectan **a través del** departamento; la tabla
+marginal mezcla ese camino indirecto con el efecto directo, que es el que interesa.
+
+```{r}
+#| label: fig-u22-berkeley-grafo
+#| fig-cap: "Grafo de asociación de las admisiones de Berkeley (S = sexo, D = departamento, Ad = admisión). El departamento está unido a los otros dos: por eso la asociación marginal entre sexo y admisión no coincide con la que hay dentro de cada departamento. La arista discontinua es la que se pregunta: ¿hay efecto directo del sexo sobre la admisión?"
+#| fig-width: 3.5
+#| fig-height: 3
+nodos_ucb <- tibble::tibble(nodo = c("S", "Ad", "D"), x = c(0, 1, 0.5), y = c(0, 0, 0.87))
+dibuja_grafo(list(c("S", "D"), c("Ad", "D")), "Berkeley", nodos = nodos_ucb) +
+  geom_segment(aes(x = 0, y = 0, xend = 1, yend = 0), linetype = "dashed", colour = "grey50")
+```
+
+El modelo log-lineal permite contrastarlo formalmente. Si el sexo no influye en la admisión dentro de los
+departamentos, el modelo de **independencia condicional** —sexo y admisión independientes **dado** el
+departamento— debería ajustar:
+
+```{r}
+#| label: u22-berkeley-modelos
+d_ucb <- as.data.frame(ucb)
+g <- function(fml) glm(fml, family = poisson, data = d_ucb)
+m_ucb <- list(
+  mutua       = g(Freq ~ Admit + Gender + Dept),
+  condicional = g(Freq ~ Admit * Dept + Gender * Dept),
+  homogenea   = g(Freq ~ (Admit + Gender + Dept)^2))
+purrr::map_dfr(names(m_ucb), ~ tibble::tibble(
+  modelo = .x, gl = df.residual(m_ucb[[.x]]), deviance = round(deviance(m_ucb[[.x]]), 1),
+  p_ajuste = signif(pchisq(deviance(m_ucb[[.x]]), df.residual(m_ucb[[.x]]), lower.tail = FALSE), 2)))
+
+# El mismo modelo condicional, quitando el departamento A
+m_sin_A <- glm(Freq ~ Admit * Dept + Gender * Dept, family = poisson, data = as.data.frame(ucb[, , -1]))
+c(deviance = round(deviance(m_sin_A), 1), gl = df.residual(m_sin_A),
+  p_ajuste = round(pchisq(deviance(m_sin_A), df.residual(m_sin_A), lower.tail = FALSE), 2))
+```
+
+Ni la independencia condicional ni la asociación homogénea ajustan del todo, y la razón tiene nombre: el
+departamento A, donde las mujeres tuvieron una ventaja clara que no se repite en los demás. Quitándolo, la
+independencia condicional ajusta bien. La conclusión honesta es doble: el «sesgo contra las mujeres» de la
+tabla marginal **era un artefacto** de colapsar sobre el departamento, y dentro de los departamentos no
+hay un patrón común, sino un departamento que se aparta del resto. La jerarquía no siempre termina en un
+modelo limpio; cuando no lo hace, los residuos y la lectura por estratos dicen por qué.
+
+### ¿Y en nuestra cartera?
+
+En la cartera ocurre lo contrario, y conviene comprobarlo. Si zona y tipo son independientes dada la
+asistencia —el modelo que elegimos—, el odds ratio entre zona y asistencia es el mismo en la tabla de dos
+vías que dentro de cada tipo de vehículo:
+
+```{r}
+#| label: u22-colapsabilidad
+rbind(marginal    = exp(coef(m_sat)[grepl(":", names(coef(m_sat)))]),
+      condicional = exp(coef(mods$condicional)[grepl("zona_circulacion.*:asistencia",
+                                                     names(coef(mods$condicional)))])) |>
+  round(3)
+```
+
+Coinciden: colapsar sobre el tipo de vehículo no distorsiona la asociación entre zona y asistencia, y la
+tabla de dos vías de la [Sección 2.2](#sec-u22-dosvias) era legítima.
 
 ::: {.callout-important}
 ## Cuándo se puede colapsar una tabla
@@ -318,15 +595,22 @@ $B$** (condicionalmente al resto) [@christensen2025, §5.3]. En términos del mo
 $[AC]$ o el $[BC]$ es prescindible, colapsar es inocuo; si **ambos** hacen falta —$C$ está asociado a
 los dos—, colapsar sesga y puede invertir el signo.
 
-En nuestra cartera zona y tipo son independientes entre sí, así que la tabla `zona × daños` de la
-[Unidad 2.1](#sec-u21) era legítima. No hay que dar eso por supuesto: hay que **comprobarlo**.
+En Berkeley, el departamento está asociado con el sexo **y** con la admisión: colapsar sobre él distorsiona.
+En nuestra cartera, la zona y el tipo son independientes dada la asistencia: colapsar sobre el tipo es
+inocuo. No hay que dar ninguna de las dos cosas por supuesta: hay que **comprobarlo**.
 :::
 
-Esta es la misma distinción condicional/marginal que reaparece en los mixtos
-([Unidad 2.5](#sec-u25)) y la que sostiene la detección de *proxies* de
-[2.6](#sec-u22-proxy).
 
-### Cuatro factores o más: trabajar por orden de interacción {#sec-u22-orden-superior}
+::: {.callout-note}
+## Lo que hemos aprendido (tres vías)
+- Con tres factores hay una **jerarquía** de cinco modelos; cada uno es un **grafo de asociación**.
+- Dos factores sin arista directa son **independientes dado** lo que los conecta.
+- Se elige por LRT y AIC, y se comunica como una **frase de independencia condicional**.
+- **Colapsar** sobre un factor asociado con los otros dos puede invertir la conclusión (Simpson); si no
+  lo está, es inocuo.
+:::
+
+## 2.4 Más de tres vías *(ampliación)* {#sec-u22-orden-superior}
 
 Con tres factores pudimos enumerar los cinco modelos y elegir. Con cuatro eso deja de ser viable: el
 número de modelos jerárquicos se dispara, muchos no se anidan entre sí, y ninguna tabla los recoge
@@ -337,18 +621,18 @@ con todos los efectos principales, luego con todas las interacciones dobles, lue
 triples… y se mira a partir de qué orden dejar de subir no aporta [@christensen2025, §6.2.1]. R lo
 escribe con el operador `^`, que ya usamos: `(A+B+C+D)^2` son todas las dobles, `^3` todas las triples.
 
-Lo hacemos sobre la tabla de cuatro vías `zona × tipo × uso × daños`:
+Lo hacemos sobre la tabla de cuatro vías `zona × tipo × uso × asistencia`:
 
 ```{r}
 #| label: u22-cuatro-vias
-tab4 <- xtabs(~ zona_circulacion + tipo_vehiculo + uso + danos, data = cart_tab)
+tab4 <- xtabs(~ zona_circulacion + tipo_vehiculo + uso + asistencia, data = cart_tab)
 d4   <- as.data.frame(tab4)
 
 ordenes <- list(
-  "1 · solo principales"  = Freq ~ zona_circulacion + tipo_vehiculo + uso + danos,
-  "2 · todas las dobles"  = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^2,
-  "3 · todas las triples" = Freq ~ (zona_circulacion + tipo_vehiculo + uso + danos)^3,
-  "4 · saturado"          = Freq ~ zona_circulacion * tipo_vehiculo * uso * danos)
+  "1 · solo principales"  = Freq ~ zona_circulacion + tipo_vehiculo + uso + asistencia,
+  "2 · todas las dobles"  = Freq ~ (zona_circulacion + tipo_vehiculo + uso + asistencia)^2,
+  "3 · todas las triples" = Freq ~ (zona_circulacion + tipo_vehiculo + uso + asistencia)^3,
+  "4 · saturado"          = Freq ~ zona_circulacion * tipo_vehiculo * uso * asistencia)
 
 purrr::map_dfr(names(ordenes), ~ {
   m <- glm(ordenes[[.x]], family = poisson, data = d4); gl <- df.residual(m)
@@ -359,20 +643,21 @@ purrr::map_dfr(names(ordenes), ~ {
 ```
 
 El resultado merece una mirada atenta, porque es **inquietante**: el modelo de orden 1 —independencia
-mutua de los cuatro factores— **no se rechaza** ($p=0{,}082$). Pero con tres factores la independencia
-mutua sí se rechazaba, y con claridad ($p=0{,}0014$). ¿Ha desaparecido la asociación entre zona, tipo y
-daños al añadir `uso`?
+mutua de los cuatro factores— **no se rechaza** ($p=0{,}079$). Pero con tres factores la independencia
+mutua sí se rechazaba, y con claridad ($p=0{,}0058$). ¿Ha desaparecido la asociación entre zona, tipo y
+asistencia al añadir `uso`?
 
-No: sigue ahí, entera. Lo que ha ocurrido es que la deviance ha subido poco (31,9 → 40,1) y los grados
+No: sigue ahí, entera. Lo que ha ocurrido es que la deviance ha subido poco (27,8 → 40,3) y los grados
 de libertad **mucho** (12 → 29). La misma señal repartida entre más del doble de celdas produce un
-contraste que ya no la detecta. Añadir un factor irrelevante no ha cambiado los datos: ha **diluido la
+contraste global que ya no la detecta. Añadir un factor no ha cambiado los datos: ha **diluido la
 potencia** del contraste.
 
 La moraleja es directa y va contra el instinto: en tablas, **incluir factores «por si acaso» tiene un
-coste**, y el coste es dejar de ver lo que sí estaba. Si `uso` no aporta a la pregunta, sobra.
+coste**, y el coste es dejar de ver lo que sí estaba. Cada factor que se añade debe responder a la
+pregunta.
 
 La cuenta de parámetros conviene saber reproducirla a mano, porque es la que revela cuánto cuesta cada
-orden. Con $A$ = zona (3), $B$ = tipo (3), $C$ = uso (2), $D$ = daños (2) hay $3\cdot3\cdot2\cdot2=36$
+orden. Con $A$ = zona (3), $B$ = tipo (3), $C$ = uso (2), $D$ = asistencia (2) hay $3\cdot3\cdot2\cdot2=36$
 celdas:
 
 | Orden | Términos que añade | Parámetros nuevos | Acumulados | gl |
@@ -387,7 +672,7 @@ Fijado el orden máximo que hace falta, se **poda dentro de él**: se quitan uno
 orden y se conserva solo lo que aporte. Y el modelo final se lee **traduciéndolo a enunciados de
 independencia condicional**, que es lo que el cliente entiende [@christensen2025, §5.1]. Por ejemplo, si
 sobreviven $[AD][BD][CD]$, el modelo dice: *zona, tipo y uso son independientes entre sí, y cada uno se
-asocia con el siniestro* —exactamente lo que encontramos con tres factores, ahora con cuatro—.
+asocia con la asistencia* —exactamente lo que encontramos con tres factores, ahora con cuatro—.
 
 ::: {.callout-warning}
 ## El coste de añadir factores
@@ -417,87 +702,9 @@ continuación.
   esquema de muestreo. Recorre la jerarquía a mano.
 :::
 
-## 2.4 Diagnóstico: dónde falla el modelo {#sec-u22-diagnostico}
+### Tablas escasas y ceros {#sec-u22-escasez}
 
-Un modelo de tabla puede ajustar mal en unas pocas celdas y bien en el resto. La deviance global no lo
-dice; los residuos, sí.
-
-### Residuos ajustados
-
-El residuo de Pearson de una celda, $e_{ij} = (n_{ij}-\hat\mu_{ij})/\sqrt{\hat\mu_{ij}}$, tiene un
-problema: su varianza es **menor que 1**, y en distinto grado según la celda, porque el modelo ha usado
-los datos para estimar los marginales. Dividirlo por su error estándar da el **residuo ajustado**
-(estandarizado), que sí se compara con una normal estándar: por encima de $|2|$ la celda merece
-atención, y por encima de $|3|$ es una discrepancia clara [@christensen2025, §6.7].
-
-```{r}
-#| label: u22-residuos
-d3$r_aj <- rstandard(mods$condicional, type = "pearson")   # residuos AJUSTADOS
-d3 |>
-  dplyr::mutate(esperado = round(fitted(mods$condicional), 1), r_aj = round(r_aj, 2)) |>
-  dplyr::arrange(dplyr::desc(abs(r_aj))) |>
-  head(6)
-```
-
-Los dos residuos mayores rozan el $|2|$ —turismos de zona mixta sin daños por encima de lo esperado,
-motos de zona mixta por debajo—, y ninguno llega a $|3|$. Con **18 celdas**, esperar algún residuo por
-encima de 2 es lo normal: al 5 % tocaría casi uno por puro azar. Es la misma cautela de siempre con las
-comparaciones múltiples, y la razón de no leer el máximo de una lista como si fuera un contraste. La
-lectura correcta es la conjunta: la deviance global ajusta ($p=0{,}24$) y ningún residuo destaca de
-verdad, así que el modelo de independencia condicional describe bien la tabla.
-
-Cuando un modelo **sí** falla, este listado señala **exactamente qué combinación** lo rompe, y eso
-suele ser el hallazgo que se comunica al cliente —más útil que el $p$-valor global—.
-
-### El mosaico
-
-La versión gráfica de lo anterior. En un mosaico el área de cada baldosa es proporcional a la frecuencia
-observada y el color codifica el residuo de Pearson **respecto a un modelo concreto**: azul donde hay más
-casos de los que ese modelo espera, rojo donde hay menos, gris donde cuadra.
-
-Ese «respecto a un modelo concreto» es la clave, y el descuido más habitual: si no se especifica nada,
-`vcd::mosaic()` **no** contrasta el modelo que acabas de elegir, sino la **independencia mutua**. Aquí
-tenemos las dos vistas, y comparadas cuentan la historia de la jerarquía mejor que la tabla de
-deviances.
-
-```{r}
-#| label: fig-u22-mosaico-mutua
-#| fig-cap: "Mosaico bajo INDEPENDENCIA MUTUA (el modelo por defecto de `vcd::mosaic`). Los turismos de zona mixta sin daños aparecen en azul (muchos más de los esperados) y los de zona urbana sin daños en rojo: el modelo no reproduce la tabla, y el propio gráfico da su p-valor."
-#| fig-width: 7.5
-#| fig-height: 5
-vcd::mosaic(tab3, shade = TRUE, legend = TRUE,   # por defecto: ~ zona + tipo + danos
-            main = "Independencia mutua",
-            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
-```
-
-```{r}
-#| label: fig-u22-mosaico-condicional
-#| fig-cap: "Mosaico bajo INDEPENDENCIA CONDICIONAL (zona ⊥ tipo | daños), el modelo seleccionado. Todas las baldosas quedan en gris: el modelo reproduce la tabla, y las discrepancias de la figura anterior eran precisamente la asociación de zona y tipo con los daños, que este modelo ya incorpora."
-#| fig-width: 7.5
-#| fig-height: 5
-vcd::mosaic(tab3, shade = TRUE, legend = TRUE,
-            expected = ~ zona_circulacion * danos + tipo_vehiculo * danos,
-            main = "Independencia condicional",
-            labeling_args = list(rot_labels = c(bottom = 0, right = 0)))
-```
-
-Las baldosas coloreadas de la primera figura **desaparecen** en la segunda. No es que los datos hayan
-cambiado: es que el modelo condicional ya explica lo que la independencia mutua dejaba sin explicar —la
-asociación de zona y de tipo con los daños—. Un mosaico no dice si una tabla «tiene estructura»: dice
-qué estructura le **falta al modelo que le pases**. Sin declarar el modelo, la figura no significa nada
-concreto.
-
-::: {.callout-note}
-## Pearson frente a ajustados
-El sombreado de `vcd` usa residuos de **Pearson**; el listado anterior usaba los **ajustados**
-(`rstandard`). Los ajustados son los correctos para juzgar celda a celda, porque los de Pearson tienen
-varianza menor que 1 y hacen parecer menores las discrepancias. Para localizar visualmente el problema
-el mosaico basta; para cuantificarlo, usa los ajustados.
-:::
-
-### Tablas escasas y ceros
-
-Es la advertencia con la que cerrábamos [2.3](#sec-u22-orden-superior), ahora con números. Sobre la
+Es la advertencia del recuadro anterior, ahora con números. Sobre la
 misma tabla de cuatro vías:
 
 ```{r}
@@ -538,11 +745,14 @@ a explicar una imposibilidad, y contamina el ajuste del resto de la tabla.
   `MASS::loglm` permite pasar `start` y ceros fijos de forma más explícita.
 :::
 
-## 2.5 Tablas cuadradas: modelizar el cambio {#sec-u22-cuadradas}
+## 2.5 Tablas de cambio: el bonus-malus {#sec-u22-cuadradas}
 
-Un caso especial y muy útil: la **misma** clasificación medida en dos momentos. El bonus-malus de la
-cartera se reevalúa cada año, y cruzar el nivel previo con el actual da una tabla $5\times 5$ cuya
-diagonal son las pólizas que no se mueven.
+Pasamos a la segunda pregunta de la dirección. El nivel de **bonus-malus** (1 = mejor tarifa … 5 = peor)
+se reevalúa cada año. Si cruzamos el nivel del año previo con el actual obtenemos una **tabla cuadrada**:
+la **misma** clasificación medida en dos momentos, cuya diagonal son las pólizas que no cambian de
+nivel.
+
+### La tabla y sus marginales
 
 ```{r}
 #| label: u22-cuadrada
@@ -552,6 +762,21 @@ cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera
                 par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))
 xtabs(Freq ~ prev + act, data = cuad) |> addmargins()
 ```
+
+Fuera de la diagonal están las pólizas que suben o bajan. Y comparando los dos marginales —el reparto de
+niveles el año previo y el actual— se ve si el conjunto de la cartera se desplaza (@tbl-u22-cambio-marg):
+
+```{r}
+#| label: tbl-u22-cambio-marg
+#| tbl-cap: "Distribuciones marginales del bonus-malus (proporciones) en el año previo y en el actual."
+rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
+      actual = prop.table(table(cartera$bonus_malus_act))) |>
+  round(3) |>
+  as.data.frame.matrix() |>
+  tibble::rownames_to_column("año")
+```
+
+Los marginales se parecen, pero no son idénticos. ¿Es una diferencia real?
 
 En una tabla así el modelo de independencia no interesa: por supuesto que el nivel de un año predice el
 del siguiente. Las preguntas útiles son otras: ¿el trasiego es **equilibrado**? ¿ha cambiado el
@@ -703,9 +928,14 @@ bonus-malus es, sobre todo, que la mayoría de las pólizas **se quedan donde es
 entre niveles vecinos es un efecto de segundo orden.
 
 Y así hay que contárselo a la dirección: no «los niveles contiguos están asociados», sino «algo más de
-la **mitad** de las pólizas no se mueve de nivel, y entre las que se mueven el salto tiende a ser
-corto». Es un mensaje distinto y conduce a decisiones distintas —por ejemplo, sobre cada cuánto merece
-la pena reevaluar—.
+la **mitad** de las pólizas no se mueve de nivel de un año a otro». Es un mensaje distinto y conduce a
+decisiones distintas —por ejemplo, sobre cada cuánto merece la pena reevaluar—.
+
+Cuidado con añadir «y las que se mueven dan saltos cortos». Que los saltos de un nivel abunden más que
+los de cuatro ocurre en **cualquier** escala de cinco niveles, aunque los saltos se repartan al azar: hay
+más pares de niveles a distancia 1 que a distancia 4. Por eso el término de asociación del modelo con
+inercia queda pequeño (compruébalo en `summary(m_mov)`). Lo comprobamos con el DGP en la
+[validación](#sec-u22-validacion).
 
 ::: {.callout-note}
 ## Lo que este ejemplo enseña sobre el oficio
@@ -733,144 +963,63 @@ Todo con `glm`; lo único que cambia es cómo se construye el término:
   fijadas) no son log-lineales: son multiplicativos y requieren `gnm`. Fuera del alcance del curso.
 :::
 
-## 2.6 Aplicación: detectar *proxies* del factor prohibido {#sec-u22-proxy}
+### Validación contra el DGP {#sec-u22-validacion}
 
-Cerramos con el uso que da a esta unidad su peso en el estudio de caso. La ley prohíbe tarificar con el
-**sexo** (primas unisex; TJUE C-236/09, *Test-Achats*). Excluir la variable del modelo parece
-suficiente, y no lo es: si una variable **permitida** está asociada al sexo, el modelo sigue usando esa
-información por la puerta de atrás. Esa variable es un ***proxy***.
+Hasta aquí hemos decidido con criterios internos a los datos; al cerrar, contrastamos con el proceso
+generador. En la cartera de teoría los factores (`zona_circulacion`, `tipo_vehiculo`, `uso`…) se sortean
+**de forma independiente** entre sí, y cada uno influye en la tasa de asistencias: la estructura
+verdadera de la tabla de tres vías es la **independencia condicional** $[AC][BC]$, la que seleccionamos
+en la [Sección 2.3](#sec-u22-tresvias).
 
-Y aquí está la conexión: **«$V$ es un proxy de $S$» es, exactamente, «$V$ y $S$ no son
-independientes»** — una hipótesis contrastable en una tabla de contingencia. Con la respuesta en la
-tabla, la pregunta se afina: *¿queda asociación entre $S$ y $V$ una vez tenido en cuenta el resultado?*
-
-En la cartera de teoría el sexo es ruido puro por construcción, así que sirve como **control negativo**:
-vemos qué aspecto tiene un «no proxy».
+Para el bonus-malus, cada póliza **conserva su nivel** con una probabilidad fija y, si cambia, salta a
+**cualquiera** de los otros cuatro niveles con la misma probabilidad; solo las pólizas con siniestro
+reciben además un empujón hacia el nivel superior:
 
 ```{r}
-#| label: u22-proxy-control
-tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + danos, data = cart_tab))
-m_ci  <- glm(Freq ~ sexo * danos + tipo_vehiculo * danos, family = poisson, data = tp)
-m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + danos)^2,      family = poisson, data = tp)
-anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | danos  (no hay proxy)
+#| label: u22-validacion
+verdad <- attr(cartera, "verdad")
+c(persistencia = verdad$persistencia)
+
+# ¿Saltos cortos? Distancia de los cambios observados frente a la que darían saltos al azar
+# niv y nva (nivel previo y actual) vienen del chunk de la deriva
+mueve   <- nva != niv
+p_prev  <- prop.table(table(factor(niv[mueve], levels = 1:5)))    # de dónde parten los que cambian
+al_azar <- sapply(1:4, \(d) sum(sapply(1:5, \(i) p_prev[[i]] * sum(abs((1:5)[-i] - i) == d) / 4)))
+rbind(observado = prop.table(table(factor(abs(nva - niv)[mueve], levels = 1:4))),
+      al_azar   = al_azar) |> round(3)
 ```
 
-Y —esto es lo que de verdad hay que mirar— el **tamaño** de esa asociación, con su intervalo:
-
-```{r}
-#| label: u22-proxy-control-tamano
-broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
-  dplyr::filter(grepl("^sexo.*:tipo", term)) |>
-  dplyr::select(term, estimate, conf.low, conf.high) |>
-  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
-```
-
-Y aquí la realidad nos regala una lección mejor que cualquier ejemplo de manual: sale
-$p \approx 0{,}056$. Justo al borde, cuando sabemos con **certeza** que en esta cartera `sexo` es ruido
-sorteado de forma independiente. Con la regla mecánica del 0,05 nos habríamos salvado por tres
-milésimas; si hubiera salido 0,047, habríamos «descubierto» un proxy inexistente.
-
-Y aún hay más, mirando el tamaño en lugar del contraste global: el segundo odds ratio —
-`sexo × furgoneta`— tiene un intervalo de confianza que **no contiene el 1** (aproximadamente
-$[1{,}01;\ 1{,}59]$). Es decir: un término **individualmente «significativo»** en una asociación que por
-construcción **no existe**.
-
-::: {.callout-warning}
-## Este es un falso positivo, y lo sabemos con certeza
-Lo que enseña este resultado no es cómo está la cartera, sino cómo **no** hay que leer un contraste:
-
-- **La hipótesis nula es cierta y aun así hemos obtenido un $p$ casi significativo y un intervalo que
-  excluye el 1.** No es mala suerte excepcional: bajo $H_0$ el $p$-valor se distribuye **uniforme**, así
-  que un valor por debajo de 0,10 ocurre una vez de cada diez, y aquí además hay **dos** términos de
-  interacción, cada uno con su oportunidad de fallar.
-- **Con un umbral rígido, la conclusión depende del ruido**, no del fenómeno.
-- **Un intervalo que roza el 1 por su extremo inferior no es evidencia de nada.** $[1{,}01;\ 1{,}59]$ es
-  compatible con «ningún efecto» y con «efecto moderado»: lo que dice es que **no hay información
-  suficiente**, no que haya asociación.
-
-En el estudio de caso vas a contrastar **varias** covariables permitidas contra `sexo`. Con ocho
-covariables esperas casi una alerta falsa por puro tanteo. No llames proxy a nada sin mirar la
-**magnitud**, sin comprobar que el intervalo está claramente lejos del 1 y sin tener en cuenta cuántos
-contrastes has hecho. Aquí tienes la verdad del DGP para comprobarlo; con datos reales no la tendrás, y
-esa es exactamente la razón de ser prudente.
-:::
-
-Y así se ve un proxy de verdad, con proceso generador explícito:
-
-```{r}
-#| label: u22-proxy-simulado
-set.seed(SEMILLA_CURSO)
-n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
-# Niveles EXPLÍCITOS: "M" es la referencia, así el coeficiente se llama `sH` y se lee
-# "hombres frente a mujeres". Sin declararlos, R ordena alfabéticamente (H antes que M)
-# y el coeficiente saldría invertido.
-s <- factor(sample(c("M", "H"), n, TRUE), levels = c("M", "H"))        # factor prohibido
-v <- factor(ifelse(runif(n) < ifelse(s == "H", 0.30, 0.05), "moto", "otro"),
-            levels = c("otro", "moto"))                               # PERMITIDA, asociada a s
-y <- rbinom(n, 1, plogis(-0.8 + 1.20 * (v == "moto") + 0.20 * (s == "H")))
-sim <- as.data.frame(xtabs(~ s + v + y))
-
-anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
-      glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
-```
-
-Rechazo claro: la variable permitida **está** asociada al factor prohibido. Lo que el proxy transporta
-se mide comparando el efecto **marginal** del factor prohibido con el **ajustado** por la variable
-permitida —la brecha entre ambos es la fuga—:
-
-```{r}
-#| label: u22-proxy-fuga
-d_sim <- data.frame(y = y, s = s, v = v)
-or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
-c(OR_marginal    = round(or_s(y ~ s),     3),   # lo que se ve sin controlar el proxy
-  OR_ajustado    = round(or_s(y ~ s + v), 3),   # el efecto directo del factor prohibido
-  verdad_directa = round(exp(0.20),       3))   # el valor con el que se generaron los datos
-```
-
-El **ajustado** queda cerca de la verdad (a un 5 %, dentro del error de muestreo), mientras el
-**marginal** la exagera un **30 %**. Esa brecha es, literalmente, la información prohibida que `v`
-transporta: si tarificas con `v` y sin `s`, estás aplicando buena parte de la diferencia entre hombres y
-mujeres sin haberla escrito en ningún sitio —y sin que aparezca en el modelo—.
+Ese mecanismo explica lo que encontramos: la **inercia** de la diagonal, una **deriva** pequeña hacia el
+*malus* (el empujón de los siniestros) y la ausencia de un patrón propio de saltos cortos. Las distancias
+observadas casi coinciden con las de un reparto al azar; el ligero exceso de saltos de un nivel es,
+precisamente, el empujón de las pólizas con siniestro.
 
 ::: {.callout-important}
-## Lo que este análisis sí dice y lo que no
-El contraste identifica **qué** variables transportan información prohibida y **cuánta**. No decide qué
-hacer con ellas: eliminar un proxy con efecto causal propio —la moto es objetivamente más siniestrosa—
-sacrifica poder predictivo legítimo, y la alternativa (conservarla y aceptar la fuga) es una decisión
-de política, no estadística.
-
-Lo que el análisis exige es que la decisión sea **explícita y cuantificada**, no un descuido. Eso es lo
-que se te pide en la reflexión individual del estudio de caso.
-:::
-
-::: {.callout-important}
-## Tarea del estudiante (2.2) — Preguntas 4, 5, 18 y 19 del caso
+## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
 Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
 
 - **P4 · Asociación (jerarquía).** Tu tabla tiene **cuatro** factores —`tipo_vehiculo`,
-  `zona_circulacion` y `combustible` cruzados con *tener o no* siniestro—, así que no la abordes
-  enumerando modelos: recórrela **por orden de interacción** (`^2`, `^3`, saturado) como en
-  [2.3](#sec-u22-orden-superior), fija el orden máximo necesario y **poda dentro de él**. Justifica el
-  modelo elegido por LRT y AIC, con el **recuento de gl** hecho a mano, y **tradúcelo a enunciados de
-  independencia condicional** —eso es lo que responde a la pregunta de la dirección—. Compara además el
-  odds ratio **marginal** con el **condicional** de al menos un par de factores y razona si colapsar era
-  legítimo. **Valida** contra `attr(cartera, "verdad")`.
+  `zona_circulacion` y `combustible` cruzados con *tener o no* siniestro (`tuvo_siniestro`)—. Empieza por
+  una tabla de tres vías y **dibuja el grafo** del modelo que elijas; después recorre la de cuatro **por
+  orden de interacción** (`^2`, `^3`, saturado) como en la [Sección 2.4](#sec-u22-orden-superior), fija el
+  orden máximo necesario y **poda dentro de él**. Justifica el modelo elegido por LRT y AIC, con el
+  **recuento de gl** hecho a mano, y **tradúcelo a enunciados de independencia condicional** —eso es lo
+  que responde a la pregunta de la dirección—. Compara el odds ratio **marginal** con el **condicional** de
+  al menos un par de factores y razona si colapsar era legítimo.
 - **P5 · Movilidad del bonus-malus.** Sobre la tabla cuadrada `bonus_malus_prev × bonus_malus_act`:
   contrasta **simetría**, ajusta **cuasi-simetría** y obtén la **homogeneidad marginal** como la
   diferencia entre ambas. Cuantifica la **deriva** y su sentido. Aprovecha que los niveles están
   **ordenados**: ajusta la **asociación uniforme** y decide si añadir un término de **inercia** de la
   diagonal; interpreta qué dice el modelo elegido sobre cómo se mueven las pólizas.
-- **P18 · Proxies (junto con P17).** Contrasta la **independencia condicional** entre `sexo` y cada
-  covariable permitida. Identifica los proxies, distingue los que lo son de los que no —habrá controles
-  negativos— y **mide la fuga** comparando el efecto marginal y el ajustado de `sexo`. Recuerda que vas a
-  hacer **varios** contrastes: algún $p$ pequeño saldrá por azar, así que no llames proxy a nada sin
-  mirar la magnitud. Lleva la conclusión a la reflexión individual: ¿qué haces con la variable, y a qué
-  coste?
 - **P19 · Control de calidad.** Reajusta al menos una de esas asociaciones como **logística** y comprueba
   que recuperas los mismos odds ratios que el log-lineal saturado. Explica por qué **deben** coincidir,
   qué cambia de una parametrización a otra, y qué habrías concluido si no hubieran coincidido.
 
 Cuida el **diagnóstico**: residuos ajustados y mosaico —con el modelo declarado— antes de firmar
 cualquier conclusión, y comprueba la ocupación de las celdas antes de fiarte de un $p$-valor. Y da
-siempre el **tamaño** del efecto junto al $p$: significativo no es lo mismo que importante.
+siempre el **tamaño** del efecto junto al $p$: significativo no es lo mismo que importante. **Valida**
+contra `attr(cartera, "verdad")` al final.
+
+La pregunta **P18** (proxies del factor prohibido) usa estas mismas herramientas, pero se plantea con la
+selección de variables, en la [Unidad 2.7](#sec-u27-proxy).
 :::

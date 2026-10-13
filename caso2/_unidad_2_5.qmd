@@ -21,6 +21,9 @@ inferencia y selección → bondad de ajuste y diagnóstico.
 Objetivo general: **mixtos** (espiral) — extender la Poisson a datos **agrupados y anidados**
 (interceptos aleatorios por región y agencia), interpretar los **componentes de varianza** (σ², ICC) y
 distinguir la media **condicional** de la **marginal**.
+
+Fuentes: @bates2015 para la estimación con `lme4`; @nakagawa2013 y @nakagawa2017 para el $R^2$ y el
+ICC; @faraway2016 para los modelos mixtos con R.
 :::
 
 ## 5.1 Qué es y de dónde viene: el agrupamiento {#sec-u25-contexto}
@@ -29,7 +32,7 @@ La respuesta `n_gestiones` cuenta las gestiones de siniestro de cada póliza, tr
 **agencia**; y las 30 agencias se reparten en **6 regiones**. En el margen `n_gestiones` parecía casi
 bien portada (var/media ≈ 1.2), pero esconde esa jerarquía: su ritmo varía **entre regiones** y, dentro
 de cada región, **entre agencias**. Lo vemos representando la tasa de gestiones de cada agencia,
-agrupada por su región:
+agrupada por su región (@fig-u25-anidamiento):
 
 ```{r}
 #| label: fig-u25-anidamiento
@@ -255,7 +258,7 @@ gráfico).
 :::
 
 Los interceptos aleatorios predichos (BLUP) sitúan cada agencia respecto a su región. El gráfico de
-intervalos ordena las agencias y señala las que tramitan a un ritmo atípico:
+intervalos ordena las agencias y señala las que tramitan a un ritmo atípico (@fig-u25-blups):
 
 ```{r}
 #| label: fig-u25-blups
@@ -354,7 +357,7 @@ performance::compare_performance(
 )
 ```
 
-El mixto debería quedar por delante. Aquí conecta con la [Unidad 2.3](#sec-u23): la variación entre
+El mixto queda claramente por delante, tanto en AIC como en BIC. Aquí conecta con la [Unidad 2.3](#sec-u23): la variación entre
 grupos que en el margen parecía **sobredispersión** ($\phi>1$) el GLMM la explica de forma estructural,
 en vez de absorberla como dispersión sin estructura. La binomial negativa recogería ese exceso de
 varianza, pero no distingue región de agencia ni predice una agencia nueva; el mixto sí.
@@ -372,7 +375,7 @@ un único $p$-valor.
 
 El diagnóstico combina las herramientas del compendio de conteo con las propias de los mixtos. Residuos
 simulados (`DHARMa`), que ya deberían salir bien portados si la estructura jerárquica captó el
-agrupamiento:
+agrupamiento (@fig-u25-dharma):
 
 ```{r}
 #| label: fig-u25-dharma
@@ -393,17 +396,7 @@ performance::r2(m_glmm)
 ```
 
 Conviene además comprobar que el ajuste **convergió** y no es **singular** (`isSingular(m_glmm)`: un
-componente de varianza colapsado a 0 indicaría un modelo sobreparametrizado para estos datos). Y, como el
-banco es simulado, podemos **validar contra la verdad**: el DGP fijó $\sigma_{\text{reg}}=0.50$ y
-$\sigma_{\text{ag}}=0.60$; el mixto estima `r round(sd_reg, 2)` y `r round(sd_ag, 2)`.
-
-La región se recupera bien, pero la **agencia se queda claramente por debajo** de su valor verdadero,
-hasta el punto de invertir el orden —en la verdad la agencia varía más que la región, y aquí sale al
-revés—. No es un fallo del método, sino la dificultad de estimar el componente de agencia con **pocos
-grupos por región** (unas cinco agencias en cada una): la verosimilitud tiende a **encoger** esa varianza
-y a atribuir parte de ella al nivel superior. Es un aviso útil: los componentes de varianza —y el orden
-entre niveles— se estiman con **mucha** incertidumbre cuando hay pocos grupos, así que conviene leerlos
-con prudencia y no sobreinterpretar cuál pesa más.
+componente de varianza colapsado a 0 indicaría un modelo sobreparametrizado para estos datos).
 
 ::: {.callout-tip}
 ## 🔧 En R. Bondad de ajuste en modelos mixtos
@@ -413,6 +406,30 @@ sobre la estructura aleatoria, **dispersión residual** (`testDispersion`), **$R
 —marginal frente a condicional—, el **ICC** por nivel, y el control de **convergencia y singularidad**.
 Ninguna medida resume el ajuste por sí sola: se leen juntas.
 :::
+
+### Validación contra el DGP
+
+Como el banco es simulado, al cerrar podemos **validar contra la verdad**: el DGP fijó
+$\sigma_{\text{reg}}=0.50$ y $\sigma_{\text{ag}}=0.60$; el mixto estima `r round(sd_reg, 2)` y
+`r round(sd_ag, 2)`.
+
+La región sale cerca de su valor, pero la **agencia se queda claramente por debajo**, hasta el punto de
+invertir el orden —en la verdad la agencia varía más que la región, y aquí sale al revés—. Conviene no
+leerlo como un sesgo del método, por dos razones:
+
+- **El 0.60 no es la variación de estas 30 agencias.** Es la desviación típica de la distribución de la
+  que se **sortearon**; las 30 agencias que de hecho salieron tienen su propia dispersión. Y con solo
+  cinco agencias por región, parte de esa dispersión cae, por azar, **entre** regiones —las medias por
+  región de los efectos de agencia no son exactamente cero—. El modelo no puede distinguir esa parte de un
+  efecto de región, y se la atribuye a la región.
+- **La región es el componente menos preciso**, porque se estima con solo 6 grupos. Que salga cerca de su
+  valor es, en buena parte, suerte de esta muestra.
+
+La comparación honesta es con los efectos **efectivamente sorteados**, no con el parámetro de la
+distribución. En el estudio de caso los tienes: `attr(cartera, "verdad")$u_ag` y `$u_reg`. Y la lección
+general se mantiene: con pocos grupos, los componentes de varianza —y el orden entre niveles— se estiman
+con **mucha** incertidumbre, así que conviene leerlos con prudencia y no sobreinterpretar cuál pesa más.
+
 
 ## 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE) {#sec-u25-olre}
 
@@ -495,7 +512,7 @@ Que $\sigma_{\text{obs}}$ sea claramente **mayor que 0** confirma la sobredisper
 del contraste en el borde de [§5.4](#sec-u25-inferencia): miramos su magnitud y los criterios de
 información, no un único $p$-valor. La prueba de fuego es el **diagnóstico de residuos**: si el OLRE ha
 absorbido el exceso de varianza, los residuos simulados de `DHARMa` quedan bien portados y el test de
-dispersión, no significativo:
+dispersión, no significativo (@fig-u25-olre-diag):
 
 ```{r}
 #| label: fig-u25-olre-diag
@@ -539,8 +556,13 @@ Así medido, el RMSE del OLRE queda al nivel del de la NB2 y la Poisson —los t
 promedio poblacional—, que es lo esperable. Por eso la comparación honesta se apoya en el **AIC**, no en
 el RMSE condicional.
 
-Las dos correcciones dejan muy atrás a la Poisson y, entre sí, suelen quedar **próximas** en AIC: son dos
-lentes —Poisson-lognormal frente a Poisson-Gamma— para la misma sobredispersión. ¿Cuál elegir? La NB da
+Las dos correcciones dejan muy atrás a la Poisson y, entre sí, quedan **próximas** en AIC
+(`r round(AIC(m_olre))` el OLRE frente a `r round(AIC(m_nb2))` la NB2): son dos lentes
+—Poisson-lognormal frente a Poisson-Gamma— para la misma sobredispersión. Esa comparación hay que leerla
+con cautela: `glmer` aproxima la verosimilitud del OLRE por **Laplace**, que es poco precisa cuando cada
+efecto aleatorio descansa en una sola observación con conteos bajos, así que una diferencia de pocos
+puntos de AIC no es concluyente. Comprueba también que el ajuste converge: en este documento los avisos
+de `glmer` quedan ocultos por `warning: false`. ¿Cuál elegir? La NB da
 una **distribución cerrada**, es más rápida y es la opción por defecto ante sobredispersión pura; el OLRE
 encaja con naturalidad cuando **ya tienes efectos aleatorios** —por ejemplo, si quisieras combinar la
 heterogeneidad de póliza con la de agencia en un mismo modelo— o cuando prefieres la mezcla lognormal.

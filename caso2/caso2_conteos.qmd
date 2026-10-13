@@ -27,10 +27,9 @@ editor:
 
 <!-- ============================================================================
      Caso 2 (Poisson).
-       - TEORÍA (unidades 2.1-2.6): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
-         Esquema de diseño: ESQUEMA_DATOS_SEGUROS.md.
-       - ESTUDIO DE CASO (Unidad 2.8) y Caso 3: R/dgp_auto.R -> cartera de auto rica.
-         Diseño: DISENO_DGP_AUTO.md. (La cohorte de salud quedó archivada en ec_seguro_salud/.)
+       - TEORÍA (unidades 2.1-2.7): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
+       - ESTUDIO DE CASO (Unidad 2.8) y Caso 3: R/dgp_auto.R -> cartera de auto de cada
+         equipo (datos_equipos_auto/equipo_XX/).
 ============================================================================ -->
 
 
@@ -47,7 +46,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -85,26 +84,26 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 
 | Unidad | Contenido | Objetivo y datos |
 |:--:|:----------------------------------------------------------------|:------------------|
-| **2.1** | *«¿Cuántas veces y a qué ritmo?»* — Poisson y log-lineal: *Contexto* (recuentos, tasas, tablas de contingencia y de cambio) · *Modelización y estimación* · *Interpretación* (IRR, asociación) · *Inferencia y selección* · *Bondad de ajuste, diagnóstico y predicción*. | **RA1** (y primer contacto con RA2, RA7 y RA8)<br>**Datos:** `cartera` |
-| **2.2** *(ampliación)* | *«¿Y si el dato es la celda?»* — Modelos log-lineales para tablas: esquemas de muestreo y grados de libertad · dos vías y el puente con la logística · **jerarquía** de tres vías, **Simpson** y tablas de **orden superior** (por orden de interacción) · diagnóstico de tablas (residuos ajustados, mosaico, escasez y ceros) · **tablas cuadradas** (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal) · detección de ***proxies***. | **RA2**<br>**Datos:** `cartera` |
+| **2.1** | *«¿Cuántas veces y a qué ritmo?»* — Regresión de Poisson para tasas: *Contexto* (recuentos y exposición) · *Modelización y estimación* (la tasa $\lambda$ y el *offset*) · *Interpretación y predicción* (IRR, predicción con intervalo) · *Inferencia y selección* · *Bondad de ajuste y diagnóstico* · *Validación*. | **RA1** (y primer contacto con RA7 y RA8)<br>**Datos:** `cartera` (`n_asistencia`) |
+| **2.2** | *«¿Y si el dato es la celda?»* — Modelos log-lineales. *Asociación:* de la póliza a la celda (esquemas de muestreo, grados de libertad) · dos vías (independencia, odds ratio, puente con la logística) · tres vías (**jerarquía** con **grafos de asociación**, diagnóstico, **Simpson** con Berkeley) · más de tres vías *(ampliación)*. *Cambio:* **tablas cuadradas** del bonus-malus (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal e inercia). | **RA2**<br>**Datos:** `cartera` (`n_asistencia`, bonus-malus) y `UCBAdmissions` |
 | **2.3** | *«¿Y si la varianza supera a la media?»* — Sobredispersión: causas, diagnóstico, quasi-Poisson y binomial negativa (con OLRE y conexiones). | **RA3** (y RA7 en el diagnóstico)<br>**Datos:** `cartera` |
 | **2.4** | *«¿Y si sobran ceros?»* — Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | **RA4** (y RA7)<br>**Datos:** `cartera` |
 | **2.5** | *«¿Y si las pólizas se agrupan por agencia?»* — Conteos agrupados: GLMM de Poisson. | **RA5** (espiral de mixtos; y RA7)<br>**Datos:** `cartera` (por `agencia`/`region`) |
 | **2.6** | *«¿Del conteo al reloj?»* — Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | **RA6** (espiral de supervivencia; y RA7)<br>**Datos:** `cartera` (persona-periodo) |
-| **2.7** | *«¿Qué predictores retener, y generaliza?»* — Selección, validación cruzada y regularización (`glmnet` Poisson). | **RA8**<br>**Datos:** `cartera` |
-| **2.8** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cohorte sanitaria |
+| **2.7** | *«¿Qué predictores retener, y generaliza?»* — Selección, validación cruzada y regularización (`glmnet` Poisson) · seleccionar con un factor prohibido: ***proxies***. | **RA8** (y RA2 en los proxies)<br>**Datos:** `cartera` |
+| **2.8** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cartera de auto de cada equipo |
 
 **Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso2/scripts/`):
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **2.1** | ajuste y *offset*: [`glm(family = poisson, offset = log(exposicion))`](#sec-u21-modelizacion) · interpretación: [IRR con `broom::tidy(exponentiate = TRUE)` · `predict`](#sec-u21-interpretacion) · inferencia: [`anova` · `drop1` · `AIC`/`BIC` · `update`](#sec-u21-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::check_overdispersion`](#sec-u21-diagnostico) |
-| **2.2** | tablas: [`xtabs` · `as.data.frame` · `addmargins` · `prop.table` · `glm(Freq ~ ..., poisson)` · `MASS::loglm`](#sec-u22-dosvias) · jerarquía: [`anova` · `ftable` · `margin.table` · `pchisq`](#sec-u22-orden-superior) · diagnóstico: [`rstandard(type = "pearson")` · `vcd::mosaic` · `vcdExtra::mosaic3d`](#sec-u22-diagnostico) · tablas cuadradas: [simetría, cuasi-simetría, asociación uniforme](#sec-u22-cuadradas) |
+| **2.1** | ajuste y *offset*: [`glm(family = poisson, offset = log(exposicion))`](#sec-u21-modelizacion) · interpretación y predicción: [IRR con `broom::tidy(exponentiate = TRUE)` · `predict` · `marginaleffects::predictions`](#sec-u21-interpretacion) · inferencia: [`anova` · `drop1` · `AIC`/`BIC` · `update`](#sec-u21-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::check_overdispersion`](#sec-u21-diagnostico) |
+| **2.2** | tablas: [`xtabs` · `as.data.frame` · `addmargins` · `prop.table` · `glm(Freq ~ ..., poisson)` · `MASS::loglm`](#sec-u22-dosvias) · jerarquía: [`anova` · `ftable` · `margin.table` · `pchisq`](#sec-u22-orden-superior) · grafos y diagnóstico: [`rstandard(type = "pearson")` · `vcd::mosaic`](#sec-u22-tresvias) · tablas cuadradas: [simetría, cuasi-simetría, asociación uniforme](#sec-u22-cuadradas) |
 | **2.3** | detección: [`AER::dispersiontest` · `DHARMa::testDispersion` · `countreg::rootogram`](#sec-u23-diagnostico) · quasi-Poisson: [`glm(family = quasipoisson)`](#sec-u23-quasi) · binomial negativa: [`MASS::glm.nb` · `glmmTMB` (NB1 y NB2) · `sigma`](#sec-u23-nb) · bondad de ajuste: [`performance::r2` · AIC/BIC · rootograma](#sec-u23-elegir) |
 | **2.4** | detección: [`DHARMa::testZeroInflation` · `vcdExtra::zero.test` · `countreg::zitest`](#sec-u24-ceros) · ZIP/ZINB: [`pscl::zeroinfl` · `glmmTMB(ziformula = )`](#sec-u24-zi) · hurdle: [`pscl::hurdle`](#sec-u24-hurdle) · comparación: [AIC · ceros predichos frente a observados](#sec-u24-elegir) |
 | **2.5** | GLMM Poisson: [`lme4::glmer` · anidamiento `(1 \| a/b)` · `VarCorr` · `isSingular`](#sec-u25-modelo) · bondad de ajuste: [`DHARMa` · dispersión residual · $R^2$ de Nakagawa · ICC](#sec-u25-diagnostico) · OLRE: [`(1 \| id_obs)` · `performance::compare_performance`](#sec-u25-olre) |
 | **2.6** | riesgos a trozos: [`glm(poisson, offset)` · `survival::Surv` · `survfit` · `broom::tidy`](#sec-u26-piecewise) · Cox como contraste: [`coxph` · `cox.zph` (Schoenfeld)](#sec-u26-clasicos) |
-| **2.7** | validación cruzada: [`boot::cv.glm`](#sec-u27-cv) · regularización: [`glmnet` · `cv.glmnet` · `model.matrix` · `lambda.min`/`lambda.1se`](#sec-u27-reg) · alcance: [qué familias cubre `glmnet`](#sec-u27-binomial) |
+| **2.7** | validación cruzada: [`boot::cv.glm`](#sec-u27-cv) · regularización: [`glmnet` · `cv.glmnet` · `model.matrix` · `lambda.min`/`lambda.1se`](#sec-u27-reg) · proxies: [independencia condicional en tabla](#sec-u27-proxy) · alcance: [qué familias cubre `glmnet`](#sec-u27-binomial) |
 | **2.8** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 
@@ -116,7 +115,7 @@ Para la teoría trabajamos con una **cartera de seguros de auto simulada**: una 
 pólizas durante un periodo y registra, para cada una, cuántas veces ocurre cada tipo de incidencia.
 Al ser **simulada** conocemos su proceso generador (la «verdad»), lo que nos permitirá **validar** los
 ajustes —como hicimos con la cohorte del Caso 1—. El estudio de caso ([Unidad 2.8](#sec-u28)) usará
-una **cohorte sanitaria** análoga, generada con el mismo motor.
+una cartera de auto **más rica**, distinta para cada equipo.
 
 Cada fila es una **póliza**. `exposicion` mide **cuánto tiempo llevamos con ese cliente**: su tiempo
 contratado con nosotros como **fracción de la antigüedad del cliente más antiguo (y aún vigente)**. La
@@ -129,7 +128,7 @@ y 1.00). Como el número de incidencias depende del tiempo expuesto, la exposici
 | Estructura | `id_poliza`; `agencia` (oficina que gestiona la póliza — variable de **agrupación**); `region` (agrupa las agencias — nivel superior del **anidamiento**, para la Unidad 2.5); `exposicion` (tiempo contratado del cliente como **fracción de la antigüedad del más antiguo y vigente**; entre 0.30 y 1.00 → *offset*; no confundir con la variable de ruido `antiguedad_cliente`) |
 | Respuestas (conteos) | `n_asistencia` (asistencias en carretera; frecuentes), `n_danos` (partes por daños propios; heterogéneos), `n_fraude` (reclamaciones **sometidas a revisión antifraude**; con exceso de ceros estructurales), `n_gestiones` (gestiones de siniestro **de la póliza** tramitadas a través de su agencia; una cifra por póliza, con ritmo propio de cada agencia) |
 | Predictores del riesgo | `edad_conductor`, `antiguedad_carnet`, `potencia_cv`, `antiguedad_vehiculo`, `zona_circulacion`, `uso`, `tipo_vehiculo` |
-| Variables adicionales (ruido / selección) | `sexo`, `estado_civil`, `color_vehiculo`, `tiene_garaje`, `forma_pago`, `financiado`, `km_declarados`, `valor_vehiculo`, `n_conductores`, `antiguedad_cliente` |
+| Predictores adicionales (selección) | `sexo`, `estado_civil`, `color_vehiculo`, `tiene_garaje`, `forma_pago`, `financiado`, `km_declarados`, `valor_vehiculo`, `n_conductores`, `antiguedad_cliente` |
 | Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: nivel de **bonificación-penalización** de la póliza (1 = mejor tarifa … 5 = peor) el **año anterior** y el **actual**; comparándolos se ve cómo evoluciona el riesgo (tabla cuadrada) |
 | Tiempo-a-evento | `tiempo_primer_sin` (tramo del periodo en que se observa el **primer siniestro** de la póliza; o el último tramo seguido si no hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
 
@@ -145,26 +144,25 @@ Generamos la cartera y la miramos por encima:
 source("R/dgp_conteos.R")            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
 cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
 glimpse(cartera)
+head(cartera)
 ```
 
-Un **descriptivo global** de las cuatro respuestas —media, porcentaje de ceros, máximo y el cociente
-varianza/media, que anticipa la dispersión—:
+Un **descriptivo global** de las cuatro respuestas —media, máximo y el cociente
+varianza/media, que anticipa la dispersión— (@tbl-cartera-resp):
 
 ```{r}
 #| label: tbl-cartera-resp
-#| tbl-cap: "Descriptivo de las cuatro respuestas de conteo: media, % de ceros, máximo y cociente varianza/media."
+#| tbl-cap: "Descriptivo de las cuatro respuestas de conteo: media, máximo y cociente varianza/media."
 resp <- c("n_asistencia", "n_danos", "n_fraude", "n_gestiones")
 purrr::map_dfr(resp, ~ tibble::tibble(
   respuesta = .x,
   media     = round(mean(cartera[[.x]]), 2),
-  pct_ceros = round(mean(cartera[[.x]] == 0) * 100),
   maximo    = max(cartera[[.x]]),
   var_media = round(var(cartera[[.x]]) / mean(cartera[[.x]]), 2)))
 ```
 
 El cociente `var_media` ya adelanta parte de la historia: **cercano a 1** en `n_asistencia` (Poisson
-bien portada); **claramente > 1** en `n_danos` (sobredispersión) y en `n_fraude` (aquí inflado por su
-**exceso de ceros** —mira su `pct_ceros`—). En cambio `n_gestiones` parece casi bien portada en el margen
+bien portada); **claramente > 1** en `n_danos` (sobredispersión) y en `n_fraude`. En cambio `n_gestiones` parece casi bien portada en el margen
 (var/media $\approx 1.2$): su rasgo —el efecto de la **agencia**— apenas se aprecia en un descriptivo marginal y
 solo se destapará al **modelar el agrupamiento** (Unidad 2.5). Cada unidad se ocupará de uno de estos
 rasgos.
@@ -186,10 +184,6 @@ cartera |>
   labs(x = "nº de eventos por póliza", y = "nº de pólizas")
 ```
 
-# Reproducibilidad {#sec-repro2}
-
-<!-- TODO -->
-
 {{< include _unidad_2_1.qmd >}}
 
 {{< include _unidad_2_2.qmd >}}
@@ -205,6 +199,16 @@ cartera |>
 {{< include _unidad_2_7.qmd >}}
 
 {{< include _unidad_2_8.qmd >}}
+
+# Reproducibilidad {#sec-repro2}
+
+Este documento se ha generado con la versión de R y de los paquetes que recoge la salida siguiente.
+Si al reproducirlo obtienes cifras ligeramente distintas, compara primero estas versiones con las tuyas.
+
+```{r}
+#| label: session-info
+sessionInfo()
+```
 
 # Referencias del Caso 2 {#sec-refs2}
 

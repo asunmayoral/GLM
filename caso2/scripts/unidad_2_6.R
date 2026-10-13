@@ -36,8 +36,8 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", MASS = "7.3.65", MuMIn = "1.48.19", broom = "1.0.13",
-  dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
   pscl = "1.5.9", purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
   tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13",
@@ -67,7 +67,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -315,11 +315,13 @@ dplyr::bind_rows(
   tibble::tibble(
     termino   = names(cont),
     estimado  = as.numeric(coef(m_pw)[names(cont)] * sd_v),
-    verdadero = as.numeric(b[cont])
+    verdadero = as.numeric(b[cont]),
+    ee        = as.numeric(sqrt(diag(vcov(m_pw)))[names(cont)] * sd_v)
   ),
   tibble::tibble(
     termino   = cate,
     estimado  = as.numeric(coef(m_pw)[cate]),
+    ee        = as.numeric(sqrt(diag(vcov(m_pw)))[cate]),
     # el DGP mide la zona frente a 'rural'; R, frente a 'urbana'
     verdadero = as.numeric(c(0, b["moto"], b["furgoneta"],
                              b["mixta"] - b["urbana"], -b["urbana"]))

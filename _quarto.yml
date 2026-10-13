@@ -72,7 +72,7 @@ website:
       - section: "Caso 2 · Conteos y tasas"
         href: caso2/caso2_conteos.qmd
         contents:
-          - text: "2.1 · Poisson y log-lineales"
+          - text: "2.1 · Poisson: conteos y tasas"
             href: caso2/caso2_conteos.qmd#sec-u21
           - text: "2.2 · Log-lineales para tablas"
             href: caso2/caso2_conteos.qmd#sec-u22

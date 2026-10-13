@@ -15,8 +15,9 @@ mejor una póliza nueva. Esta unidad da dos pasos para separar *ajustar bien* de
 error de predicción **fuera de la muestra**, dejando fuera parte de los datos y prediciéndolos. Segundo, la
 **regularización** —*ridge*, *lasso* y *elastic-net*—, que en vez de elegir modelos uno a uno **encoge** los
 coeficientes hacia cero y, en el caso del *lasso*, pone algunos **exactamente** a cero: selección y ajuste en
-una sola pasada. Cerramos comprobando que es la **misma máquina** que ya usamos en la logística del Caso 1:
-solo cambia la familia.
+una sola pasada. Después atendemos un caso especial de selección: qué hacer con un **factor prohibido** y las
+variables que lo transportan. Cerramos comprobando que es la **misma máquina** que ya usamos en la
+logística del Caso 1: solo cambia la familia.
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -31,7 +32,10 @@ de lo que en el Caso 1 hacíamos con la *deviance* y el AUC *in-sample*.
        7.1 De la selección clásica a la validación cruzada (AIC/BIC -> CV k-fold; sesgo-varianza).
        7.2 Regularización: ridge, lasso y elastic-net (glmnet Poisson + cv.glmnet; lasso = selección;
            validación contra la "verdad" del DGP).
-       7.3 La misma máquina en la binaria (glmnet family="binomial"; nota Gamma -> Caso 3).
+       7.3 Seleccionar con un factor prohibido: proxies (contraste de independencia condicional en tabla,
+           control negativo con sexo, proxy simulado y medida de la fuga). Trasladado desde la 2.2;
+           PENDIENTE de reescritura didáctica (el control negativo en la frontera p ~ 0.057 confunde).
+       7.4 La misma máquina en la binaria (glmnet family="binomial"; nota Gamma -> Caso 3).
 ============================================================================ -->
 
 Trabajaremos sobre la respuesta **limpia** de la cartera, `n_asistencia` (la Poisson bien portada de la
@@ -98,7 +102,7 @@ anova(m_activos, m_todo, test = "LRT")
 
 Con datos generados sin relación con el ruido, el descenso **no supera** lo que 14 parámetros extra compran por
 azar —aquí, una caída de *deviance* de $\approx 18$ sobre $14$ grados de libertad, con $p \approx 0.22$—, así que
-el test **no rechaza**: no hay evidencia de que esas variables pertenezcan al modelo, justo lo que dice el DGP.
+el test **no rechaza**: no hay evidencia de que esas variables pertenezcan al modelo.
 Fíjate en que el LRT es, en el fondo, **otra forma de cobrar por la
 complejidad**: no mira el descenso a secas, sino si **supera** el umbral de una $\chi^2_{14}$; esa misma idea
 —descenso de *deviance* frente a número de parámetros— es la que el AIC convierte en un cargo fijo de $2$ por
@@ -246,8 +250,10 @@ $$
 -\,\ell(\beta) \;+\; \lambda \, P(\beta),
 $$
 
-donde $-\ell(\beta)$ es la *deviance* (el desajuste) y $P(\beta)$ un **castigo** que crece con la magnitud de
-los coeficientes. El parámetro $\lambda \ge 0$ marca el precio del castigo: con $\lambda = 0$ recuperamos la
+donde $-\ell(\beta)$ es la log-verosimilitud cambiada de signo —el desajuste; equivale a la *deviance*
+salvo una constante y un factor 2— y $P(\beta)$ un **castigo** que crece con la magnitud de
+los coeficientes. El parámetro $\lambda \ge 0$ (la notación habitual de la regularización; no confundir con la tasa
+$\lambda$ de la [Unidad 2.1](#sec-u21-modelizacion)) marca el precio del castigo: con $\lambda = 0$ recuperamos la
 máxima verosimilitud de siempre; según sube, los coeficientes se **encogen** hacia cero. ¿Por qué habría de
 predecir mejor un ajuste **sesgado a propósito**? Por el compromiso de antes: encoger introduce algo de sesgo
 pero **recorta mucha varianza**, y en predicción esa permuta casi siempre sale a cuenta —sobre todo con
@@ -264,7 +270,7 @@ el mejor cuando muchos predictores aportan un poco y están correlacionados.
 Su geometría —de esquinas— hace que, al apretar, algunos coeficientes lleguen a **cero exacto**: el *lasso*
 **selecciona** variables mientras ajusta. Es lo que buscamos aquí: un modelo **corto** que diga qué conservar.
 
-- **Elastic-net** [@zou2005] **mezcla** ambos, $P(\beta)=\alpha\sum_j|\beta_j| + (1-\alpha)\sum_j \beta_j^2$, con
+- **Elastic-net** [@zou2005] **mezcla** ambos, $P(\beta)=\alpha\sum_j|\beta_j| + \tfrac{1-\alpha}{2}\sum_j \beta_j^2$ (la forma que usa `glmnet`), con
 $\alpha \in [0,1]$ ($\alpha=1$ es *lasso* puro; $\alpha=0$, *ridge* puro). Combina lo mejor de los dos: selecciona
 como el *lasso* pero, ante un grupo de predictores correlacionados, tiende a **quedarse con el grupo** en vez de
 elegir caprichosamente uno solo, que es una conocida inestabilidad del *lasso*.
@@ -280,7 +286,7 @@ la que convierte «encoger» en «seleccionar».
 
 ### `glmnet` sobre la Poisson
 
-El paquete **`glmnet`** [@friedman2010] ajusta estos modelos para toda la familia GLM, la Poisson incluida, y
+El paquete **`glmnet`** [@friedman2010] ajusta estos modelos para los GLM —la Poisson incluida— y
 lo hace para **toda una rejilla de $\lambda$ a la vez** (la *ruta de regularización*) de forma muy eficiente.
 Tres detalles de su uso, distintos de `glm()`:
 
@@ -303,7 +309,7 @@ dim(x)
 ```
 
 Ajustamos la ruta *lasso* completa ($\alpha = 1$) y miramos cómo entra cada coeficiente según relajamos el
-castigo (de $\lambda$ grande, todo a cero, a $\lambda$ pequeño, casi la máxima verosimilitud):
+castigo (de $\lambda$ grande, todo a cero, a $\lambda$ pequeño, casi la máxima verosimilitud) (@fig-u27-ruta-lasso):
 
 ```{r}
 #| label: fig-u27-ruta-lasso
@@ -323,7 +329,7 @@ aportación **a la predicción**, no por su significación *in-sample*.
 La ruta ofrece un modelo por cada $\lambda$; falta decidir **cuál**. Y aquí se cierra el círculo con la
 Sección 7.1: elegimos el $\lambda$ por **validación cruzada**, con la *deviance* de Poisson como métrica.
 `cv.glmnet` hace exactamente eso —parte en k bloques, recorre la rejilla y promedia la *deviance*
-*out-of-sample*—:
+*out-of-sample*— (@fig-u27-cvglmnet):
 
 ```{r}
 #| label: fig-u27-cvglmnet
@@ -500,7 +506,123 @@ que sigue siendo optimista), o recurrir a métodos de inferencia post-selección
 de **predicción y cribado**, no de contraste.
 :::
 
-## 7.3 La misma máquina en la binaria {#sec-u27-binomial}
+## 7.3 Seleccionar con un factor prohibido: los *proxies* {#sec-u27-proxy}
+
+Seleccionar variables no es solo una cuestión de predicción: a veces hay variables que **no se pueden**
+usar, y su ausencia no basta para que su información quede fuera. La ley prohíbe tarificar con el
+**sexo** (primas unisex; TJUE C-236/09, *Test-Achats*). Excluir la variable del modelo parece
+suficiente, y no lo es: si una variable **permitida** está asociada al sexo, el modelo sigue usando esa
+información por la puerta de atrás. Esa variable es un ***proxy***.
+
+Y aquí está la conexión: **«$V$ es un proxy de $S$» es, exactamente, «$V$ y $S$ no son
+independientes»** — una hipótesis contrastable en una tabla de contingencia, con las herramientas de la
+[Unidad 2.2](#sec-u22-tresvias). Con la respuesta en la tabla (aquí, tener o no alguna asistencia), la
+pregunta se afina: *¿queda asociación entre $S$ y $V$ una vez tenido en cuenta el resultado?*
+
+En la cartera de teoría el sexo es ruido puro por construcción, así que sirve como **control negativo**:
+vemos qué aspecto tiene un «no proxy».
+
+```{r}
+#| label: u27-proxy-control
+# Indicador de alguna asistencia: la misma respuesta de la unidad, ahora como factor de una tabla
+cart_prox <- cartera |>
+  dplyr::mutate(asistencia = factor(ifelse(n_asistencia > 0, "con", "sin"), levels = c("sin", "con")))
+tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + asistencia, data = cart_prox))
+m_ci  <- glm(Freq ~ sexo * asistencia + tipo_vehiculo * asistencia, family = poisson, data = tp)
+m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + asistencia)^2,           family = poisson, data = tp)
+anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | asistencia  (no hay proxy)
+```
+
+Y —esto es lo que de verdad hay que mirar— el **tamaño** de esa asociación, con su intervalo:
+
+```{r}
+#| label: u27-proxy-control-tamano
+broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl("^sexo.*:tipo", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Y aquí la realidad nos regala una lección mejor que cualquier ejemplo de manual: sale
+$p \approx 0{,}057$. Justo al borde, cuando sabemos con **certeza** que en esta cartera `sexo` es ruido
+sorteado de forma independiente. Con la regla mecánica del 0,05 nos habríamos salvado por menos de siete
+milésimas; si hubiera salido 0,047, habríamos «descubierto» un proxy inexistente.
+
+Y aún hay más, mirando el tamaño en lugar del contraste global: el segundo odds ratio —
+`sexo × furgoneta`— tiene un intervalo de confianza que **no contiene el 1** (aproximadamente
+$[1{,}01;\ 1{,}58]$). Es decir: un término **individualmente «significativo»** en una asociación que por
+construcción **no existe**.
+
+::: {.callout-warning}
+## Este es un falso positivo, y lo sabemos con certeza
+Lo que enseña este resultado no es cómo está la cartera, sino cómo **no** hay que leer un contraste:
+
+- **La hipótesis nula es cierta y aun así hemos obtenido un $p$ casi significativo y un intervalo que
+  excluye el 1.** No es mala suerte excepcional: bajo $H_0$ el $p$-valor se distribuye **uniforme**, así
+  que un valor por debajo de 0,10 ocurre una vez de cada diez, y aquí además hay **dos** términos de
+  interacción, cada uno con su oportunidad de fallar.
+- **Con un umbral rígido, la conclusión depende del ruido**, no del fenómeno.
+- **Un intervalo que roza el 1 por su extremo inferior no es evidencia de nada.** $[1{,}01;\ 1{,}58]$ es
+  compatible con «ningún efecto» y con «efecto moderado»: lo que dice es que **no hay información
+  suficiente**, no que haya asociación.
+
+En el estudio de caso vas a contrastar **varias** covariables permitidas contra `sexo`. Con ocho
+covariables contrastadas al 5 %, la probabilidad de al menos una alerta falsa ya ronda una de cada tres
+($1-0{,}95^8\approx 0{,}34$), y más si cada covariable aporta varios términos. No llames proxy a nada sin mirar la
+**magnitud**, sin comprobar que el intervalo está claramente lejos del 1 y sin tener en cuenta cuántos
+contrastes has hecho. Aquí tienes la verdad del DGP para comprobarlo; con datos reales no la tendrás, y
+esa es exactamente la razón de ser prudente.
+:::
+
+Y así se ve un proxy de verdad, con proceso generador explícito:
+
+```{r}
+#| label: u27-proxy-simulado
+set.seed(SEMILLA_CURSO)
+n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
+# Niveles EXPLÍCITOS: "M" es la referencia, así el coeficiente se llama `sH` y se lee
+# "hombres frente a mujeres". Sin declararlos, R ordena alfabéticamente (H antes que M)
+# y el coeficiente saldría invertido.
+s <- factor(sample(c("M", "H"), n, TRUE), levels = c("M", "H"))        # factor prohibido
+v <- factor(ifelse(runif(n) < ifelse(s == "H", 0.30, 0.05), "moto", "otro"),
+            levels = c("otro", "moto"))                               # PERMITIDA, asociada a s
+y <- rbinom(n, 1, plogis(-0.8 + 1.20 * (v == "moto") + 0.20 * (s == "H")))
+sim <- as.data.frame(xtabs(~ s + v + y))
+
+anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
+      glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
+```
+
+Rechazo claro: la variable permitida **está** asociada al factor prohibido. Lo que el proxy transporta
+se mide comparando el efecto **marginal** del factor prohibido con el **ajustado** por la variable
+permitida —la brecha entre ambos es la fuga—:
+
+```{r}
+#| label: u27-proxy-fuga
+d_sim <- data.frame(y = y, s = s, v = v)
+or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
+c(OR_marginal    = round(or_s(y ~ s),     3),   # lo que se ve sin controlar el proxy
+  OR_ajustado    = round(or_s(y ~ s + v), 3),   # el efecto directo del factor prohibido
+  verdad_directa = round(exp(0.20),       3))   # el valor con el que se generaron los datos
+```
+
+El **ajustado** queda cerca de la verdad (a un 5 %, dentro del error de muestreo), mientras el
+**marginal** la exagera un **30 %**. Esa brecha es, literalmente, la información prohibida que `v`
+transporta: si tarificas con `v` y sin `s`, estás aplicando buena parte de la diferencia entre hombres y
+mujeres sin haberla escrito en ningún sitio —y sin que aparezca en el modelo—.
+
+::: {.callout-important}
+## Lo que este análisis sí dice y lo que no
+El contraste identifica **qué** variables transportan información prohibida y **cuánta**. No decide qué
+hacer con ellas: eliminar un proxy con efecto causal propio —la moto es objetivamente más siniestrosa—
+sacrifica poder predictivo legítimo, y la alternativa (conservarla y aceptar la fuga) es una decisión
+de política, no estadística.
+
+Lo que el análisis exige es que la decisión sea **explícita y cuantificada**, no un descuido. Eso es lo
+que se te pide en la reflexión individual del estudio de caso.
+:::
+
+## 7.4 La misma máquina en la binaria {#sec-u27-binomial}
 
 Todo lo anterior no es de la Poisson: es de los **GLM**. `glmnet` regulariza cualquier familia sin más que
 cambiar el argumento `family`, con el mismo `x`, la misma `cv.glmnet` y la misma lectura del `lambda.1se`. Para
@@ -540,16 +662,18 @@ predictores de la **probabilidad** de siniestro —la misma máquina que en la P
 evaluación de clasificadores del Caso 1, ahora sí *out-of-sample*.
 
 ::: {.callout-tip}
-## 🔧 En R. Qué familias cubre `glmnet` (y cuál no)
-`glmnet` regulariza `gaussian` (lineal), `binomial` (logística), `poisson` (conteos/tasas), `multinomial`,
-`mgaussian` y `cox` (supervivencia). Cubre, por tanto, los dos primeros casos del curso y el nexo de
-supervivencia de la [Unidad 2.6](#sec-u26). **No** trae la familia **Gamma**, que será el corazón del Caso 3
-(continuas positivas): allí la regularización se tratará de forma **conceptual**, o con extensiones fuera de
-`glmnet`. La idea —*deviance* + castigo, $\lambda$ por validación cruzada— es la misma sea cual sea la familia.
+## 🔧 En R. Qué familias cubre `glmnet`
+`glmnet` trae integradas `gaussian` (lineal), `binomial` (logística), `poisson` (conteos/tasas),
+`multinomial`, `mgaussian` y `cox` (supervivencia): los dos primeros casos del curso y el nexo de
+supervivencia de la [Unidad 2.6](#sec-u26). Desde la versión 4.0 admite además **cualquier familia de
+`glm()`** pasada como objeto —por ejemplo `family = Gamma(link = "log")`, la del Caso 3— [@tay2023]. Con un
+límite que retomaremos allí: la penalización actúa sobre los **coeficientes**, no sobre el parámetro de
+dispersión de la familia. La idea —*deviance* + castigo, $\lambda$ por validación cruzada— es la misma sea
+cual sea la familia.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (2.7) — Preguntas 16 y 17 del caso
+## Tarea del estudiante (2.7) — Preguntas 16, 17 y 18 del caso
 Sobre **la cartera de tu equipo**, la dirección pide un modelo **sencillo, fiable y responsable** para anticipar
 la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.8](#sec-u28)). Con `n_siniestros` y su
 *offset* de exposición:
@@ -565,7 +689,13 @@ la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.8](#sec-
 4. **Fairness (P17).** `sexo` predice, pero es **factor prohibido** (primas unisex, *Test-Achats*): **exclúyelo**
    de la tarifa, detecta posibles **proxies** —variables permitidas que lo correlacionan— y razona una selección
    **responsable**.
-5. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
+5. **Proxies (P18).** Contrasta la **independencia condicional** entre `sexo` y cada covariable permitida
+   ([Sección 7.3](#sec-u27-proxy)). Identifica los proxies, distingue los que lo son de los que no —habrá
+   controles negativos— y **mide la fuga** comparando el efecto marginal y el ajustado de `sexo`. Recuerda
+   que vas a hacer **varios** contrastes: algún $p$ pequeño saldrá por azar, así que no llames proxy a nada
+   sin mirar la magnitud. Lleva la conclusión a la reflexión individual: ¿qué haces con la variable, y a
+   qué coste?
+6. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
    activos** y **descarta el ruido**. Discute los **activos débiles**: ¿los retiene? ¿Por qué la selección por
    predicción no coincide exactamente con la verdad, y por qué eso **no** es un error del método?
 
@@ -576,5 +706,5 @@ final, para validar.
 Con esto cerramos el recorrido teórico del Caso 2: de la Poisson y las tasas ([2.1](#sec-u21)) a la
 sobredispersión ([2.3](#sec-u23)) y el exceso de ceros ([2.4](#sec-u24)), de los conteos agrupados
 ([2.5](#sec-u25)) al hazard como tasa ([2.6](#sec-u26)), y ahora a **elegir y encoger** modelos con validación
-cruzada y regularización. La [Unidad 2.8](#sec-u28) no añade teoría: pone todo esto a trabajar sobre una cohorte
-sanitaria, en un informe de consultoría donde tú decides —y justificas— qué modelo responde cada pregunta.
+cruzada y regularización. La [Unidad 2.8](#sec-u28) no añade teoría: pone todo esto a trabajar sobre la cartera
+de auto de tu equipo, en un informe ejecutivo dirigido a la dirección donde tú decides —y justificas— qué modelo responde cada pregunta.

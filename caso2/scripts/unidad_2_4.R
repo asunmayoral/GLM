@@ -36,8 +36,8 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", MASS = "7.3.65", MuMIn = "1.48.19", broom = "1.0.13",
-  dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1", lmtest = "0.9.40",
   marginaleffects = "0.32.0", performance = "0.17.0", pscl = "1.5.9",
   sessioninfo = "1.2.4", survival = "3.8.6", tibble = "3.3.1",
   tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
@@ -66,7 +66,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -188,6 +188,19 @@ m_zip <- pscl::zeroinfl(
              uso + potencia_cv,
   dist = "poisson", data = cartera)
 summary(m_zip)
+
+# -----------------------------------------------------------------------------
+# [u24-zip-edad]
+#   4 · Demasiados ceros
+#     > 4.2 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
+# -----------------------------------------------------------------------------
+m_zip_edad <- pscl::zeroinfl(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + edad_conductor + antiguedad_carnet +
+             offset(log(exposicion)) |
+             uso + potencia_cv,
+  dist = "poisson", data = cartera)
+lmtest::lrtest(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de conteo
 
 # -----------------------------------------------------------------------------
 # [u24-zinb]
@@ -314,6 +327,8 @@ cbind(ZIP    = predict(m_zip, nuevas, type = "response"),
 # -----------------------------------------------------------------------------
 v <- attr(cartera, "verdad")
 v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
+# el DGP usa la potencia tipificada: llevamos el coeficiente del ZIP (por CV) a esa escala
+c(potencia_tipificada_ZIP = coef(m_zip)[["zero_potencia_cv"]] * sd(cartera$potencia_cv))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

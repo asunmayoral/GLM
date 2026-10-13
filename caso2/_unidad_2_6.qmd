@@ -2,8 +2,8 @@
 
 # 6 · Del conteo al reloj. Supervivencia {#sec-u26}
 
-En el Caso 1 aplazamos el modelo de Cox y prometimos volver a la supervivencia desde otra familia. Aquí
-cumplimos: el **hazard** —el ritmo instantáneo al que ocurre el evento— es, en el fondo, una **tasa**, y
+En el Caso 1 trabajamos la supervivencia en tiempo discreto y dejamos el tiempo continuo —y el modelo de
+Cox, que desarrollaremos en el Caso 3— para más adelante. Aquí damos el primer paso desde otra familia: el **hazard** —el ritmo instantáneo al que ocurre el evento— es, en el fondo, una **tasa**, y
 ya sabemos modelar tasas con la Poisson y un *offset*. El evento de esta cartera es el **primer
 siniestro** de cada póliza (`tiempo_primer_sin`, `evento`), seguido a lo largo de la **antigüedad** del
 cliente con la aseguradora y sujeto a **censura** cuando su historial acaba sin siniestro. Trocearemos ese tiempo en
@@ -19,16 +19,11 @@ otra cosa que un GLMM de Poisson.
 Objetivo general: **supervivencia** (espiral) — el modelo de **riesgos a trozos** como `glm(poisson)`
 con `offset(log` tiempo-persona`)`; su equivalencia con el persona-periodo `cloglog` del Caso 1, la
 comparación con **Cox** y **Kaplan–Meier**, y el nexo con la **fragilidad** (*frailty* ≡ GLMM de Poisson).
-:::
 
-<!-- ============================================================================
-     ESQUEMA PROPUESTO (a validar antes de desarrollar sección a sección):
-       6.1 Contexto: el hazard como una tasa.
-       6.2 El modelo exponencial a trozos como GLM de Poisson.
-       6.3 Dos lentes del mismo hazard: Poisson y cloglog (nexo Caso 1).
-       6.4 ¿Comparable con los clásicos? Cox y Kaplan-Meier.
-       6.5 Fragilidad = GLMM de Poisson (puente con la Unidad 2.5).
-============================================================================ -->
+Fuentes: @holford1980, @aitkin1980 y @laird1981 para la equivalencia entre riesgos a trozos y Poisson;
+@whitehead1980 para su conexión con Cox; @dobson2018 (cap. 10) para la supervivencia en el marco GLM;
+@andersen1982 para los eventos recurrentes.
+:::
 
 ## 6.1 El hazard como una tasa: el problema del tiempo a evento {#sec-u26-contexto}
 
@@ -74,7 +69,7 @@ Son dos formas de mirar el mismo fenómeno, y en la [Sección 6.3](#sec-u26-nexo
 Como ya hemos comentado, vamos a describir el fenómeno en **tiempo continuo**. Suponemos que bajo los tramos (periodos en nuestro caso) el tiempo transcurre de forma continua —el siniestro ocurre en un instante real, aunque nosotros no lo registramos— y que los tramos son solo la **resolución** con la que lo observamos. Esa mirada continua es la que permite hablar de **tasa** en lugar de probabilidad y, por tanto, la que abre la puerta a la Poisson.
 
 Con ese supuesto, tres funciones describen el tiempo a evento. La **supervivencia** $S(t)=P(T>t)$ es la
-probabilidad de seguir sin siniestro, cuando ya hemos llegado al instante $t$. El **hazard** $h(t)$ es la tasa instantánea de siniestro entre quienes siguen en riesgo,
+probabilidad de seguir sin siniestro **más allá** del instante $t$. El **hazard** $h(t)$ es la tasa instantánea de siniestro entre quienes siguen en riesgo,
 
 $$h(t)=\lim_{\Delta t\to 0}\frac{P(t\le T<t+\Delta t \mid T\ge t)}{\Delta t},$$
 
@@ -138,7 +133,7 @@ exactamente la forma discreta $S_k=\prod_j(1-h_j)$ de la que hablábamos: Kaplan
 por la proporción observada $d_j/n_j$, **sin suponer nada** sobre la forma del hazard. Por eso será la
 referencia natural contra la que contrastemos nuestro modelo en la [Sección 6.4](#sec-u26-clasicos). 
 
-Representamos a continuación KM en función de la `zona_circulacion`, que es uno de los factores de interés:
+Representamos a continuación KM en función de la `zona_circulacion`, que es uno de los factores de interés (@fig-u26-km):
 
 ```{r}
 #| label: fig-u26-km
@@ -297,7 +292,8 @@ Recorramos esas piezas: primero el eje temporal, después los predictores en tre
 
 Empezamos por el tramo, que es el eje sobre el que se construye el hazard base. La curva de Kaplan–Meier
 de la [Sección 6.1](#sec-u26-contexto) ya anticipaba que la supervivencia cae con la antigüedad; ahora
-miramos el hazard por tramos directamente, junto con el tamaño que lo sostiene:
+miramos el hazard por tramos directamente, junto con el tamaño que lo sostiene (la tabla y la
+@fig-u26-haz-emp):
 
 ```{r}
 #| label: u26-haz-emp
@@ -411,7 +407,7 @@ km_all <- purrr::map_dfr(vars_eda, \(v) {
 ```
 
 **Primera mirada: la supervivencia.** Curvas de Kaplan–Meier de cada predictor. Buscamos que los niveles
-**se separen** —señal de que la variable discrimina— y en qué dirección lo hacen.
+**se separen** —señal de que la variable discrimina— y en qué dirección lo hacen (@fig-u26-eda-km).
 
 ```{r}
 #| label: fig-u26-eda-km
@@ -450,7 +446,7 @@ separar la experiencia de la edad.
 
 **Segunda mirada: el hazard.** La misma información, pero sobre el ritmo en lugar de sobre la
 supervivencia acumulada. Aquí buscamos **cuánto** se despega cada nivel del hazard global y, en las
-continuas, si el patrón es **monótono**.
+continuas, si el patrón es **monótono** (@fig-u26-eda-haz).
 
 ```{r}
 #| label: fig-u26-eda-haz
@@ -486,7 +482,7 @@ confusa de su asociación con la edad.
 
 **Tercera mirada: la proporcionalidad.** El gráfico log-log. Si un factor multiplica el hazard por una
 constante, $\log(-\log S(t))$ de sus niveles difiere en una constante y las curvas salen **paralelas**.
-No buscamos que coincidan —eso sería ausencia de efecto—, sino que **mantengan la distancia**.
+No buscamos que coincidan —eso sería ausencia de efecto—, sino que **mantengan la distancia** (@fig-u26-eda-loglog).
 
 ```{r}
 #| label: fig-u26-eda-loglog
@@ -631,8 +627,7 @@ zona— apuntan en direcciones razonables pero con intervalos que cruzan el 1 co
 Conviene no leer eso como que «no influyen». Con solo un `r round(mean(cartera$evento) * 100)` % de
 pólizas siniestradas, el estudio tiene poca **potencia** para efectos de la magnitud que veíamos en el
 descriptivo: distinguir un hazard de $0.081$ de otro de $0.073$ exige muchos más eventos de los que
-tenemos. Ausencia de evidencia no es evidencia de ausencia —salvo, como veremos al validar, en el caso del
-sexo, donde además sabemos que la verdad es cero—.
+tenemos. Ausencia de evidencia no es evidencia de ausencia.
 
 ::: {.callout-tip}
 ## 🔧 En R. El modelo de riesgos a trozos como `glm(poisson)`
@@ -689,10 +684,6 @@ anova(m_pw, m_int, test = "Chisq")
 La interacción consume 10 grados de libertad y reduce la desviación en $17.3$, con un $p$-valor de
 $0.068$: **no se rechaza** la proporcionalidad al nivel habitual (0.05). Los datos son compatibles con que el efecto de la zona sea el mismo en todos los tramos, que es lo que el modelo asume.
 
-Y en este caso
-lo sabemos con certeza, porque el DGP no incluyó ninguna interacción con el tiempo: la proporcionalidad se
-cumple exactamente y el contraste se está comportando como debe.
-
 La cautela pertinente: **no rechazar no es demostrar o aceptar proporcionalidad**. Este contraste
 reparte sus 10 grados de libertad entre todos los patrones imaginables de desviación, y lo hace con unos
 `r sum(pp$y)` eventos, así que su potencia es limitada: una no proporcionalidad moderada podría pasarle
@@ -738,7 +729,7 @@ Con el modelo ajustado, predecir consiste en poner un **perfil concreto** —una
 y recorrer con él los tramos. El modelo devuelve su hazard en cada uno, $\hat\lambda_k$, y de ahí sale su
 curva de supervivencia acumulando, tal como vimos: $\hat H_k=\sum_{j\le k}\hat\lambda_j$ y
 $\hat S_k=e^{-\hat H_k}$. Nótese la doble lectura: esos mismos $\hat\lambda_k$ son, a la vez, la **forma
-estimada del hazard base** desplazada por el perfil elegido, así que el gráfico sirve para predecir y para
+estimada del hazard base** desplazada por el perfil elegido, así que el gráfico (@fig-u26-pw-surv) sirve para predecir y para
 interpretar.
 
 ```{r}
@@ -791,8 +782,8 @@ trabajo hecho:
   media, zona rural, uso particular, turismo) no coincide con el de R (primer nivel de cada factor). La
   salida es comparar **razones entre tramos**, $\lambda_k/\lambda_1$, que bajo proporcionalidad son las
   mismas para cualquier perfil.
-- Los **coeficientes** tampoco: el DGP usó las continuas **estandarizadas**, así que su $0.20$ para la
-  potencia significa «por desviación típica», mientras que el nuestro es «por CV». Basta multiplicar el
+- Los **coeficientes** tampoco: el DGP usó las continuas **estandarizadas**, así que su $0.15$ para la
+  edad significa «por desviación típica», mientras que el nuestro es «por año». Basta multiplicar el
   nuestro por `sd()` para ponerlos en la misma escala. Y en la zona, el DGP toma `rural` como referencia y
   R toma `urbana`, de modo que hay que restar.
 
@@ -842,11 +833,13 @@ dplyr::bind_rows(
   tibble::tibble(
     termino   = names(cont),
     estimado  = as.numeric(coef(m_pw)[names(cont)] * sd_v),
-    verdadero = as.numeric(b[cont])
+    verdadero = as.numeric(b[cont]),
+    ee        = as.numeric(sqrt(diag(vcov(m_pw)))[names(cont)] * sd_v)
   ),
   tibble::tibble(
     termino   = cate,
     estimado  = as.numeric(coef(m_pw)[cate]),
+    ee        = as.numeric(sqrt(diag(vcov(m_pw)))[cate]),
     # el DGP mide la zona frente a 'rural'; R, frente a 'urbana'
     verdadero = as.numeric(c(0, b["moto"], b["furgoneta"],
                              b["mixta"] - b["urbana"], -b["urbana"]))
@@ -857,15 +850,17 @@ dplyr::bind_rows(
 
 Empecemos por la fila más informativa: **`sexo`**, cuyo valor verdadero es **exactamente 0** porque el DGP
 no lo utiliza para generar el tiempo hasta el siniestro. Es un **control negativo** perfecto, y el modelo lo
-supera con nota: estima $-0.008$. No se ha inventado un efecto donde no lo había, y de paso nos da una
-referencia utilísima —**la magnitud del ruido**— con la que juzgar el resto de la tabla.
+supera con nota: estima $-0.008$, muy cerca de 0 en relación con su error estándar (el intervalo del
+*hazard ratio* de la [Sección 6.2](#sec-u26-piecewise) iba de $0.871$ a $1.130$). No se ha inventado un
+efecto donde no lo había.
 
-Con esa vara de medir, los resultados se ordenan solos. La **edad** ($0.136$ frente a $0.15$) y la **zona
+La **edad** ($0.136$ frente a $0.15$) y la **zona
 mixta** ($-0.104$ frente a $-0.12$) se recuperan bien. Los demás se quedan **cortos** —la experiencia
 ($-0.064$ frente a $-0.10$), la moto ($0.063$ frente a $0.20$), la zona rural ($-0.086$ frente a
-$-0.20$)— y la furgoneta llega a salir con el **signo cambiado** ($-0.059$ frente a $0.08$). Nótese que
-todos ellos son varias veces mayores que el ruido de $0.008$ que marca el sexo: no son cero, pero están
-mal medidos.
+$-0.20$)— y la furgoneta llega a salir con el **signo cambiado** ($-0.059$ frente a $0.08$). Pero ninguna de
+esas distancias a la verdad llega a un error estándar y medio (compáralas con la columna `ee`, el error
+estándar en la escala del DGP, entre $0.06$ y $0.11$): son las que cabe esperar del azar del muestreo, no un
+sesgo del modelo.
 
 Esto no es un fallo del método, sino la consecuencia directa de lo que ya decían los intervalos de
 confianza. Con unos `r sum(pp$y)` primeros siniestros no hay información suficiente para resolver efectos
@@ -1043,10 +1038,9 @@ cox.zph(m_cox)
 ```
 
 La respuesta es contundente: ninguna covariable baja de $p=0.34$ y el contraste **global** llega a $0.94$.
-Los *hazard ratios* no cambian con el tiempo, que es justo lo que cabe esperar de un DGP que los fijó
-constantes.
+No hay evidencia de que los *hazard ratios* cambien con el tiempo.
 
-Y ahora el gráfico, que es donde se ve la trayectoria de cada efecto:
+Y ahora el gráfico, que es donde se ve la trayectoria de cada efecto (@fig-u26-zph):
 
 ```{r}
 #| label: fig-u26-zph
@@ -1061,15 +1055,18 @@ par(mfrow = c(1, 1))
 
 En los cinco paneles $\beta(t)$ es plano dentro de su banda —ni siquiera `zona_circulacion`, el que más ondula, escapa (p=0.93)—: confirma lo que decían los p-valores. Dos avisos: en los factores los puntos forman franjas por tener pocos valores, y las escalas verticales cambian entre paneles, así que solo cuenta la forma frente a su propia banda.
 
-Frente al 0.068 de la interacción `tramo:zona_circulacion` en la  [Sección 6.2](#sec-u26-piecewise), aquí el pvalor
-es mucho más alto: aquel contraste busca cualquier desviación y cox.zph solo una tendencia temporal, por lo que es más nítido cuando no la hay. 
+Frente al 0.068 de la interacción `tramo:zona_circulacion` en la [Sección 6.2](#sec-u26-piecewise), aquí
+el $p$-valor es mucho más alto. No significa que este contraste aporte más evidencia **a favor** de la
+proporcionalidad —un $p$ alto nunca la demuestra—: los dos buscan desviaciones distintas (aquel, cualquier
+patrón de la zona por tramo, con 10 grados de libertad; `cox.zph`, una tendencia en el tiempo) y ninguno
+encuentra evidencia en contra.
 
 Podemos concluir pues, que la proporcionalidad se sostiene en estos datos; hasta aquí todas las pruebas realizadas concluyen lo mismo: el gráfico log-log del análisis descriptivo (las curvas de cada factor salían paralelas) , el contraste de la interacción y el test de Schoenfeld -sin tendencia temporal en los residuos y un pvalor global de 0.94).
 
 ### Kaplan–Meier: la curva sin modelo frente a la del modelo
 
 Para la curva la comparación debe ser justa: enfrentamos la Kaplan–Meier **global** a la supervivencia de
-un modelo que solo lleva el hazard base, **sin covariables**.
+un modelo que solo lleva el hazard base, **sin covariables** (@fig-u26-km-vs-pw).
 
 ```{r}
 #| label: fig-u26-km-vs-pw
@@ -1146,9 +1143,10 @@ c(sigma_agencia = sd_frag)
 ```
 
 El componente estimado, $\hat\sigma\approx$ `r round(sd_frag, 3)`, es indistinguible de cero. No es un
-fracaso, sino un **control negativo**: el DGP generó el tiempo a evento solo a partir de las covariables,
-sin ningún efecto de agencia —al contrario que `n_gestiones`, donde sí lo había y la
-[Unidad 2.5](#sec-u25) recuperó $\sigma\approx0.6$—. Conviene reconocer esta señal, porque es la que verás
+fracaso: una vez tenidas en cuenta las covariables, las agencias no comparten un nivel de riesgo propio
+para el primer siniestro —al contrario que en `n_gestiones`, donde la [Unidad 2.5](#sec-u25) estimó
+$\hat\sigma_{\text{ag}}\approx$ `r round(sd_ag, 2)`—. Lo confirma el DGP, que genera el tiempo a evento
+sin ningún efecto de agencia. Conviene reconocer esta señal, porque es la que verás
 cuando un agrupamiento no aporte: una varianza que se desploma y, en el límite, un ajuste **singular**.
 
 En nuestros datos ignorar la fragilidad es inocuo: no la hay. Pero no conviene generalizarlo, porque cuando sí está presente aparece un fenómeno propio de la supervivencia, la depleción. Los frágiles fallan antes, de modo que el conjunto de riesgo se va vaciando de ellos y queda cada vez más «sano». En consecuencia, el hazard de la población crece más despacio que el de cada individuo —puede incluso bajar aunque el riesgo individual no deje de subir—. Un modelo sin fragilidad estima esa curva poblacional aplanada; no es que se equivoque, sino que responde a otra pregunta: «¿cómo evoluciona el riesgo de los que siguen aquí?» en lugar de «¿cómo evoluciona mi riesgo?», que es el que importa al aconsejar a un cliente concreto.
@@ -1194,6 +1192,28 @@ m <- glm(y ~ tramo + covariables, family = poisson, data = pp)
 # predicción: hazard por tramo -> H acumulado -> S(t) = exp(-H)
 ```
 
+::: {.callout-tip}
+## 🔧 En R. Cuando el tiempo es continuo: cortar con `survSplit`
+En esta cartera el tiempo venía ya agrupado en tramos iguales. Si lo que tienes es el tiempo **exacto**
+(en años, por ejemplo) hasta el primer siniestro o la censura, el procedimiento es el mismo con dos
+cambios: tú eliges los cortes, y el tiempo en riesgo de cada tramo deja de ser constante —el último tramo
+de cada póliza suele estar incompleto—, así que el *offset* vuelve a ser imprescindible.
+
+```r
+library(survival)
+pp <- survSplit(Surv(t_primer_sin, evento) ~ ., data = cartera,
+                cut = 1:9, episode = "tramo")       # cortes en los años 1, 2, ..., 9
+pp$en_riesgo <- pp$t_primer_sin - pp$tstart          # tiempo en riesgo dentro del tramo
+m <- glm(evento ~ factor(tramo) + covariables + offset(log(en_riesgo)),
+         family = poisson, data = pp)
+```
+
+`survSplit` devuelve una fila por póliza y tramo, con el inicio (`tstart`), el final (que conserva el
+nombre del tiempo original) y el indicador de evento **de ese tramo**. Elegir los cortes es una decisión de
+modelización: tramos más finos describen mejor la forma del hazard, pero cada uno necesita eventos
+suficientes para estimarse.
+:::
+
 **2 · Conteos por subperiodo** (eventos recurrentes). Tienes el **número** de partes de cada sujeto en
 cada subperiodo, con su exposición. Mismo modelo, con dos diferencias: `y` es ahora un conteo (no un
 0/1) y el sujeto **no sale** del conjunto de riesgo tras un parte, así que el *offset* de la exposición
@@ -1203,8 +1223,10 @@ vuelve a ser imprescindible:
 m <- glm(y ~ tramo + covariables + offset(log(exposicion)), family = poisson, data = pp)
 ```
 
-Es el modelo de **Andersen–Gill**, que lleva Cox al terreno de los procesos de recuento. Ya no se modela
-el hazard del primer evento, sino la **intensidad** del proceso completo.
+Es el modelo de **Andersen–Gill** [@andersen1982], que lleva Cox al terreno de los procesos de recuento.
+Ya no se modela el hazard del primer evento, sino la **intensidad** del proceso completo. En el estudio de
+caso, `panel.csv` ya viene en este formato: una fila por póliza y año, con el número de partes del año
+(`n_partes_anual`) y su exposición (`expo_anual`, que entra como `offset(log(expo_anual))`).
 
 **3 · Solo totales** (sin *cuándo*). Tienes el número de partes de cada sujeto en todo el periodo, pero
 no en qué momento ocurrieron. Sin información temporal solo cabe una **tasa media**, es decir, un hazard
@@ -1217,7 +1239,7 @@ S_t    <- exp(-lambda * t)         # supervivencia; P(>=1 evento en una unidad d
 ```
 
 Es el modelo de la [Unidad 2.1](#sec-u21) leído como supervivencia. Es también el precio de tener solo
-totales: la forma del riesgo que sí recuperamos en el caso 1 —que se duplicaba con la antigüedad— aquí es
+totales: la forma del riesgo que sí recuperamos en la situación 1 —que se duplicaba con la antigüedad— aquí es
 invisible.
 
 **Dos cautelas al pasar a conteos.** Con eventos recurrentes, el supuesto de proceso de Poisson
@@ -1237,11 +1259,14 @@ Conteo y supervivencia no son dos modelos, sino dos preguntas sobre el mismo pro
 Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.8](#sec-u28)):
 
 - **P13 · El primer siniestro.** Expande a **persona-periodo** y ajusta el modelo de **riesgos a trozos**
-  (Poisson + offset) sobre `t_primer_sin`/`evento`; describe el **hazard base** por tramo de antigüedad, lee
+  (Poisson + offset) sobre `t_primer_sin`/`evento` —en tu cartera el tiempo es **continuo**: córtalo en
+  tramos con `survSplit` y usa el tiempo en riesgo como *offset*, como en la [Sección 6.6](#sec-u26-conteos)—;
+  describe el **hazard base** por tramo de antigüedad, lee
   las razones de riesgo, y compara la curva de supervivencia con **Kaplan–Meier** y **Cox**.
 - **P14 · Eventos recurrentes (avanzado).** Con el **panel** (`panel.csv`) y el historial de partes, plantea
   el modelo de **Andersen–Gill** (offset variable) y discute si el riesgo del 2.º, 3.º… siniestro difiere del
-  primero —conexión con la fragilidad de la [2.3](#sec-u23)—.
+  primero —conexión con la fragilidad de la [Sección 6.5](#sec-u26-frailty) y con la sobredispersión de la
+  [Unidad 2.3](#sec-u23)—.
 - **P15 · Recomendación.** Traduce el hazard en una política de **cada cuánto revisar** las pólizas de más
   riesgo.
 

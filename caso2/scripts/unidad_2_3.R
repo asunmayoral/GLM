@@ -36,10 +36,10 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  AER = "1.2.17", DHARMa = "0.5.0", MASS = "7.3.65", MuMIn = "1.48.19",
-  broom = "1.0.13", dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0",
-  lme4 = "2.0.1", marginaleffects = "0.32.0", performance = "0.17.0",
-  pscl = "1.5.9", purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
+  AER = "1.2.17", DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
+  dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  marginaleffects = "0.32.0", performance = "0.17.0", pscl = "1.5.9",
+  purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
   tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13",
   vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
@@ -67,7 +67,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -235,7 +235,9 @@ dplyr::left_join(
 
 # -----------------------------------------------------------------------------
 # [fig-u23-quasi-resid]
-#   3 · Sobredispersión > 3.2 Quasi-Poisson > Bondad de ajuste y diagnóstico
+#   3 · Sobredispersión
+#     > 3.2 Quasi-Poisson
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 tibble::tibble(ajustado = fitted(m_quasi),
                residuo  = residuals(m_quasi, type = "pearson")) |>
@@ -269,7 +271,8 @@ sigma(m_nb1)   # dispersion alpha de la NB1
 se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
 se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
 data.frame(term = names(se_q), se_quasi = round(se_q, 4),
-           se_nb1 = round(se_nb1[names(se_q)], 4))
+           se_nb1 = round(se_nb1[names(se_q)], 4),
+           cociente = round(se_nb1[names(se_q)] / se_q, 3))
 
 # -----------------------------------------------------------------------------
 # [u23-nb-disp]

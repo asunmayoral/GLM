@@ -36,8 +36,8 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", MASS = "7.3.65", MuMIn = "1.48.19", broom = "1.0.13",
-  dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", performance = "0.17.0", pscl = "1.5.9",
   sessioninfo = "1.2.4", survival = "3.8.6", tibble = "3.3.1",
   tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
@@ -66,7 +66,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -77,6 +77,7 @@ theme_set(theme_minimal(base_size = 12))
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 glimpse(cartera)
+head(cartera)
 
 # -----------------------------------------------------------------------------
 # [u27-datos]
@@ -263,9 +264,62 @@ tibble::tibble(
   variables_vivas = c(n_no_nulos(cv_ridge), n_no_nulos(cv_enet), n_no_nulos(cv_lasso)))
 
 # -----------------------------------------------------------------------------
+# [u27-proxy-control]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 Seleccionar con un factor prohibido: los proxies
+# -----------------------------------------------------------------------------
+# Indicador de alguna asistencia: la misma respuesta de la unidad, ahora como factor de una tabla
+cart_prox <- cartera |>
+  dplyr::mutate(asistencia = factor(ifelse(n_asistencia > 0, "con", "sin"), levels = c("sin", "con")))
+tp <- as.data.frame(xtabs(~ sexo + tipo_vehiculo + asistencia, data = cart_prox))
+m_ci  <- glm(Freq ~ sexo * asistencia + tipo_vehiculo * asistencia, family = poisson, data = tp)
+m_hom <- glm(Freq ~ (sexo + tipo_vehiculo + asistencia)^2,           family = poisson, data = tp)
+anova(m_ci, m_hom, test = "LRT")     # H0: sexo _||_ tipo | asistencia  (no hay proxy)
+
+# -----------------------------------------------------------------------------
+# [u27-proxy-control-tamano]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 Seleccionar con un factor prohibido: los proxies
+# -----------------------------------------------------------------------------
+broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl("^sexo.*:tipo", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+
+# -----------------------------------------------------------------------------
+# [u27-proxy-simulado]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 Seleccionar con un factor prohibido: los proxies
+# -----------------------------------------------------------------------------
+set.seed(SEMILLA_CURSO)
+n <- 20000        # n grande y efectos exagerados a propósito: queremos VER la fuga
+# Niveles EXPLÍCITOS: "M" es la referencia, así el coeficiente se llama `sH` y se lee
+# "hombres frente a mujeres". Sin declararlos, R ordena alfabéticamente (H antes que M)
+# y el coeficiente saldría invertido.
+s <- factor(sample(c("M", "H"), n, TRUE), levels = c("M", "H"))        # factor prohibido
+v <- factor(ifelse(runif(n) < ifelse(s == "H", 0.30, 0.05), "moto", "otro"),
+            levels = c("otro", "moto"))                               # PERMITIDA, asociada a s
+y <- rbinom(n, 1, plogis(-0.8 + 1.20 * (v == "moto") + 0.20 * (s == "H")))
+sim <- as.data.frame(xtabs(~ s + v + y))
+
+anova(glm(Freq ~ s*y + v*y, family = poisson, data = sim),
+      glm(Freq ~ (s + v + y)^2, family = poisson, data = sim), test = "LRT")
+
+# -----------------------------------------------------------------------------
+# [u27-proxy-fuga]
+#   7 · Selección, validación cruzada y regularización
+#     > 7.3 Seleccionar con un factor prohibido: los proxies
+# -----------------------------------------------------------------------------
+d_sim <- data.frame(y = y, s = s, v = v)
+or_s <- function(fml) exp(coef(glm(fml, family = binomial, data = d_sim))[["sH"]])
+c(OR_marginal    = round(or_s(y ~ s),     3),   # lo que se ve sin controlar el proxy
+  OR_ajustado    = round(or_s(y ~ s + v), 3),   # el efecto directo del factor prohibido
+  verdad_directa = round(exp(0.20),       3))   # el valor con el que se generaron los datos
+
+# -----------------------------------------------------------------------------
 # [u27-binomial]
 #   7 · Selección, validación cruzada y regularización
-#     > 7.3 La misma máquina en la binaria
+#     > 7.4 La misma máquina en la binaria
 # -----------------------------------------------------------------------------
 set.seed(SEMILLA_CURSO)
 cv_bin <- cv.glmnet(x, cartera$evento, family = "binomial",
@@ -278,7 +332,7 @@ c(no_nulos_1se = n_sel("lambda.1se"), no_nulos_min = n_sel("lambda.min"))
 # -----------------------------------------------------------------------------
 # [u27-binomial-min]
 #   7 · Selección, validación cruzada y regularización
-#     > 7.3 La misma máquina en la binaria
+#     > 7.4 La misma máquina en la binaria
 # -----------------------------------------------------------------------------
 # Coeficientes que sobreviven a lambda.min, en escala ODDS RATIO (exp del coeficiente).
 m_bin <- as.matrix(coef(cv_bin, s = "lambda.min"))

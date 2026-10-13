@@ -1,5 +1,5 @@
 # =============================================================================
-# Caso 2 · Unidad 2.1 — 1 · Poisson y modelos log-lineales
+# Caso 2 · Unidad 2.1 — 1 · Regresión de Poisson: conteos y tasas
 # -----------------------------------------------------------------------------
 # Todos los chunks de código de la unidad, extraídos de _unidad_2_1.qmd.
 # Cada bloque va precedido de su LABEL y de la ruta de encabezados
@@ -36,10 +36,10 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", MASS = "7.3.65", MuMIn = "1.48.19", broom = "1.0.13",
-  dplyr = "1.2.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
-  marginaleffects = "0.32.0", performance = "0.17.0", pscl = "1.5.9",
-  purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
+  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
+  forcats = "1.0.1", ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
+  lme4 = "2.0.1", marginaleffects = "0.32.0", performance = "0.17.0",
+  pscl = "1.5.9", purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
   tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13",
   vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
@@ -67,7 +67,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(MuMIn); library(glmnet)   # selección / regularización 
+library(glmnet)       # regularización (2.7)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -78,89 +78,70 @@ theme_set(theme_minimal(base_size = 12))
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 glimpse(cartera)
+head(cartera)
 
 # -----------------------------------------------------------------------------
 # [fig-u21-exposicion]
-#   1 · Poisson y modelos log-lineales
-#     > 1.1 Contexto: qué problemas resuelve este modelo
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.1 Contexto: qué problema resuelve este modelo
 # -----------------------------------------------------------------------------
 cartera |>
   mutate(tramo = cut(exposicion, c(0, 0.5, 0.75, 1),
                      labels = c("< 0.5", "0.5–0.75", "> 0.75"), include.lowest = TRUE)) |>
   group_by(tramo) |>
-  summarise(media_danos = mean(n_danos), .groups = "drop") |>
-  ggplot(aes(tramo, media_danos)) +
+  summarise(`media por póliza` = mean(n_asistencia),
+            `tasa (por unidad de exposición)` = sum(n_asistencia) / sum(exposicion),
+            .groups = "drop") |>
+  tidyr::pivot_longer(-tramo, names_to = "medida", values_to = "valor") |>
+  ggplot(aes(tramo, valor)) +
   geom_col(fill = "steelblue") +
-  labs(x = "exposición (fracción de la antigüedad máxima)", y = "media de partes por daños")
-
-# -----------------------------------------------------------------------------
-# [tbl-u21-contingencia]
-#   1 · Poisson y modelos log-lineales
-#     > 1.1 Contexto: qué problemas resuelve este modelo
-# -----------------------------------------------------------------------------
-cartera |>
-  mutate(danos = ifelse(n_danos > 0, "con daños", "sin daños")) |>
-  count(zona_circulacion, danos) |>
-  tidyr::pivot_wider(names_from = danos, values_from = n) |>
-  mutate(pct_con_danos = round(`con daños` / (`con daños` + `sin daños`) * 100))
-
-# -----------------------------------------------------------------------------
-# [tbl-u21-cambio]
-#   1 · Poisson y modelos log-lineales
-#     > 1.1 Contexto: qué problemas resuelve este modelo
-# -----------------------------------------------------------------------------
-# pasamos la `table` a data.frame ANCHO: sin esto se imprime por consola, `df-print: paged`
-# no la alcanza y Quarto no puede numerarla ni referenciarla como tabla
-addmargins(table(previo = cartera$bonus_malus_prev, actual = cartera$bonus_malus_act)) |>
-  as.data.frame.matrix() |>
-  tibble::rownames_to_column("previo")
-
-# -----------------------------------------------------------------------------
-# [tbl-u21-cambio-marg]
-#   1 · Poisson y modelos log-lineales
-#     > 1.1 Contexto: qué problemas resuelve este modelo
-# -----------------------------------------------------------------------------
-rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
-      actual = prop.table(table(cartera$bonus_malus_act))) |>
-  round(3) |>
-  as.data.frame.matrix() |>
-  tibble::rownames_to_column("año")
+  facet_wrap(~ medida) +
+  labs(x = "exposición (fracción de la antigüedad máxima)", y = "asistencias")
 
 # -----------------------------------------------------------------------------
 # [fig-u21-eda-modelo]
-#   1 · Poisson y modelos log-lineales
+#   1 · Regresión de Poisson: conteos y tasas
 #     > 1.2 Modelización y estimación
-#       > Aplicado a los cuatro problemas del contexto
+#       > Aplicado a la cartera
 # -----------------------------------------------------------------------------
-dplyr::bind_rows(
-  purrr::map_dfr(c("edad_conductor", "potencia_cv"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(dplyr::ntile(.data[[.x]], 4)),
-                     y = n_asistencia, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop")),
-  purrr::map_dfr(c("zona_circulacion", "uso", "tipo_vehiculo"), ~ cartera |>
-    dplyr::transmute(predictor = .x, nivel = factor(.data[[.x]]),
-                     y = n_asistencia, e = exposicion) |>
-    dplyr::group_by(predictor, nivel) |> dplyr::summarise(tasa = sum(y) / sum(e), .groups = "drop"))) |>
-  ggplot(aes(nivel, tasa)) +
-  geom_col(fill = "steelblue") +
+# sum(y)/sum(e) es el EMV de la tasa Poisson del grupo; como Var(sum y) = sum mu,
+# su error estándar aproximado es sqrt(sum y)/sum(e)
+tasa_por_nivel <- function(var, nivel) {
+  tibble::tibble(nivel = nivel, y = cartera$n_asistencia, e = cartera$exposicion) |>
+    dplyr::group_by(nivel) |>
+    dplyr::summarise(tasa = sum(y) / sum(e), ee = sqrt(sum(y)) / sum(e), .groups = "drop") |>
+    dplyr::mutate(predictor = var, nivel = as.character(nivel))
+}
+continuos   <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo")
+categoricos <- c("zona_circulacion", "uso", "tipo_vehiculo")
+tasas_eda <- dplyr::bind_rows(
+  # cut_number: cuartiles etiquetados con su rango, más legibles que "1, 2, 3, 4"
+  purrr::map(continuos,   \(v) tasa_por_nivel(v, ggplot2::cut_number(cartera[[v]], 4))),
+  purrr::map(categoricos, \(v) tasa_por_nivel(v, cartera[[v]]))) |>
+  dplyr::mutate(nivel     = forcats::fct_inorder(nivel),
+                predictor = factor(predictor, levels = c(continuos, categoricos)))
+tasa_global <- sum(cartera$n_asistencia) / sum(cartera$exposicion)
+
+ggplot(tasas_eda, aes(nivel, tasa)) +
+  geom_hline(yintercept = tasa_global, linetype = "dashed", colour = "grey50") +
+  geom_pointrange(aes(ymin = tasa - 1.96 * ee, ymax = tasa + 1.96 * ee), colour = "steelblue") +
   facet_wrap(~ predictor, scales = "free_x", nrow = 2) +
-  labs(x = "nivel (cuartil, en los continuos)", y = "tasa de asistencias (por unidad de exposición)")
+  labs(x = NULL, y = "tasa de asistencias (por unidad de exposición)") +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 
 # -----------------------------------------------------------------------------
-# [u21-fit-conteo]
-#   1 · Poisson y modelos log-lineales
+# [u21-cor-edad-carnet]
+#   1 · Regresión de Poisson: conteos y tasas
 #     > 1.2 Modelización y estimación
-#       > Aplicado a los cuatro problemas del contexto
+#       > Aplicado a la cartera
 # -----------------------------------------------------------------------------
-m_conteo <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo,
-                family = poisson, data = cartera)
-broom::tidy(m_conteo)
+cor(cartera$edad_conductor, cartera$antiguedad_carnet)
 
 # -----------------------------------------------------------------------------
 # [u21-fit-tasa]
-#   1 · Poisson y modelos log-lineales
+#   1 · Regresión de Poisson: conteos y tasas
 #     > 1.2 Modelización y estimación
-#       > Aplicado a los cuatro problemas del contexto
+#       > Aplicado a la cartera
 # -----------------------------------------------------------------------------
 m_tasa <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                 offset(log(exposicion)),
@@ -168,100 +149,64 @@ m_tasa <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + u
 broom::tidy(m_tasa)
 
 # -----------------------------------------------------------------------------
-# [u21-fit-loglineal]
-#   1 · Poisson y modelos log-lineales
-#     > 1.2 Modelización y estimación
-#       > Aplicado a los cuatro problemas del contexto
-# -----------------------------------------------------------------------------
-tabla <- cartera |>
-  dplyr::mutate(danos = ifelse(n_danos > 0, "con", "sin")) |>
-  dplyr::count(zona_circulacion, danos)                 # una fila por celda: n = frecuencia
-
-m_indep <- glm(n ~ zona_circulacion + danos, family = poisson, data = tabla)  # independencia
-m_sat   <- glm(n ~ zona_circulacion * danos, family = poisson, data = tabla)  # con asociación
-
-# el saturado reproduce la tabla; el de independencia, no
-cbind(tabla, indep = round(fitted(m_indep), 1), sat = round(fitted(m_sat), 1))
-
-# -----------------------------------------------------------------------------
-# [u21-fit-simetria]
-#   1 · Poisson y modelos log-lineales
-#     > 1.2 Modelización y estimación
-#       > Aplicado a los cuatro problemas del contexto
-# -----------------------------------------------------------------------------
-cuad <- as.data.frame(table(prev = cartera$bonus_malus_prev, act = cartera$bonus_malus_act)) |>
-  dplyr::mutate(i = as.integer(prev), j = as.integer(act),
-                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))   # empareja (i,j) y (j,i)
-
-m_sim <- glm(Freq ~ par, family = poisson, data = cuad)                   # modelo de simetría
-head(broom::tidy(m_sim), 5)
-
-# -----------------------------------------------------------------------------
 # [u21-irr]
-#   1 · Poisson y modelos log-lineales
-#     > 1.3 Interpretación
-#       > En regresión: razones de tasas (IRR)
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > Razones de tasas (IRR)
 # -----------------------------------------------------------------------------
-broom::tidy(m_tasa, exponentiate = TRUE, conf.int = TRUE)
+irr <- broom::tidy(m_tasa, exponentiate = TRUE, conf.int = TRUE)
+irr
+irr_moto <- irr[irr$term == "tipo_vehiculomoto", ]   # el ejemplo que se interpreta abajo
 
 # -----------------------------------------------------------------------------
 # [u21-pred]
-#   1 · Poisson y modelos log-lineales
-#     > 1.3 Interpretación
-#       > En regresión: razones de tasas (IRR)
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > Razones de tasas (IRR)
 # -----------------------------------------------------------------------------
 perfil <- data.frame(edad_conductor = 45, potencia_cv = 110, zona_circulacion = "urbana",
                      uso = "particular", tipo_vehiculo = "turismo", exposicion = 1)
 predict(m_tasa, perfil, type = "response")   # nº esperado de asistencias en la ventana de exposición
 
 # -----------------------------------------------------------------------------
-# [u21-abs]
-#   1 · Poisson y modelos log-lineales
-#     > 1.3 Interpretación
-#       > Efecto relativo vs absoluto
+# [u21-pred-ic]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > Razones de tasas (IRR)
 # -----------------------------------------------------------------------------
-perfiles <- data.frame(edad_conductor = 45, potencia_cv = 110,
-                       zona_circulacion = c("urbana", "rural"), uso = "particular",
-                       tipo_vehiculo = "turismo", exposicion = 1)
-predict(m_tasa, perfiles, type = "response")   # esperadas: urbana vs rural
+p  <- predict(m_tasa, perfil, type = "link", se.fit = TRUE)        # eta y su error estándar
+ic <- exp(p$fit + c(estimacion = 0, inf = -1.96, sup = 1.96) * p$se.fit)
+ic                                                                 # IC 95 % de la tasa esperada
+marginaleffects::predictions(m_tasa, newdata = perfil)             # la misma cuenta, en una línea
 
 # -----------------------------------------------------------------------------
-# [u21-loglin-or]
-#   1 · Poisson y modelos log-lineales
-#     > 1.3 Interpretación
-#       > En el log-lineal: la asociación
+# [u21-abs]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > Razones de tasas (IRR)
 # -----------------------------------------------------------------------------
-m_logit <- glm(I(n_danos > 0) ~ zona_circulacion, family = binomial, data = cartera)
-exp(coef(m_logit))   # odds ratios de 'con daños' respecto a la zona de referencia
+# mismo cambio (turismo -> moto) sobre dos perfiles con tasas de partida muy distintas
+base <- data.frame(perfil = c("bajo riesgo", "alto riesgo"),
+                   edad_conductor = c(65, 25), potencia_cv = c(80, 160),
+                   zona_circulacion = c("rural", "urbana"), uso = c("particular", "comercial"),
+                   exposicion = 1)
+turismo <- predict(m_tasa, transform(base, tipo_vehiculo = "turismo"), type = "response")
+moto    <- predict(m_tasa, transform(base, tipo_vehiculo = "moto"),    type = "response")
+data.frame(perfil = base$perfil, turismo, moto,
+           cociente   = moto / turismo,    # relativo: la IRR de la moto, igual en los dos perfiles
+           diferencia = moto - turismo)    # absoluto: crece con la tasa de partida
 
 # -----------------------------------------------------------------------------
 # [u21-drop1]
-#   1 · Poisson y modelos log-lineales
+#   1 · Regresión de Poisson: conteos y tasas
 #     > 1.4 Inferencia y selección
 #       > Contraste de los efectos
 # -----------------------------------------------------------------------------
 drop1(m_tasa, test = "LRT")   # aporte de cada predictor por razón de verosimilitudes
 
 # -----------------------------------------------------------------------------
-# [u21-indep]
-#   1 · Poisson y modelos log-lineales
-#     > 1.4 Inferencia y selección
-#       > El contraste de independencia es un LRT
-# -----------------------------------------------------------------------------
-anova(m_indep, m_sat, test = "LRT")   # H0: zona y daños son independientes
-
-# -----------------------------------------------------------------------------
-# [u21-simetria-test]
-#   1 · Poisson y modelos log-lineales
-#     > 1.4 Inferencia y selección
-#       > El contraste de simetría
-# -----------------------------------------------------------------------------
-c(deviance = deviance(m_sim), gl = df.residual(m_sim),
-  p_valor  = pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE))
-
-# -----------------------------------------------------------------------------
 # [u21-seleccion]
-#   1 · Poisson y modelos log-lineales
+#   1 · Regresión de Poisson: conteos y tasas
 #     > 1.4 Inferencia y selección
 #       > Selección de modelos
 # -----------------------------------------------------------------------------
@@ -270,42 +215,153 @@ AIC(m_tasa, m_red)
 anova(m_red, m_tasa, test = "LRT")
 
 # -----------------------------------------------------------------------------
-# [u21-dispersion]
-#   1 · Poisson y modelos log-lineales
-#     > 1.5 Bondad de ajuste, diagnóstico y predicción
-#       > Bondad de ajuste y el índice de dispersión
+# [u21-gof]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Deviance y $\chi^2$ de Pearson
 # -----------------------------------------------------------------------------
-disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
-c(deviance_gl = deviance(m_tasa) / df.residual(m_tasa),
-  indice_dispersion = disp(m_tasa))
+gl <- df.residual(m_tasa)
+D  <- deviance(m_tasa)
+X2 <- sum(residuals(m_tasa, type = "pearson")^2)
+c(D = D, X2 = X2, gl = gl, D_gl = D / gl, X2_gl = X2 / gl,
+  mediana_mu = median(fitted(m_tasa)))
 
 # -----------------------------------------------------------------------------
-# [u21-dharma]
-#   1 · Poisson y modelos log-lineales
-#     > 1.5 Bondad de ajuste, diagnóstico y predicción
-#       > Diagnóstico de residuos
+# [u21-deviance-esperada]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Deviance y $\chi^2$ de Pearson
 # -----------------------------------------------------------------------------
-library(DHARMa)
-simulateResiduals(m_tasa, plot = TRUE)      # residuos escalados; QQ y dispersión
-performance::check_overdispersion(m_tasa)   # test formal del índice de dispersión
+# aporte esperado de UNA observación a D si el modelo es correcto, según su media mu
+aporte_D <- function(mu) {
+  k <- 0:(qpois(1 - 1e-12, mu) + 1)
+  sum(dpois(k, mu) * 2 * (ifelse(k > 0, k * log(k / mu), 0) - (k - mu)))
+}
+mus <- c(0.1, 0.4, 1, 3, 10)
+tibble::tibble(mu = mus, aporte_esperado_D = sapply(mus, aporte_D), aporte_esperado_X2 = 1)
+
+# -----------------------------------------------------------------------------
+# [u21-dispersion]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > El índice de dispersión
+# -----------------------------------------------------------------------------
+disp <- function(m) sum(residuals(m, type = "pearson")^2) / df.residual(m)
+disp(m_tasa)
 
 # -----------------------------------------------------------------------------
 # [u21-sobredispersion]
-#   1 · Poisson y modelos log-lineales
-#     > 1.5 Bondad de ajuste, diagnóstico y predicción
-#       > El puente a la sobredispersión (Unidad 2.3)
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > El índice de dispersión
 # -----------------------------------------------------------------------------
 m_danos <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                  offset(log(exposicion)), family = poisson, data = cartera)
 c(asistencia = disp(m_tasa), danos = disp(m_danos))
 
 # -----------------------------------------------------------------------------
-# [u21-pred-celda]
-#   1 · Poisson y modelos log-lineales
-#     > 1.5 Bondad de ajuste, diagnóstico y predicción
-#       > Predicción
+# [u21-rootograma-tabla]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > El rootograma
 # -----------------------------------------------------------------------------
-transform(tabla, esperado_indep = round(fitted(m_indep), 1))   # observado (n) vs esperado si independientes
+mu_hat <- fitted(m_tasa)
+K <- 0:max(cartera$n_asistencia)
+raiz <- tibble::tibble(
+  k         = K,
+  observado = as.numeric(table(factor(cartera$n_asistencia, levels = K))),
+  esperado  = sapply(K, \(k) sum(dpois(k, mu_hat))))
+raiz
+
+# -----------------------------------------------------------------------------
+# [fig-u21-rootograma]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > El rootograma
+# -----------------------------------------------------------------------------
+ggplot(raiz) +
+  geom_rect(aes(xmin = k - 0.4, xmax = k + 0.4,
+                ymin = sqrt(esperado) - sqrt(observado), ymax = sqrt(esperado)),
+            fill = "steelblue", alpha = 0.7) +
+  geom_line(aes(k, sqrt(esperado)), colour = "darkorange", linewidth = 0.8) +
+  geom_point(aes(k, sqrt(esperado)), colour = "darkorange") +
+  geom_hline(yintercept = 0) +
+  labs(x = "nº de asistencias", y = "raíz de la frecuencia")
+
+# -----------------------------------------------------------------------------
+# [fig-u21-residuos-crudos]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Residuos de Pearson y de deviance
+# -----------------------------------------------------------------------------
+res <- tibble::tibble(ajustado = fitted(m_tasa),
+                      r        = residuals(m_tasa, type = "deviance"),
+                      y        = factor(cartera$n_asistencia))
+paneles <- c("Residuos frente a ajustados", "QQ normal")
+dplyr::bind_rows(
+  res |> dplyr::transmute(panel = paneles[1], x = ajustado, r, y),
+  res |> dplyr::arrange(r) |>
+    dplyr::transmute(panel = paneles[2], x = qnorm(ppoints(dplyr::n())), r, y)) |>
+  dplyr::mutate(panel = factor(panel, levels = paneles)) |>
+  ggplot(aes(x, r, colour = y)) +
+  geom_point(size = 0.6, alpha = 0.5) +
+  geom_abline(data = data.frame(panel = factor(paneles[2], levels = paneles)),
+              aes(intercept = 0, slope = 1), inherit.aes = FALSE, linetype = "dashed") +
+  facet_wrap(~ panel, scales = "free_x") +
+  labs(x = NULL, y = "residuo de deviance", colour = "asistencias")
+
+# -----------------------------------------------------------------------------
+# [u21-residuos-ceros]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Residuos de Pearson y de deviance
+# -----------------------------------------------------------------------------
+c(prop_ceros = mean(cartera$n_asistencia == 0),
+  prop_residuos_negativos = mean(res$r < 0))
+
+# -----------------------------------------------------------------------------
+# [fig-u21-dharma]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Residuos simulados (DHARMa)
+# -----------------------------------------------------------------------------
+set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
+res_sim <- DHARMa::simulateResiduals(m_tasa, n = 1000)
+plot(res_sim)
+
+# -----------------------------------------------------------------------------
+# [u21-dharma-tests]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Residuos simulados (DHARMa)
+# -----------------------------------------------------------------------------
+contrastes_dharma <- list(
+  uniformidad     = DHARMa::testUniformity(res_sim, plot = FALSE),
+  dispersion      = DHARMa::testDispersion(res_sim, plot = FALSE),
+  exceso_de_ceros = DHARMa::testZeroInflation(res_sim, plot = FALSE))
+tibble::tibble(contraste = names(contrastes_dharma),
+               p_valor   = sapply(contrastes_dharma, \(t) t$p.value))
+
+# -----------------------------------------------------------------------------
+# [u21-validacion]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.5 Bondad de ajuste y diagnóstico
+#       > Validación contra el DGP
+# -----------------------------------------------------------------------------
+verdad <- attr(cartera, "verdad")
+b_dgp  <- setNames(verdad$betas$limpio, verdad$nombres_beta)
+terminos <- c("edad_conductor", "potencia_cv", "zona_circulacionmixta", "zona_circulacionrural",
+              "usocomercial", "tipo_vehiculomoto", "tipo_vehiculofurgoneta")
+# continuas: del efecto por unidad al efecto por desviación típica; factores: sin cambio
+escala <- c(sd(cartera$edad_conductor), sd(cartera$potencia_cv), rep(1, 5))
+est <- coef(m_tasa)[terminos] * escala
+ee  <- sqrt(diag(vcov(m_tasa)))[terminos] * escala
+# en la zona el DGP mide frente a 'rural' y R frente a 'urbana': hay que restar
+dgp <- c(b_dgp[["z_edad"]], b_dgp[["z_pot"]], b_dgp[["mixta"]] - b_dgp[["urbana"]],
+         -b_dgp[["urbana"]], b_dgp[["comercial"]], b_dgp[["moto"]], b_dgp[["furgoneta"]])
+tibble::tibble(termino = terminos, estimado = est, verdadero = dgp,
+               distancia_en_EE = (est - dgp) / ee) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------
