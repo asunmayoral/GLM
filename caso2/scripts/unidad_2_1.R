@@ -202,7 +202,8 @@ data.frame(perfil = base$perfil, turismo, moto,
 #     > 1.4 Inferencia y selección
 #       > Contraste de los efectos
 # -----------------------------------------------------------------------------
-drop1(m_tasa, test = "LRT")   # aporte de cada predictor por razón de verosimilitudes
+d1 <- drop1(m_tasa, test = "LRT")   # aporte de cada predictor por razón de verosimilitudes
+d1
 
 # -----------------------------------------------------------------------------
 # [u21-seleccion]
@@ -212,7 +213,8 @@ drop1(m_tasa, test = "LRT")   # aporte de cada predictor por razón de verosimil
 # -----------------------------------------------------------------------------
 m_red <- update(m_tasa, . ~ . - tipo_vehiculo)
 AIC(m_tasa, m_red)
-anova(m_red, m_tasa, test = "LRT")
+lrt_tipo <- anova(m_red, m_tasa, test = "LRT")
+lrt_tipo
 
 # -----------------------------------------------------------------------------
 # [u21-gof]
@@ -225,20 +227,7 @@ D  <- deviance(m_tasa)
 X2 <- sum(residuals(m_tasa, type = "pearson")^2)
 c(D = D, X2 = X2, gl = gl, D_gl = D / gl, X2_gl = X2 / gl,
   mediana_mu = median(fitted(m_tasa)))
-
-# -----------------------------------------------------------------------------
-# [u21-deviance-esperada]
-#   1 · Regresión de Poisson: conteos y tasas
-#     > 1.5 Bondad de ajuste y diagnóstico
-#       > Deviance y $\chi^2$ de Pearson
-# -----------------------------------------------------------------------------
-# aporte esperado de UNA observación a D si el modelo es correcto, según su media mu
-aporte_D <- function(mu) {
-  k <- 0:(qpois(1 - 1e-12, mu) + 1)
-  sum(dpois(k, mu) * 2 * (ifelse(k > 0, k * log(k / mu), 0) - (k - mu)))
-}
-mus <- c(0.1, 0.4, 1, 3, 10)
-tibble::tibble(mu = mus, aporte_esperado_D = sapply(mus, aporte_D), aporte_esperado_X2 = 1)
+c(pvalor_D = pchisq(D,gl,lower.tail = FALSE), pvalor_X2 = pchisq(X2,gl,lower.tail = FALSE))
 
 # -----------------------------------------------------------------------------
 # [u21-dispersion]
@@ -270,7 +259,9 @@ K <- 0:max(cartera$n_asistencia)
 raiz <- tibble::tibble(
   k         = K,
   observado = as.numeric(table(factor(cartera$n_asistencia, levels = K))),
-  esperado  = sapply(K, \(k) sum(dpois(k, mu_hat))))
+  esperado  = sapply(K, \(k) sum(dpois(k, mu_hat))),
+  raiz_observado = sqrt(observado),
+  raiz_esperado = sqrt(esperado))
 raiz
 
 # -----------------------------------------------------------------------------
@@ -359,9 +350,10 @@ ee  <- sqrt(diag(vcov(m_tasa)))[terminos] * escala
 # en la zona el DGP mide frente a 'rural' y R frente a 'urbana': hay que restar
 dgp <- c(b_dgp[["z_edad"]], b_dgp[["z_pot"]], b_dgp[["mixta"]] - b_dgp[["urbana"]],
          -b_dgp[["urbana"]], b_dgp[["comercial"]], b_dgp[["moto"]], b_dgp[["furgoneta"]])
-tibble::tibble(termino = terminos, estimado = est, verdadero = dgp,
-               distancia_en_EE = (est - dgp) / ee) |>
+validacion <- tibble::tibble(termino = terminos, estimado = est, verdadero = dgp,
+                             distancia_en_EE = (est - dgp) / ee) |>
   dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+validacion
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

@@ -78,6 +78,7 @@ theme_set(theme_minimal(base_size = 12))
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 glimpse(cartera)
+head(cartera)
 
 # -----------------------------------------------------------------------------
 # [u26-datos]

@@ -207,16 +207,21 @@ según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
   frente a `n_asistencia` —¿mismos factores, misma fuerza?— (P3).
 
 - **Asociación y cambio (P4–P5 · [2.2](#sec-u22)).** Cruza `tipo_vehiculo`, `zona_circulacion` y
-  `combustible` con *tener o no* siniestro —son **cuatro** factores: recórrelos **por orden de
-  interacción**, no enumerando modelos—, fija el orden máximo necesario, poda dentro de él y traduce el
-  modelo final a **enunciados de independencia condicional**, justificándolo por LRT/AIC y con el
-  **recuento de gl**; compara el OR **marginal** con el **condicional** y razona la
-  **colapsabilidad** (P4). Sobre la **tabla cuadrada** `bonus_malus_prev` →
-  `bonus_malus_act`: **simetría**, **cuasi-simetría** y **homogeneidad marginal** como diferencia entre
-  ambas, magnitud y sentido de la **deriva**, y aprovechamiento del **orden** de los niveles con la
-  **asociación uniforme** (1 gl frente a 16) más un término de **inercia** de la diagonal si aporta (P5).
-  Diagnostica con **residuos ajustados** y **mosaico**, y comprueba la ocupación de las celdas antes de
-  interpretar cualquier $p$-valor.
+  `combustible` con *tener o no* siniestro (`tuvo_siniestro`) y responde qué factores se asocian con
+  tener siniestro, si se asocian entre sí, si alguna asociación cambia con un tercer factor y si es
+  legítimo colapsar la tabla (P4). Son **cuatro** factores: recórrelos **por orden de interacción**
+  contrastando **órdenes consecutivos** con LRT —no solo cada modelo frente al saturado, que pierde
+  potencia con muchos gl—, fija el orden máximo, **poda** dentro de él con `drop1()` y traduce el modelo
+  final a **enunciados de independencia condicional**, con el **recuento de gl** hecho a mano; compara el
+  OR **marginal** con el **condicional** y razona la **colapsabilidad**. Sobre la **tabla cuadrada**
+  `bonus_malus_prev` → `bonus_malus_act` (P5), empieza por el **mapa de calor** y responde: cuántas
+  pólizas se quedan en su nivel, si el trasiego entre niveles es equilibrado (**simetría**), si ha
+  cambiado el reparto global (**homogeneidad marginal**, como diferencia entre simetría y
+  **cuasi-simetría**), cuánto ha cambiado —con el nivel medio **y** con el porcentaje en cada nivel— y qué
+  estructura tiene el movimiento (**asociación uniforme**, 1 gl frente a 16, más **inercia** de la
+  diagonal si aporta); cierra con lo que implica para ingresos y retención. Diagnostica con **residuos
+  ajustados** y **mosaico**, y comprueba la ocupación de las celdas antes de interpretar cualquier
+  $p$-valor.
 
 - **Variabilidad y ceros (P6–P8 · 2.3–2.4).** Diagnostica la **sobredispersión** (var/media, dispersión) y
   compara **quasi-Poisson** vs **binomial negativa**, explicando el efecto en errores estándar e inferencia

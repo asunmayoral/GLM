@@ -78,6 +78,7 @@ theme_set(theme_minimal(base_size = 12))
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 glimpse(cartera)
+head(cartera)
 
 # -----------------------------------------------------------------------------
 # [fig-u23-eda-modelo]
@@ -235,9 +236,7 @@ dplyr::left_join(
 
 # -----------------------------------------------------------------------------
 # [fig-u23-quasi-resid]
-#   3 · Sobredispersión
-#     > 3.2 Quasi-Poisson
-#       > Bondad de ajuste y diagnóstico
+#   3 · Sobredispersión > 3.2 Quasi-Poisson > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 tibble::tibble(ajustado = fitted(m_quasi),
                residuo  = residuals(m_quasi, type = "pearson")) |>

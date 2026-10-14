@@ -459,8 +459,8 @@ una escalada por la varianza que la Poisson le asigna ($\mathrm{Var}(Y_i)=\mu_i$
 
 El contraste clásico de bondad de ajuste enfrenta cualquiera de los dos a una $\chi^2_{n-p}$: si el
 modelo es correcto, deberían rondar sus grados de libertad $n-p$. Pero esa aproximación exige
-**medias esperadas altas** (o datos agrupados), y con conteos individuales y muchos ceros, que es lo
-habitual, **falla**. Lo comprobamos con nuestro ajuste, que tiene una media baja:
+**medias esperadas altas** (o datos agrupados). Con conteos individuales y muchos ceros, que es lo
+habitual, **falla** la aproximación asintótica, de modo que ninguno de los dos tests es fiable. Lo comprobamos con nuestro ajuste, que tiene una media baja:
 
 ```{r}
 #| label: u21-gof
@@ -475,6 +475,8 @@ c(pvalor_D = pchisq(D,gl,lower.tail = FALSE), pvalor_X2 = pchisq(X2,gl,lower.tai
 Como resumen global, preferimos
 $X^2$, aunque su $p$-valor frente a la $\chi^2$ sigue siendo aproximado con medias bajas, así que no lo
 usamos como veredicto, sino a través del índice de dispersión.
+
+La bondad del ajuste se juzga pues, en términos de indicadores de ajuste como el índice de dispersión, el rootograma y el diagnóstico con los residuos.
 
 ### El índice de dispersión
 
@@ -499,7 +501,7 @@ disp(m_tasa)
 ```
 
 En `n_asistencia` el índice vale `r round(disp(m_tasa), 2)`: la Poisson basta. Y aquí está el puente a
-la siguiente unidad, porque el índice es también el **detector** de sobredispersión. Ajustando la misma
+la siguiente unidad, porque el índice es también el **detector de sobredispersión**. Ajustando la misma
 Poisson a `n_danos` —los partes por daños— se ve el contraste:
 
 ```{r}
@@ -724,25 +726,29 @@ pregunta de la [Unidad 2.7](#sec-u27).
 ::: {.callout-tip}
 ## 🤖 Un prompt para comparar el ajuste con la verdad del DGP
 ```
-Utiliza el código programado en el fichero [script_generador_dgp] para identificar las relaciones y valores reales de los parámetros utilizados. Utiliza el ajuste conseguido en R con un GLM de Poisson sobre un banco simulado llamado cartera. Esta es la fórmula del modelo: [pega formula(m_tasa)]. Estos son sus coeficientes: [pega broom::tidy(m_tasa)]. La verdad del proceso generador está en
-attr(cartera, "verdad"); esta es su estructura: [pega str(attr(cartera, "verdad"), max.level = 2)].
-
+Tengo un GLM de Poisson ajustado en R sobre un banco simulado, `cartera`.
+- Fórmula: [pega formula(m_tasa)]
+- Coeficientes: [pega broom::tidy(m_tasa)]
+- Verdad del generador: attr(cartera, "verdad"), con esta estructura:
+  [pega str(attr(cartera, "verdad"), max.level = 2)]
+- Cómo se generan los datos: [pega el fichero R/dgp_*.R]. Úsalo solo para saber
+  cómo se construye cada término; los valores verdaderos tómalos de `verdad`.
 
 Escribe código R (tidyverse y broom) que:
-1. Empareje cada coeficiente del modelo con su valor verdadero. Ten en cuenta
-   que el generador puede usar predictores continuos tipificados o
-   transformados y otras categorías de referencia: antes de comparar, explica
-   qué transformación aplicas a cada término y por qué.
-2. Construya una tabla con la estimación, su IC 95 %, el valor verdadero y la
-   distancia entre ambos en errores estándar.
-3. Dibuje un gráfico de intervalos en escala IRR, un término por fila, con el
-   valor verdadero marcado.
-4. Liste los términos del generador que el modelo no incluye y los del modelo
-   que no están en el generador.
+1. Empareje cada coeficiente con su valor verdadero. Antes, explica la
+   transformación de cada término (tipificación con sd() de `cartera`,
+   categoría de referencia distinta, etc.). Excluye el intercepto, salvo que
+   la equivalencia sea inequívoca.
+2. Dé una tabla con estimación, IC 95 %, valor verdadero y distancia en errores
+   estándar, todo en la misma escala.
+3. Dibuje los intervalos en escala IRR, un término por fila, con la verdad marcada.
+4. Liste los términos del generador que faltan en el modelo y los del modelo que
+   no están en el generador.
+5. Señale los términos a más de 2 EE de la verdad y comente en dos frases si las
+   diferencias son compatibles con el azar.
 
-Usa solo nombres de objetos y elementos que aparezcan en lo que te he pegado;
-no inventes ninguno. Si la equivalencia de escala de algún término no es
-inequívoca, pregúntame antes de suponerla.
+Usa solo nombres que aparezcan en lo que te he pegado. Si la equivalencia de
+escala de algún término no es inequívoca, pregúntame antes de suponerla.
 ```
 
 Antes de fiarte del resultado, comprueba a mano al menos un término: la transformación de escala es
