@@ -197,6 +197,37 @@ data.frame(perfil = base$perfil, turismo, moto,
            diferencia = moto - turismo)    # absoluto: crece con la tasa de partida
 
 # -----------------------------------------------------------------------------
+# [u21-log-lm]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > ¿Y si transformamos la respuesta con el logaritmo?
+# -----------------------------------------------------------------------------
+c(prop_ceros = round(mean(cartera$n_asistencia == 0), 3))
+# La respuesta transformada se construye fuera de la fórmula: log((y + cte) / t)
+ajusta_log <- function(cte) {
+  d <- dplyr::mutate(cartera, y_log = log((n_asistencia + cte) / exposicion))
+  lm(y_log ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo, data = d)
+}
+m_log1  <- ajusta_log(1)
+m_log05 <- ajusta_log(0.5)
+tibble::tibble(termino     = names(coef(m_tasa))[-1],
+               IRR_poisson = exp(coef(m_tasa))[-1],
+               exp_b_c1    = exp(coef(m_log1))[-1],
+               exp_b_c05   = exp(coef(m_log05))[-1]) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+
+# -----------------------------------------------------------------------------
+# [u21-log-media]
+#   1 · Regresión de Poisson: conteos y tasas
+#     > 1.3 Interpretación y predicción
+#       > ¿Y si transformamos la respuesta con el logaritmo?
+# -----------------------------------------------------------------------------
+round(c(observada = mean(cartera$n_asistencia),
+        poisson   = mean(fitted(m_tasa)),
+        log_c1    = mean(cartera$exposicion * exp(fitted(m_log1)) - 1),
+        log_c05   = mean(cartera$exposicion * exp(fitted(m_log05)) - 0.5)), 3)
+
+# -----------------------------------------------------------------------------
 # [u21-drop1]
 #   1 · Regresión de Poisson: conteos y tasas
 #     > 1.4 Inferencia y selección

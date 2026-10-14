@@ -217,9 +217,11 @@ según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
   `bonus_malus_prev` → `bonus_malus_act` (P5), empieza por el **mapa de calor** y responde: cuántas
   pólizas se quedan en su nivel, si el trasiego entre niveles es equilibrado (**simetría**), si ha
   cambiado el reparto global (**homogeneidad marginal**, como diferencia entre simetría y
-  **cuasi-simetría**), cuánto ha cambiado —con el nivel medio **y** con el porcentaje en cada nivel— y qué
-  estructura tiene el movimiento (**asociación uniforme**, 1 gl frente a 16, más **inercia** de la
-  diagonal si aporta); cierra con lo que implica para ingresos y retención. Diagnostica con **residuos
+  **cuasi-simetría**, leyendo sus residuos si esta no ajusta), cuánto ha cambiado —con el nivel medio
+  **y** con el porcentaje en cada nivel— y qué estructura tiene el movimiento (**asociación uniforme**,
+  1 gl frente a 16, más **inercia** de la diagonal si aporta, con $e^{\beta}$ y $e^{\delta}$ y sus
+  intervalos); separa siempre si un término **aporta** de si el modelo **ajusta**, y cierra con lo que
+  implica para ingresos y retención. Diagnostica con **residuos
   ajustados** y **mosaico**, y comprueba la ocupación de las celdas antes de interpretar cualquier
   $p$-valor.
 

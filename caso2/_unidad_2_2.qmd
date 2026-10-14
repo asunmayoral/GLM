@@ -1282,7 +1282,7 @@ sección:
 
 Como en toda la unidad, el dato es la **celda**: la respuesta es siempre `Freq`, y las predictoras son
 características de la celda (de qué nivel viene, a cuál va, si es diagonal…). Lo que distingue a un
-modelo de otro es **qué predictoras** usa, y cada subsección lo indica en un párrafo «Qué necesita en R».
+modelo de otro es **qué predictoras** usa, y cada subsección lo indica en un párrafo «Modelización en R».
 
 ```{r}
 #| label: u22-cuadrada
@@ -1349,15 +1349,17 @@ la cartera se desplaza (@tbl-u22-cambio-marg):
 
 ```{r}
 #| label: tbl-u22-cambio-marg
-#| tbl-cap: "Distribuciones marginales del bonus-malus (proporciones) en el año previo y en el actual."
-rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
-      actual = prop.table(table(cartera$bonus_malus_act))) |>
-  round(3) |>
+#| tbl-cap: "Distribuciones marginales del bonus-malus (porcentaje de pólizas en cada nivel) en el año previo y en el actual, y su cambio en puntos porcentuales."
+pct_prev <- 100 * prop.table(table(cartera$bonus_malus_prev))
+pct_act  <- 100 * prop.table(table(cartera$bonus_malus_act))
+rbind(previo = pct_prev, actual = pct_act, cambio = pct_act - pct_prev) |>
+  round(1) |>
   as.data.frame.matrix() |>
   tibble::rownames_to_column("año")
 ```
 
-Los marginales se parecen, pero no son idénticos. ¿Es una diferencia real?
+Los marginales se parecen, pero no son idénticos: el nivel central (3) pierde peso y lo ganan los dos
+extremos, el 1 (*bonus* máximo) y el 5 (*malus* máximo). ¿Es una diferencia real?
 
 En una tabla así el modelo de independencia no interesa: por supuesto que el nivel de un año predice el
 del siguiente. Las preguntas (2) a (4) son las que importan, y son el terreno de los modelos para
@@ -1375,8 +1377,8 @@ $$
 \log\mu_{ij}=\gamma_{\{i,j\}},\qquad \gamma_{\{i,j\}}=\gamma_{\{j,i\}}.
 $$
 
-**Qué necesita en R.** Respuesta `Freq`; única predictora, el factor `par`. Al usarlo solo, las dos
-celdas espejo comparten parámetro y el modelo les asigna la misma frecuencia esperada, que es
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ par`. Al usar `par` como único predictor,
+las dos celdas espejo comparten parámetro y el modelo les asigna la misma frecuencia esperada, que es
 exactamente lo que dice la simetría:
 
 ```{r}
@@ -1386,8 +1388,11 @@ c(deviance = round(deviance(m_sim), 2), gl = df.residual(m_sim),
   p = signif(pchisq(deviance(m_sim), df.residual(m_sim), lower.tail = FALSE), 3))
 ```
 
-Los gl salen de la cuenta: $I^2=25$ celdas, $I(I+1)/2=15$ parámetros, **10 gl**. Se rechaza con
-holgura: el intercambio **no** es simétrico.
+Los gl salen de contar parejas de niveles. La simetría estima un parámetro por cada pareja sin orden de
+niveles, contando las de la diagonal: $\binom{5}{2}+\binom{5}{1}=10+5=15$. Con $5^2=25$ celdas quedan
+$25-15=10$ gl, uno por cada pareja de niveles distintos, $\binom{5}{2}=10$: cada una impone una
+restricción $\mu_{ij}=\mu_{ji}$, y la diagonal no impone ninguna. Se rechaza con holgura: el
+intercambio **no** es simétrico.
 
 Cuidado con el paso siguiente, que es donde se equivoca casi todo el mundo: rechazar la simetría
 **no** demuestra que haya deriva. La simetría impone **dos** cosas a la vez —patrón de intercambio
@@ -1407,31 +1412,36 @@ $$
 En nuestro problema: *cada nivel puede tener más o menos peso este año que el anterior* ($\lambda^{A}_j$
 distinto de $\lambda^{P}_j$), *de modo que el reparto global puede cambiar; pero, descontado eso, el
 intercambio entre dos niveles es simétrico*: no hay un flujo de más en un sentido que no se deba a ese
-cambio de pesos. Sus gl son $(I-1)(I-2)/2 = 6$.
+cambio de pesos. 
+El número de parámetros que ajustamos es pues, el de pares distintos ($10=\binom{5}{2}$), más $I-1$ por cada factor (fila y columna), más 1 del efecto global; es decir, 19. Sus gl son pues $25-19=6$, los de la simetría menos los $5-1=4$ parámetros libres de los marginales.
 
-**Qué necesita en R.** Respuesta `Freq`; predictoras, los factores `prev` y `act`, que dan los efectos
-$\lambda^{P}_i$ y $\lambda^{A}_j$, más `par` para la parte simétrica. Los tres términos se solapan en parte, así que algunos parámetros son
-redundantes: R los detecta y los deja como `NA` en `coef()`, sin que haya que quitarlos a mano.
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + par`. Los factores `prev` y
+`act` dan los efectos $\lambda^{P}_i$ y $\lambda^{A}_j$, y `par` la parte simétrica. Los tres términos se
+solapan en parte, así que algunos parámetros son redundantes: R los detecta y los deja como `NA` en
+`coef()`, sin que haya que quitarlos a mano.
 
 ```{r}
 #| label: u22-cuasisimetria
 m_qs <- glm(Freq ~ prev + act + par, family = poisson, data = cuad)
-c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs))
+c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs),
+  p = signif(pchisq(deviance(m_qs), df.residual(m_qs), lower.tail = FALSE), 3))
 ```
 
 Y ahora el punto clave: la **homogeneidad marginal**, $\mu_{i+}=\mu_{+i}$ para todo $i$. En nuestro
 problema: *el porcentaje de pólizas en cada nivel es el mismo los dos años* —la pregunta (3)—. Se
-contrasta como **simetría dada la cuasi-simetría**, comparando los dos modelos [@agresti2013, cap. 11]:
+contrasta como **simetría dada la cuasi-simetría**, comparando los dos modelos [@agresti2013, cap. 11].
+Este contraste **no** se obtiene ajustando un modelo de «homogeneidad marginal» directamente: no es un
+modelo log-lineal, y de ahí el rodeo por la cuasi-simetría.
+
+**Modelización en R.** No hay modelo nuevo que ajustar: comparamos con `anova()` los dos ya ajustados,
+`m_sim` y `m_qs`, mediante un LRT.
 
 ```{r}
 #| label: u22-homogeneidad-marginal
 anova(m_sim, m_qs, test = "LRT")   # H0: homogeneidad marginal (dada la cuasi-simetría)
 ```
 
-**Qué necesita en R.** Ningún modelo nuevo: basta comparar con `anova()` los dos ya ajustados, `m_sim`
-y `m_qs`. Los $I-1=4$ gl de la diferencia son los de la comparación de marginales. Este contraste **no** se
-obtiene ajustando un modelo de «homogeneidad marginal» directamente: no es un modelo log-lineal, y de
-ahí el rodeo por la cuasi-simetría.
+Los $5-1=4$ gl de la diferencia son los de la comparación de marginales.
 
 La lectura conjunta de los tres resultados es lo que responde a la pregunta del cliente:
 
@@ -1441,11 +1451,30 @@ La lectura conjunta de los tres resultados es lo que responde a la pregunta del 
 | se rechaza | se acepta | hay intercambio asimétrico, pero se compensa: reparto estable |
 | se rechaza | se rechaza | hay **deriva**: el reparto global se desplaza |
 
+**Con nuestros datos.** Los tres contrastes dan:
+
+| Contraste | Deviance | gl | $p$ | Conclusión |
+|:--|--:|--:|--:|:--|
+| Simetría (frente al saturado) | 89,92 | 10 | $6\times 10^{-15}$ | se rechaza |
+| Cuasi-simetría (frente al saturado) | 34,28 | 6 | $6\times 10^{-6}$ | se rechaza |
+| Homogeneidad marginal (simetría frente a cuasi-simetría) | 55,64 | 4 | $2\times 10^{-11}$ | se rechaza |
+
+Estamos en la última fila de la tabla anterior: **hay deriva**, el reparto de niveles no es el mismo los
+dos años. De los 89,92 puntos de deviance que separan la simetría del saturado, 55,64 se deben a que los
+marginales han cambiado; es lo que ya mostraban la @tbl-u22-cambio-marg y el mapa de calor, con la
+cartera abriéndose hacia los extremos.
+
+Pero la cuasi-simetría tampoco ajusta: aun dejando libres los marginales, el intercambio entre niveles
+no es simétrico. Queda un flujo con sentido propio que el cambio de marginales no explica; la
+[validación contra el DGP](#sec-u22-validacion) dirá de dónde viene. Esto obliga a leer con cautela el
+$p$ de la homogeneidad marginal, que se calcula dentro de un modelo que no ajusta. La conclusión de
+fondo, sin embargo, no depende de él: el cambio de los marginales se ve directamente en los datos.
+
 ### Cuánta deriva, y en qué sentido
 
-Los contrastes dicen *si* hay deriva; su magnitud y sentido se leen en los marginales. Aquí no hace
-falta la tabla: volvemos a los datos de cada póliza y convertimos sus dos niveles en números (`niv`,
-`nva`) para calcular medias y diferencias:
+Los contrastes dicen *si* hay deriva; para saber cuánta y en qué sentido hay que medirla. La medida más
+inmediata es el nivel medio de la cartera. Aquí no hace falta la tabla: volvemos a los datos de cada
+póliza y convertimos sus dos niveles en números (`niv`, `nva`) para calcular medias y diferencias:
 
 ```{r}
 #| label: u22-deriva
@@ -1457,53 +1486,63 @@ c(nivel_medio_previo = round(mean(niv), 3),
   pct_mejora         = round(100 * mean(nva < niv), 1))
 ```
 
-Una deriva positiva significa desplazamiento hacia el *malus* (peor tarifa); negativa, hacia el
-*bonus*. Es la cifra que va al informe —y aquí conviene detenerse—.
+Una deriva positiva significa desplazamiento hacia el *malus*; negativa, hacia el *bonus*. Medida así,
+la deriva es mínima: el nivel medio pasa de 3,007 a 3,026, una diferencia de 0,020 en una escala de 1 a
+5, y las pólizas que empeoran (25,8 %) apenas superan a las que mejoran (22,0 %). Sin embargo, el
+contraste de homogeneidad marginal se rechazaba con $p\approx 2\times 10^{-11}$. ¿Cómo encajan las dos
+cosas?
+
+Porque el cambio no está en la media, sino en el **reparto**. La última fila de la @tbl-u22-cambio-marg
+lo muestra: el nivel central pierde 4,8 puntos y los ganan los dos extremos, el 1 (+2,6) y el 5 (+3,7).
+El aumento del nivel 1 tira de la media hacia abajo y el del nivel 5 hacia arriba; los dos efectos se
+compensan, y la media apenas se mueve.
+
+**La conclusión con nuestros datos** es, por tanto, que la cartera no se desplaza en bloque hacia el
+*malus*: se **polariza**, con más pólizas a la vez en la mejor y en la peor tarifa. Para el negocio, eso
+tiene dos lecturas:
+
+- **Ingresos.** Si el descuento del nivel 1 y el recargo del nivel 5 son de magnitud parecida, las dos
+  colas se compensan y la prima media cambia poco. Si el recargo pesa más que el descuento (o al revés),
+  la polarización sí mueve la prima media, en un sentido o en otro.
+- **Retención.** Haya o no efecto en la prima media, hay más pólizas en el nivel más caro, que son las
+  más expuestas a irse a la competencia.
 
 ::: {.callout-warning}
 ## Significativo no es lo mismo que importante
-El contraste de homogeneidad marginal se rechaza de forma aplastante ($p\approx 2\times 10^{-11}$), y
-sin embargo el nivel medio pasa de **3,007 a 3,026**: una deriva de **0,020** en una escala de 1 a 5, y
-un 25,8 % de pólizas que empeoran frente a un 22,0 % que mejoran. Con $n\approx 3.000$ el contraste
-detecta desplazamientos que, medidos así, parecen **irrelevantes**.
-
-Pero el nivel medio no es el único tamaño posible. La @tbl-u22-cambio-marg muestra que el reparto sí
-cambia: el nivel 3 pierde peso (del 28,4 % al 23,5 %) y lo ganan los dos extremos, que se compensan en la
-media. Si eso importa depende de la magnitud que interese al negocio: con una escala de primas lineal en
-el nivel, la prima media apenas se mueve; con una escala que no lo sea, o mirando la retención de las
-pólizas en el nivel más caro, sí. Si el informe dijera solo «se rechaza la homogeneidad marginal: hay
-deriva hacia el *malus*», sería literalmente cierto y **engañoso**; la conclusión honesta es que la
-cartera no se desplaza en bloque, sino que **se abre hacia los extremos**, y que su peso para el negocio
-se mide con la prima y la retención, no con el nivel medio.
-
-Dar siempre el **tamaño** junto al $p$-valor no es un adorno metodológico: es lo que separa un informe
-útil de uno que induce a una decisión equivocada.
+Con $n\approx 3.000$, los contrastes detectan cambios pequeños; por eso el $p$-valor no basta y hay que
+dar siempre el **tamaño** del efecto. Pero este ejemplo añade una segunda lección: el tamaño depende de
+**cómo se mida**. Un resumen único, como el nivel medio, puede hacer parecer despreciable un cambio que
+existe en el reparto. La medida adecuada es la que responde a la pregunta del negocio —aquí, cuántas
+pólizas hay en cada nivel y lo que eso supone en primas y retención—, no la más cómoda de calcular.
 :::
 
 ### Asociación ordinal: aprovechar que los niveles están ordenados
 
-Los cinco niveles del bonus-malus **están ordenados**, y tratarlos como categorías nominales
-desperdicia esa información: la interacción del saturado gasta $(5-1)^2=16$ gl en estimar una
-estructura que probablemente es mucho más simple. El punto de partida es la **independencia**,
+Los cinco niveles del bonus-malus **están ordenados**, y los modelos anteriores no lo aprovechan. Para
+describir *cuánto* se parece el nivel de este año al del anterior hay tres modelos, de menos a más
+parámetros de asociación:
 
-$$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j ,$$
+- **Independencia**, $\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j$: el nivel actual no
+  depende del previo, como si el sistema reasignara los niveles al azar. Ningún parámetro de asociación;
+  nadie lo cree, pero sirve de referencia.
+- **Saturado**: cada combinación de niveles tiene su propia asociación, con $(5-1)^2=16$ parámetros.
+  Reproduce la tabla, pero no la resume.
+- **Asociación uniforme** (*linear-by-linear*): a la independencia le añade **un** solo término, que usa
+  los números de los niveles como puntuaciones [@christensen2025, cap. 7; @agresti2013, caps. 9–10]:
+  $$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j + \beta\, i\, j .$$
 
-que en nuestro problema diría *el nivel de este año no depende del del año anterior*: un sistema que
-reasignara los niveles al azar. Nadie la cree, pero sirve de referencia. El modelo de **asociación
-uniforme** (*linear-by-linear*) le añade **un** solo parámetro, usando las puntuaciones de los niveles
-($u_i=i$, $v_j=j$) [@christensen2025, cap. 7; @agresti2013, caps. 9–10]:
+En la asociación uniforme, toda la relación entre los dos años queda en $\beta$, y con una forma muy
+concreta: al tratar los niveles como equiespaciados, el paso de un nivel al siguiente pesa lo mismo en
+cualquier punto de la escala. Por eso el **odds ratio local**, el de dos niveles previos contiguos frente
+a dos actuales contiguos, es el mismo en toda la tabla:
+$\mu_{ij}\,\mu_{i+1,j+1}/(\mu_{i,j+1}\,\mu_{i+1,j})=e^{\beta}$. En nuestro problema: *las pólizas que
+estaban un nivel más arriba tienen, este año, unas odds $e^{\beta}$ veces mayores de estar un nivel más
+arriba, sea cual sea el nivel de partida*.
 
-$$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j + \beta\, u_i v_j .$$
-
-En nuestro problema: *quien estaba en un nivel más alto tiende a seguir en uno más alto, con la misma
-intensidad entre cualquier par de niveles vecinos*. Si $\beta>0$, para dos niveles previos contiguos,
-las odds de estar este año en el nivel $j+1$ frente al $j$ se multiplican por $e^{\beta}$, sea cual sea
-$j$: es el **odds ratio local**, $\mu_{ij}\,\mu_{i+1,j+1}/(\mu_{i,j+1}\,\mu_{i+1,j})=e^{\beta}$.
-
-**Qué necesitan en R.** Respuesta `Freq` en los dos. Predictoras de la independencia, los factores `prev`
-y `act`; la asociación uniforme añade una covariable **numérica**: el producto `i * j` de las puntuaciones, escrito `I(i * j)` para que
-R lo calcule como producto y no como interacción de factores. Es una sola columna, de ahí que gaste un
-solo parámetro.
+**Modelización en R.** Ajustamos dos GLM Poisson: la independencia con `Freq ~ prev + act`, y la
+asociación uniforme con `Freq ~ prev + act + I(i * j)`. El término nuevo es una covariable **numérica**,
+el producto de las puntuaciones, escrito `I(i * j)` para que R lo calcule como producto y no como
+interacción de factores. Es una sola columna, de ahí que gaste un solo parámetro.
 
 ```{r}
 #| label: u22-ordinal
@@ -1514,26 +1553,37 @@ c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
   OR_local        = round(exp(coef(m_unif)["I(i * j)"]), 3))
 ```
 
-El único $\beta$ resume toda la asociación: $e^{\beta}\approx 1{,}32$ es el **odds ratio local**, el
-mismo para cualquier par de niveles adyacentes. El término gana muchísima deviance sobre el modelo de
-independencia (más de 550 puntos con **1 solo** gl), así que la asociación ordinal existe y es fuerte.
+El único $\beta$ resume toda la asociación: $e^{\beta}\approx 1{,}32$, el mismo para cualquier par de
+niveles adyacentes. Y ese único término mejora enormemente sobre la independencia: la deviance baja de
+1.579,5 a 1.023,8, una ganancia de 555,7 puntos con **1 solo** gl. La asociación ordinal existe y es
+fuerte, y basta un parámetro para recogerla en lugar de 16.
 
 Pero ahora hay que hacer la pregunta que de verdad importa —**¿ajusta?**— y no confundirla con la
 anterior:
 
 ```{r}
 #| label: u22-ordinal-ajuste
-c(deviance = round(deviance(m_unif), 1), gl = df.residual(m_unif))
+c(deviance  = round(deviance(m_unif), 1), gl = df.residual(m_unif),
+  p         = signif(pchisq(deviance(m_unif), df.residual(m_unif), lower.tail = FALSE), 3),
+  chi2_q95  = round(qchisq(0.95, df.residual(m_unif)), 1))   # lo máximo «razonable» si el modelo fuera cierto
 ```
 
-**No ajusta.** Una deviance de ~1.024 sobre 15 gl es un desastre: el modelo mejora enormemente sobre la
-independencia y sigue siendo, en términos absolutos, malísimo. Son dos preguntas distintas y confundirlas
-es un error corriente: *«este término aporta»* no implica *«este modelo describe los datos»*.
+**No ajusta.** Si el modelo fuera correcto, su deviance se movería en torno a sus 15 gl y rara vez
+pasaría de 25 (el percentil 95 de la $\chi^2_{15}$); sale 1.023,8. Y no se contradice con el contraste
+anterior, porque son dos preguntas distintas. El LRT comparaba **dos modelos entre sí**: $\beta$ elimina
+555,7 de los 1.579,5 puntos de falta de ajuste de la independencia, un 35 %. El ajuste absoluto compara
+el modelo **con los datos**: el 65 % restante sigue ahí. Mejorar mucho sobre un punto de partida muy malo
+no basta para llegar a un buen modelo. *«Este término aporta»* no implica *«este modelo describe los
+datos»*.
 
 La razón se ve mirando la tabla: la **diagonal** concentra algo más de la mitad de las pólizas —las que
-no cambian de nivel—. Ninguna asociación suave, que reparte la masa de forma gradual al acercarse a la
-diagonal, puede reproducir un pico así. Hace falta un término que trate la **permanencia** como
-fenómeno propio. El modelo de **inercia** añade a la asociación uniforme un indicador de diagonal:
+no cambian de nivel—. Ninguna asociación gradual, que reparte la masa de forma suave al acercarse a la
+diagonal, puede reproducir un pico así.
+
+### Inercia: las pólizas que no cambian de nivel
+
+Hace falta un término que trate la **permanencia** como fenómeno propio. El modelo de **inercia** añade a
+la asociación uniforme un indicador de diagonal:
 
 $$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j + \beta\, ij + \delta\, I(i=j).$$
 
@@ -1541,33 +1591,49 @@ En nuestro problema: *además del gradiente entre niveles, cada póliza tiene un
 quedarse donde estaba*; $e^{\delta}$ es el factor por el que se multiplican las frecuencias de la
 diagonal respecto a lo que daría solo el gradiente.
 
-**Qué necesita en R.** Respuesta `Freq`; las predictoras de la asociación uniforme más un indicador de
-diagonal: un factor que
-vale `"queda"` cuando $i=j$ y `"mueve"` en el resto, construido a partir de `i` y `j`.
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + I(i * j) + diagonal`, donde
+`diagonal` es un factor que vale `"queda"` cuando $i=j$ y `"mueve"` en el resto, construido a partir de
+`i` y `j`.
 
 ```{r}
 #| label: u22-movilidad
 cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
 m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
 anova(m_unif, m_mov, test = "LRT")
-c(deviance = round(deviance(m_mov), 1), gl = df.residual(m_mov))
+c(deviance      = round(deviance(m_mov), 1), gl = df.residual(m_mov),
+  pct_se_quedan = round(100 * sum(cuad$Freq[cuad$i == cuad$j]) / sum(cuad$Freq), 1))
+# Solo los dos términos que interesan; los de prev y act únicamente reproducen los marginales
+broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(term %in% c("I(i * j)", "diagonalqueda")) |>
+  dplyr::mutate(efecto = c("gradiente (e^beta)", "inercia (e^delta)")) |>
+  dplyr::select(efecto, estimate, conf.low, conf.high, p.value) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), ~ round(.x, 3))) |>
+  as.data.frame()                  # para ver los tres decimales
 ```
 
-El salto es brutal: la deviance cae de ~1.024 a ~39 gastando **un** grado de libertad. Con 14 gl el
-ajuste sigue sin ser perfecto, pero hemos pasado de un modelo inservible a uno razonable con un solo
-parámetro. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
+El salto es brutal: la deviance cae de 1.023,8 a 38,7 gastando **un** grado de libertad. La tabla de
+efectos separa los dos componentes del movimiento:
+
+- **Inercia**: $e^{\delta}=4{,}10$, con intervalo $[3{,}75;\ 4{,}49]$. Las frecuencias de la diagonal son
+  unas cuatro veces las que daría solo el gradiente; es el efecto que domina, y el 52,2 % de las pólizas
+  está en esa diagonal.
+- **Gradiente** (asociación uniforme): $e^{\beta}=1{,}031$, con intervalo $[1{,}004;\ 1{,}058]$ y
+  $p=0{,}024$. Sigue siendo significativo, pero es pequeño: sin la inercia valía 1,317, porque el modelo
+  uniforme cargaba sobre $\beta$ el pico de la diagonal que no podía explicar de otro modo. Con 14 gl el modelo sigue sin ajustar
+del todo —queda, sobre todo, el flujo de un paso hacia arriba que tampoco recogía la cuasi-simetría—, pero con un solo
+parámetro hemos eliminado casi toda la falta de ajuste. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
 rasgo dominante de esta tabla no es la asociación ordinal, sino la inercia**. Lo que explica el
 bonus-malus es, sobre todo, que la mayoría de las pólizas **se quedan donde estaban**; el gradiente
 entre niveles vecinos es un efecto de segundo orden.
 
 Y así hay que contárselo a la dirección: no «los niveles contiguos están asociados», sino «algo más de
-la **mitad** de las pólizas no se mueve de nivel de un año a otro». Es un mensaje distinto y conduce a
+la **mitad** de las pólizas (el 52,2 %) no se mueve de nivel de un año a otro». Es un mensaje distinto y conduce a
 decisiones distintas —por ejemplo, sobre cada cuánto merece la pena reevaluar—.
 
 Cuidado con añadir «y las que se mueven dan saltos cortos». Que los saltos de un nivel abunden más que
 los de cuatro ocurre en **cualquier** escala de cinco niveles, aunque los saltos se repartan al azar: hay
-más pares de niveles a distancia 1 que a distancia 4. Por eso el término de asociación del modelo con
-inercia queda pequeño (compruébalo en `summary(m_mov)`). Lo comprobamos con el DGP en la
+más pares de niveles a distancia 1 que a distancia 4. Es coherente con lo que acabamos de ver: una vez
+recogida la inercia, el gradiente apenas pesa. Lo comprobamos con el DGP en la
 [validación](#sec-u22-validacion).
 
 ::: {.callout-note}
@@ -1581,20 +1647,48 @@ hacer ese control —las frecuencias esperadas son grandes—, así que no hay e
 
 ::: {.callout-tip}
 ## 🔧 En R. Tablas cuadradas
-Todo con `glm`; lo único que cambia es cómo se construye el término:
+Todo con `glm`; lo único que cambia es cómo se construyen los datos y los términos.
 
-- **Ver la tabla** — `prop.table(N, 1)` da adónde va cada nivel previo (% por fila) y `N - t(N)` el
-  flujo neto entre cada par; con `as.data.frame(as.table(...))` y `ggplot() + geom_tile()` se dibujan
-  como mapa de calor.
-- **Simetría** — factor que empareja $(i,j)$ con $(j,i)$:
-  `par = factor(paste(pmin(i,j), pmax(i,j), sep = "-"))`, y `Freq ~ par`. Gl: $I(I-1)/2$.
-- **Cuasi-simetría** — `Freq ~ prev + act + par`. Gl: $(I-1)(I-2)/2$.
+**Preparar los datos**
+
+- **De las pólizas a las celdas** — `xtabs(~ nivel_previo + nivel_actual, data = d)` y
+  `as.data.frame()`: una fila por celda, con `Freq`.
+- **Columnas auxiliares** — `i = as.integer(prev)`, `j = as.integer(act)` (los niveles como números) y
+  `par = factor(paste(pmin(i, j), pmax(i, j), sep = "-"))` (la pareja sin orden, que empareja $(i,j)$ con
+  $(j,i)$).
+- **Volver a la matriz** — `xtabs(Freq ~ prev + act, data = cuad)`; `addmargins()` añade los totales.
+
+**Describir el cambio**
+
+- **Marginales y su cambio** — `100 * prop.table(table(x))` para cada año, y la resta de los dos.
+- **Mapa de calor** — `prop.table(N, 1)` da adónde va cada nivel previo (% por fila) y `N - t(N)` el
+  flujo neto entre cada par; con `as.data.frame(as.table(...))` y `ggplot() + geom_tile()` se dibujan.
+- **Deriva media** — sobre las pólizas, no sobre la tabla: `as.integer()` de los dos niveles y
+  `mean(nva - niv)`, `mean(nva > niv)`.
+
+**Los modelos**
+
+- **Simetría** — `Freq ~ par`. Gl: $\binom{I}{2}=I(I-1)/2$.
+- **Cuasi-simetría** — `Freq ~ prev + act + par`; los parámetros redundantes salen `NA` en `coef()`.
+  Gl: $\binom{I-1}{2}=(I-1)(I-2)/2$.
 - **Homogeneidad marginal** — no es un modelo log-lineal: es el LRT
   `anova(m_simetria, m_cuasisimetria, test = "LRT")`, con $I-1$ gl.
-- **Asociación uniforme** — `Freq ~ prev + act + I(i*j)` con `i`, `j` **numéricos**. 1 gl; $e^\beta$ es
-  el odds ratio local. Con puntuaciones no equiespaciadas, sustituye `i*j` por `u[i]*v[j]`.
-- **Inercia de la diagonal** — añade un indicador `i == j` (o un factor con un nivel por celda
-  diagonal, si crees que la inercia varía con el nivel).
+- **Independencia y asociación uniforme** — `Freq ~ prev + act` y `Freq ~ prev + act + I(i * j)`, con
+  `i`, `j` **numéricos**; `I()` hace que R calcule el producto. 1 gl; $e^\beta$ es el odds ratio local.
+  Con puntuaciones no equiespaciadas, sustituye `i * j` por `u[i] * v[j]`.
+- **Inercia** — añade un factor de diagonal, `factor(ifelse(i == j, "queda", "mueve"))` (o un nivel por
+  celda diagonal, si crees que la inercia varía con el nivel).
+
+**Contrastar y leer**
+
+- **Término a término** — `anova(m1, m2, test = "LRT")` entre modelos anidados.
+- **Ajuste absoluto** — `pchisq(deviance(m), df.residual(m), lower.tail = FALSE)`, y como referencia
+  `qchisq(0.95, df.residual(m))`: lo máximo razonable para la deviance si el modelo fuera cierto.
+- **Solo los efectos que interesan** — `broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)` filtrado
+  por `term` (aquí, `I(i * j)` y `diagonalqueda`), sin los coeficientes de `prev` y `act`, que solo
+  reproducen los marginales.
+- **Dónde falla un modelo** — `xtabs(rstandard(m, type = "pearson") ~ prev + act, data = cuad)` pone los
+  residuos ajustados en forma de tabla (lo usamos en la validación).
 - Los modelos de movilidad más elaborados (RC de Goodman, con puntuaciones **estimadas** en vez de
   fijadas) no son log-lineales: son multiplicativos y requieren `gnm`. Fuera del alcance del curso.
 :::
@@ -1671,6 +1765,18 @@ Ese mecanismo explica lo que encontramos: la **inercia** de la diagonal, una **d
 observadas casi coinciden con las de un reparto al azar; el ligero exceso de saltos de un nivel es,
 precisamente, el empujón de las pólizas con siniestro.
 
+Ese empujón explica también por qué no ajustaba la cuasi-simetría: es un flujo de **un paso hacia
+arriba**, en un solo sentido, que ningún cambio de marginales reproduce. Se ve en sus residuos ajustados:
+
+```{r}
+#| label: u22-validacion-qs
+xtabs(round(rstandard(m_qs, type = "pearson"), 2) ~ prev + act, data = cuad)   # filas: nivel previo
+```
+
+Las celdas de subir un nivel, justo por encima de la diagonal ($1\to 2$, $2\to 3$, $3\to 4$, $4\to 5$),
+tienen todas residuo positivo —más pólizas de las que el modelo espera—, y sus espejos, las de bajar un
+nivel, negativo.
+
 ::: {.callout-important}
 ## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
 Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
@@ -1703,13 +1809,22 @@ tiene el movimiento? Cierra con lo que significa para los ingresos y la retenci�
 
 *Tips:*
 
-- Empieza por el mapa de calor (porcentaje por fila y flujo neto): te dirá qué buscar.
-- Para (2) y (3): simetría, cuasi-simetría y homogeneidad marginal como LRT entre ambas. Rechazar la
-  simetría no prueba por sí solo que el reparto haya cambiado.
+- Prepara la tabla en formato largo con las columnas auxiliares `i`, `j` y `par`; todos los modelos
+  salen de ahí.
+- Empieza por el mapa de calor (porcentaje por fila y flujo neto) y por el cambio de los marginales: te
+  dirán qué buscar.
+- Para (2) y (3): simetría, cuasi-simetría y homogeneidad marginal como LRT entre ambas, con los gl
+  contados a mano. Rechazar la simetría no prueba por sí solo que el reparto haya cambiado. Si la
+  cuasi-simetría tampoco ajusta, lee con cautela el $p$ de la homogeneidad marginal y busca en sus
+  residuos ajustados qué flujo queda sin explicar.
 - Cuantifica el cambio del reparto con el nivel medio **y** con el porcentaje de pólizas en cada nivel:
   un nivel medio estable puede esconder una cartera que se desplaza hacia los extremos.
 - Para (4): asociación uniforme frente a independencia, y un término de inercia de la diagonal si
-  aporta. Mira siempre el ajuste absoluto, no solo el LRT.
+  aporta. Separa las dos preguntas —¿aporta el término? (LRT) y ¿ajusta el modelo? (deviance frente a
+  sus gl)— y da $e^{\beta}$ y $e^{\delta}$ con su intervalo: fíjate en cómo cambia $\beta$ al añadir la
+  inercia.
+- Para el negocio: el efecto de un cambio en el reparto sobre la prima media depende de cuánto
+  descuenta o recarga cada nivel; razónalo, aunque no tengas la tarifa.
 
 **P19 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
 asociaciones de P4 como logística de `tuvo_siniestro` y compara sus odds ratios con los del log-lineal

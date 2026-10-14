@@ -522,9 +522,10 @@ patchwork::wrap_plots(
 #     > 2.4 Tablas de cambio: el bonus-malus
 #       > La tabla y sus marginales
 # -----------------------------------------------------------------------------
-rbind(previo = prop.table(table(cartera$bonus_malus_prev)),
-      actual = prop.table(table(cartera$bonus_malus_act))) |>
-  round(3) |>
+pct_prev <- 100 * prop.table(table(cartera$bonus_malus_prev))
+pct_act  <- 100 * prop.table(table(cartera$bonus_malus_act))
+rbind(previo = pct_prev, actual = pct_act, cambio = pct_act - pct_prev) |>
+  round(1) |>
   as.data.frame.matrix() |>
   tibble::rownames_to_column("año")
 
@@ -545,7 +546,8 @@ c(deviance = round(deviance(m_sim), 2), gl = df.residual(m_sim),
 #       > Cuasi-simetría y homogeneidad marginal
 # -----------------------------------------------------------------------------
 m_qs <- glm(Freq ~ prev + act + par, family = poisson, data = cuad)
-c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs))
+c(deviance = round(deviance(m_qs), 2), gl = df.residual(m_qs),
+  p = signif(pchisq(deviance(m_qs), df.residual(m_qs), lower.tail = FALSE), 3))
 
 # -----------------------------------------------------------------------------
 # [u22-homogeneidad-marginal]
@@ -586,18 +588,28 @@ c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
 #     > 2.4 Tablas de cambio: el bonus-malus
 #       > Asociación ordinal: aprovechar que los niveles están ordenados
 # -----------------------------------------------------------------------------
-c(deviance = round(deviance(m_unif), 1), gl = df.residual(m_unif))
+c(deviance  = round(deviance(m_unif), 1), gl = df.residual(m_unif),
+  p         = signif(pchisq(deviance(m_unif), df.residual(m_unif), lower.tail = FALSE), 3),
+  chi2_q95  = round(qchisq(0.95, df.residual(m_unif)), 1))   # lo máximo «razonable» si el modelo fuera cierto
 
 # -----------------------------------------------------------------------------
 # [u22-movilidad]
 #   2 · Modelos log-lineales para tablas de contingencia
 #     > 2.4 Tablas de cambio: el bonus-malus
-#       > Asociación ordinal: aprovechar que los niveles están ordenados
+#       > Inercia: las pólizas que no cambian de nivel
 # -----------------------------------------------------------------------------
 cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
 m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
 anova(m_unif, m_mov, test = "LRT")
-c(deviance = round(deviance(m_mov), 1), gl = df.residual(m_mov))
+c(deviance      = round(deviance(m_mov), 1), gl = df.residual(m_mov),
+  pct_se_quedan = round(100 * sum(cuad$Freq[cuad$i == cuad$j]) / sum(cuad$Freq), 1))
+# Solo los dos términos que interesan; los de prev y act únicamente reproducen los marginales
+broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(term %in% c("I(i * j)", "diagonalqueda")) |>
+  dplyr::mutate(efecto = c("gradiente (e^beta)", "inercia (e^delta)")) |>
+  dplyr::select(efecto, estimate, conf.low, conf.high, p.value) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), ~ round(.x, 3))) |>
+  as.data.frame()                  # para ver los tres decimales
 
 # -----------------------------------------------------------------------------
 # [u22-validacion-tablas]
@@ -641,6 +653,14 @@ p_prev  <- prop.table(table(factor(niv[mueve], levels = 1:5)))    # de dónde pa
 al_azar <- sapply(1:4, \(d) sum(sapply(1:5, \(i) p_prev[[i]] * sum(abs((1:5)[-i] - i) == d) / 4)))
 rbind(observado = prop.table(table(factor(abs(nva - niv)[mueve], levels = 1:4))),
       al_azar   = al_azar) |> round(3)
+
+# -----------------------------------------------------------------------------
+# [u22-validacion-qs]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Validación contra el DGP
+# -----------------------------------------------------------------------------
+xtabs(round(rstandard(m_qs, type = "pearson"), 2) ~ prev + act, data = cuad)   # filas: nivel previo
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

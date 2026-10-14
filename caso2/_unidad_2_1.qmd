@@ -350,6 +350,65 @@ aplica sobre una tasa de partida más alta. Para tarificar importan las dos lect
 **cuánto más arriesgado** es un perfil en proporción, y la diferencia, **cuántas asistencias más** hay
 que cubrir.
 
+### ¿Y si transformamos la respuesta con el logaritmo?
+
+Hay una alternativa tentadora a todo lo anterior: tomar el logaritmo de la tasa y ajustar una regresión
+lineal ordinaria, `lm(log(y / t) ~ ...)`. También da efectos multiplicativos, y es más familiar. Pero no
+estima lo mismo que el GLM, y con conteos tiene tres problemas [@ohara2010]:
+
+- **Los ceros.** $\log 0$ no existe, y en un conteo los ceros abundan. El parche habitual,
+  $\log(y+c)$, obliga a elegir una constante $c$ arbitraria (¿1?, ¿0,5?).
+- **Media frente a mediana.** El GLM modela $\log \operatorname{E}[Y]$, el logaritmo de la **media**; la
+  regresión sobre el logaritmo modela $\operatorname{E}[\log Y]$, la media de los logaritmos. Por la
+  desigualdad de Jensen, $\operatorname{E}[\log Y] \le \log \operatorname{E}[Y]$: exponenciar ese ajuste
+  no devuelve la media, sino algo más pequeño, próximo a la mediana.
+- **La varianza.** Transformar con el logaritmo supone una dispersión proporcional a la media (coeficiente
+  de variación constante, como en la log-normal). En un conteo la varianza crece como la media; la
+  transformación que la estabiliza sería la raíz cuadrada, no el logaritmo.
+
+Lo comprobamos sobre la cartera: misma tasa, mismos predictores que `m_tasa`, y dos constantes distintas
+para salvar los ceros.
+
+```{r}
+#| label: u21-log-lm
+c(prop_ceros = round(mean(cartera$n_asistencia == 0), 3))
+# La respuesta transformada se construye fuera de la fórmula: log((y + cte) / t)
+ajusta_log <- function(cte) {
+  d <- dplyr::mutate(cartera, y_log = log((n_asistencia + cte) / exposicion))
+  lm(y_log ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo, data = d)
+}
+m_log1  <- ajusta_log(1)
+m_log05 <- ajusta_log(0.5)
+tibble::tibble(termino     = names(coef(m_tasa))[-1],
+               IRR_poisson = exp(coef(m_tasa))[-1],
+               exp_b_c1    = exp(coef(m_log1))[-1],
+               exp_b_c05   = exp(coef(m_log05))[-1]) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 3)))
+```
+
+Dos de cada tres pólizas no tienen ninguna asistencia, y eso se nota. Los efectos de la regresión sobre
+el logaritmo quedan **mucho más cerca de 1** que los IRR (la moto pasa de 1,25 a 1,06 o 1,09): con tantos
+ceros, $\log(y+c)$ está dominado por la constante y aplasta las diferencias. Y cambian con $c$, que es una
+elección arbitraria. Al volver a la escala de los conteos, el problema de Jensen aparece en la media
+predicha ($\hat y = t\,e^{\hat\eta} - c$):
+
+```{r}
+#| label: u21-log-media
+round(c(observada = mean(cartera$n_asistencia),
+        poisson   = mean(fitted(m_tasa)),
+        log_c1    = mean(cartera$exposicion * exp(fitted(m_log1)) - 1),
+        log_c05   = mean(cartera$exposicion * exp(fitted(m_log05)) - 0.5)), 3)
+```
+
+El GLM reproduce exactamente la media observada (con intercepto y enlace canónico, la suma de los
+ajustados es la suma de los datos); las dos regresiones sobre el logaritmo se quedan cortas, y más cuanto
+menor es $c$. Para tarificar, que necesita la **media**, el error va siempre en la peor dirección.
+
+Si se corrige la retransformación para estimar la misma media que el GLM, las dos vías rara vez difieren
+mucho [@morrissey2020]; pero es un paso más, que el GLM no necesita. En la Unidad 3.2 del Caso 3 volvemos
+a esta comparación con respuestas continuas y positivas, donde la log-normal sí es una candidata seria, y
+vemos cómo hacer esa corrección.
+
 ::: {.callout-tip}
 ## 🔧 En R. Leer IRR y predecir tasas
 Dos gestos, uno para los **coeficientes** y otro para las **predicciones**:
