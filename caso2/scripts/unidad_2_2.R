@@ -154,19 +154,23 @@ round(c(G2 = G2, p_G2 = pchisq(G2, gl, lower.tail = FALSE),
 # [u22-or-a-mano]
 #   2 · Modelos log-lineales para tablas de contingencia
 #     > 2.1 Tablas de dos vías: ¿asociación o independencia?
-#       > Leer la asociación: odds ratios
+#       > Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
 # -----------------------------------------------------------------------------
-mu   <- xtabs(fitted(m_sat) ~ zona_circulacion + asistencia, data = d2)   # ajustadas, en forma de tabla
-odds <- mu[, "con"] / mu[, "sin"]                                         # odds de asistencia por zona
-round(c(odds_urbana = odds[["urbana"]], odds_mixta = odds[["mixta"]], odds_rural = odds[["rural"]],
-        OR_mixta_vs_urbana = odds[["mixta"]] / odds[["urbana"]],
-        OR_rural_vs_urbana = odds[["rural"]] / odds[["urbana"]]), 3)
+mu <- xtabs(fitted(m_sat) ~ zona_circulacion + asistencia, data = d2)   # ajustadas, en forma de tabla
+cadena <- data.frame(
+  con  = mu[, "con"],
+  sin  = mu[, "sin"],
+  prob = mu[, "con"] / (mu[, "con"] + mu[, "sin"]),     # Pr(con | zona)
+  odds = mu[, "con"] / mu[, "sin"])
+cadena$OR_vs_urbana   <- cadena$odds / cadena["urbana", "odds"]
+cadena$prob_vs_urbana <- cadena$prob / cadena["urbana", "prob"]   # cociente de probabilidades, para comparar
+round(cadena, 3)
 
 # -----------------------------------------------------------------------------
 # [u22-dosvias-or]
 #   2 · Modelos log-lineales para tablas de contingencia
 #     > 2.1 Tablas de dos vías: ¿asociación o independencia?
-#       > Leer la asociación: odds ratios
+#       > Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
 # -----------------------------------------------------------------------------
 broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::filter(grepl(":", term)) |>

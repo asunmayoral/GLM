@@ -293,43 +293,53 @@ tratamos en la [Sección 2.3](#sec-u22-escasez).
 :::
 
 
-### Leer la asociación: odds ratios
+### Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
 
 La interacción se lee como un **odds ratio**. Para una tabla $2\times 2$ el coeficiente de interacción
 *es* el log-odds ratio; con más niveles, cada coeficiente compara una fila con la de referencia (aquí, la
 zona urbana).
 
 ::: {.callout-note}
-## De la razón de tasas al odds ratio
-En la [Unidad 2.1](#sec-u21-interpretacion) exponenciábamos los coeficientes y leíamos **razones de tasas**
-(IRR). Aquí exponenciamos y leemos **odds ratios**. No es otra técnica: en los dos casos
-$e^{\text{coeficiente}}$ es un efecto multiplicativo sobre una media Poisson. Lo que cambia es **qué se
-compara**.
-
-En la regresión de la 2.1, $e^{\beta_k}=\lambda(x_k+1)/\lambda(x_k)$ compara dos **tasas**. En la tabla,
-con la restricción de referencia, la interacción compara dos **cocientes de frecuencias**:
+## De las frecuencias esperadas al odds ratio
+El modelo log-lineal da frecuencias esperadas $\mu_{ij}$: las medias Poisson de cada celda, como las
+tasas de la [Unidad 2.1](#sec-u21-interpretacion), ahora por celda. Dentro de cada zona, esas frecuencias
+se convierten en probabilidades dividiendo por el total de la zona —es el esquema producto-multinomial—:
 
 $$
-e^{\lambda^{AB}_{ij}}=\frac{\mu_{ij}/\mu_{i1}}{\mu_{1j}/\mu_{11}}.
+\pi_i=\Pr(\text{con}\mid \text{zona } i)=\frac{\mu_{i2}}{\mu_{i1}+\mu_{i2}},\qquad
+\text{odds}_i=\frac{\pi_i}{1-\pi_i}=\frac{\mu_{i2}}{\mu_{i1}},\qquad
+\mathrm{OR}_{i}=\frac{\text{odds}_i}{\text{odds}_1}=e^{\lambda^{AB}_{i2}}.
 $$
 
-Como $B$ es la asistencia, $\mu_{i2}/\mu_{i1}$ es la frecuencia esperada «con» frente a «sin» en la zona $i$:
-la **odds** de tener alguna asistencia en esa zona. Y el cociente de dos odds es un **odds ratio**. Por eso
-la asociación en tablas se lee siempre como OR, y por eso coincide con la logística (lo vemos más abajo).
+Los coeficientes se leen a lo largo de esa cadena: $e^{\lambda^{B}_2}$ es la odds de la zona de referencia
+(urbana), $e^{\lambda^{AB}_{i2}}$ la multiplica para pasar a la zona $i$, y la probabilidad se recupera con
+$\pi=\text{odds}/(1+\text{odds})$, que no es otra cosa que la inversa del logit y anticipa el puente con
+la logística.
 :::
 
-Lo comprobamos haciendo a mano ese cociente de cocientes con las frecuencias ajustadas del modelo:
+Lo comprobamos recorriendo la cadena con las frecuencias ajustadas del modelo:
 
 ```{r}
 #| label: u22-or-a-mano
-mu   <- xtabs(fitted(m_sat) ~ zona_circulacion + asistencia, data = d2)   # ajustadas, en forma de tabla
-odds <- mu[, "con"] / mu[, "sin"]                                         # odds de asistencia por zona
-round(c(odds_urbana = odds[["urbana"]], odds_mixta = odds[["mixta"]], odds_rural = odds[["rural"]],
-        OR_mixta_vs_urbana = odds[["mixta"]] / odds[["urbana"]],
-        OR_rural_vs_urbana = odds[["rural"]] / odds[["urbana"]]), 3)
+mu <- xtabs(fitted(m_sat) ~ zona_circulacion + asistencia, data = d2)   # ajustadas, en forma de tabla
+cadena <- data.frame(
+  con  = mu[, "con"],
+  sin  = mu[, "sin"],
+  prob = mu[, "con"] / (mu[, "con"] + mu[, "sin"]),     # Pr(con | zona)
+  odds = mu[, "con"] / mu[, "sin"])
+cadena$OR_vs_urbana   <- cadena$odds / cadena["urbana", "odds"]
+cadena$prob_vs_urbana <- cadena$prob / cadena["urbana", "prob"]   # cociente de probabilidades, para comparar
+round(cadena, 3)
 ```
 
-Los dos cocientes coinciden con los coeficientes de interacción exponenciados:
+Las probabilidades son las mismas que los porcentajes por fila de la @tbl-u22-pct-fila (el saturado
+reproduce la tabla): un 37,4 % de las pólizas urbanas pide alguna asistencia, frente a un 31,9 % en la
+zona mixta y un 31,2 % en la rural. El OR de la zona mixta, 0,782, dice que sus **odds** son un 22 %
+menores que las de la urbana; su **probabilidad** es un 15 % menor (0,852). No son lo mismo: el OR solo se
+parece al cociente de probabilidades cuando el suceso es raro, y aquí una de cada tres pólizas pide
+asistencia. Por eso, para comunicar, conviene dar las probabilidades junto al OR.
+
+Los dos OR coinciden con los coeficientes de interacción exponenciados, que además traen su intervalo:
 
 ```{r}
 #| label: u22-dosvias-or

@@ -23,8 +23,9 @@ format:
     smooth-scroll: true
 
   # ---------------------------------------------------------------------------
-  # PDF. Bloque ACTIVO: un solo `quarto render informe.qmd` produce los dos
-  # archivos que se entregan, informe.html e informe.pdf.
+  # PDF. Bloque ACTIVO. Los dos archivos que se entregan, informe.html e
+  # informe.pdf, se obtienen con DOS renders explícitos, uno a cada formato
+  # (ver las instrucciones de publicación, justo debajo de esta cabecera).
   #
   # Requiere una distribución de LaTeX, que se instala UNA sola vez (igual en
   # Windows, macOS y Linux) desde el Terminal de RStudio:
@@ -70,27 +71,27 @@ format:
   CÓMO PUBLICAR Y ENTREGAR EL INFORME EN GITHUB
   ────────────────────────────────────────────────────────────────
 
-  1) Renombra este fichero como informe.qmd y renderízalo:
+  1) Renombra este fichero como informe.qmd y renderízalo DOS veces,
+     una a cada formato. En RStudio, despliega la flecha que hay al
+     lado del botón "Render" y elige primero "Render HTML" y después
+     "Render PDF". Si prefieres la pestaña Terminal (junto a Console):
 
-       quarto render informe.qmd
+       quarto render informe.qmd --to html
+       quarto render informe.qmd --to pdf
 
-     La cabecera YAML declara los DOS formatos, así que ese único
-     comando genera informe.html e informe.pdf, que son exactamente
-     los dos archivos que se entregan. El HTML es autocontenido
+     Así obtienes informe.html e informe.pdf, que son exactamente los
+     dos archivos que se entregan. El HTML es autocontenido
      ("embed-resources: true"), sin carpeta informe_files/.
 
-     OJO: el botón "Render" de RStudio genera SOLO el primer formato
-     declarado en el YAML, que aquí es el HTML. Si lo usas, el PDF no
-     aparece y no es que algo falle. Para obtener los dos, ejecuta el
-     comando anterior en la pestaña Terminal de RStudio (junto a
-     Console), o despliega la flecha que hay al lado de "Render" y
-     elige el formato.
+     OJO: pulsar directamente el botón "Render" genera SOLO el HTML.
+     Si el PDF no aparece no es que algo falle: te falta el segundo
+     render, el explícito a PDF.
 
      Para el PDF hace falta LaTeX, que se instala UNA sola vez con
      "quarto install tinytex" (ver apartado 5.9.1 de la Guía GitHub
-     del Estudiante). Si aún no lo tienes, el render deja hecho el
-     informe.html y falla al llegar al PDF: no has perdido nada,
-     instala LaTeX y vuelve a renderizar.
+     del Estudiante). Si aún no lo tienes, el render a PDF falla,
+     pero el informe.html ya está hecho: no has perdido nada,
+     instala LaTeX y repite el render a PDF.
 
      Plan B si la instalación se resiste: abre informe.html y usa
      Archivo > Imprimir > Guardar como PDF. Sale un PDF con el
@@ -139,7 +140,7 @@ Un informe ejecutivo no resume todo el análisis: selecciona la evidencia necesa
 decidir qué hacer, por qué hacerlo y con qué cautelas.
 :::
 
-::: {.callout-note collapse="true"}
+::: {.callout-note collapse="false"}
 ## Cómo usar esta plantilla
 - Producto esperado: documento breve para que una audiencia empresarial comprenda el problema,
   valore la evidencia y decida próximas acciones.
@@ -148,7 +149,7 @@ decidir qué hacer, por qué hacerlo y con qué cautelas.
   ni acumules gráficos. Sustituye el texto entre corchetes `[...]` y elimina las indicaciones.
 - Estructura: (0) Resumen ejecutivo · (1) Problema y decisión · (2) Evidencia disponible ·
   (3) Enfoque de análisis · (4) Hallazgos clave · (5) Implicaciones y recomendaciones ·
-  (6) Riesgos, limitaciones y próximos pasos · (7) Referencias, IA y anexo metodológico.
+  (6) Riesgos, limitaciones y próximos pasos · (7) Referencias y uso de IA · Anexo de metodología completa · Anexo de reproducibilidad.
 :::
 
 ::: {.callout-tip}
@@ -177,11 +178,10 @@ bibliográfica rota; compruébalo en el documento renderizado.
 |-----------|-------------------------------------------------|
 | Título del proyecto | [Completar] |
 | Equipo | [Completar] |
+| Fecha | [Completar]|
 | Asignatura / titulación | [Completar] |
 | Curso académico | [Completar] |
-| Profesorado | [Completar] |
-| Audiencia destinataria | [Dirección, cliente, responsable de área, comité de decisión...] |
-| Decisión que se quiere apoyar | [Completar] |
+
 
 # Resumen ejecutivo
 
@@ -208,7 +208,7 @@ decisión se quiere apoyar con el análisis.
 | Audiencia decisora | [Completar] |
 | Decisión o acción que se quiere apoyar | [Completar] |
 | Consecuencia de no actuar | [Completar] |
-| Criterio de éxito o indicador relevante | [Completar] |
+| Criterio de éxito o indicador relevante | [Completar si procede] |
 
 > **Formulación breve del problema:** [Redactar en un párrafo el problema y la decisión que la audiencia debe valorar.]
 
@@ -240,6 +240,11 @@ Este apartado **no lleva subsecciones ni diagnóstico**. Nada de supuestos, cont
 métricas de ajuste o criterios de selección de modelos: eso es el informe técnico, y si el lector lo
 necesita, ahí está. Aquí basta con decir qué se analizó, por qué era lo adecuado y en una línea qué
 hace fiable el resultado. Tampoco van cifras de resultado: esas son los hallazgos clave.
+
+Conviene **remitir al lector al [anexo metodológico](#sec-anexo-metodologia)** para que amplíe
+información sobre el enfoque analítico: su resumen inicial recoge, hallazgo a hallazgo, técnicas,
+supuestos, métricas y validación. Basta una frase al cerrar la sección, por ejemplo en la nota
+metodológica breve.
 :::
 
 > [**Abre la sección y presenta la tabla**: en dos o tres frases, el enfoque general y por qué
@@ -254,9 +259,9 @@ hace fiable el resultado. Tampoco van cifras de resultado: esas son los hallazgo
 > [**Lee la tabla**: qué elección metodológica no era obvia y qué gana la decisión con ella. Una
 > frase, no un párrafo. Borra este recuadro cuando lo hayas redactado.]
 
-> **Nota metodológica breve:** [100–150 palabras como máximo. El detalle técnico va al anexo metodológico.]
+> **Nota metodológica breve:** [100–150 palabras como máximo. El detalle técnico va al [anexo metodológico](#sec-anexo-metodologia).]
 
-# Hallazgos clave
+# Hallazgos clave {#sec-hallazgos}
 
 ::: {.callout-important}
 ## Regla de selección
@@ -268,7 +273,7 @@ a muchos gráficos mostrados sin interpretación.
 > [**Abre la sección**: anuncia cuántos hallazgos presentas y en qué orden. Ordénalos por lo que
 > pesan en la decisión, no por el orden en que los encontraste.]
 
-## Hallazgo clave 1: [título interpretativo]
+## Hallazgo clave 1: [título interpretativo] {#sec-hallazgo-1}
 
 > [**Presenta el hallazgo 1**: enúncialo en una frase antes de la ficha. El título del apartado ya
 > lo adelanta; aquí lo concretas.]
@@ -295,7 +300,7 @@ a muchos gráficos mostrados sin interpretación.
 # Código que genera la visualización del hallazgo 1
 ```
 
-## Hallazgo clave 2: [título interpretativo]
+## Hallazgo clave 2: [título interpretativo] {#sec-hallazgo-2}
 
 > [**Presenta el hallazgo 2**: enúncialo en una frase antes de la ficha. El título del apartado ya
 > lo adelanta; aquí lo concretas.]
@@ -322,7 +327,7 @@ a muchos gráficos mostrados sin interpretación.
 # Código que genera la visualización del hallazgo 2
 ```
 
-## Hallazgo clave 3: [título interpretativo]
+## Hallazgo clave 3: [título interpretativo] {#sec-hallazgo-3}
 
 > [**Presenta el hallazgo 3**: enúncialo en una frase antes de la ficha. El título del apartado ya
 > lo adelanta; aquí lo concretas.]
@@ -407,7 +412,7 @@ beneficio se espera, qué riesgo existe y cómo evaluar el impacto.
 > [**Lee la @tbl-pasos**: qué paso desbloquea a los demás. Borra este recuadro cuando lo hayas
 > redactado.]
 
-# Referencias, uso de IA y anexo metodológico breve
+# Referencias y uso de IA
 
 ## Referencias
 
@@ -450,10 +455,6 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 > [**Reflexiona**, que es más que declarar: cómo verificaste lo que la IA produjo, qué corregiste y
 > qué descartaste. Borra este recuadro cuando lo hayas redactado.]
 
-## Anexo metodológico breve
-
-> [Incluir el detalle mínimo para que el lector interesado conozca técnicas, métricas, validación, supuestos, limpieza de datos o decisiones relevantes, sin sobrecargar el cuerpo ejecutivo.]
-
 # Anexos opcionales
 
 > [**Abre la sección y presenta la @tbl-anexos**: qué has dejado fuera del cuerpo y con qué
@@ -467,6 +468,140 @@ transparente y concreto, y permitir constatar que la autoría del trabajo no es 
 | Anexo D. Prompts de IA | [Solo si el profesorado lo solicita o si aportan trazabilidad] |
 
 : [Descripción de la tabla] {#tbl-anexos}
+
+# Anexo · Metodología completa del análisis {#sec-anexo-metodologia}
+
+::: {.callout-important}
+## Apartado obligatorio, dirigido al profesorado
+El cuerpo del informe está escrito para quien decide y por eso calla casi todo el proceso técnico.
+Este anexo hace lo contrario: está escrito para **quien evalúa**, y tiene que dejar a la vista cómo
+se llegó a cada hallazgo clave desde los datos. Lo que no esté aquí no puede valorarse, aunque lo
+hayáis hecho.
+
+El anexo empieza con un **resumen metodológico**, pensado para el lector que solo quiere el detalle
+mínimo de cada hallazgo. Después se reconstruye, **hallazgo a hallazgo** y en el mismo orden que la
+@sec-hallazgos, el procedimiento completo que sostiene cada uno, de modo que se pueda leer de
+principio a fin sin saltar entre apartados. Lo común a todos (la preparación de los datos) se cuenta
+una sola vez; y si dos hallazgos salen del mismo modelo, el segundo remite al primero y añade solo lo
+suyo.
+
+Las salidas que respaldan cada paso (coeficientes, contrastes, gráficos de diagnóstico) se generan
+aquí, en chunks que se ejecutan al renderizar y muestran su código (`echo: true`), plegado en el
+HTML. El script completo se enlaza en el apartado *Código reproducible comentado* del anexo de
+reproducibilidad.
+:::
+
+## Resumen metodológico
+
+> [**Abre el apartado y presenta la @tbl-met-resumen**: en dos o tres frases, cuántos modelos se
+> ajustaron en total, cuáles sostienen los hallazgos y qué decisión sobre los datos condiciona la
+> lectura de todos ellos. La tabla da, para cada hallazgo, el detalle mínimo para que el lector
+> interesado conozca cómo se obtuvo, sin entrar en el procedimiento.]
+
+| Hallazgo | Técnica o modelo | Supuestos y diagnóstico | Métricas y validación | Datos y decisiones relevantes |
+|----------|------------------|-------------------------|-----------------------|-------------------------------|
+| [Hallazgo 1](#sec-met-hallazgo-1) | [Familia, enlace y predictores del modelo final] | [Qué se comprobó y si se sostuvo] | [Métrica principal y cómo se validó] | [Limpieza, transformaciones o decisiones que lo condicionan] |
+| [Hallazgo 2](#sec-met-hallazgo-2) | [Completar] | [Completar] | [Completar] | [Completar] |
+| [Hallazgo 3](#sec-met-hallazgo-3) | [Completar] | [Completar] | [Completar] | [Completar] |
+
+: [Descripción de la tabla] {#tbl-met-resumen}
+
+> [**Lee la @tbl-met-resumen**: qué cautela metodológica conviene tener presente al leer los
+> hallazgos. Una o dos frases. Borra este recuadro cuando lo hayas redactado.]
+
+## Preparación común de los datos
+
+> [**Del dato bruto a la tabla de análisis**, una sola vez para todos los hallazgos: fuente y forma
+> de lectura, filas y columnas al cargar y al terminar, unidad de análisis, registros eliminados y
+> por qué, tratamiento de ausentes y atípicos, transformaciones, variables derivadas y
+> recodificaciones, y la **categoría de referencia** de cada factor. Si una decisión afecta solo a un
+> hallazgo, cuéntala en el suyo.]
+
+```{r}
+#| label: met-preparacion
+#| echo: true
+#| eval: false
+
+# Lectura, limpieza y recodificación. Al final, deja constancia del resultado:
+# dim(datos); summary(datos); colSums(is.na(datos))
+```
+
+## Procedimiento seguido para el hallazgo 1: [título] {#sec-met-hallazgo-1}
+
+::: {.callout-tip}
+## Qué se espera leer en esta narración
+Un relato breve —orientativamente, una o dos páginas por hallazgo— que permita seguir, en el orden
+en que se hizo, el camino que lleva de los datos al hallazgo que se presenta en la @sec-hallazgo-1. No
+es una lista de casillas: cada paso se cuenta con **lo que se hizo, lo que salió y lo que se decidió
+por ello**. Debe responder, por este orden, a:
+
+1. **Punto de partida.** Qué pregunta responde el hallazgo o qué recomendación sostiene, cuál es la
+   variable respuesta y qué naturaleza tiene (binaria, ordinal, conteo, continua positiva, tiempo
+   hasta evento…).
+2. **Exploración previa.** Qué se miró en los datos antes de modelizar y qué decisión cambió:
+   elegir una familia, transformar o agrupar un predictor, incluir una interacción, sospechar
+   sobredispersión.
+3. **Modelos ajustados.** La secuencia de modelos hasta el final (nulo, intermedios, alternativas de
+   otra familia o con otra estructura aleatoria), la **formulación** del modelo final con la
+   codificación explícita de cada variable, y por qué se descartó cada alternativa.
+4. **Selección.** Con qué criterio se eligió el modelo final (razón de verosimilitudes entre
+   anidados, AIC/BIC entre no anidados) y con qué resultado.
+5. **Supuestos y diagnóstico.** Qué supuestos exige el modelo, cómo se comprobó cada uno y qué
+   dijeron los residuos (simulados en respuestas discretas), las observaciones influyentes, la
+   separación, la colinealidad o la singularidad. Si algo falló, qué se corrigió; si el modelo queda
+   fuera de alguna herramienta de diagnóstico, en qué descansa entonces.
+6. **Desempeño y validación.** Con qué métrica se midió que el modelo sirve, según la naturaleza de
+   la respuesta y frente a qué referencia (modelo nulo, regla trivial), y cómo se validó fuera de la
+   muestra de ajuste o con un análisis de sensibilidad. Si no se validó, por qué.
+7. **De la salida al hallazgo.** Qué estimación concreta (coeficiente, *odds ratio*, efecto
+   marginal, predicción…) produce cada cifra que aparece en el cuerpo, y en qué chunk se calcula.
+
+Si en el camino algo no salió como se esperaba —un modelo que no convergió, un supuesto que obligó a
+cambiar de familia, una conclusión que la validación matizó—, se cuenta en su paso: deja patente que
+las decisiones se tomaron a la vista de la evidencia y no a posteriori.
+:::
+
+> [Narración del procedimiento seguido para el hallazgo 1.]
+
+```{r}
+#| label: met-hallazgo-1
+#| echo: true
+#| eval: false
+
+# Modelos ajustados, comparación, diagnóstico, desempeño y validación del hallazgo 1
+# m0 <- glm(y ~ 1, family = binomial, data = datos)
+# m1 <- glm(y ~ x1 + x2, family = binomial, data = datos)
+# anova(m0, m1, test = "LRT"); AIC(m0, m1)
+# res <- DHARMa::simulateResiduals(m1, n = 1000)   # fija set.seed() antes
+# plot(res); DHARMa::testDispersion(res); car::vif(m1)
+# broom::tidy(m1, conf.int = TRUE, exponentiate = TRUE)
+```
+
+## Procedimiento seguido para el hallazgo 2: [título] {#sec-met-hallazgo-2}
+
+> [Narración del procedimiento seguido para el hallazgo 2, con la misma estructura que el
+> hallazgo 1. Si sale del mismo modelo que otro hallazgo, remite a él y cuenta solo lo específico.]
+
+```{r}
+#| label: met-hallazgo-2
+#| echo: true
+#| eval: false
+
+# Modelos ajustados, comparación, diagnóstico, desempeño y validación del hallazgo 2
+```
+
+## Procedimiento seguido para el hallazgo 3: [título] {#sec-met-hallazgo-3}
+
+> [Narración del procedimiento seguido para el hallazgo 3, con la misma estructura que el
+> hallazgo 1.]
+
+```{r}
+#| label: met-hallazgo-3
+#| echo: true
+#| eval: false
+
+# Modelos ajustados, comparación, diagnóstico, desempeño y validación del hallazgo 3
+```
 
 # Anexo · Reproducibilidad y entorno de ejecución
 
@@ -525,7 +660,22 @@ sessioninfo::session_info()
 ```
 :::
 
+## Código reproducible comentado
+
+Este anexo recoge el código que sostiene pasos del análisis que no aportan argumento al cuerpo del informe, pero que hacen falta para auditarlo o repetirlo.
+
+Se incluye aquí el enlace a un fichero script (disponible en Github) con todo el código limpio y comentado para renderizar los resultados proporcionados en el informe, junto con todos los chequeos, evaluaciones, comparaciones y diagnósticos precisos para validar el análisis. Sería el documento que habría de utilizar el equipo técnico para reproducir el análisis, con todos los chequeos de rigor, y el que podría utilizar por el profesorado para validar el procedimiento completo de ajuste.
+
+
 # Checklist final antes de entregar
+
+::: {.callout-warning}
+## Elimina este checklist antes de entregar
+Este checklist es una herramienta de autocomprobación, **no forma parte del informe**. Úsalo antes
+de renderizar la versión definitiva para verificar que el informe contiene los elementos básicos y,
+una vez repasado, **borra esta sección entera** (título, aviso y tabla) del `informe.qmd`. Después,
+renderiza la versión que entregas.
+:::
 
 | Comprobación | Sí | A revisar |
 |-------------------------------------------------|:---:|:---:|
@@ -533,7 +683,8 @@ sessioninfo::session_info()
 | El resumen ejecutivo puede leerse de forma autónoma. | ☐ | ☐ |
 | La decisión que se quiere apoyar aparece claramente formulada. | ☐ | ☐ |
 | Solo se incluyen resultados relevantes para la decisión. | ☐ | ☐ |
-| Los gráficos son pocos, legibles y con títulos interpretativos. | ☐ | ☐ |
+| Los gráficos son claros, legibles y con numeración correlativa y títulos interpretativos. | ☐ | ☐ |
+| Las tablas están enumeradas con numeración correlativa y títulos interpretativos. | ☐ | ☐ |
 | La metodología se explica de forma breve y comprensible. | ☐ | ☐ |
 | Las recomendaciones son concretas, priorizadas y respaldadas por evidencia. | ☐ | ☐ |
 | Se explican beneficios esperados, riesgos y forma de evaluar impacto. | ☐ | ☐ |
@@ -542,5 +693,7 @@ sessioninfo::session_info()
 | El uso de IA está declarado. | ☐ | ☐ |
 | **Cada sección está introducida**, y toda tabla o figura se presenta antes, se cita por su número y se comenta después. | ☐ | ☐ |
 | **No queda ningún recuadro de instrucción de la plantilla** sin sustituir por texto propio. | ☐ | ☐ |
+| **En el cuerpo del informe PDF no se ve código**: los chunks del cuerpo no muestran su código (`echo: false`, fijado en el chunk `setup`); el código solo aparece en los anexos. | ☐ | ☐ |
 | **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
+| **El anexo de metodología completa documenta todo el proceso**: para cada hallazgo clave se narra el procedimiento que lo sostiene: modelos ajustados (también los descartados), selección, supuestos y diagnóstico, desempeño, validación y de qué salida sale cada cifra del cuerpo. | ☐ | ☐ |
 | **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |

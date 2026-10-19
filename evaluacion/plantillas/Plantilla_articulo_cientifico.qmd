@@ -23,8 +23,9 @@ format:
     smooth-scroll: true
 
   # ---------------------------------------------------------------------------
-  # PDF. Bloque ACTIVO: un solo `quarto render informe.qmd` produce los dos
-  # archivos que se entregan, informe.html e informe.pdf.
+  # PDF. Bloque ACTIVO. Los dos archivos que se entregan, informe.html e
+  # informe.pdf, se obtienen con DOS renders explícitos, uno a cada formato
+  # (ver las instrucciones de publicación, justo debajo de esta cabecera).
   #
   # Requiere una distribución de LaTeX, que se instala UNA sola vez (igual en
   # Windows, macOS y Linux) desde el Terminal de RStudio:
@@ -70,27 +71,27 @@ format:
   CÓMO PUBLICAR Y ENTREGAR EL INFORME EN GITHUB
   ────────────────────────────────────────────────────────────────
 
-  1) Renombra este fichero como informe.qmd y renderízalo:
+  1) Renombra este fichero como informe.qmd y renderízalo DOS veces,
+     una a cada formato. En RStudio, despliega la flecha que hay al
+     lado del botón "Render" y elige primero "Render HTML" y después
+     "Render PDF". Si prefieres la pestaña Terminal (junto a Console):
 
-       quarto render informe.qmd
+       quarto render informe.qmd --to html
+       quarto render informe.qmd --to pdf
 
-     La cabecera YAML declara los DOS formatos, así que ese único
-     comando genera informe.html e informe.pdf, que son exactamente
-     los dos archivos que se entregan. El HTML es autocontenido
+     Así obtienes informe.html e informe.pdf, que son exactamente los
+     dos archivos que se entregan. El HTML es autocontenido
      ("embed-resources: true"), sin carpeta informe_files/.
 
-     OJO: el botón "Render" de RStudio genera SOLO el primer formato
-     declarado en el YAML, que aquí es el HTML. Si lo usas, el PDF no
-     aparece y no es que algo falle. Para obtener los dos, ejecuta el
-     comando anterior en la pestaña Terminal de RStudio (junto a
-     Console), o despliega la flecha que hay al lado de "Render" y
-     elige el formato.
+     OJO: pulsar directamente el botón "Render" genera SOLO el HTML.
+     Si el PDF no aparece no es que algo falle: te falta el segundo
+     render, el explícito a PDF.
 
      Para el PDF hace falta LaTeX, que se instala UNA sola vez con
      "quarto install tinytex" (ver apartado 5.9.1 de la Guía GitHub
-     del Estudiante). Si aún no lo tienes, el render deja hecho el
-     informe.html y falla al llegar al PDF: no has perdido nada,
-     instala LaTeX y vuelve a renderizar.
+     del Estudiante). Si aún no lo tienes, el render a PDF falla,
+     pero el informe.html ya está hecho: no has perdido nada,
+     instala LaTeX y repite el render a PDF.
 
      Plan B si la instalación se resiste: abre informe.html y usa
      Archivo > Imprimir > Guardar como PDF. Sale un PDF con el
@@ -133,7 +134,7 @@ format:
 # no al renderizar):
 # install.packages(c("tidyverse", "broom", "marginaleffects", "emmeans",
 #                    "ggeffects", "car", "DHARMa", "performance", "pROC", "here"))
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
 ::: {.callout-tip}
@@ -681,6 +682,14 @@ sessioninfo::session_info()
 
 # Checklist final antes de entregar
 
+::: {.callout-warning}
+## Elimina este checklist antes de entregar
+Este checklist es una herramienta de autocomprobación, **no forma parte del informe**. Úsalo antes
+de renderizar la versión definitiva para verificar que el informe contiene los elementos básicos y,
+una vez repasado, **borra esta sección entera** (título, aviso y tabla) del `informe.qmd`. Después,
+renderiza la versión que entregas.
+:::
+
 | Comprobación | Sí | A revisar |
 |-------------------------------------------------|:---:|:---:|
 | **El documento está íntegramente personalizado**: título, subtítulo, autoría y fecha son los del equipo; cabeceras y pies no conservan texto de la plantilla; no queda ningún `[texto entre corchetes]`, ninguna instrucción de la plantilla ni ninguna sección de ejemplo sin sustituir por contenido propio; se han eliminado los apartados que no apliquen. | ☐ | ☐ |
@@ -698,7 +707,10 @@ sessioninfo::session_info()
 | Las limitaciones y líneas futuras están reconocidas. | ☐ | ☐ |
 | Todas las citas tienen su referencia final en formato APA 7. | ☐ | ☐ |
 | El uso de IA está declarado. | ☐ | ☐ |
+| Los gráficos son claros, legibles y con numeración correlativa y títulos interpretativos. | ☐ | ☐ |
+| Las tablas están enumeradas con numeración correlativa y títulos interpretativos. | ☐ | ☐ |
 | **Cada sección está introducida**, y toda tabla o figura se presenta antes, se cita por su número y se comenta después. | ☐ | ☐ |
 | **No queda ningún recuadro de instrucción de la plantilla** sin sustituir por texto propio. | ☐ | ☐ |
+| **En el cuerpo del informe PDF no se ve código**: los chunks del cuerpo no muestran su código (`echo: false`, fijado en el chunk `setup`); el código solo aparece en los anexos. | ☐ | ☐ |
 | **El `informe.qmd` renderiza de cero en otro ordenador**: reiniciado R y borrada la caché, el documento se genera entero sin errores; sin rutas absolutas, con todos los paquetes declarados en `setup`, sin objetos heredados de otra sesión y con `set.seed()` antes de todo lo aleatorio. | ☐ | ☐ |
 | **El anexo de reproducibilidad está completo**: semilla declarada y salida de `sessionInfo()` en el documento renderizado. | ☐ | ☐ |
