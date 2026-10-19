@@ -302,22 +302,73 @@ zona urbana).
 ::: {.callout-note}
 ## De las frecuencias esperadas al odds ratio
 El modelo log-lineal da frecuencias esperadas $\mu_{ij}$: las medias Poisson de cada celda, como las
-tasas de la [Unidad 2.1](#sec-u21-interpretacion), ahora por celda. Dentro de cada zona, esas frecuencias
-se convierten en probabilidades dividiendo por el total de la zona —es el esquema producto-multinomial—:
+tasas de la [Unidad 2.1](#sec-u21-interpretacion), ahora por celda. En nuestra tabla, la zona es la fila
+$i$ (1 = urbana, 2 = mixta, 3 = rural) y la asistencia la columna $j$ (1 = sin, 2 = con):
+
+| Zona ($i$) | Sin asistencia ($j=1$) | Con asistencia ($j=2$) | Total de la zona | $\pi_i=\Pr(\text{con}\mid \text{zona } i)$ |
+|:--|:--:|:--:|:--:|:--:|
+| urbana (1) | $\mu_{11}$ | $\mu_{12}$ | $\mu_{1+}=\mu_{11}+\mu_{12}$ | $\mu_{12}/\mu_{1+}$ |
+| mixta (2) | $\mu_{21}$ | $\mu_{22}$ | $\mu_{2+}=\mu_{21}+\mu_{22}$ | $\mu_{22}/\mu_{2+}$ |
+| rural (3) | $\mu_{31}$ | $\mu_{32}$ | $\mu_{3+}=\mu_{31}+\mu_{32}$ | $\mu_{32}/\mu_{3+}$ |
+
+Dentro de cada zona, las frecuencias se convierten en probabilidades dividiendo por el total de la fila
+—es el esquema producto-multinomial—. De ahí salen, en cadena, la probabilidad, la odds y el odds ratio:
 
 $$
-\pi_i=\Pr(\text{con}\mid \text{zona } i)=\frac{\mu_{i2}}{\mu_{i1}+\mu_{i2}},\qquad
+\pi_i=\frac{\mu_{i2}}{\mu_{i1}+\mu_{i2}},\qquad
 \text{odds}_i=\frac{\pi_i}{1-\pi_i}=\frac{\mu_{i2}}{\mu_{i1}},\qquad
 \mathrm{OR}_{i}=\frac{\text{odds}_i}{\text{odds}_1}=e^{\lambda^{AB}_{i2}}.
 $$
 
-Los coeficientes se leen a lo largo de esa cadena: $e^{\lambda^{B}_2}$ es la odds de la zona de referencia
+La odds es el cociente entre las dos celdas de una misma fila (el total de la zona se cancela), y el OR
+compara la odds de una fila con la de la urbana. Los coeficientes se leen a lo largo de esa cadena: $e^{\lambda^{B}_2}$ es la odds de la zona de referencia
 (urbana), $e^{\lambda^{AB}_{i2}}$ la multiplica para pasar a la zona $i$, y la probabilidad se recupera con
 $\pi=\text{odds}/(1+\text{odds})$, que no es otra cosa que la inversa del logit y anticipa el puente con
 la logística.
 :::
 
-Lo comprobamos recorriendo la cadena con las frecuencias ajustadas del modelo:
+**El ajuste.** Veamos primero todos los coeficientes del saturado, en escala log y exponenciados, con su
+intervalo:
+
+```{r}
+#| label: u22-dosvias-coef
+broom::tidy(m_sat, conf.int = TRUE) |>
+  dplyr::transmute(term,
+                   coef = round(estimate, 3),
+                   exp_coef = round(exp(estimate), 3),
+                   conf.low = round(exp(conf.low), 3),
+                   conf.high = round(exp(conf.high), 3)) |>
+  as.data.frame()
+```
+
+Cada coeficiente exponenciado es una frecuencia o un cociente de frecuencias de la tabla, y solo los de
+interacción hablan de asociación:
+
+- **Intercepto** ($e^{\lambda}=883$): la frecuencia esperada de la celda de referencia, pólizas urbanas
+  **sin** asistencia ($\mu_{11}$).
+- **Efecto fila**, `zona_circulacionmixta` y `zona_circulacionrural` ($e^{\lambda^{A}_i}=0{,}826$ y
+  $0{,}460$): cuántas pólizas sin asistencia hay en cada zona respecto a la urbana ($\mu_{i1}/\mu_{11}$).
+  Recogen el **tamaño** de las zonas, no si la asistencia depende de ellas.
+- **Efecto columna**, `asistenciacon` ($e^{\lambda^{B}_2}=0{,}598$): la **odds** de asistencia en la zona
+  de referencia, $\mu_{12}/\mu_{11}$.
+- **Interacción**, `zona_circulacionmixta:asistenciacon` y `zona_circulacionrural:asistenciacon`
+  ($e^{\lambda^{AB}_{i2}}=0{,}782$ y $0{,}758$): los **odds ratios** de cada zona frente a la urbana. Son
+  los únicos términos que miden la asociación entre zona y asistencia.
+
+**Los odds ratios.** Los aislamos, con su intervalo de confianza:
+
+```{r}
+#| label: u22-dosvias-or
+broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl(":", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high)
+```
+
+Las odds de tener alguna asistencia son menores en las zonas mixta y rural que en la urbana: los dos OR
+están por debajo de 1, y sus intervalos no contienen el 1.
+
+**De los odds ratios a las probabilidades.** Por último, recorremos la cadena del recuadro con las
+frecuencias ajustadas, para ver las probabilidades que hay detrás de cada OR:
 
 ```{r}
 #| label: u22-or-a-mano
@@ -339,34 +390,53 @@ menores que las de la urbana; su **probabilidad** es un 15 % menor (0,852). No s
 parece al cociente de probabilidades cuando el suceso es raro, y aquí una de cada tres pólizas pide
 asistencia. Por eso, para comunicar, conviene dar las probabilidades junto al OR.
 
-Los dos OR coinciden con los coeficientes de interacción exponenciados, que además traen su intervalo:
+Todo lo anterior sale de estimar las seis frecuencias de la tabla. La @fig-u22-dosvias-ajuste las muestra
+con su incertidumbre:
 
 ```{r}
-#| label: u22-dosvias-or
-broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
-  dplyr::filter(grepl(":", term)) |>
-  dplyr::select(term, estimate, conf.low, conf.high)
+#| label: fig-u22-dosvias-ajuste
+#| fig-cap: "Frecuencias esperadas de cada celda según el modelo saturado, con su intervalo de confianza al 95 % (calculado en escala log y exponenciado). Como el saturado reproduce la tabla, la estimación coincide con el recuento observado; lo que añade el modelo es la incertidumbre."
+#| fig-width: 7
+#| fig-height: 4
+pred <- predict(m_sat, type = "link", se.fit = TRUE)   # escala log: ahí el intervalo es simétrico
+d2 |>
+  dplyr::mutate(mu = exp(pred$fit),
+                low = exp(pred$fit - qnorm(0.975) * pred$se.fit),
+                high = exp(pred$fit + qnorm(0.975) * pred$se.fit)) |>
+  ggplot(aes(zona_circulacion, mu, colour = asistencia)) +
+  geom_pointrange(aes(ymin = low, ymax = high), position = position_dodge(width = 0.4)) +
+  labs(x = "zona de circulación", y = "frecuencia esperada (pólizas)", colour = "asistencia") +
+  theme_minimal()
 ```
 
-Las odds de tener alguna asistencia son menores en las zonas mixta y rural que en la urbana (OR por
-debajo de 1, con intervalos que no contienen el 1). De paso, el coeficiente `asistenciacon` exponenciado es
-la odds de la zona de referencia (la urbana): por eso los efectos principales no se interpretan como
-efectos sobre la asociación, sino como piezas que reproducen los marginales.
+En la zona urbana la distancia entre las celdas «sin» y «con» es menor, en proporción, que en la mixta y
+la rural: es la mayor probabilidad de asistencia que miden la odds y el OR. Los intervalos son estrechos
+porque los recuentos son grandes, lo mismo que hacía fiable la aproximación $\chi^2$ del contraste.
 
 ### El puente con la logística
 
 Cuando uno de los factores es claramente la **respuesta** —aquí, tener o no alguna asistencia— el log-lineal
 saturado y la **logística** de ese factor sobre el otro son el **mismo modelo** reparametrizado
-[@dunnsmyth2018, §10.4.6; @christensen2025, §2.5]. Los coeficientes de asociación coinciden:
+[@dunnsmyth2018, §10.4.6; @christensen2025, §2.5]. Ponemos todos los coeficientes de los dos modelos,
+cada uno junto a su pareja:
 
 ```{r}
 #| label: u22-puente-logit
 m_logit <- glm(asistencia ~ zona_circulacion, family = binomial, data = cart_tab)
-rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
-      logistica = coef(m_logit)[-1]) |> round(4)
+tibble::tibble(
+  termino_loglineal = names(coef(m_sat)),
+  loglineal         = coef(m_sat),
+  # pareja de cada coeficiente en la logística; NA = no tiene equivalente
+  termino_logistica = c(NA, NA, NA, "(Intercept)", "zona_circulacionmixta", "zona_circulacionrural"),
+  logistica         = coef(m_logit)[termino_logistica]) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 4))) |>
+  as.data.frame()                  # para ver los cuatro decimales
 ```
 
-Idénticos hasta el redondeo. Para ver por qué, basta con escribir la odds de asistencia en la zona $i$
+Los seis coeficientes del log-lineal se reparten en dos grupos. Los tres primeros —el intercepto
+$\lambda$ y el efecto fila $\lambda^{A}_i$ de la zona— no tienen pareja en la logística. Los otros tres
+coinciden exactamente con los de la logística: el efecto columna `asistenciacon` ($\lambda^{B}_2$) es su
+intercepto, y las dos interacciones ($\lambda^{AB}_{i2}$) son sus efectos de zona. Para ver por qué, basta con escribir la odds de asistencia en la zona $i$
 con el log-lineal saturado y tomar logaritmos (nivel 1 de asistencia = `sin`, nivel 2 = `con`; con las restricciones de celda de referencia,
 $\lambda^B_1=\lambda^{AB}_{i1}=0$):
 
@@ -1279,20 +1349,36 @@ En `cartera` cada póliza trae dos columnas con su nivel: `bonus_malus_prev` (el
 pólizas que no cambian de nivel.
 
 Para ajustar los modelos con `glm`, como en el resto de la unidad, pasamos la tabla a formato largo, una
-fila por celda (25 filas), en el objeto `cuad`. Estas son las variables con las que trabajamos en toda la
-sección:
+fila por celda (25 filas), en el objeto `cuad`. Las variables con las que trabajamos son estas
+(@tbl-u22-cambio-vars):
 
-| Variable | Dónde está | Qué es | Para qué la usamos |
+| Variable | Qué es |
+|:--|:--|
+| `prev`, `act` | nivel de bonus-malus del año anterior y del actual (factor, 1 a 5); salen de `bonus_malus_prev` y `bonus_malus_act` de `cartera` |
+| `Freq` | número de pólizas en la celda (`prev`, `act`): la **respuesta** de todos los modelos |
+| `par` | la pareja de niveles sin orden: las celdas 1 → 2 y 2 → 1 comparten la etiqueta `"1-2"` |
+| `i`, `j` | los niveles previo y actual como **números** (1 a 5), para usarlos como puntuaciones |
+| `diagonal` | indica si la póliza se queda en su nivel (`"queda"`, $i=j$) o cambia (`"mueve"`); la construimos con `i` y `j` al llegar al modelo de inercia |
+
+: Variables de la tabla de cambio, en `cuad` (una fila por celda). {#tbl-u22-cambio-vars}
+
+Cada modelo de la sección responde a alguna de las preguntas de la dirección y necesita unas variables
+concretas (@tbl-u22-cambio-modelos):
+
+| Modelo | Qué afirma, en nuestro problema | Responde a | Necesita, además de `Freq` |
 |:--|:--|:--|:--|
-| `bonus_malus_prev`, `bonus_malus_act` | `cartera` (una fila por póliza) | nivel del año anterior y del actual, factor ordenado 1–5 | origen de la tabla; la deriva se calcula sobre ellas |
-| `prev`, `act` | `cuad` (una fila por celda) | los mismos niveles, como factor | **predictoras**: efectos de fila y de columna |
-| `Freq` | `cuad` | número de pólizas en la celda | la **respuesta** de todos los modelos (Poisson) |
-| `i`, `j` | `cuad` | los niveles previo y actual como **números** | construir **predictoras** que usan el orden (`I(i * j)`) o la diagonal ($i=j$) |
-| `par` | `cuad` | la pareja de niveles **sin orden**: $(i,j)$ y $(j,i)$ reciben la misma etiqueta (1 → 2 y 2 → 1 son las dos `"1-2"`) | **predictora** de la simetría y la cuasi-simetría: trata las celdas espejo como una sola |
+| Simetría | entre dos niveles cualesquiera, pasan tantas pólizas en un sentido como en el otro | (2) | `par` |
+| Cuasi-simetría | el reparto de niveles puede cambiar, pero el intercambio entre pares sigue siendo simétrico | (2) y (3) | `prev`, `act`, `par` |
+| Homogeneidad marginal | el porcentaje de pólizas en cada nivel es el mismo los dos años | (3) | ninguna nueva: compara los dos anteriores |
+| Independencia | el nivel actual no depende del previo (referencia) | (4) | `prev`, `act` |
+| Asociación uniforme | quien estaba más arriba tiende a seguir más arriba, con la misma intensidad entre niveles vecinos | (4) | `prev`, `act`, `i`, `j` |
+| Inercia | además, cada póliza tiende a quedarse en su nivel | (1) y (4) | lo anterior y `diagonal` |
+
+: Hoja de ruta de la sección: qué afirma cada modelo, a qué pregunta responde y qué variables necesita. {#tbl-u22-cambio-modelos}
 
 Como en toda la unidad, el dato es la **celda**: la respuesta es siempre `Freq`, y las predictoras son
 características de la celda (de qué nivel viene, a cuál va, si es diagonal…). Lo que distingue a un
-modelo de otro es **qué predictoras** usa, y cada subsección lo indica en un párrafo «Modelización en R».
+modelo de otro es **qué predictoras** usa; cada subsección lo concreta en un párrafo «Modelización en R».
 
 ```{r}
 #| label: u22-cuadrada
@@ -1387,7 +1473,7 @@ $$
 \log\mu_{ij}=\gamma_{\{i,j\}},\qquad \gamma_{\{i,j\}}=\gamma_{\{j,i\}}.
 $$
 
-**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ par`. Al usar `par` como único predictor,
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ par`. Al usar `par` (@tbl-u22-cambio-vars) como único predictor,
 las dos celdas espejo comparten parámetro y el modelo les asigna la misma frecuencia esperada, que es
 exactamente lo que dice la simetría:
 
@@ -1551,7 +1637,7 @@ arriba, sea cual sea el nivel de partida*.
 
 **Modelización en R.** Ajustamos dos GLM Poisson: la independencia con `Freq ~ prev + act`, y la
 asociación uniforme con `Freq ~ prev + act + I(i * j)`. El término nuevo es una covariable **numérica**,
-el producto de las puntuaciones, escrito `I(i * j)` para que R lo calcule como producto y no como
+el producto de las puntuaciones `i` y `j` (@tbl-u22-cambio-vars), escrito `I(i * j)` para que R lo calcule como producto y no como
 interacción de factores. Es una sola columna, de ahí que gaste un solo parámetro.
 
 ```{r}
@@ -1601,9 +1687,8 @@ En nuestro problema: *además del gradiente entre niveles, cada póliza tiene un
 quedarse donde estaba*; $e^{\delta}$ es el factor por el que se multiplican las frecuencias de la
 diagonal respecto a lo que daría solo el gradiente.
 
-**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + I(i * j) + diagonal`, donde
-`diagonal` es un factor que vale `"queda"` cuando $i=j$ y `"mueve"` en el resto, construido a partir de
-`i` y `j`.
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + I(i * j) + diagonal`, con el
+indicador `diagonal` de la @tbl-u22-cambio-vars, que construimos aquí a partir de `i` y `j`.
 
 ```{r}
 #| label: u22-movilidad

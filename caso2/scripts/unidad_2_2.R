@@ -151,6 +151,30 @@ round(c(G2 = G2, p_G2 = pchisq(G2, gl, lower.tail = FALSE),
         gl = gl, min_esperada = min(fitted(m_ind))), 4)
 
 # -----------------------------------------------------------------------------
+# [u22-dosvias-coef]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.1 Tablas de dos vías: ¿asociación o independencia?
+#       > Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
+# -----------------------------------------------------------------------------
+broom::tidy(m_sat, conf.int = TRUE) |>
+  dplyr::transmute(term,
+                   coef = round(estimate, 3),
+                   exp_coef = round(exp(estimate), 3),
+                   conf.low = round(exp(conf.low), 3),
+                   conf.high = round(exp(conf.high), 3)) |>
+  as.data.frame()
+
+# -----------------------------------------------------------------------------
+# [u22-dosvias-or]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.1 Tablas de dos vías: ¿asociación o independencia?
+#       > Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
+# -----------------------------------------------------------------------------
+broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(grepl(":", term)) |>
+  dplyr::select(term, estimate, conf.low, conf.high)
+
+# -----------------------------------------------------------------------------
 # [u22-or-a-mano]
 #   2 · Modelos log-lineales para tablas de contingencia
 #     > 2.1 Tablas de dos vías: ¿asociación o independencia?
@@ -167,14 +191,20 @@ cadena$prob_vs_urbana <- cadena$prob / cadena["urbana", "prob"]   # cociente de 
 round(cadena, 3)
 
 # -----------------------------------------------------------------------------
-# [u22-dosvias-or]
+# [fig-u22-dosvias-ajuste]
 #   2 · Modelos log-lineales para tablas de contingencia
 #     > 2.1 Tablas de dos vías: ¿asociación o independencia?
 #       > Leer la asociación: de las frecuencias a las probabilidades y los odds ratios
 # -----------------------------------------------------------------------------
-broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
-  dplyr::filter(grepl(":", term)) |>
-  dplyr::select(term, estimate, conf.low, conf.high)
+pred <- predict(m_sat, type = "link", se.fit = TRUE)   # escala log: ahí el intervalo es simétrico
+d2 |>
+  dplyr::mutate(mu = exp(pred$fit),
+                low = exp(pred$fit - qnorm(0.975) * pred$se.fit),
+                high = exp(pred$fit + qnorm(0.975) * pred$se.fit)) |>
+  ggplot(aes(zona_circulacion, mu, colour = asistencia)) +
+  geom_pointrange(aes(ymin = low, ymax = high), position = position_dodge(width = 0.4)) +
+  labs(x = "zona de circulación", y = "frecuencia esperada (pólizas)", colour = "asistencia") +
+  theme_minimal()
 
 # -----------------------------------------------------------------------------
 # [u22-puente-logit]
@@ -183,8 +213,14 @@ broom::tidy(m_sat, exponentiate = TRUE, conf.int = TRUE) |>
 #       > El puente con la logística
 # -----------------------------------------------------------------------------
 m_logit <- glm(asistencia ~ zona_circulacion, family = binomial, data = cart_tab)
-rbind(loglineal = coef(m_sat)[grepl(":", names(coef(m_sat)))],
-      logistica = coef(m_logit)[-1]) |> round(4)
+tibble::tibble(
+  termino_loglineal = names(coef(m_sat)),
+  loglineal         = coef(m_sat),
+  # pareja de cada coeficiente en la logística; NA = no tiene equivalente
+  termino_logistica = c(NA, NA, NA, "(Intercept)", "zona_circulacionmixta", "zona_circulacionrural"),
+  logistica         = coef(m_logit)[termino_logistica]) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 4))) |>
+  as.data.frame()                  # para ver los cuatro decimales
 
 # -----------------------------------------------------------------------------
 # [u22-residuos-2v]
