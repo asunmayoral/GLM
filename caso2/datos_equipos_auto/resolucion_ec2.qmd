@@ -1,0 +1,400 @@
+---
+title: "resolucion_ec2"
+format: html
+editor: visual
+---
+```{r}
+#| label: setup
+#| include: false
+
+# Núcleo.
+library(broom)
+library(tidyverse)
+library(MASS)          # glm.nb (base-recommended)
+library(pscl)          # hurdle / zeroinfl
+library(glmmTMB)       # conteos mixtos / ceros
+library(lme4)          # glmer (Poisson)
+library(DHARMa); library(performance); library(marginaleffects)
+library(survival)      # riesgos a trozos (base-recommended)
+library(glmnet)       # regularización (2.7)
+library(vcd)           # mosaicos para tablas de contingencia (2.2)
+library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
+
+SEMILLA_CURSO <- 20252026L
+set.seed(SEMILLA_CURSO)
+theme_set(theme_minimal(base_size = 12))
+```
+
+## 8.1 El estudio de caso (entregable) {#sec-u28-caso}
+
+### El encargo
+
+Te contrata la **dirección técnica** de una **aseguradora de automóvil**, que gestiona su cartera a
+través de una red de **agencias**. No son estadísticos: te traen sus datos y sus preguntas, y esperan
+**respuestas y recomendaciones** para tarificar y planificar, no una clase de modelos. Como en el
+Caso 1, tú **eliges y justificas** el modelo en cada caso.
+
+> **Lo que la dirección quiere saber**
+>
+> *Sobre el ritmo de siniestros y qué lo explica*
+>
+> 1. ¿A qué **ritmo** tienen siniestros nuestras pólizas, y qué factores lo suben o lo bajan —y **cuánto**?
+> 2. ¿Podríais estimar el ritmo esperado, **con su margen**, de una **póliza nueva** de un perfil concreto?
+> 3. Las **asistencias en carretera**, ¿siguen el mismo patrón de riesgo que los siniestros, o responden a
+>    otras cosas?
+> 4. ¿Están **asociados** entre sí el tipo de vehículo, la zona y el combustible, y con tener o no algún
+>    siniestro? Nos interesa saber **quién con quién**: si dos de ellos parecen ir juntos solo porque
+>    ambos se relacionan con un tercero, no queremos confundirnos.
+> 5. Reevaluamos el **bonus-malus** cada año: ¿cómo se mueven las pólizas de un nivel a otro? ¿Es un vaivén
+>    equilibrado o hay **deriva** (empeoran más de las que mejoran)? ¿Y tiene ese movimiento alguna
+>    **regularidad** que podamos resumir en pocos números, o hay que mirar las 25 casillas una a una?
+>
+> *Sobre la enorme variabilidad y los ceros*
+>
+> 6. Unas pocas pólizas concentran **muchísimos partes** y la mayoría casi ninguno. ¿Vuestro modelo refleja
+>    esa variabilidad o se queda corto? ¿Qué implica para la **tarifa** y para lo fiables que son vuestros
+>    números?
+> 7. ¿A qué se debe esa variabilidad de más: hay pólizas **intrínsecamente más siniestrosas** que las
+>    variables no capturan?
+> 8. La mayoría de reclamaciones **nunca pasa por revisión antifraude**. ¿Hay pólizas que por su naturaleza
+>    **no la levantan**, frente a otras que aún no lo han hecho? ¿Cómo las distinguimos?
+>
+> *Sobre las agencias y el territorio*
+>
+> 9. ¿El volumen de **gestiones** depende de la **agencia** que lleva la póliza, o es cosa de la propia
+>    póliza? ¿**Cuánta** variación es atribuible a la agencia?
+> 10. ¿Hay un efecto de **región** por encima de las agencias?
+> 11. ¿Qué agencias se **desvían** —mejor o peor de lo que cabría esperar por su cartera—?
+> 12. Si abrimos una **agencia nueva**, ¿qué deberíamos esperar?
+>
+> *Sobre cómo evoluciona el riesgo en el tiempo*
+>
+> 13. ¿Cómo cambia el riesgo del **primer siniestro** a lo largo de la antigüedad de la póliza? ¿Sube, baja,
+>     se mantiene?
+> 14. Con el **historial completo** de partes, ¿el riesgo de los **siguientes** siniestros se comporta como
+>     el del primero, o distinto?
+> 15. ¿Cada cuánto conviene **revisar** a las pólizas de más riesgo?
+>
+> *Sobre un modelo sencillo, fiable y responsable*
+>
+> 16. Manejamos **muchísimas variables**: ¿cuáles merece la pena **conservar** para anticipar la
+>     siniestralidad, sin perder fiabilidad?
+> 17. Tenemos el **sexo** del conductor y sabemos que predice, pero la ley **prohíbe** tarificar con él:
+>     ¿cómo hacéis una selección que lo **respete** y no lo cuele por la puerta de atrás (proxies)?
+> 18. Y si lo quitamos del modelo, ¿estamos ya tranquilos? ¿Hay alguna de las variables que **sí** podemos
+>     usar que vaya tan de la mano del sexo que en realidad lo esté sustituyendo? Si es así, decidnos
+>     **cuál** y **cuánto** de la diferencia entre hombres y mujeres se nos sigue colando por ahí.
+> 19. Última cosa, y va sin ánimo de ofender: estos números los vamos a usar para fijar precios. ¿Cómo
+>     comprobáis vosotros mismos que no os habéis equivocado? Si el mismo dato se puede analizar de dos
+>     maneras distintas, ¿os dan lo mismo?
+
+| Preguntas | Qué se pregunta | Dónde se trabaja |
+|:--|:--|:--|
+| **P1–P3** | Ritmo de siniestros y factores; predicción para una póliza nueva; comparación con las asistencias | [Unidad 2.1](#sec-u21) |
+| **P4–P5** | Asociación entre factores; movilidad del bonus-malus | [Unidad 2.2](#sec-u22) |
+| **P6–P7** | Variabilidad de más y su origen | [Unidad 2.3](#sec-u23) (con [2.5](#sec-u25) y [2.6](#sec-u26)) |
+| **P8** | Pólizas que no levantan revisión antifraude | [Unidad 2.4](#sec-u24) |
+| **P9–P12** | Agencias y territorio | [Unidad 2.5](#sec-u25) |
+| **P13–P15** | Evolución del riesgo en el tiempo | [Unidad 2.6](#sec-u26) |
+| **P16–P18** | Selección de variables, factor prohibido y sus *proxies* | [Unidad 2.7](#sec-u27) |
+| **P19** | Control de calidad: log-lineal frente a logística | [Unidad 2.2](#sec-u22) |
+
+: Correspondencia entre las preguntas de la dirección y la unidad en que se trabaja cada una. {#tbl-u28-mapa-preguntas}
+
+## Los datos
+
+Como los datos son **simulados** (con proceso generador conocido), podrás validar tus estimaciones
+contra la verdad. En la carpeta de tu equipo (`datos_equipos_auto/equipo_XX/`) tienes cuatro ficheros:
+
+| Fichero | Una fila por | Contenido |
+|---|---|------------|
+| `cartera.csv` | póliza | Las variables de cada póliza, **sin** la verdad del DGP: es el fichero con el que trabajas a ciegas. |
+| `cartera.rds` | póliza | Lo mismo, más tres atributos: `attr(cartera, "verdad")` (parámetros del DGP, para validar **al final**), `attr(cartera, "siniestros")` y `attr(cartera, "panel")` (las dos tablas siguientes). |
+| `siniestros.csv` | parte de siniestro | `id_poliza`; `k` (orden del parte dentro de la póliza); `t_k` (instante del parte, en años desde el alta); `coste_k` (coste del parte, €); `anio` (año de póliza en que ocurre). |
+| `panel.csv` | póliza y año | `id_poliza`; `anio`; `tstart` y `tstop` (inicio y fin del tramo, en años); `expo_anual` (tiempo expuesto en el tramo → *offset* variable); `n_partes_anual` (partes en el tramo); `edad_t` y `antig_veh_t` (edad del conductor y antigüedad del vehículo ese año); `en_riesgo` (siempre 1: la póliza está en riesgo todo el tramo). |
+
+Cada fila de la cartera es una **póliza**, observada durante su `antiguedad` en la cartera. La
+**exposición** entra como *offset* (`offset = log(exposicion)`): los partes se leen **por unidad de
+tiempo expuesto**, no en bruto.
+
+| Papel | Variables |
+|---|---------|
+| Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (`antiguedad / 10`: la misma antigüedad medida en **décadas**, entre 0.01 y 1 → *offset*; la tasa se lee como partes por cada 10 años de póliza); `antiguedad` (años en la cartera) |
+| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia); `tuvo_siniestro` (1 si `n_siniestros > 0`: versión binaria, útil para las tablas de P4) |
+| Predictores de riesgo | `edad_conductor` (y en tramos, `edad_tramo`: 18-25 / 25-35 / 35-65 / 65+); `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
+| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Úsalo para **discutir** *fairness* y variables *proxy*, no para el modelo final. Aviso: excluirlo del modelo **no garantiza** que su información quede fuera —eso es lo que te toca averiguar en P18— |
+| Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
+| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
+| Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
+
+Hay **más variables de las que necesitarás**: algunas son ruido, a propósito, para que ejercites la
+selección y decidas qué entra en el modelo.
+
+### Carga de datos
+
+```{r}
+#| label: carga-datos
+
+# Configurar con la base de datos correspondiente a cada equipo
+url_base <- "https://raw.githubusercontent.com/asunmayoral/GLM/master/caso2/datos_equipos_auto/equipo_20/"
+
+cartera <- read_csv(paste0(url_base, "cartera.csv"))
+glimpse(cartera)
+
+# El panel persona-año (proceso de conteo) y la tabla larga de siniestros
+panel <- read_csv(paste0(url_base, "panel.csv"))
+glimpse(panel)
+
+siniestros <- read_csv(paste0(url_base, "siniestros.csv"))
+glimpse(siniestros)
+
+# La verdad del DGP
+cartera_rds <- readRDS(gzcon(url(paste0(url_base, "cartera.rds"))))
+# para recuperar la verdad 
+#attr(cartera_rds, "verdad")
+#attr(cartera_rds,"siniestros")
+#attr(cartera_rds, "panel") 
+```
+### Procesado de los datos
+
+Codificación a factores y estandarización de variables continuas.
+
+```{r}
+#| label: prep
+# Factores con referencia explícita
+cartera <- cartera |>
+  mutate(
+    edad_tramo       = factor(edad_tramo, levels = c("18-25","25-35","35-65","65+")),
+    zona_circulacion = relevel(factor(zona_circulacion), ref = "urbana"),
+    uso              = relevel(factor(uso),              ref = "particular"),
+    tipo_vehiculo    = relevel(factor(tipo_vehiculo),    ref = "turismo"),
+    combustible      = relevel(factor(combustible),      ref = "gasolina"),
+    sexo             = factor(sexo),
+    id_agencia       = factor(id_agencia),
+    id_region        = factor(id_region),
+    bonus_malus_prev = factor(bonus_malus_prev, levels = 1:5),
+    bonus_malus_act  = factor(bonus_malus_act,  levels = 1:5)
+  )
+
+# Estandarización de continuos (guardamos media y DE para predecir perfiles nuevos)
+vars_z <- c(carnet = "antiguedad_carnet", pot = "potencia_cv",
+            antv = "antiguedad_vehiculo", km = "km_anuales", dens = "densidad")
+centros <- sapply(vars_z, function(v) mean(cartera[[v]]))
+escalas <- sapply(vars_z, function(v) sd(cartera[[v]]))
+for (nm in names(vars_z))
+  cartera[[paste0("z_", nm)]] <- (cartera[[vars_z[nm]]] - centros[nm]) / escalas[nm]
+
+# Helper para construir el perfil de una póliza nueva en la misma escala z
+z_de <- function(nm, valor_bruto) (valor_bruto - centros[nm]) / escalas[nm]
+```
+
+## Unidad 2.1
+
+::: {.callout-important}
+## Tarea del estudiante (2.1) — Preguntas 1 a 3 del caso
+Sobre la cartera de tu equipo abordas el primer bloque de la dirección:
+
+1. **Ritmo y perfiles (P1).** Modela la **tasa** de `n_siniestros` con Poisson y `offset(log(exposicion))`
+   y lee los factores en **IRR** con sus intervalos.
+   *Pistas:* interpreta al menos un IRR con la frase completa de la
+   [Sección 1.3](#sec-u21-interpretacion) («a igualdad de…, la tasa esperada es … veces …»). En tu
+   cartera `exposicion` es la antigüedad en **décadas** (`antiguedad / 10`), así que la tasa se lee como
+   siniestros por cada 10 años de póliza. No incluyas `sexo`: es el factor prohibido ([Unidad 2.8](#sec-u28)).
+2. **Predicción (P2).** Estima el ritmo esperado —con intervalo— de una **póliza nueva** de un perfil dado.
+   *Pistas:* en el `newdata`, `exposicion = 0.1` equivale a **un año** de póliza. Distingue en tu
+   respuesta el intervalo de la **tasa media** de ese perfil del número de siniestros que tendrá **una**
+   póliza concreta.
+3. **¿Mismo patrón? (P3).** Repite con `n_asistencia` y compara: ¿los mismos factores, con la misma fuerza,
+   que en `n_siniestros`?
+   *Pista:* une las dos tablas de `broom::tidy(..., exponentiate = TRUE, conf.int = TRUE)` por `term` y
+   dibuja los IRR de las dos respuestas, lado a lado, con sus intervalos.
+
+**Diagnóstico.** Para cada respuesta, comprueba si la Poisson basta con el **índice de dispersión**, el
+**rootograma** y los **residuos simulados** de `DHARMa` ([Sección 1.5](#sec-u21-diagnostico)). Si el
+índice se dispara, los intervalos de P1 y P2 son **demasiado estrechos**: anótalo y no los des por
+buenos; lo resolverás en la [Unidad 2.3](#sec-u23) (P6–P7).
+
+**Validación.** Al final, y solo al final, compara tus estimaciones con la verdad de tu cartera
+(`attr(cartera, "verdad")`, en `cartera.rds`). Sus nombres y escalas no coinciden con los de la
+cartera de teoría, así que el código de la validación de esta unidad no te sirve tal cual: el prompt del
+recuadro anterior está pensado para ese emparejamiento.
+
+Las preguntas **P4** (asociación en tablas), **P5** (movilidad del bonus-malus) y **P19** (control de
+calidad) se abordan con la [Unidad 2.2](#sec-u22); la **P18** (proxies), con la [Unidad 2.7](#sec-u27-proxy).
+:::
+
+
+
+## Unidad 2.2
+
+::: {.callout-important}
+## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
+Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
+
+**P4 · ¿Qué factores se asocian con tener un siniestro, y cómo se relacionan entre sí?** Cruza
+`tipo_vehiculo`, `zona_circulacion` y `combustible` con `tuvo_siniestro` (tener o no al menos un
+siniestro) y responde: (a) ¿qué factores se asocian con tener siniestro?; (b) ¿están asociados los
+factores entre sí?; (c) ¿cambia alguna asociación según el nivel de un tercer factor?; (d) ¿es legítimo
+leer la tabla de dos vías de uno de esos factores con `tuvo_siniestro`, sumando sobre los demás?
+
+*Tips:*
+
+- Empieza con tres vías (dos factores y `tuvo_siniestro`): ajusta los cinco modelos, dibuja el grafo
+  del elegido y escríbelo como frase de independencia condicional ([Sección 2.2](#sec-u22-tresvias)).
+- Con los cuatro factores no enumeres modelos: ajusta los órdenes 1 a 4 y contrasta **órdenes
+  consecutivos** con `anova(m1, m2, m3, m4, test = "LRT")`; el ajuste frente al saturado pierde potencia
+  cuando hay muchos gl. Fijado el orden, poda con `drop1()`
+  ([Sección 2.3](#sec-u22-orden-superior)).
+- Haz el recuento de gl a mano sobre la fórmula y compruébalo con `df.residual()`.
+- Para (d), compara el OR **marginal** con el **condicional** del modelo elegido y razónalo con la regla
+  de colapsabilidad; si no coinciden, piensa en Simpson.
+- Antes de fiarte de un $p$-valor, mira la ocupación de las celdas (`sum(tab < 5)`, `min(fitted(m))`) y
+  los residuos ajustados.
+
+**P5 · ¿Cómo se mueven las pólizas entre niveles de bonus-malus, y qué implica para el negocio?** Sobre
+la tabla cuadrada `bonus_malus_prev × bonus_malus_act`, responde las cuatro preguntas de la
+[Sección 2.4](#sec-u22-cuadradas): (1) ¿cuántas pólizas se quedan en su nivel?; (2) ¿es equilibrado el
+trasiego entre pares de niveles?; (3) ¿ha cambiado el reparto global de niveles?; (4) ¿qué estructura
+tiene el movimiento? Cierra con lo que significa para los ingresos y la retención.
+
+*Tips:*
+
+- Prepara la tabla en formato largo con las columnas auxiliares `i`, `j` y `par`; todos los modelos
+  salen de ahí.
+- Empieza por el mapa de calor (porcentaje por fila y flujo neto) y por el cambio de los marginales: te
+  dirán qué buscar.
+- Para (2) y (3): simetría, cuasi-simetría y homogeneidad marginal como LRT entre ambas, con los gl
+  contados a mano. Rechazar la simetría no prueba por sí solo que el reparto haya cambiado. Si la
+  cuasi-simetría tampoco ajusta, lee con cautela el $p$ de la homogeneidad marginal y busca en sus
+  residuos ajustados qué flujo queda sin explicar.
+- Cuantifica el cambio del reparto con el nivel medio **y** con el porcentaje de pólizas en cada nivel:
+  un nivel medio estable puede esconder una cartera que se desplaza hacia los extremos.
+- Para (4): asociación uniforme frente a independencia, y un término de inercia de la diagonal si
+  aporta. Separa las dos preguntas —¿aporta el término? (LRT) y ¿ajusta el modelo? (deviance frente a
+  sus gl)— y da $e^{\beta}$ y $e^{\delta}$ con su intervalo: fíjate en cómo cambia $\beta$ al añadir la
+  inercia.
+- Para el negocio: el efecto de un cambio en el reparto sobre la prima media depende de cuánto
+  descuenta o recarga cada nivel; razónalo, aunque no tengas la tarifa.
+
+**P19 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
+asociaciones de P4 como logística de `tuvo_siniestro` y compara sus odds ratios con los del log-lineal
+saturado.
+
+*Tips:*
+
+- Deben coincidir exactamente. Explica por qué con la derivación de «El puente con la logística»
+  ([Sección 2.1](#sec-u22-dosvias)): al restar los logaritmos, el efecto principal del factor explicativo
+  se cancela.
+- Explica qué estima el log-lineal que la logística no necesita (los totales de cada nivel del factor) y
+  qué habrías concluido si no hubieran coincidido (por ejemplo, un nivel de referencia distinto en cada
+  modelo).
+
+Da siempre el **tamaño** del efecto junto al $p$-valor, y **valida** al final contra
+`attr(cartera, "verdad")`: ¿coincide la estructura que has elegido con la del proceso generador?
+
+La pregunta **P18** (proxies del factor prohibido) usa estas mismas herramientas, pero se plantea con la
+selección de variables, en la [Unidad 2.7](#sec-u27-proxy).
+:::
+
+## Unidad 2.3
+
+::: {.callout-important}
+## Tarea del estudiante (2.3) — Preguntas 6 y 7 del caso
+Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.8](#sec-u28)):
+
+- **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
+  la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
+  quasi-Poisson y binomial negativa, y **decide y justifica** cuál la captura mejor —AIC y re-diagnóstico—.
+  Explica qué cambia —y qué no— en los **errores estándar** y en la **tarifa**.
+- **P7 · ¿De dónde viene?** Razona esa variabilidad extra como **heterogeneidad no observada** (fragilidad):
+  pólizas intrínsecamente más siniestrosas que las variables no capturan. Deja el puente hacia los mixtos
+  ([2.5](#sec-u25)) y la supervivencia ([2.6](#sec-u26)).
+
+Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`attr(cartera, "verdad")$theta_frail`).
+:::
+
+## Unidad 2.4
+
+::: {.callout-important}
+## Tarea del estudiante (2.4) — Pregunta 8 del caso
+Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.8](#sec-u28)): *la mayoría
+de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
+frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
+exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
+**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca la levanta,
+o proceso en dos etapas?). Interpreta las **dos partes** (quién puede levantarla / a qué ritmo) y **valida** la
+parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
+:::
+
+## Unidad 2.5
+
+::: {.callout-important}
+## Tarea del estudiante (2.5) — Preguntas 9 a 12 del caso
+Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, intercepto aleatorio por
+**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.8](#sec-u28)):
+
+- **P9 · ¿Cuánta variación es de agencia?** Interpreta los efectos fijos en IRR (condicionales a la agencia)
+  y cuantifica el **ICC**.
+- **P10 · Territorio.** Añade la **región** al anidamiento (`(1 | id_region/id_agencia)`) y valora si aporta.
+- **P11 · Agencias atípicas.** Con BLUPs / *caterpillar*, identifica las que se **desvían** y comenta el
+  **shrinkage**.
+- **P12 · Agencia nueva.** Distingue predicción **condicional** vs **marginal**: ¿qué esperar de una agencia
+  sin historial?
+
+Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** los componentes de varianza estimados frente a
+$\sigma_a$ y $\sigma_{reg}$ del DGP (`attr(cartera, "verdad")$sigma_ag`, `$sigma_reg`).
+:::
+
+## Unidad 2.6
+
+::: {.callout-important}
+## Tarea del estudiante (2.6) — Preguntas 13 a 15 del caso
+Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.8](#sec-u28)):
+
+- **P13 · El primer siniestro.** Expande a **persona-periodo** y ajusta el modelo de **riesgos a trozos**
+  (Poisson + offset) sobre `t_primer_sin`/`evento` —en tu cartera el tiempo es **continuo**: córtalo en
+  tramos con `survSplit` y usa el tiempo en riesgo como *offset*, como en la [Sección 6.6](#sec-u26-conteos)—;
+  describe el **hazard base** por tramo de antigüedad, lee
+  las razones de riesgo, y compara la curva de supervivencia con **Kaplan–Meier** y **Cox**.
+- **P14 · Eventos recurrentes (avanzado).** Con el **panel** (`panel.csv`) y el historial de partes, plantea
+  el modelo de **Andersen–Gill** (offset variable) y discute si el riesgo del 2.º, 3.º… siniestro difiere del
+  primero —conexión con la fragilidad de la [Sección 6.5](#sec-u26-frailty) y con la sobredispersión de la
+  [Unidad 2.3](#sec-u23)—.
+- **P15 · Recomendación.** Traduce el hazard en una política de **cada cuánto revisar** las pólizas de más
+  riesgo.
+
+**Valida** el hazard base contra la forma Weibull del DGP (`attr(cartera, "verdad")$weib_shape`, `$lambda0`).
+:::
+
+## Unidad 2.7
+
+::: {.callout-important}
+## Tarea del estudiante (2.7) — Preguntas 16, 17 y 18 del caso
+Sobre **la cartera de tu equipo**, la dirección pide un modelo **sencillo, fiable y responsable** para anticipar
+la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.8](#sec-u28)). Con `n_siniestros` y su
+*offset* de exposición:
+
+1. **Selección (P16).** Compara, por **validación cruzada** (*deviance* de Poisson en 10 bloques), el modelo
+   nulo, uno con los predictores que a priori consideres «del riesgo» y el modelo con **todas** las variables.
+   Contrástalo con **AIC** y **BIC**, y comenta las discrepancias.
+2. **Regularización (P16).** Ajusta un **Poisson regularizado** con `cv.glmnet` (*lasso*; prueba también *ridge*
+   y *elastic-net*). Presenta la **ruta de regularización** y la **curva de validación cruzada**, y **justifica**
+   tu elección de $\lambda$ (`min` frente a `1se`).
+3. **Modelo final (P16).** **Qué variables retiene** el *lasso* y qué **IRR** tienen. Interpreta las dos o tres
+   más relevantes en términos que la dirección entienda («la zona urbana multiplica por … la tasa de siniestros»).
+4. **Fairness (P17).** `sexo` predice, pero es **factor prohibido** (primas unisex, *Test-Achats*): **exclúyelo**
+   de la tarifa, detecta posibles **proxies** —variables permitidas que lo correlacionan— y razona una selección
+   **responsable**.
+5. **Proxies (P18).** Contrasta la **independencia condicional** entre `sexo` y cada covariable permitida
+   ([Sección 7.3](#sec-u27-proxy)). Identifica los proxies, distingue los que lo son de los que no —habrá
+   controles negativos— y **mide la fuga** comparando el efecto marginal y el ajustado de `sexo`. Recuerda
+   que vas a hacer **varios** contrastes: algún $p$ pequeño saldrá por azar, así que no llames proxy a nada
+   sin mirar la magnitud. Lleva la conclusión a la reflexión individual: ¿qué haces con la variable, y a
+   qué coste?
+6. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
+   activos** y **descarta el ruido**. Discute los **activos débiles**: ¿los retiene? ¿Por qué la selección por
+   predicción no coincide exactamente con la verdad, y por qué eso **no** es un error del método?
+
+Entrega, como siempre, un cuaderno **reproducible** (semilla fija) y ajusta **a ciegas**: mira la verdad solo al
+final, para validar.
+:::
