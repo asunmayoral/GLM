@@ -224,6 +224,224 @@ calidad) se abordan con la [Unidad 2.2](#sec-u22); la **P18** (proxies), con la 
 :::
 
 
+::: callout-note
+1. DESCRIBIR/VISUALIZAR la relación entre las tasas de siniestros y las variables predictoras. Pedid ayuda a las IAs. 
+>Anticipo que tendréis que agrupar para poder ver cosas, pero es interesante que os enfrentéis a los ceros de la Poisson (log=-infty) y a las exposiciones (entre 0 y 1). Podéis valorar usar, en lugar de la exposición, la antigüedad de las pólizas en la cartera (antiguedad=exposicion x 10 años).
+
+2. AJUSTAR. De entre todas las predictoras, elegid una variable continua (en la que apreciéis mejor la linealidad) y una categórica (que se visualice con impacto en el exploratorio), y SOLO con esas dos, ajustad un modelo predictivo óptimo.
+
+3. CHEQUEAR Y PREDECIR. Resolver la evaluación y diagnóstico. Predecir la tasa de siniestros para pólizas nuevas, en función de la covariable continua y en todas las categorías de la categórica.
+
+4. VALIDAR contra DPG. La verdad de la cartera está en `attr(cartera, "verdad")`.
+
+5. EXPONER. Montad 4 diapositivas en las que expongáis qué habéis hecho (contexto, definiciones, resultados, implicaciones), y el próximo día las exponemos en 2 minutos por equipo.
+:::
+
+### 1.1 Explorar
+
+```{r}
+#| label: explora-siniestros
+
+# Tasa de siniestros por año de póliza frente a los predictores de riesgo.
+# Exposición en AÑOS: antiguedad (= 10 * exposicion), para leer la tasa como partes/año.
+
+cartera <- cartera %>%
+  mutate(antiguedad = exposicion * 10)
+
+# Tasa agregada (Σ partes / Σ años) 
+resumir_tasa <- function(d,...) {
+  d |>
+    summarise(...,partes = sum(n_siniestros), anios = sum(antiguedad), n = n(),
+              .groups = "drop") |>
+    mutate(tasa = partes / anios)
+}
+
+tasa_global <- sum(cartera$n_siniestros) / sum(cartera$antiguedad)
+
+# ---- 1 · Predictores continuos: quintiles, situados en la mediana del grupo ----
+vars_cont <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "cilindrada",
+               "antiguedad_vehiculo", "valor_vehiculo", "densidad", "km_anuales")
+
+tasas_cont <- cartera |>
+  dplyr::select(all_of(vars_cont), n_siniestros, antiguedad) |>
+  pivot_longer(all_of(vars_cont), names_to = "variable", values_to = "valor") |>
+  group_by(variable) |>
+  mutate(grupo = ntile(valor, 5)) |>              
+  # quintiles: grupos de igual nº de pólizas
+  group_by(variable, grupo) |>
+  #identificación del punto medio de cada trozo
+  resumir_tasa(x = median(valor))
+# tasas_cont
+
+ggplot(tasas_cont, aes(x, tasa)) +
+  geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
+  geom_line() +
+  scale_y_log10() +                              
+  # escala log: la del predictor lineal
+  facet_wrap(~ variable, scales = "free_x", ncol = 4) +
+  labs(x = "Mediana del quintil", y = "Partes por año (escala log)",
+       title = "Tasa de siniestros por quintiles de cada predictor continuo",
+       subtitle = "Línea discontinua: tasa global")
+
+# ---- 2 · Predictores categóricos ----------------------------------------------
+vars_cat <- c("edad_tramo", "zona_circulacion", "uso", "tipo_vehiculo", "combustible")
+
+tasas_cat <- cartera |>
+  dplyr::select(all_of(vars_cat), n_siniestros, antiguedad) |>
+  pivot_longer(all_of(vars_cat), names_to = "variable", values_to = "nivel") |>
+  group_by(variable, nivel) |>
+  resumir_tasa() |>
+  # orden natural de los tramos de edad y de la zona; el resto, alfabético
+  mutate(nivel = fct_relevel(nivel, "18-25", "25-35", "35-65", "65+",
+                             "urbana", "mixta", "rural"))
+#tasas_cat
+
+ggplot(tasas_cat, aes(nivel, tasa)) +
+  geom_hline(yintercept = tasa_global, linetype = 2, colour = "grey50") +
+  geom_point()+
+  scale_y_log10() +
+  facet_wrap(~ variable, scales = "free_x", ncol = 3) +
+  labs(x = NULL, y = "Partes por año (escala log)",
+       title = "Tasa de siniestros por nivel de cada predictor categórico",
+       subtitle = "Línea discontinua: tasa global")
+```
+
+### 1.2 Ajustar
+
+Elegimos como covariable continua `km_anuales` y como factor `zona_circulacion`.
+```{r}
+#|  label: ajuste-poisson
+fit_base = glm(n_siniestros ~ km_anuales*zona_circulacion + offset(log(antiguedad)), family = poisson, data =cartera) 
+summary(fit_base)
+
+anova(fit_base,update(fit_base,.~ . - km_anuales:zona_circulacion),test="LRT")
+```
+
+
+
+### 1.3 Evaluar, diagnosticar y predecir
+```{r}
+#| label: evaluacion-poisson
+
+gl <- df.residual(fit_base)
+D  <- deviance(fit_base)
+X2 <- sum(residuals(fit_base, type = "pearson")^2)
+c(D = D, X2 = X2, gl = gl, D_gl = D / gl, X2_gl = X2 / gl,
+  mediana_mu = median(fitted(fit_base)))
+```
+
+Se aprecia algo de sobre dispersión ($\hat \phi=$`r X2/gl`).
+```{r}
+# Rootograma
+m_tasa=fit_base
+mu_hat <- fitted(m_tasa)
+K <- 0:max(cartera$n_siniestros)
+raiz <- tibble::tibble(
+  k         = K,
+  observado = as.numeric(table(factor(cartera$n_siniestros, levels = K))),
+  esperado  = sapply(K, \(k) sum(dpois(k, mu_hat))),
+  raiz_observado = sqrt(observado),
+  raiz_esperado = sqrt(esperado))
+#raiz
+
+ggplot(raiz) +
+  geom_rect(aes(xmin = k - 0.4, xmax = k + 0.4,
+                ymin = sqrt(esperado) - sqrt(observado), ymax = sqrt(esperado)),
+            fill = "steelblue", alpha = 0.7) +
+  geom_line(aes(k, sqrt(esperado)), colour = "darkorange", linewidth = 0.8) +
+  geom_point(aes(k, sqrt(esperado)), colour = "darkorange") +
+  geom_hline(yintercept = 0) +
+  labs(x = "nº de asistencias", y = "raíz de la frecuencia")
+```
+
+Se aprecia cierto desajuste entre observaciones y predicciones.
+
+```{r}
+#| label: residuos-poisson
+set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
+res_sim <- DHARMa::simulateResiduals(fit_base, n = 1000)
+plot(res_sim)
+
+contrastes_dharma <- list(
+  uniformidad     = DHARMa::testUniformity(res_sim, plot = FALSE),
+  dispersion      = DHARMa::testDispersion(res_sim, plot = FALSE),
+  exceso_de_ceros = DHARMa::testZeroInflation(res_sim, plot = FALSE),
+  outliers        = DHARMa::testOutliers(res_sim, plot = FALSE))
+tibble::tibble(contraste = names(contrastes_dharma),
+               p_valor   = sapply(contrastes_dharma, \(t) t$p.value))
+```
+Y tampoco el diagnóstico con los residuos funciona especialmente bien:  hay desviaciones significativas respecto a uniformidad (se rechaza la distribución que supone el modelo), 
+se evidencian dispersión y exceso de ceros significativos, y también outliers.
+
+
+### 1.4 Predicción y conclusiones
+```{r}
+#|label: pred-irr
+
+irr = broom::tidy(fit_base, exponentiate = TRUE, conf.int = TRUE)
+irr
+```
+
+```{r}
+#| label: prediccion-tasas 
+
+# 2 · Rejilla con la predicción de la tasa anual
+rejilla <- tidyr::expand_grid(
+    km_anuales = seq(min(cartera$km_anuales), max(cartera$km_anuales), length.out = 200),
+    zona_circulacion = c("urbana", "mixta", "rural")) |>
+  mutate(antiguedad = 1) |>                                   # tasa por año
+  # predicción en escala log con su error estándar, añadida como columnas fit y se.fit
+  mutate(as_tibble(predict(fit_base, newdata = pick(everything()),
+                           type = "link", se.fit = TRUE)[c("fit", "se.fit")])) |>
+  mutate(tasa    = exp(fit),
+         tasa_li = exp(fit - qnorm(0.975) * se.fit),
+         tasa_ls = exp(fit + qnorm(0.975) * se.fit))
+
+ggplot(rejilla, aes(km_anuales, tasa, colour = zona_circulacion, fill = zona_circulacion)) +
+  geom_ribbon(aes(ymin = tasa_li, ymax = tasa_ls), alpha = 0.2, colour = NA) +
+  geom_line(linewidth = 1) +
+  # marcas en el eje X: dónde hay datos de verdad
+  geom_rug(data = cartera, aes(x = km_anuales), inherit.aes = FALSE,
+           alpha = 0.1, sides = "b") +
+  labs(x = "km anuales", y = "Partes por año", colour = "Zona", fill = "Zona",
+       title = "Tasa de siniestros predicha según km anuales y zona",
+       subtitle = "Bandas: IC 95 % · marcas inferiores: km observados")
+```
+
+
+```{r}
+#| label: prediccion-irr 
+# 3. Cálculo de las IRR por quintiles de kilometraje
+# Quintiles de km y su mediana (punto representativo de cada franja)
+km_q <- cartera |>
+  mutate(q_km = ntile(km_anuales, 5)) |>
+  group_by(q_km) |>
+  summarise(km_anuales = median(km_anuales), .groups = "drop")
+
+emm <- emmeans(fit_base, ~ zona_circulacion | km_anuales,
+               at = list(km_anuales = km_q$km_anuales),
+               offset = 0)                      # offset 0 = antiguedad 1 → tasa anual
+
+irr_zona = contrast(emm, method = "trt.vs.ctrl", ref = "rural", type = "response") |>
+  confint(by = NULL, adjust = "mvt") |>
+  as_tibble()|>
+  # emmeans devuelve km_anuales como factor; se pasa a numérico para que el eje sea continuo
+  mutate(km_anuales = as.numeric(as.character(km_anuales)))
+
+desplaza <- position_dodge(width = 800)   # en unidades de km
+
+ggplot(irr_zona, aes(km_anuales, ratio, colour = contrast)) +
+  geom_hline(yintercept = 1, linetype = 2, colour = "grey50") +   # IRR = 1: sin diferencia
+  geom_line(position = desplaza) +
+  geom_pointrange(aes(ymin = asymp.LCL, ymax = asymp.UCL), position = desplaza) +
+  labs(x = "km anuales (mediana de cada quintil)",
+       y = "IRR frente a zona rural (escala log)",
+       colour = "Contraste",
+       title = "Razón de tasas de siniestros frente a la zona rural",
+       subtitle = "IC 95 % con ajuste exacto (mvt) para las 10 comparaciones")
+
+```
+
 
 ## Unidad 2.2
 
