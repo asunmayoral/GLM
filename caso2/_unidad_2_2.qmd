@@ -1358,7 +1358,8 @@ fila por celda (25 filas), en el objeto `cuad`. Las variables con las que trabaj
 | `Freq` | número de pólizas en la celda (`prev`, `act`): la **respuesta** de todos los modelos |
 | `par` | la pareja de niveles sin orden: las celdas 1 → 2 y 2 → 1 comparten la etiqueta `"1-2"` |
 | `i`, `j` | los niveles previo y actual como **números** (1 a 5), para usarlos como puntuaciones |
-| `diagonal` | indica si la póliza se queda en su nivel (`"queda"`, $i=j$) o cambia (`"mueve"`); la construimos con `i` y `j` al llegar al modelo de inercia |
+| `diagonal` | indica si la póliza se queda en su nivel (`"queda"`, $i=j$) o cambia (`"mueve"`); se construye con `i` y `j` |
+| `sube1` | vale 1 si la póliza sube exactamente un nivel ($j=i+1$) y 0 en el resto; se construye con `i` y `j` |
 
 : Variables de la tabla de cambio, en `cuad` (una fila por celda). {#tbl-u22-cambio-vars}
 
@@ -1373,6 +1374,7 @@ concretas (@tbl-u22-cambio-modelos):
 | Independencia | el nivel actual no depende del previo (referencia) | (4) | `prev`, `act` |
 | Asociación uniforme | quien estaba más arriba tiende a seguir más arriba, con la misma intensidad entre niveles vecinos | (4) | `prev`, `act`, `i`, `j` |
 | Inercia | además, cada póliza tiende a quedarse en su nivel | (1) y (4) | lo anterior y `diagonal` |
+| Inercia y paso hacia arriba | las pólizas tienden a quedarse en su nivel, y cuando cambian, suben un nivel más a menudo que cualquier otro movimiento | (1), (2) y (4); y permite proyectar el año próximo | `prev`, `act`, `diagonal`, `sube1` |
 
 : Hoja de ruta de la sección: qué afirma cada modelo, a qué pregunta responde y qué variables necesita. {#tbl-u22-cambio-modelos}
 
@@ -1385,7 +1387,9 @@ modelo de otro es **qué predictoras** usa; cada subsección lo concreta en un p
 cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera)) |>
   dplyr::rename(prev = bonus_malus_prev, act = bonus_malus_act) |>
   dplyr::mutate(i = as.integer(prev), j = as.integer(act),
-                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))
+                par      = factor(paste(pmin(i, j), pmax(i, j), sep = "-")),
+                diagonal = factor(ifelse(i == j, "queda", "mueve")),
+                sube1    = as.integer(j == i + 1))
 dplyr::filter(cuad, par %in% c("1-2", "2-2"))   # dos celdas espejo y una de la diagonal
 ```
 
@@ -1631,9 +1635,13 @@ En la asociación uniforme, toda la relación entre los dos años queda en $\bet
 concreta: al tratar los niveles como equiespaciados, el paso de un nivel al siguiente pesa lo mismo en
 cualquier punto de la escala. Por eso el **odds ratio local**, el de dos niveles previos contiguos frente
 a dos actuales contiguos, es el mismo en toda la tabla:
-$\mu_{ij}\,\mu_{i+1,j+1}/(\mu_{i,j+1}\,\mu_{i+1,j})=e^{\beta}$. En nuestro problema: *las pólizas que
-estaban un nivel más arriba tienen, este año, unas odds $e^{\beta}$ veces mayores de estar un nivel más
-arriba, sea cual sea el nivel de partida*.
+$\mu_{ij}\,\mu_{i+1,j+1}/(\mu_{i,j+1}\,\mu_{i+1,j})=e^{\beta}$. 
+
+En nuestro problema, miremos por ejemplo solo dos niveles correlativos, como 2 y 3, y planteemos como objetivo estimar los odds de estar en el nivel 3 actualmente frente al 2. El odds a favor de empeorar a nivel 3 desde 2 (frente a mantener) es $\mu_{23}/\mu_{22}$, y el odds a mantenerse en 3 frente a mejorar a 2 es $\mu_{33}/\mu_{32}$, por lo que el odds ratio local sería el cociente de esos dos:
+
+$$ \frac{\mu_{33}/\mu_{32}}{\mu_{23}/\mu_{22}}=e^{\beta}$$
+La asociación uniforme supone que eso odds ratio es el mismo, $e^{\beta}$, para cualesquiera dos niveles correlativos en la escala del bonus-malus. Así, los odds de mantenerse en cualquier nivel frente a mejorar en uno son $e^{\beta}$ veces los de empeorar desde el nivel anterior (hasta él) frente a mantenerse en el anterior.
+
 
 **Modelización en R.** Ajustamos dos GLM Poisson: la independencia con `Freq ~ prev + act`, y la
 asociación uniforme con `Freq ~ prev + act + I(i * j)`. El término nuevo es una covariable **numérica**,
@@ -1664,38 +1672,39 @@ c(deviance  = round(deviance(m_unif), 1), gl = df.residual(m_unif),
   chi2_q95  = round(qchisq(0.95, df.residual(m_unif)), 1))   # lo máximo «razonable» si el modelo fuera cierto
 ```
 
-**No ajusta.** Si el modelo fuera correcto, su deviance se movería en torno a sus 15 gl y rara vez
+**No ajusta** lo suficiente (frente al saturado). Si el modelo fuera correcto, su deviance se movería en torno a sus 15 gl y rara vez
 pasaría de 25 (el percentil 95 de la $\chi^2_{15}$); sale 1.023,8. Y no se contradice con el contraste
 anterior, porque son dos preguntas distintas. El LRT comparaba **dos modelos entre sí**: $\beta$ elimina
 555,7 de los 1.579,5 puntos de falta de ajuste de la independencia, un 35 %. El ajuste absoluto compara
 el modelo **con los datos**: el 65 % restante sigue ahí. Mejorar mucho sobre un punto de partida muy malo
-no basta para llegar a un buen modelo. *«Este término aporta»* no implica *«este modelo describe los
-datos»*.
+no basta para llegar a un buen modelo. 
 
-La razón se ve mirando la tabla: la **diagonal** concentra algo más de la mitad de las pólizas —las que
+Además, el resultado se ve mirando la tabla: la **diagonal** concentra algo más de la mitad de las pólizas —las que
 no cambian de nivel—. Ninguna asociación gradual, que reparte la masa de forma suave al acercarse a la
 diagonal, puede reproducir un pico así.
 
 ### Inercia: las pólizas que no cambian de nivel
 
-Hace falta un término que trate la **permanencia** como fenómeno propio. El modelo de **inercia** añade a
-la asociación uniforme un indicador de diagonal:
+Hace falta pues, un término que trate la **permanencia** como fenómeno propio. El modelo de **inercia** añade a
+la asociación uniforme un indicador de diagonal, común a todas las celdas de la diagonal:
 
 $$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j + \beta\, ij + \delta\, I(i=j).$$
 
-En nuestro problema: *además del gradiente entre niveles, cada póliza tiene una propensión propia a
-quedarse donde estaba*; $e^{\delta}$ es el factor por el que se multiplican las frecuencias de la
-diagonal respecto a lo que daría solo el gradiente.
+En nuestro problema: *además del gradiente entre niveles*, cada póliza tiene una propensión extra a
+quedarse donde estaba, y además de la misma intensidad (en torno al 52%); $e^{\delta}$ representa  cuántas veces más frecuentes son las celdas de la diagonal de lo que serían si solo actuaran los marginales y el gradiente $\beta$
 
 **Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + I(i * j) + diagonal`, con el
-indicador `diagonal` de la @tbl-u22-cambio-vars, que construimos aquí a partir de `i` y `j`.
+indicador `diagonal` de la @tbl-u22-cambio-vars.
 
 ```{r}
 #| label: u22-movilidad
-cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
 m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
 anova(m_unif, m_mov, test = "LRT")
 c(deviance      = round(deviance(m_mov), 1), gl = df.residual(m_mov),
+  p_ajuste      = signif(pchisq(deviance(m_mov), df.residual(m_mov), lower.tail = FALSE), 3),
+  chi2_q95      = round(qchisq(0.95, df.residual(m_mov)), 1),
+  # cuánto de la falta de ajuste de la independencia queda eliminado
+  pct_eliminada = round(100 * (1 - deviance(m_mov) / deviance(m_indep_c)), 1),
   pct_se_quedan = round(100 * sum(cuad$Freq[cuad$i == cuad$j]) / sum(cuad$Freq), 1))
 # Solo los dos términos que interesan; los de prev y act únicamente reproducen los marginales
 broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
@@ -1714,9 +1723,13 @@ efectos separa los dos componentes del movimiento:
   está en esa diagonal.
 - **Gradiente** (asociación uniforme): $e^{\beta}=1{,}031$, con intervalo $[1{,}004;\ 1{,}058]$ y
   $p=0{,}024$. Sigue siendo significativo, pero es pequeño: sin la inercia valía 1,317, porque el modelo
-  uniforme cargaba sobre $\beta$ el pico de la diagonal que no podía explicar de otro modo. Con 14 gl el modelo sigue sin ajustar
-del todo —queda, sobre todo, el flujo de un paso hacia arriba que tampoco recogía la cuasi-simetría—, pero con un solo
-parámetro hemos eliminado casi toda la falta de ajuste. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
+  uniforme cargaba sobre $\beta$ el pico de la diagonal que no podía explicar de otro modo.
+
+¿Ajusta ya? Todavía no del todo: frente al saturado, su deviance de 38,7 con 14 gl supera el percentil 95
+de la $\chi^2_{14}$ (23,7), y el contraste da $p=0{,}0004$. Queda, sobre todo, el flujo de un paso hacia
+arriba que tampoco recogía la cuasi-simetría. Pero el modelo ha eliminado el 97,6 % de la falta de ajuste
+de la independencia con solo dos parámetros de asociación, y lo que queda es un rasgo concreto e
+identificado, no un desajuste general. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
 rasgo dominante de esta tabla no es la asociación ordinal, sino la inercia**. Lo que explica el
 bonus-malus es, sobre todo, que la mayoría de las pólizas **se quedan donde estaban**; el gradiente
 entre niveles vecinos es un efecto de segundo orden.
@@ -1731,11 +1744,191 @@ más pares de niveles a distancia 1 que a distancia 4. Es coherente con lo que a
 recogida la inercia, el gradiente apenas pesa. Lo comprobamos con el DGP en la
 [validación](#sec-u22-validacion).
 
+### Un modelo que ajusta: inercia y paso hacia arriba
+
+Al modelo de inercia le quedaba el flujo de un paso hacia arriba, y se ve a simple vista en el panel
+izquierdo de la @fig-u22-cambio-heatmap: las cifras **justo encima de la diagonal** —las de subir
+exactamente un nivel— son mayores que las del resto de cambios, que se mantienen más o menos parecidas.
+Lo comprobamos con los porcentajes por fila:
+
+```{r}
+#| label: u22-sube1-desc
+pct <- 100 * prop.table(xtabs(Freq ~ prev + act, data = cuad), 1)[cbind(cuad$i, cuad$j)]   # % de su fila
+round(pct[cuad$sube1 == 1], 1)                                  # 1->2, 2->3, 3->4, 4->5
+c(media_subir_un_nivel = round(mean(pct[cuad$sube1 == 1]), 1),
+  media_otros_cambios  = round(mean(pct[cuad$i != cuad$j & cuad$sube1 == 0]), 1))
+```
+
+Subir un nivel recoge de media el 15,4 % de cada fila; cualquier otro cambio, el 11,0 %. Es el empujón de
+los siniestros que vimos en la cuasi-simetría. El modelo que lo recoge sustituye el gradiente por un
+indicador de esas cuatro celdas:
+
+$$\log \mu_{ij} = \lambda + \lambda^{P}_i + \lambda^{A}_j + \delta\, I(i=j) + \gamma\, I(j=i+1).$$
+
+En nuestro problema: *la mayoría de las pólizas se queda en su nivel; cuando cambian, subir exactamente
+un nivel es más frecuente que cualquier otro movimiento, y el resto de cambios no tiene un patrón
+propio*. $e^{\delta}$ mide cuánto más frecuente es quedarse, y $e^{\gamma}$ cuánto más frecuente es subir
+un nivel, los dos frente a un cambio cualquiera.
+
+¿Y la tendencia de la cartera hacia los extremos, el 1 y el 5? No necesita parámetros propios: ya está en
+el efecto columna $\lambda^{A}_j$, que reproduce cuántas pólizas hay en cada nivel este año. Lo que faltaba
+no era *adónde* acaban las pólizas, sino *cómo* se mueven.
+
+**Modelización en R.** Ajustamos el GLM Poisson con `Freq ~ prev + act + diagonal + sube1`, con las
+variables de la @tbl-u22-cambio-vars. Lo comparamos con el modelo de inercia y gradiente, los dos frente
+al saturado, y comprobamos que no hace falta añadirle el gradiente ni un término de «bajar un nivel»:
+
+```{r}
+#| label: u22-sube1
+m_sube <- glm(Freq ~ prev + act + diagonal + sube1, family = poisson, data = cuad)
+ajuste <- function(m) c(deviance = round(deviance(m), 2), gl = df.residual(m),
+                        p_ajuste = signif(pchisq(deviance(m), df.residual(m), lower.tail = FALSE), 3),
+                        AIC = round(AIC(m), 1))
+rbind(inercia_gradiente = ajuste(m_mov), inercia_sube1 = ajuste(m_sube))   # frente al saturado
+
+anova(m_sube, update(m_sube, . ~ . + I(i * j)), test = "LRT")           # ¿falta el gradiente?
+anova(m_sube, update(m_sube, . ~ . + I(j == i - 1)), test = "LRT")      # ¿falta «bajar un nivel»?
+
+broom::tidy(m_sube, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(term %in% c("diagonalqueda", "sube1")) |>
+  dplyr::select(term, estimate, conf.low, conf.high, p.value) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), ~ round(.x, 3))) |>
+  as.data.frame()
+```
+
+Ahora sí: **ajusta**. Con los mismos 14 gl que el modelo de inercia y gradiente, la deviance baja de
+38,65 a 14,39, el contraste frente al saturado da $p=0{,}42$ y el AIC pasa de 220,3 a 196,0. Ni el
+gradiente ($p=0{,}91$) ni un término de bajar un nivel
+($p=0{,}19$) aportan nada: el «gradiente» que habíamos visto era, en realidad, este paso hacia arriba.
+
+Los dos parámetros se leen directamente:
+
+- **Inercia**: $e^{\delta}=4{,}76$, intervalo $[4{,}40;\ 5{,}16]$. Quedarse en el nivel es casi cinco
+  veces más frecuente que un cambio cualquiera.
+- **Paso hacia arriba**: $e^{\gamma}=1{,}41$, intervalo $[1{,}25;\ 1{,}59]$. Subir exactamente un nivel es
+  un 41 % más frecuente que cualquier otro cambio.
+
+**Diagnóstico: los residuos.** Un $p$ de ajuste alto dice que el modelo no se aparta de la tabla en su
+conjunto; los residuos ajustados dicen si queda algún rincón mal recogido. Los ponemos en forma de tabla,
+y comparamos las cuatro celdas de subir un nivel con las del modelo de inercia y gradiente:
+
+```{r}
+#| label: u22-sube1-residuos
+r_sube <- xtabs(round(rstandard(m_sube, type = "pearson"), 2) ~ prev + act, data = cuad)
+r_sube                                                            # filas: nivel previo
+sube_un_nivel <- cbind(1:4, 2:5)                                  # celdas 1->2, 2->3, 3->4, 4->5
+rbind(inercia_gradiente = xtabs(rstandard(m_mov, type = "pearson") ~ prev + act, data = cuad)[sube_un_nivel],
+      inercia_sube1     = r_sube[sube_un_nivel]) |> round(2)
+c(celdas_mas_de_2 = sum(abs(r_sube) > 2), max_abs = max(abs(r_sube)))
+```
+
+El patrón ha desaparecido: los residuos de subir un nivel, que con el modelo anterior eran todos
+positivos (de 1,40 a 3,26), ahora oscilan en torno a cero (de $-0{,}99$ a $0{,}91$). De las 25 celdas, solo
+una pasa de $|2|$, la de bajar del nivel 2 al 1 ($-2{,}35$), y ninguna se acerca a $|3|$. Con 25 celdas,
+que una pase de 2 por azar es lo esperable (en torno a una de cada veinte), y no hay ningún grupo de
+celdas con un mismo signo que sugiera otro patrón.
+
+El mosaico da la misma lectura de un vistazo (@fig-u22-sube1-mosaico). Le pasamos las frecuencias
+esperadas del modelo con el argumento `expected`, como vimos en la Sección 2.2:
+
+```{r}
+#| label: fig-u22-sube1-mosaico
+#| fig-cap: "Mosaico de la tabla de cambio respecto al modelo de inercia y paso hacia arriba. Ninguna baldosa sale coloreada: el modelo no deja discrepancias de importancia en ninguna celda. El p-valor de la leyenda es el contraste de ajuste con el X² de Pearson."
+#| fig-width: 6
+#| fig-height: 5.5
+mu_cambio <- xtabs(fitted(m_sube) ~ prev + act, data = cuad)       # frecuencias esperadas, en tabla
+vcd::mosaic(xtabs(Freq ~ prev + act, data = cuad), shade = TRUE, legend = TRUE,
+            expected = mu_cambio, df = df.residual(m_sube),
+            labeling_args = list(set_varnames = c(prev = "nivel previo", act = "nivel actual")))
+```
+
+El modelo de inercia y paso hacia arriba queda así validado por los tres lados: ajusta frente al saturado,
+no deja residuos sistemáticos, y reproduce el mecanismo del DGP (lo comprobamos en la
+[validación](#sec-u22-validacion)).
+
+### Qué esperar el año próximo
+
+El modelo no «predice» el reparto de este año, que el efecto columna reproduce por construcción. Lo que
+sí da son las **probabilidades de transición**: de cada nivel de partida $i$, la probabilidad de acabar
+en cada nivel $j$, $P(j\mid i)=\mu_{ij}/\mu_{i+}$. Si la cartera se mantiene —las mismas pólizas, sin
+altas ni bajas— y las reglas de transición no cambian, aplicarlas al reparto actual da el del año
+próximo: $n^{\text{próx}}_j=\sum_i n^{\text{act}}_i\,P(j\mid i)$.
+
+La proyección lleva dos fuentes de incertidumbre. La primera es la de la **estimación**: los
+coeficientes $\hat{\boldsymbol\theta}$ del modelo no se conocen con exactitud, pero sabemos que el
+estimador de máxima verosimilitud es aproximadamente normal, $\hat{\boldsymbol\theta}\approx
+\mathcal{N}(\boldsymbol\theta,\ \hat{\mathbf{V}})$, con $\hat{\mathbf{V}}$ su matriz de covarianzas
+(`vcov()`). En consecuencia, también lo son los predictores lineales de todas las celdas a la vez,
+$\hat{\boldsymbol\eta}=\mathbf{X}\hat{\boldsymbol\theta}\approx\mathcal{N}(\boldsymbol\eta,\
+\mathbf{X}\hat{\mathbf{V}}\mathbf{X}')$: se simula en escala log, porque $\hat\mu_{ij}=e^{\hat\eta_{ij}}$
+no es normal, y conjuntamente, porque las celdas comparten parámetros y sus estimaciones están
+correlacionadas. Simular $\boldsymbol\theta$ y calcular $\mathbf{X}\boldsymbol\theta$ es justo eso. La
+segunda fuente es el **azar** de quién se mueve el año próximo: aunque las probabilidades de
+transición fueran exactas, las $n^{\text{act}}_i$ pólizas del nivel $i$ se reparten entre los cinco
+niveles como una **multinomial**. Las incorporamos simulando $B=5000$ veces; en cada réplica
+$b=1,\dots,B$:
+
+1. **Coeficientes**: se extrae $\boldsymbol\theta^{(b)}\sim\mathcal{N}(\hat{\boldsymbol\theta},\
+   \hat{\mathbf{V}})$.
+2. **Probabilidades de transición**: con ellos se recalculan las frecuencias esperadas y las
+   probabilidades,
+   $$\mu^{(b)}_{ij}=\exp\big(\mathbf{x}_{ij}'\boldsymbol\theta^{(b)}\big),\qquad
+   P^{(b)}(j\mid i)=\frac{\mu^{(b)}_{ij}}{\sum_{k}\mu^{(b)}_{ik}},$$
+   donde $\mathbf{x}_{ij}$ es la fila de la matriz de diseño de la celda $(i,j)$.
+3. **Número esperado** en cada nivel, solo con la incertidumbre de la estimación:
+   $$E^{(b)}_j=\sum_{i} n^{\text{act}}_i\,P^{(b)}(j\mid i).$$
+4. **Número realizado**, añadiendo el azar del año próximo: para cada nivel de partida se reparten sus
+   pólizas,
+   $$\big(N^{(b)}_{i1},\dots,N^{(b)}_{i5}\big)\sim\text{Multinomial}\big(n^{\text{act}}_i;\
+   P^{(b)}(1\mid i),\dots,P^{(b)}(5\mid i)\big),\qquad N^{(b)}_j=\sum_i N^{(b)}_{ij}.$$
+
+Con las $B$ réplicas, los percentiles 2,5 y 97,5 de $\{E^{(b)}_j\}$ dan el **intervalo de confianza**
+del número **esperado** de pólizas en el nivel $j$, y los de $\{N^{(b)}_j\}$ el **intervalo de
+predicción** del número que habrá **realmente**. La estimación puntual es $n^{\text{próx}}_j$, calculada
+con $\hat{\boldsymbol\theta}$.
+
+```{r}
+#| label: u22-proyeccion
+P  <- mu_cambio / rowSums(mu_cambio)                                            # P(j | i): filas, nivel de partida
+n_act  <- colSums(xtabs(Freq ~ prev + act, data = cuad))          # pólizas en cada nivel este año
+n_prox <- drop(n_act %*% P)                                       # pólizas esperadas el año próximo
+round(P, 3)
+
+set.seed(SEMILLA_CURSO)
+X <- model.matrix(m_sube)
+sims <- t(replicate(5000, {
+  b  <- MASS::mvrnorm(1, coef(m_sube), vcov(m_sube))                          # paso 1
+  M  <- matrix(0, 5, 5); M[cbind(cuad$i, cuad$j)] <- exp(X %*% b)             # paso 2: mu_ij
+  Pb <- M / rowSums(M)                                                        #         P(j | i)
+  esperado  <- drop(n_act %*% Pb)                                             # paso 3
+  realizado <- rowSums(sapply(1:5, \(i) rmultinom(1, n_act[i], Pb[i, ])))     # paso 4
+  c(esperado, realizado)
+}))
+data.frame(nivel = 1:5, actual = as.vector(n_act), proximo = round(n_prox),
+           ic_low  = round(apply(sims[, 1:5],  2, quantile, 0.025)),
+           ic_high = round(apply(sims[, 1:5],  2, quantile, 0.975)),
+           ip_low  = round(apply(sims[, 6:10], 2, quantile, 0.025)),
+           ip_high = round(apply(sims[, 6:10], 2, quantile, 0.975)))
+```
+
+Si la cartera se mantiene, el año próximo cabe esperar que **el nivel 3 siga vaciándose**, de 723 pólizas a
+unas 662 (intervalo de confianza: 623 a 702), y que **el nivel 5 siga creciendo**, de 579 a unas 627 (586
+a 670). Son los dos cambios claros: en los dos casos el intervalo deja fuera la cifra actual. El nivel 1
+también apunta al alza, de 539 a unas 573, pero su intervalo (534 a 613) todavía incluye la cifra actual;
+y los niveles 2 y 4 se quedarían, en la práctica, como están.
+
+El intervalo de predicción es más ancho, porque añade el azar del año próximo: en el nivel 5, por ejemplo,
+el número de pólizas que habrá realmente estará, con un 95 % de probabilidad, entre 569 y 685. Es la
+cifra que conviene dar a la dirección para planificar, junto con los dos supuestos de los que depende: la
+cartera cerrada (sin altas ni bajas) y unas reglas de transición estables. Con la tarifa de cada nivel,
+estas cifras se traducen directamente en la prima esperada de la cartera.
+
 ::: {.callout-note}
 ## Lo que este ejemplo enseña sobre el oficio
-Hemos recorrido tres modelos y la conclusión ha cambiado dos veces: primero parecía que había deriva
+Hemos recorrido varios modelos y la conclusión ha ido cambiando: primero parecía que había deriva
 (la había, pero no en el nivel medio, sino en el reparto entre niveles), luego que la asociación ordinal resumía la tabla (ganaba mucha deviance,
-pero no ajustaba), y al final que la inercia era el fenómeno principal. En cada paso el error habría
+pero no ajustaba), después que la inercia era el fenómeno principal, y al final que, con un único término más —el paso
+hacia arriba que dejaba en los residuos—, el modelo ajusta y permite proyectar el año próximo. En cada paso el error habría
 sido detenerse en el $p$-valor sin mirar **el ajuste absoluto** y **la magnitud**. Con tablas se puede
 hacer ese control —las frecuencias esperadas son grandes—, así que no hay excusa para no hacerlo.
 :::
@@ -1750,7 +1943,8 @@ Todo con `glm`; lo único que cambia es cómo se construyen los datos y los tér
   `as.data.frame()`: una fila por celda, con `Freq`.
 - **Columnas auxiliares** — `i = as.integer(prev)`, `j = as.integer(act)` (los niveles como números) y
   `par = factor(paste(pmin(i, j), pmax(i, j), sep = "-"))` (la pareja sin orden, que empareja $(i,j)$ con
-  $(j,i)$).
+  $(j,i)$), `diagonal = factor(ifelse(i == j, "queda", "mueve"))` (si la celda es de la diagonal) y
+  `sube1 = as.integer(j == i + 1)` (si la celda es de subir exactamente un nivel).
 - **Volver a la matriz** — `xtabs(Freq ~ prev + act, data = cuad)`; `addmargins()` añade los totales.
 
 **Describir el cambio**
@@ -1771,8 +1965,10 @@ Todo con `glm`; lo único que cambia es cómo se construyen los datos y los tér
 - **Independencia y asociación uniforme** — `Freq ~ prev + act` y `Freq ~ prev + act + I(i * j)`, con
   `i`, `j` **numéricos**; `I()` hace que R calcule el producto. 1 gl; $e^\beta$ es el odds ratio local.
   Con puntuaciones no equiespaciadas, sustituye `i * j` por `u[i] * v[j]`.
-- **Inercia** — añade un factor de diagonal, `factor(ifelse(i == j, "queda", "mueve"))` (o un nivel por
-  celda diagonal, si crees que la inercia varía con el nivel).
+- **Inercia** — añade `diagonal` a la fórmula (o un factor con un nivel por celda diagonal, si crees que
+  la inercia varía con el nivel).
+- **Inercia y paso hacia arriba** — `Freq ~ prev + act + diagonal + sube1`. En general, cualquier patrón
+  que dejen los residuos en un grupo de celdas se recoge con un indicador de esas celdas.
 
 **Contrastar y leer**
 
@@ -1784,6 +1980,14 @@ Todo con `glm`; lo único que cambia es cómo se construyen los datos y los tér
   reproducen los marginales.
 - **Dónde falla un modelo** — `xtabs(rstandard(m, type = "pearson") ~ prev + act, data = cuad)` pone los
   residuos ajustados en forma de tabla (lo usamos en la validación).
+
+**Proyectar el año próximo**
+
+- **Probabilidades de transición** — `mu <- xtabs(fitted(m) ~ prev + act, data = cuad)` y
+  `P <- mu / rowSums(mu)`; la proyección es `n_act %*% P`.
+- **Intervalos** — simular coeficientes con `MASS::mvrnorm(1, coef(m), vcov(m))` da el intervalo de
+  confianza del número esperado; añadir `rmultinom()` por nivel de partida da el de predicción.
+  `quantile(x, c(0.025, 0.975))` sobre las simulaciones da los límites.
 - Los modelos de movilidad más elaborados (RC de Goodman, con puntuaciones **estimadas** en vez de
   fijadas) no son log-lineales: son multiplicativos y requieren `gnm`. Fuera del alcance del curso.
 :::
@@ -1871,6 +2075,9 @@ xtabs(round(rstandard(m_qs, type = "pearson"), 2) ~ prev + act, data = cuad)   #
 Las celdas de subir un nivel, justo por encima de la diagonal ($1\to 2$, $2\to 3$, $3\to 4$, $4\to 5$),
 tienen todas residuo positivo —más pólizas de las que el modelo espera—, y sus espejos, las de bajar un
 nivel, negativo.
+Es exactamente el término `sube1` del modelo que ajusta, en la sección «Un modelo que ajusta: inercia y
+paso hacia arriba»: añadirlo reproduce el mecanismo del DGP —una probabilidad fija de quedarse, saltos al
+azar y el empujón de los siniestros—.
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
@@ -1915,11 +2122,14 @@ tiene el movimiento? Cierra con lo que significa para los ingresos y la retenci�
 - Cuantifica el cambio del reparto con el nivel medio **y** con el porcentaje de pólizas en cada nivel:
   un nivel medio estable puede esconder una cartera que se desplaza hacia los extremos.
 - Para (4): asociación uniforme frente a independencia, y un término de inercia de la diagonal si
-  aporta. Separa las dos preguntas —¿aporta el término? (LRT) y ¿ajusta el modelo? (deviance frente a
+  aporta. Si los residuos dejan un patrón en un grupo de celdas, tradúcelo en un indicador de
+  celda (como `sube1`) y comprueba si el modelo ajusta. Separa las dos preguntas —¿aporta el término? (LRT) y ¿ajusta el modelo? (deviance frente a
   sus gl)— y da $e^{\beta}$ y $e^{\delta}$ con su intervalo: fíjate en cómo cambia $\beta$ al añadir la
   inercia.
 - Para el negocio: el efecto de un cambio en el reparto sobre la prima media depende de cuánto
   descuenta o recarga cada nivel; razónalo, aunque no tengas la tarifa.
+- Con el modelo que ajuste, proyecta el reparto del año próximo con sus intervalos de confianza y de
+  predicción, y di de qué supuestos depende.
 
 **P19 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
 asociaciones de P4 como logística de `tuvo_siniestro` y compara sus odds ratios con los del log-lineal

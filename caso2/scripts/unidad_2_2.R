@@ -517,7 +517,9 @@ c(celdas = length(tab4), minimo = min(tab4),
 cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera)) |>
   dplyr::rename(prev = bonus_malus_prev, act = bonus_malus_act) |>
   dplyr::mutate(i = as.integer(prev), j = as.integer(act),
-                par = factor(paste(pmin(i, j), pmax(i, j), sep = "-")))
+                par      = factor(paste(pmin(i, j), pmax(i, j), sep = "-")),
+                diagonal = factor(ifelse(i == j, "queda", "mueve")),
+                sube1    = as.integer(j == i + 1))
 dplyr::filter(cuad, par %in% c("1-2", "2-2"))   # dos celdas espejo y una de la diagonal
 
 # -----------------------------------------------------------------------------
@@ -638,10 +640,13 @@ c(deviance  = round(deviance(m_unif), 1), gl = df.residual(m_unif),
 #     > 2.4 Tablas de cambio: el bonus-malus
 #       > Inercia: las pólizas que no cambian de nivel
 # -----------------------------------------------------------------------------
-cuad$diagonal <- factor(ifelse(cuad$i == cuad$j, "queda", "mueve"))
 m_mov <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
 anova(m_unif, m_mov, test = "LRT")
 c(deviance      = round(deviance(m_mov), 1), gl = df.residual(m_mov),
+  p_ajuste      = signif(pchisq(deviance(m_mov), df.residual(m_mov), lower.tail = FALSE), 3),
+  chi2_q95      = round(qchisq(0.95, df.residual(m_mov)), 1),
+  # cuánto de la falta de ajuste de la independencia queda eliminado
+  pct_eliminada = round(100 * (1 - deviance(m_mov) / deviance(m_indep_c)), 1),
   pct_se_quedan = round(100 * sum(cuad$Freq[cuad$i == cuad$j]) / sum(cuad$Freq), 1))
 # Solo los dos términos que interesan; los de prev y act únicamente reproducen los marginales
 broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
@@ -650,6 +655,88 @@ broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::select(efecto, estimate, conf.low, conf.high, p.value) |>
   dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), ~ round(.x, 3))) |>
   as.data.frame()                  # para ver los tres decimales
+
+# -----------------------------------------------------------------------------
+# [u22-sube1-desc]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Un modelo que ajusta: inercia y paso hacia arriba
+# -----------------------------------------------------------------------------
+pct <- 100 * prop.table(xtabs(Freq ~ prev + act, data = cuad), 1)[cbind(cuad$i, cuad$j)]   # % de su fila
+round(pct[cuad$sube1 == 1], 1)                                  # 1->2, 2->3, 3->4, 4->5
+c(media_subir_un_nivel = round(mean(pct[cuad$sube1 == 1]), 1),
+  media_otros_cambios  = round(mean(pct[cuad$i != cuad$j & cuad$sube1 == 0]), 1))
+
+# -----------------------------------------------------------------------------
+# [u22-sube1]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Un modelo que ajusta: inercia y paso hacia arriba
+# -----------------------------------------------------------------------------
+m_sube <- glm(Freq ~ prev + act + diagonal + sube1, family = poisson, data = cuad)
+ajuste <- function(m) c(deviance = round(deviance(m), 2), gl = df.residual(m),
+                        p_ajuste = signif(pchisq(deviance(m), df.residual(m), lower.tail = FALSE), 3),
+                        AIC = round(AIC(m), 1))
+rbind(inercia_gradiente = ajuste(m_mov), inercia_sube1 = ajuste(m_sube))   # frente al saturado
+
+anova(m_sube, update(m_sube, . ~ . + I(i * j)), test = "LRT")           # ¿falta el gradiente?
+anova(m_sube, update(m_sube, . ~ . + I(j == i - 1)), test = "LRT")      # ¿falta «bajar un nivel»?
+
+broom::tidy(m_sube, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::filter(term %in% c("diagonalqueda", "sube1")) |>
+  dplyr::select(term, estimate, conf.low, conf.high, p.value) |>
+  dplyr::mutate(dplyr::across(c(estimate, conf.low, conf.high), ~ round(.x, 3))) |>
+  as.data.frame()
+
+# -----------------------------------------------------------------------------
+# [u22-sube1-residuos]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Un modelo que ajusta: inercia y paso hacia arriba
+# -----------------------------------------------------------------------------
+r_sube <- xtabs(round(rstandard(m_sube, type = "pearson"), 2) ~ prev + act, data = cuad)
+r_sube                                                            # filas: nivel previo
+sube_un_nivel <- cbind(1:4, 2:5)                                  # celdas 1->2, 2->3, 3->4, 4->5
+rbind(inercia_gradiente = xtabs(rstandard(m_mov, type = "pearson") ~ prev + act, data = cuad)[sube_un_nivel],
+      inercia_sube1     = r_sube[sube_un_nivel]) |> round(2)
+c(celdas_mas_de_2 = sum(abs(r_sube) > 2), max_abs = max(abs(r_sube)))
+
+# -----------------------------------------------------------------------------
+# [fig-u22-sube1-mosaico]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Un modelo que ajusta: inercia y paso hacia arriba
+# -----------------------------------------------------------------------------
+mu_cambio <- xtabs(fitted(m_sube) ~ prev + act, data = cuad)       # frecuencias esperadas, en tabla
+vcd::mosaic(xtabs(Freq ~ prev + act, data = cuad), shade = TRUE, legend = TRUE,
+            expected = mu_cambio, df = df.residual(m_sube),
+            labeling_args = list(set_varnames = c(prev = "nivel previo", act = "nivel actual")))
+
+# -----------------------------------------------------------------------------
+# [u22-proyeccion]
+#   2 · Modelos log-lineales para tablas de contingencia
+#     > 2.4 Tablas de cambio: el bonus-malus
+#       > Qué esperar el año próximo
+# -----------------------------------------------------------------------------
+P  <- mu_cambio / rowSums(mu_cambio)                                            # P(j | i): filas, nivel de partida
+n_act  <- colSums(xtabs(Freq ~ prev + act, data = cuad))          # pólizas en cada nivel este año
+n_prox <- drop(n_act %*% P)                                       # pólizas esperadas el año próximo
+round(P, 3)
+
+set.seed(SEMILLA_CURSO)
+X <- model.matrix(m_sube)
+sims <- t(replicate(5000, {
+  b  <- MASS::mvrnorm(1, coef(m_sube), vcov(m_sube))              # 1) incertidumbre de la estimación
+  M  <- matrix(0, 5, 5); M[cbind(cuad$i, cuad$j)] <- exp(X %*% b)
+  Pb <- M / rowSums(M)
+  realizado <- rowSums(sapply(1:5, \(i) rmultinom(1, n_act[i], Pb[i, ])))   # 2) azar del año próximo
+  c(drop(n_act %*% Pb), realizado)
+}))
+data.frame(nivel = 1:5, actual = as.vector(n_act), proximo = round(n_prox),
+           ic_low  = round(apply(sims[, 1:5],  2, quantile, 0.025)),
+           ic_high = round(apply(sims[, 1:5],  2, quantile, 0.975)),
+           ip_low  = round(apply(sims[, 6:10], 2, quantile, 0.025)),
+           ip_high = round(apply(sims[, 6:10], 2, quantile, 0.975)))
 
 # -----------------------------------------------------------------------------
 # [u22-validacion-tablas]

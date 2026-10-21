@@ -220,8 +220,9 @@ según lo que tu cartera muestre, pero **justifica** lo que dejes fuera.
   **cuasi-simetría**, leyendo sus residuos si esta no ajusta), cuánto ha cambiado —con el nivel medio
   **y** con el porcentaje en cada nivel— y qué estructura tiene el movimiento (**asociación uniforme**,
   1 gl frente a 16, más **inercia** de la diagonal si aporta, con $e^{\beta}$ y $e^{\delta}$ y sus
-  intervalos); separa siempre si un término **aporta** de si el modelo **ajusta**, y cierra con lo que
-  implica para ingresos y retención. Diagnostica con **residuos
+  intervalos); separa siempre si un término **aporta** de si el modelo **ajusta**; con el modelo que
+  ajuste, **proyecta** el reparto del año próximo con intervalos de confianza y de predicción, y cierra
+  con lo que implica para ingresos y retención. Diagnostica con **residuos
   ajustados** y **mosaico**, y comprueba la ocupación de las celdas antes de interpretar cualquier
   $p$-valor.
 

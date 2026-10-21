@@ -12,8 +12,9 @@ en serio, porque es la patología más frecuente del conteo y la puerta de entra
 Seguimos el mismo recorrido de la Unidad 2.1 —contexto, modelización, interpretación, selección y
 bondad de ajuste—, pero con un giro: como ahora hay **varios modelos candidatos** para un mismo
 problema, no repetimos el recorrido en cada uno. Lo aplicamos al **problema** (identificarlo) y a la
-**familia** (compararla): primero **qué es y cómo se identifica** (§3.1), luego un **bloque breve por
-modelo** (§3.2–3.3), y al final la **comparación y selección** (§3.4).
+**familia** (compararla): primero **qué es y cómo se identifica** (§3.1), luego **qué estructuras
+puede tener la varianza** (§3.2), un **bloque breve por modelo** (§3.3–3.4), y al final la **comparación y
+selección** (§3.5).
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -32,17 +33,13 @@ varianza observada supera a la media hablamos de **sobredispersión** (el caso h
 por debajo, de subdispersión (mucho más raro). El síntoma no es que el modelo prediga mal la media
 —los coeficientes siguen siendo razonables—, sino que **miente sobre su propia precisión**.
 
-### La huella: media frente a varianza
+### El problema: qué queremos predecir y con qué
 
 Fijémonos en una respuesta concreta: **`n_danos`**, el número de partes por daños propios que registra
 cada póliza a lo largo del periodo. Queremos explicarlo en función de las variables de riesgo (edad del
 conductor, potencia, zona de circulación, uso, tipo de vehículo). Como el tiempo de cobertura varía de
-una póliza a otra, ajustamos una **Poisson con el *offset* de la exposición** —modelamos la tasa de
-partes por unidad de tiempo, como en la [Unidad 2.1](#sec-u21)—. Ese es el modelo `m_pois`, que
-usaremos como referencia en toda la unidad.
-
-Un vistazo exploratorio justifica esos predictores: la **tasa** de partes por daños (partes por unidad de
-exposición) no es plana frente a ninguno de ellos (@fig-u23-eda-modelo):
+una póliza a otra, lo que comparamos es la **tasa** de partes por unidad de exposición, y un vistazo
+exploratorio muestra que no es plana frente a ninguno de los predictores (@fig-u23-eda-modelo):
 
 ```{r}
 #| label: fig-u23-eda-modelo
@@ -65,65 +62,86 @@ dplyr::bind_rows(
 ```
 
 La tasa **sube con la potencia**, es mayor en zona **urbana** y para uso **comercial** y **moto**, y
-baja algo con la **edad**: hay señal en todos, lo que justifica el modelo. Ahora bien, ese modelo
-describe bien la **media**; el problema —lo veremos— está en la **varianza**. La forma más directa de
-*ver* si sostiene su hipótesis de equidispersión es enfrentar, por grupos de pólizas de riesgo parecido,
-la **media** y la **varianza** observadas. Construimos la @fig-u23-media-varianza en cuatro pasos:
+baja algo con la **edad**: hay señal en todos, lo que justifica el modelo.
 
-1. Con `m_pois` obtenemos, para cada póliza, su número **esperado** de partes $\hat\mu_i$ =
-   `fitted(m_pois)` —su riesgo según el modelo—.
-2. Ordenamos las pólizas por ese $\hat\mu_i$ y las repartimos en **12 grupos** de igual tamaño
-   (`ntile(mu, 12)`): dentro de cada grupo, las pólizas tienen un riesgo esperado parecido.
-3. En cada grupo calculamos la **media** y la **varianza** observadas de `n_danos`.
-4. Representamos varianza frente a media y superponemos tres **formas de referencia** —la Poisson y dos alternativas que trabajamos en esta unidad para mejorar el ajuste—: la recta
-   $\mathrm{Var}=\mathrm{media}$ (Poisson), la recta $\mathrm{Var}=\hat\phi\,\mathrm{media}$ (dispersión
-   **lineal**) y la curva
-   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Las dos últimas anticipan modelos de las secciones 3.2–3.3; aquí solo nos interesa **qué forma
-   siguen los puntos**.
+Ajustamos, como en la [Unidad 2.1](#sec-u21), una **Poisson con el *offset* de la exposición**. Ese es el
+modelo `m_pois`, que usaremos como referencia en toda la unidad:
 
 ```{r}
-#| label: fig-u23-media-varianza
-#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan muy por encima de la recta Var = media (sobredispersión) y, entre las dos formas de dispersión, siguen la curva cuadrática (NB2), no la recta lineal (quasi/NB1): la varianza crece con el cuadrado de la media."
-#| fig-width: 8
-#| fig-height: 4
+#| label: u23-pois-fit
 m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                 offset(log(exposicion)), family = poisson, data = cartera)
-
-mu_i  <- fitted(m_pois); y <- cartera$n_danos
-phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
-alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
-
-pts <- tibble::tibble(mu = mu_i, y = y) |>
-  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
-
-rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
-curvas <- tibble::tibble(
-  media = rango,
-  `Poisson: Var = media`               = rango,
-  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
-  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
-  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
-
-ggplot() +
-  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
-  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
-  scale_colour_manual(values = c(
-    "Poisson: Var = media"             = "grey55",
-    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
-    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
-  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+c(deviance = round(deviance(m_pois), 1), gl = df.residual(m_pois))
 ```
 
-- **Qué esperamos.** Si la Poisson describiera bien los datos, en cada grupo la varianza igualaría a la
-media y los doce puntos caerían sobre la recta $\mathrm{Var}=\mathrm{media}$. 
-- **Qué vemos.** Todos los puntos quedan muy por encima de esa recta —hay sobredispersión— y, además, **no siguen la recta lineal**
-($\hat\phi\,\mathrm{media}$) sino que se **curvan hacia arriba**, pegándose a la curva cuadrática: la
-varianza crece con el **cuadrado** de la media. No es un fallo al predecir el promedio —`m_pois` acierta
-con el nivel—, sino en la dispersión. Esa forma cuadrática anticipa un ajuste mejorado que conseguiremos en la [Sección 3.3](#sec-u23-nb) con un modelo binomial-negativo, alternativo al Poisson para asumir la sobredispersión observada.
+La deviance residual, 6.465,4 con 3.063 gl, **duplica de sobra** sus grados de libertad: si la Poisson
+describiera bien los datos, deberían ser del mismo orden. Es el primer indicio de que algo falla. Pero con
+conteos pequeños como estos la deviance no sigue bien una $\chi^2$ (lo vimos en la
+[Unidad 2.1](#sec-u21-diagnostico)), así que no la usamos como contraste: la tomamos como señal de alarma
+y la examinamos con más cuidado.
 
-### De dónde viene
+### Indicios de sobredispersión {#sec-u23-diagnostico}
+
+**El índice de dispersión.** La medida de referencia es el **índice de dispersión** $\hat\phi = X^2/(n-p)$, que definimos en la
+[Unidad 2.1](#sec-u21-diagnostico). Se puede calcular también con la deviance, pero la versión de
+Pearson es más fiable:
+
+```{r}
+#| label: u23-indice
+phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
+phi_dev     <- deviance(m_pois) / df.residual(m_pois)
+c(pearson = phi_pearson, deviance = phi_dev)
+```
+
+En `n_danos`, $\hat\phi$ sale **muy por encima de 1** (en torno a **2.4** por Pearson, 2.1 por
+deviance): cada póliza varía bastante más de lo que la Poisson tolera. Un matiz sobre las dos versiones. La basada en la **deviance** (`deviance/gl`) es
+popular pero **traicionera** con conteos escasos: cuando las medias son bajas o hay muchos patrones de
+covariables, la deviance no sigue una $\chi^2$ y el cociente puede rondar 1 **aunque haya
+sobredispersión real**. Por eso nos quedamos con el de **Pearson** como indicador rápido y no nos
+fiamos de un número suelto sin un contraste que lo respalde.
+
+El cociente cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** es la
+varianza. Lo primero se ve mejor que se cuenta; lo segundo se intuye con un gráfico y se contrasta al final
+de la sección. Empecemos por mirar.
+
+**El rootograma: dónde falla el ajuste.** El **rootograma**, que construimos en la [Unidad 2.1](#sec-u21-diagnostico) (@fig-u21-rootograma), enseña la
+sobredispersión **conteo a conteo**: enfrenta, para cada valor $k$, el número de pólizas con $k$ partes
+con el que espera el modelo, $\sum_i \mathrm{dpois}(k,\hat\mu_i)$. Aquí usamos una versión lado a lado,
+más directa de leer, en lugar de la colgante. Su valor está en que muestra **dónde** falla el modelo,
+no solo cuánto (@fig-u23-rootograma):
+
+```{r}
+#| label: fig-u23-rootograma
+#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson ajustada. La Poisson se queda corta en los ceros y en la cola alta, y sobra en los valores intermedios: el patrón típico de la sobredispersión."
+#| fig-width: 6.5
+#| fig-height: 3.6
+mu <- fitted(m_pois); K <- 0:8
+esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
+observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
+
+tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
+  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
+  ggplot(aes(k, frec, fill = fuente)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
+  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
+```
+
+El patrón es el típico de la sobredispersión: la Poisson **subestima los ceros** y **la cola** (las
+pocas pólizas que acumulan muchos partes) y **sobreestima los valores intermedios**. No acierta con la
+forma de la distribución, solo con su promedio. En la [Sección 3.4](#sec-u23-nb) repetiremos este
+rootograma con la binomial negativa, que endereza los dos extremos.
+
+### Efectos: por qué importa
+
+Ignorar la sobredispersión **no** sesga mucho los coeficientes, pero **subestima sus errores
+estándar** (aproximadamente en un factor $\sqrt{\phi}$, con $\phi$ el índice de dispersión). La
+consecuencia es una inferencia **demasiado optimista**: estadísticos de Wald inflados, intervalos de
+confianza demasiado estrechos y contrastes (LRT incluido) que declaran significativo lo que no lo es.
+Por eso, vistos los indicios, conviene confirmarla con un contraste formal
+—lo hacemos al final de la sección— antes de fiarse de ningún $p$-valor.
+
+### Causas: de dónde viene y dónde aparece
 
 La sobredispersión rara vez es un accidente: casi siempre señala **estructura no modelada**. Las
 causas típicas:
@@ -165,166 +183,33 @@ dplyr::bind_rows(
   labs(x = "nº de eventos", y = "frecuencia", fill = NULL)
 ```
 
-### Por qué importa
-
-Ignorar la sobredispersión **no** sesga mucho los coeficientes, pero **subestima sus errores
-estándar** (aproximadamente en un factor $\sqrt{\phi}$, con $\phi$ el índice de dispersión). La
-consecuencia es una inferencia **demasiado optimista**: estadísticos de Wald inflados, intervalos de
-confianza demasiado estrechos y contrastes (LRT incluido) que declaran significativo lo que no lo es.
-Por eso conviene diagnosticarla —la [medimos y contrastamos](#sec-u23-diagnostico) más abajo— antes de
-fiarse de ningún $p$-valor.
-
-### Dónde aparece
-
-Es la regla, más que la excepción, en casi todo conteo real: **siniestros por póliza** en seguros (unos
+**Dónde aparece.** Es la regla, más que la excepción, en casi todo conteo real: **siniestros por póliza** en seguros (unos
 pocos asegurados concentran la mayoría), **uso de recursos sanitarios** por paciente (crónicos que
 acumulan visitas e ingresos), **individuos por parcela** en ecología (hábitat en manchas), **defectos
 por lote** en fiabilidad, **casos por región** en epidemiología o **accidentes por conductor**. En
 todos, unas pocas unidades acumulan mucho y la mayoría casi nada.
 
-Reconocido el fenómeno, toca **identificarlo con números**. Ver la nube de puntos por encima de la recta
-es sugerente, pero conviene **medir** y **contrastar** la sobredispersión antes de cambiar de modelo.
+Vistos los indicios, sus efectos y sus causas, falta confirmarla formalmente y averiguar de qué tipo es.
 
-### El índice de dispersión {#sec-u23-diagnostico}
+### Contrastes: ¿hay sobredispersión? {#sec-u23-contrastes}
 
-La medida de referencia es el **índice de dispersión** $\hat\phi = X^2/(n-p)$, que definimos en la
-[Unidad 2.1](#sec-u21-diagnostico). Se puede calcular también con la deviance, pero la versión de
-Pearson es más fiable:
+Los indicios apuntan con claridad, pero conviene confirmarlo con un contraste formal. 
 
-```{r}
-#| label: u23-indice
-phi_pearson <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)
-phi_dev     <- deviance(m_pois) / df.residual(m_pois)
-c(pearson = phi_pearson, deviance = phi_dev)
-```
-
-En `n_danos`, $\hat\phi$ sale **muy por encima de 1** (en torno a **2.4** por Pearson, 2.1 por
-deviance): cada póliza varía bastante más de lo que la Poisson tolera. Un matiz sobre las dos versiones. La basada en la **deviance** (`deviance/gl`) es
-popular pero **traicionera** con conteos escasos: cuando las medias son bajas o hay muchos patrones de
-covariables, la deviance no sigue una $\chi^2$ y el cociente puede rondar 1 **aunque haya
-sobredispersión real**. Por eso nos quedamos con el de **Pearson** como indicador rápido y no nos
-fiamos de un número suelto sin un contraste que lo respalde.
-
-El cociente cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** es la
-varianza. Lo primero se ve mejor que se cuenta; lo segundo se contrasta. Empecemos por mirar.
-
-### El rootograma: ver dónde falla el ajuste
-
-El **rootograma**, que construimos en la [Unidad 2.1](#sec-u21-diagnostico) (@fig-u21-rootograma), enseña la
-sobredispersión **conteo a conteo**: enfrenta, para cada valor $k$, el número de pólizas con $k$ partes
-con el que espera el modelo, $\sum_i \mathrm{dpois}(k,\hat\mu_i)$. Aquí usamos una versión lado a lado,
-más directa de leer, en lugar de la colgante. Su valor está en que muestra **dónde** falla el modelo,
-no solo cuánto (@fig-u23-rootograma):
-
-```{r}
-#| label: fig-u23-rootograma
-#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson ajustada. La Poisson se queda corta en los ceros y en la cola alta, y sobra en los valores intermedios: el patrón típico de la sobredispersión."
-#| fig-width: 6.5
-#| fig-height: 3.6
-mu <- fitted(m_pois); K <- 0:8
-esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
-  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
-```
-
-El patrón es el típico de la sobredispersión: la Poisson **subestima los ceros** y **la cola** (las
-pocas pólizas que acumulan muchos partes) y **sobreestima los valores intermedios**. No acierta con la
-forma de la distribución, solo con su promedio. En la [Sección 3.3](#sec-u23-nb) repetiremos este
-rootograma con la binomial negativa, que endereza los dos extremos.
-
-### Los contrastes: ¿hay sobredispersión y de qué tipo?
-
-El rootograma deja claro que la Poisson se queda corta; para tratarlo hay tres modelos habituales, y se
-distinguen justamente por la **forma que le dan a la varianza**:
-
-- **quasi-Poisson** ([Sección 3.2](#sec-u23-quasi)): $\mathrm{Var}=\phi\,\mu$. Infla la varianza por un
-  factor **constante** —crece de forma **lineal** con $\mu$— y solo corrige los errores estándar, sin
-  cambiar de distribución.
-- **binomial negativa NB1**: $\mathrm{Var}=\mu\,(1+\alpha)=\mu+\alpha\,\mu$. También **lineal**, pero
-  con una distribución propia (permite predecir probabilidades).
-- **binomial negativa NB2** ([Sección 3.3](#sec-u23-nb)): $\mathrm{Var}=\mu+\alpha\,\mu^{2}$.
-  **Cuadrática**: la varianza se dispara más deprisa en las pólizas de mayor riesgo esperado.
-
-**La elección no es cosmética.** Si la varianza real crece de forma cuadrática y aplicamos una corrección
-lineal (quasi-Poisson o NB1), nos quedaremos cortos justo en la **cola** —donde están las pólizas más
-costosas—; y a la inversa, sobre-corregiríamos. De modo que conviene **contrastar qué estructura**
-describe mejor los datos. Tres herramientas complementarias, todas sobre `m_pois`, deciden **si** el
-exceso es significativo y **de qué forma** es.
-
-**¿Hay sobredispersión?** 
-
-El contraste de referencia es el de **Cameron–Trivedi** [@cameron1990] (`AER::dispersiontest`):
+1. El test de sobredispersión basado en el índice de Pearson y su $\chi^2$ (`performance::check_overdispersion`).
+2. El test de sobredispersión con residuos DHARMA es más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea.
+3. El contraste de referencia es el de **Cameron–Trivedi** [@cameron1990] (`AER::dispersiontest`), que 
 enfrenta $H_0:\mathrm{Var}=\mu$ a la alternativa $\mathrm{Var}=\mu+\alpha\,g(\mu)$ y decide si
-$\alpha>0$. `performance::check_overdispersion` da la versión analítica (el índice de Pearson y su $\chi^2$), y `DHARMa`, una por **simulación**, más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea:
+$\alpha>0$. 
 
 ```{r}
 #| label: u23-tests
 # Tests de sobredispersión
 print(performance::check_overdispersion(m_pois))
-print(AER::dispersiontest(m_pois))
 print(DHARMa::testDispersion(m_pois, plot = FALSE))
+print(AER::dispersiontest(m_pois))
 ```
 
-Como vemos, los tres tests concluyen a favor de sobredispersión (rechazando la hipótesis nula de conformidad con la Poisson). Ahora viene el punto de descubrir qué estructura tiene la varianza, con el fin de optar por el modelo más apropiado para capturarla.
-
-**¿De qué tipo es la sobredispersión?** 
-
-El mismo contraste elige la **forma** de la varianza mediante el argumento `trafo`, que
-fija $g$: con $g(\mu)=\mu$ prueba la alternativa **lineal** (quasi-Poisson / NB1) y con $g(\mu)=\mu^2$,
-la **cuadrática** (NB2):
-
-```{r}
-#| label: u23-trafo
-print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
-print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
-```
-
-Las dos versiones rechazan con claridad $H_0:\alpha=0$, tanto con la estructura lineal
-($\mathrm{Var}=\mu+\alpha\,\mu$) como con la cuadrática ($\mathrm{Var}=\mu+\alpha\,\mu^2$). Que rechacen las
-dos confirma que hay sobredispersión, pero **no** dice todavía cuál de las dos formas es la adecuada;
-lo vemos a continuación.
-
-**La versión transparente: regresión sobre el residuo** 
-
-La misma idea se puede reproducir a mano —y así se ve el resultado aunque falte
-`AER`—. Cameron–Trivedi parte de que, bajo la Poisson, el residuo estandarizado,
-$r_i=\dfrac{(y_i-\hat\mu_i)^2-y_i}{\hat\mu_i}$, tiene media cero; bajo la alternativa, su media es
-$\alpha\,g(\hat\mu_i)/\hat\mu_i$. Basta una **regresión auxiliar** de $r$ para estimar $\alpha$: sobre
-una **constante** para la forma lineal (NB1) y sobre la media estimada $\hat\mu$ para la **cuadrática** (NB2):
-
-```{r}
-#| label: u23-trafo-manual
-mu <- fitted(m_pois); y <- cartera$n_danos
-r  <- ((y - mu)^2 - y) / mu                   # residuo de Cameron–Trivedi (media 0 bajo la Poisson)
-test_var <- function(formula, etiqueta) {
-  s <- coef(summary(lm(formula)))[1, ]        # coeficiente = alpha estimado
-  data.frame(estructura = etiqueta, alpha = round(s[1], 3),
-             t = round(s[3], 1), p_valor = signif(s[4], 3), row.names = NULL)
-}
-rbind(test_var(r ~ 1,      "lineal (NB1): Var = mu + a*mu"),        # alpha = media de r
-      test_var(r ~ mu - 1, "cuadratica (NB2): Var = mu + a*mu^2"))  # pendiente de r sobre mu
-```
-
-En la cartera, todas las vías coinciden en lo esencial: el índice da $\hat\phi\approx 2.4$ (más del
-doble de lo admisible) y los contrastes rechazan la equidispersión de forma abrumadora ($z\approx 12$
-en Cameron–Trivedi, y también por simulación con `DHARMa`). Sobre la **forma** de la
-varianza conviene ser prudentes: los dos contrastes —lineal y cuadrático— salen fuertemente
-significativos porque $\mu$ y $\mu^2$ están muy correlacionadas y ambos «ven» el mismo exceso, de modo
-que **comparar sus estadísticos no decide** cuál es la estructura correcta. Esa decisión se toma
-**ajustando** los dos modelos y comparándolos por AIC y re-diagnóstico (NB2 frente a NB1): los ajustamos
-en la [Sección 3.3](#sec-u23-nb) y los comparamos formalmente en la [Sección 3.4](#sec-u23-elegir).
-
-::: {.callout-tip}
-En suma: el índice **mide** el exceso, el rootograma **enseña dónde** está, los contrastes
-**confirman** que la Poisson se queda corta, y la **forma** de la varianza se zanja **comparando
-modelos**, no sólo con estos tests.
-:::
+Como vemos, los tres tests concluyen a favor de sobredispersión (rechazando la hipótesis nula de conformidad con la Poisson). Confirmada, hay que decidir con qué modelo tratarla.
 
 ::: {.callout-tip}
 ## 🔧 En R. Diagnosticar la sobredispersión
@@ -335,27 +220,95 @@ Todo se calcula sobre el Poisson ya ajustado (`m_pois`):
 - **Contraste formal** — `AER::dispersiontest(m)` (Cameron–Trivedi) da $z$ y $p$;
   `performance::check_overdispersion(m)` es la versión analítica y `DHARMa::testDispersion(m)` una por
   **simulación**, más fiable con medias bajas.
-- **Forma de la varianza** — `AER::dispersiontest(m, trafo = 1)` prueba la lineal (quasi / NB1) y
-  `trafo = 2` la cuadrática (NB2). **Aviso:** ambas salen significativas porque $\mu$ y $\mu^2$ están muy
-  correlacionadas; la forma se decide **ajustando** los modelos y comparándolos por AIC, no con estos
-  contrastes.
 - **Rootograma** — enfrenta frecuencias observadas y esperadas ($\sum_i \Pr(Y_i=k)$) conteo a conteo y
   muestra **dónde** falla el ajuste. Aquí lo construimos a mano con `dpois` / `dnbinom`; la versión
   clásica es `countreg::rootogram(m)`, pero `countreg` no está en CRAN (se instala desde R-Forge).
 :::
 
-::: {.callout-tip}
-## 🔧 En R. Panorama de modelos para la sobredispersión
+## 3.2 Estructuras para la varianza {#sec-u23-estructuras}
 
-Las **tres herramientas** que desarrollaremos en esta unidad, ordenadas por la forma de su varianza:
+La sección anterior ha confirmado que la Poisson se queda corta. Antes de ajustar ningún modelo
+alternativo, conviene saber **qué posibilidades hay** y **hacia cuál apuntan los datos**: los modelos
+para la sobredispersión se diferencian, sobre todo, en cómo hacen crecer la varianza con la media.
+
+### Las opciones: qué estructura dar a la varianza {#sec-u23-opciones}
+
+Las tres herramientas que desarrollamos en esta unidad, ordenadas por la **forma que le dan a la varianza**:
 
 | Modelo | Varianza | En una frase | Se desarrolla en |
 |---|---|---|---|
-| **quasi-Poisson** | $\phi\,\mu$ (lineal) | corrige los errores estándar, sin distribución propia | [§3.2](#sec-u23-quasi) |
-| **NB1** | $\mu(1+\alpha)$ (lineal) | la gemela de la quasi, pero con verosimilitud | [§3.3](#sec-u23-nb) |
-| **NB2** | $\mu+\mu^2/\theta$ (cuadrática) | mezcla Poisson–Gamma; la opción por defecto | [§3.3](#sec-u23-nb) |
+| **quasi-Poisson** | $\phi\,\mu$ (lineal) | corrige los errores estándar, sin distribución propia | [§3.3](#sec-u23-quasi) |
+| **NB1** | $\mu(1+\alpha)$ (lineal) | la gemela de la quasi, pero con verosimilitud | [§3.4](#sec-u23-nb) |
+| **NB2** | $\mu+\alpha\,\mu^2$, con $\alpha=1/\theta$ (cuadrática) | mezcla Poisson–Gamma; la opción por defecto | [§3.4](#sec-u23-nb) |
 
-Cubren la mayoría de los casos, pero **no son las únicas** herramientas en R:
+Las dos primeras hacen crecer la varianza de forma **lineal** con $\mu$; la NB2, de forma
+**cuadrática**, así que la varianza se dispara más deprisa en las pólizas de mayor riesgo esperado. A
+diferencia de la quasi-Poisson, las dos binomiales negativas tienen una distribución propia, lo que
+permite predecir probabilidades.
+
+**¿Qué forma siguen los datos?** Antes de contrastarlo, se puede ver. Enfrentamos, por grupos de pólizas
+de riesgo parecido, la **media** y la **varianza** observadas, y construimos la @fig-u23-media-varianza en
+cuatro pasos:
+
+1. Con `m_pois` obtenemos, para cada póliza, su número **esperado** de partes $\hat\mu_i$ =
+   `fitted(m_pois)` —su riesgo según el modelo—.
+2. Ordenamos las pólizas por ese $\hat\mu_i$ y las repartimos en **12 grupos** de igual tamaño
+   (`ntile(mu, 12)`): dentro de cada grupo, las pólizas tienen un riesgo esperado parecido.
+3. En cada grupo calculamos la **media** y la **varianza** observadas de `n_danos`.
+4. Representamos varianza frente a media y superponemos tres **formas de referencia** —la Poisson y las dos estructuras de varianza que
+   acabamos de ver—: la recta
+   $\mathrm{Var}=\mathrm{media}$ (Poisson), la recta $\mathrm{Var}=\hat\phi\,\mathrm{media}$ (dispersión
+   **lineal**) y la curva
+   $\mathrm{Var}=\mathrm{media}+\hat\alpha\,\mathrm{media}^2$ (dispersión **cuadrática**). Aquí solo nos interesa **qué forma
+   siguen los puntos**.
+
+```{r}
+#| label: fig-u23-media-varianza
+#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan muy por encima de la recta Var = media (sobredispersión) y, entre las dos formas de dispersión, siguen la curva cuadrática (NB2), no la recta lineal (quasi/NB1): la varianza crece con el cuadrado de la media."
+#| fig-width: 8
+#| fig-height: 4
+mu_i  <- fitted(m_pois); y <- cartera$n_danos
+phi   <- sum(residuals(m_pois, type = "pearson")^2) / df.residual(m_pois)   # pendiente lineal
+alpha <- coef(lm(((y - mu_i)^2 - y) / mu_i ~ mu_i - 1))[[1]]                # término cuadrático
+
+pts <- tibble::tibble(mu = mu_i, y = y) |>
+  dplyr::mutate(grupo = dplyr::ntile(mu, 12)) |>           # 12 grupos de riesgo esperado parecido
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(media = mean(y), varianza = var(y), .groups = "drop")
+
+rango  <- seq(min(pts$media), max(pts$media), length.out = 100)
+curvas <- tibble::tibble(
+  media = rango,
+  `Poisson: Var = media`               = rango,
+  `Lineal: phi·media (quasi/NB1)`      = phi * rango,
+  `Cuadratica: media+a·media² (NB2)`   = rango + alpha * rango^2) |>
+  tidyr::pivot_longer(-media, names_to = "forma", values_to = "var")
+
+ggplot() +
+  geom_line(data = curvas, aes(media, var, colour = forma), linewidth = 0.7) +
+  geom_point(data = pts, aes(media, varianza), size = 2.5, colour = "grey20") +
+  scale_colour_manual(values = c(
+    "Poisson: Var = media"             = "grey55",
+    "Lineal: phi·media (quasi/NB1)"    = "darkorange",
+    "Cuadratica: media+a·media² (NB2)" = "steelblue")) +
+  labs(x = "media observada (por grupo)", y = "varianza observada", colour = NULL)
+```
+
+- **Qué esperamos.** Si la Poisson describiera bien los datos, en cada grupo la varianza igualaría a la
+media y los doce puntos caerían sobre la recta $\mathrm{Var}=\mathrm{media}$. 
+- **Qué vemos.** Todos los puntos quedan muy por encima de esa recta —hay sobredispersión— y, además, **no siguen la recta lineal**
+($\hat\phi\,\mathrm{media}$) sino que se **curvan hacia arriba**, pegándose a la curva cuadrática: la
+varianza crece con el **cuadrado** de la media. No es un fallo al predecir el promedio —`m_pois` acierta
+con el nivel—, sino en la dispersión. Esa forma cuadrática anticipa un ajuste mejorado que conseguiremos en la [Sección 3.4](#sec-u23-nb) con un modelo binomial-negativo, alternativo al Poisson para asumir la sobredispersión observada.
+
+**La elección no es cosmética.** Si la varianza real crece de forma cuadrática y aplicamos una corrección
+lineal (quasi-Poisson o NB1), nos quedaremos cortos justo en la **cola** —donde están las pólizas más
+costosas—; y a la inversa, sobre-corregiríamos. De modo que conviene **contrastar qué estructura**
+describe mejor los datos, que es lo que hacemos a continuación.
+
+::: {.callout-note collapse="true"}
+## Otras posibilidades (no las desarrollamos en esta unidad)
+Las tres anteriores cubren la mayoría de los casos, pero **no son las únicas** herramientas en R:
 
 - **Conway–Maxwell–Poisson** (COM-Poisson): un parámetro extra de dispersión que captura tanto
   **sobre-** como **subdispersión** —`glmmTMB(family = compois)` o el paquete `COMPoissonReg`—.
@@ -373,7 +326,42 @@ intercepto aleatorio por observación—, así que lo tratamos y ejemplificamos 
 ([Unidad 2.4](#sec-u24)) o un modelo mixto ([Unidad 2.5](#sec-u25)).
 :::
 
-## 3.2 Quasi-Poisson {#sec-u23-quasi}
+### Contrastes: ¿de qué tipo es la sobredispersión? {#sec-u23-forma}
+
+El mismo contraste elige la **forma** de la varianza mediante el argumento `trafo`, que
+fija $g$: con $g(\mu)=\mu$ prueba la alternativa **lineal** (quasi-Poisson / NB1) y con $g(\mu)=\mu^2$,
+la **cuadrática** (NB2):
+
+```{r}
+#| label: u23-trafo
+print(AER::dispersiontest(m_pois, trafo = 1))   # Var = mu + alpha·mu    (lineal, NB1)
+print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadratica, NB2)
+```
+
+Las dos versiones rechazan con claridad $H_0:\alpha=0$, tanto con la estructura lineal
+($\mathrm{Var}=\mu+\alpha\,\mu$) como con la cuadrática ($\mathrm{Var}=\mu+\alpha\,\mu^2$). Para decidir qué versión cuadrática utilizar habremos de ajustar alternativas y compararlas. Los ajustamos
+en la [Sección 3.4](#sec-u23-nb) y los comparamos formalmente en la [Sección 3.5](#sec-u23-elegir).
+
+
+
+::: {.callout-tip}
+## 🔧 En R. Contrastar la forma de la varianza
+
+En suma: el índice **mide** el exceso, el rootograma **enseña dónde** está, los contrastes
+**confirman** que la Poisson se queda corta, y la **forma** de la varianza se zanja **comparando
+modelos**, no sólo con estos tests.
+
+**Forma de la varianza**
+
+— `AER::dispersiontest(m, trafo = 1)` prueba la lineal (quasi / NB1) y
+- `trafo = 2` la cuadrática (NB2). 
+  
+**Aviso:** ambas salen significativas porque $\mu$ y $\mu^2$ están muy
+  correlacionadas; la forma se decide **ajustando** los modelos y comparándolos por AIC, no con estos
+  contrastes.
+:::
+
+## 3.3 Quasi-Poisson {#sec-u23-quasi}
 
 La respuesta más económica a la sobredispersión es no cambiar de distribución, sino **relajar la
 restricción de la varianza**.
@@ -512,7 +500,7 @@ $\hat\phi$ único se queda corto. Eso es justo lo que significa que «la varianz
 nube se despega de la recta. La segunda mirada es **decisiva**: como ese gráfico es ruidoso (pocos
 grupos, y estimar una varianza es inestable), la elección firme entre la varianza lineal
 (quasi-Poisson / NB1) y la cuadrática (NB2) se toma **ajustando ambos modelos y comparándolos por AIC**
-([Sección 3.3](#sec-u23-nb)). El gráfico **sugiere** la forma; el AIC la **confirma**.
+([Sección 3.4](#sec-u23-nb)). El gráfico **sugiere** la forma; el AIC la **confirma**.
 
 **Bondad de ajuste.** Al no ser generativa, la quasi-Poisson no admite rootograma ni residuos simulados;
 su ajuste se juzga por los **residuos de Pearson** (media bien especificada, sin patrón) y por que la
@@ -524,7 +512,7 @@ lineal** con la media y solo buscamos una inferencia honesta con una variación 
 supuestos; cuando crece más deprisa, o cuando necesitamos un modelo generativo (probabilidades,
 predicción de conteos), damos el paso a la binomial negativa.
 
-## 3.3 Binomial negativa {#sec-u23-nb}
+## 3.4 Binomial negativa {#sec-u23-nb}
 
 La quasi-Poisson corrige los errores estándar, pero no da una distribución. La **binomial negativa**
 (NB) sí: es un modelo generativo completo que nace, precisamente, del mecanismo que simulamos en la
@@ -607,7 +595,7 @@ diferencia de fondo es **conceptual**: la quasi-Poisson corrige los errores est�
 (estima $\phi$ con Pearson, sin verosimilitud), mientras que la NB1 es un **modelo generativo con
 verosimilitud propia** —tiene `logLik`/`AIC` y predice probabilidades—. La NB1 le da a la quasi el
 estatus de distribución que le faltaba. (La comparación formal por AIC de **todos** los modelos
-va en la [Sección 3.4](#sec-u23-elegir).)
+va en la [Sección 3.5](#sec-u23-elegir).)
 
 ::: {.callout-tip}
 ## 🔧 En R. Ajustar una binomial negativa (NB1 y NB2)
@@ -689,12 +677,12 @@ tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb)
 residuos de `DHARMa` sin desviaciones marcadas y rootograma que sigue de cerca ceros y cola—: describe
 bien estos conteos. La **NB1** cumple casi igual (su dispersión también baja a $\approx 1$), pero, al
 imponer una varianza lineal, se queda algo corta en la cola; el AIC ratificará la ventaja de la NB2
-([Sección 3.4](#sec-u23-elegir)). Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
+([Sección 3.5](#sec-u23-elegir)). Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
 ceros que la NB no explica—, el paso siguiente serían los modelos de la [Unidad 2.4](#sec-u24). La
 comparación integral de los cuatro modelos y la validación contra el DGP van en la
-[Sección 3.4](#sec-u23-elegir).
+[Sección 3.5](#sec-u23-elegir).
 
-## 3.4 Elegir, comparar y conectar {#sec-u23-elegir}
+## 3.5 Elegir, comparar y conectar {#sec-u23-elegir}
 
 Hemos ajustado cuatro modelos para el mismo problema —**Poisson**, **quasi-Poisson**, **NB1** y
 **NB2**—. Toca ponerlos frente a frente: comparar coeficientes y errores, decidir formalmente por
@@ -879,7 +867,7 @@ c(theta_DGP = verdad$theta_nb, theta_estimado = round(m_nb$theta, 3))
 
 El $\hat\theta\approx 0.97$ recupera el $\theta=1$ del DGP casi al dedillo, y la **forma de modelo**
 elegida (NB2, cuadrática) coincide con el mecanismo generador. También la alternativa cuadrática del
-contraste de Cameron–Trivedi (`trafo = 2`, en la [Sección 3.1](#sec-u23-diagnostico)) estimaba
+contraste de Cameron–Trivedi (`trafo = 2`, en la [Sección 3.2](#sec-u23-forma)) estimaba
 $\hat\alpha\approx 1.03$, en línea con el $1/\theta=1$ del DGP. Es decir: no solo hemos
 ajustado un modelo que encaja, sino **el modelo correcto**. Ese es el sentido del control de calidad que
 pediremos en el estudio de caso —ajustar a ciegas y validar al final contra `attr(., "verdad")`—.
