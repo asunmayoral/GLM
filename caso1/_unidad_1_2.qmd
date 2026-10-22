@@ -257,7 +257,7 @@ propia. Para *verla*, agrupamos GLOW en diez tramos (deciles) según la probabil
 ajustada $\hat\mu$; dentro de cada tramo el riesgo es parecido, así que podemos medir
 allí la varianza empírica de la respuesta. Confrontamos ese valor con la parábola
 $\mu(1-\mu)$: si los puntos la siguen, confirmamos —solo con datos— que en la Bernoulli
-la varianza la **dicta la media** (máxima en $\mu=0{,}5$, casi nula cerca de 0 o 1), no
+la varianza la **dicta la media** (máxima en $\mu=0.5$, casi nula cerca de 0 o 1), no
 una constante como supondría OLS. La @fig-u12-varianza-mu muestra que los puntos siguen la parábola.
 
 ```{r}
@@ -283,7 +283,7 @@ El **enlace** o *función link* $g$ conecta la media con el predictor lineal, $g
 \boldsymbol\beta$. Una misma familia puede utilizar cualquier enlace $g$ que sea una función monótona y diferenciable, pero el **enlace canónico** es aquel que iguala el parámetro natural al predictor lineal, esto es, $\theta=\eta$. Este enlace canónico simplemente aporta ventajas formales en las matemáticas, como estadísticos suficientes de dimensión mínima o simplificación de las ecuaciones de verosimilitud.
 
 En el caso binario de la familia binomial, las tres alternativas que re-escalan un predictor lineal -teóricamente definido en toda la recta real- a la escala de una probabilidad -en el rango [0,1]- son el enlace logit, el probit y el complementario log-log -cloglog-, que reproducen la forma de S invertida a la hora de relacionar el predictor lineal con la probabilidad, como se aprecia en la @fig-u12-enlaces. Logit y probit son **simétricos** (casi intercambiables tras reescalar: el
-coeficiente probit ≈ logit/1,6); el **cloglog** (complementario log-log) es **asimétrico** y será el enlace
+coeficiente probit ≈ logit/1.6); el **cloglog** (complementario log-log) es **asimétrico** y será el enlace
 natural de la supervivencia en tiempo discreto en la [Unidad 5](#sec-u15)
 [@agresti2015].
 
@@ -560,7 +560,9 @@ escala <- function(y, ylab, titulo, y0)
     scale_color_manual(values = col) +
     labs(x = "predictor x", y = ylab, color = NULL, title = titulo)
 
-p1 <- escala("log-odds", "log-odds (η)", "η = β₀ + βx  ·  recta (pendiente β)", 0)
+p1 <- escala("log-odds", "log-odds (η)",
+             # plotmath: el subíndice Unicode de β₀ no existe en la fuente del gráfico
+             expression(bold(eta == beta[0] + beta * x ~ "·  recta (pendiente" ~ beta * ")")), 0)
 p2 <- escala("odds",     "odds = e^η",   "odds  ·  multiplica e^β por unidad",            1)
 p3 <- escala("prob",     "P(evento)",    "probabilidad  ·  forma en S",        0.5) +
         scale_y_continuous(limits = c(0, 1), labels = scales::label_percent())
@@ -607,8 +609,8 @@ contenga 1**: la misma señal de efecto en las dos escalas.
 exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR e IC: exponencial del IC de beta
 ```
 
-La fractura previa multiplica las odds de fractura por $\text{OR}\approx 2{,}31$
-(IC 95 %: 1,46–3,66) y cada año de edad por $\approx 1{,}04$ (IC 95 %: 1,02–1,07);
+La fractura previa multiplica las odds de fractura por $\text{OR}\approx 2.31$
+(IC 95 %: 1.46–3.66) y cada año de edad por $\approx 1.04$ (IC 95 %: 1.02–1.07);
 ninguno cruza 1, de modo que ambos efectos son claros. (El IC de $\beta$ procede del
 perfil de verosimilitud, [Sección 2.5](#sec-u12-inferencia).)
 
@@ -631,7 +633,7 @@ supervivencia ([Unidad 5](#sec-u15)).
 
 Logit y probit, además, son casi la misma curva reescalada, de modo que sus coeficientes
 guardan una **proporción estable**: como regla práctica,
-$\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$. Es lo que recoge la
+$\beta_{\text{probit}}\approx\beta_{\text{logit}}/1.6\text{–}1.8$. Es lo que recoge la
 última columna de la tabla siguiente.
 
 ```{r}
@@ -639,12 +641,12 @@ $\beta_{\text{probit}}\approx\beta_{\text{logit}}/1{,}6\text{–}1{,}8$. Es lo q
 # Mismos datos, distinta escala del coeficiente según el enlace
 map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
   pivot_wider(names_from = enlace, values_from = estimate) |>
-  mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
+  mutate(razon_logit_probit = logit / probit)   # ~1.6-1.8 (salvo intercepto)
 ```
 
 **Tres coeficientes distintos para el mismo efecto.** La tabla anterior da, para
-`priorfrac`, tres números que no se parecen: $0{,}84$ con logit, $0{,}51$ con probit
-y $0{,}68$ con cloglog. Conviene ver qué dice cada uno tomando una **mujer concreta**:
+`priorfrac`, tres números que no se parecen: $0.84$ con logit, $0.51$ con probit
+y $0.68$ con cloglog. Conviene ver qué dice cada uno tomando una **mujer concreta**:
 70 años, sin fractura previa, y comparándola con otra igual salvo por el antecedente. De
 cada enlace pedimos las dos escalas: su predictor lineal $\eta$ —que es lo que cada uno
 lee a su manera— y la probabilidad que implica.
@@ -663,26 +665,26 @@ map_dfr(ajustes,
   pivot_wider(names_from = priorfrac, values_from = c(eta, p))
 ```
 
-- **logit: $\beta_2=0{,}84$ multiplica la ventaja.** Sin antecedente, la probabilidad de
+- **logit: $\beta_2=0.84$ multiplica la ventaja.** Sin antecedente, la probabilidad de
   fractura es del 21 %: de cada 100 mujeres así, unas **21 fracturan y 79 no**. Su ventaja
-  es, por tanto, 21 frente a 79, esto es $0{,}209/0{,}791=0{,}26$ —algo más de una fractura
+  es, por tanto, 21 frente a 79, esto es $0.209/0.791=0.26$ —algo más de una fractura
   por cada cuatro no fracturas—. Con antecedente, esa ventaja se multiplica por
-  $e^{0{,}84}=2{,}31$ y pasa a $0{,}61$ (38 frente a 62), que corresponde a una probabilidad
+  $e^{0.84}=2.31$ y pasa a $0.61$ (38 frente a 62), que corresponde a una probabilidad
   del 38 %.
   El coeficiente **no** multiplica la probabilidad —que sube de 21 % a 38 %, un factor
-  1,8—, sino la ventaja.
+  1.8—, sino la ventaja.
 
-- **probit: $\beta_2=0{,}51$ desplaza medio punto en la escala $z$.** Aquí el modelo
+- **probit: $\beta_2=0.51$ desplaza medio punto en la escala $z$.** Aquí el modelo
   coloca a cada mujer en un punto de la campana de Gauss. La de referencia está en
-  $z=-0{,}81$, y a la izquierda de ese punto queda el 21 % del área: esa es su
-  probabilidad. El antecedente la **empuja $0{,}51$ hacia la derecha**, hasta
-  $z=-0{,}30$, donde el área acumulada es el 38 %. No hay ventajas ni factores
+  $z=-0.81$, y a la izquierda de ese punto queda el 21 % del área: esa es su
+  probabilidad. El antecedente la **empuja $0.51$ hacia la derecha**, hasta
+  $z=-0.30$, donde el área acumulada es el 38 %. No hay ventajas ni factores
   multiplicativos: solo un desplazamiento a lo largo de una escala.
 
-- **cloglog: $\beta_2=0{,}68$ multiplica el riesgo acumulado.** Este enlace lee $\eta$
+- **cloglog: $\beta_2=0.68$ multiplica el riesgo acumulado.** Este enlace lee $\eta$
   como el logaritmo del riesgo que se ha ido acumulando durante el seguimiento. Para la
-  mujer de referencia ese riesgo acumulado vale $e^{-1{,}45}=0{,}23$; el antecedente lo
-  multiplica por $e^{0{,}68}=1{,}97$ y lo lleva a $0{,}46$, lo que se traduce en una
+  mujer de referencia ese riesgo acumulado vale $e^{-1.45}=0.23$; el antecedente lo
+  multiplica por $e^{0.68}=1.97$ y lo lleva a $0.46$, lo que se traduce en una
   probabilidad del 37 %. Es la lectura de la supervivencia: no «cuánta ventaja», sino
   «cuánto riesgo se ha ido sumando» ([Unidad 5](#sec-u15)).
 
@@ -701,7 +703,7 @@ mucho en el centro de la S. Para resumirlo en un número, el **efecto marginal m
 
 >"¿Cuántos puntos de probabilidad sube el evento, en promedio, por una unidad más de la covariable?
 
-En GLOW, el AME de `age` es ≈ **0,007**: unos **0,7 puntos porcentuales de riesgo de fractura por año**.
+En GLOW, el AME de `age` es ≈ **0.007**: unos **0.7 puntos porcentuales de riesgo de fractura por año**.
 
 **¿De dónde sale ese número?** 
 
@@ -763,7 +765,7 @@ parecido pese a coeficientes distintos) y se prefiere frente a otros indicadores
 
 En la @fig-u12-dos-escalas se visualiza el efecto de la edad en dos escalas. A la izquierda, en escala log-odds, 
 los dos perfiles son **rectas paralelas**: la edad entra de forma lineal y `priorfrac` solo desplaza la recta una
-cantidad **constante**, $\log(\text{OR})\approx 0{,}84$ —ahí vive el odds ratio—. A
+cantidad **constante**, $\log(\text{OR})\approx 0.84$ —ahí vive el odds ratio—. A
 la derecha, en probabilidad, esas mismas rectas se vuelven **curvas en S**: el
 efecto de `priorfrac` (la distancia entre curvas) es máximo en el centro y se
 desvanece en los extremos, **aunque el OR sea constante**. Claramente se aprecia la diferencia constante en
@@ -774,7 +776,7 @@ los odds y variable en las probabilidades.
 #| fig-width: 11
 #| fig-height: 4.8
 #| out-width: "100%"
-#| fig-cap: "El mismo modelo en dos escalas. Izquierda (log-odds): rectas paralelas, separación constante ≈ 0,84 (logaritmo del OR). Derecha (probabilidad): curvas en S, con separación variable. Trazo sólido y franja sombreada: rango de edad observado en GLOW (55–90 años); fuera, extrapolación (punteado). Bandas: IC 95 %."
+#| fig-cap: "El mismo modelo en dos escalas. Izquierda (log-odds): rectas paralelas, separación constante ≈ 0.84 (logaritmo del OR). Derecha (probabilidad): curvas en S, con separación variable. Trazo sólido y franja sombreada: rango de edad observado en GLOW (55–90 años); fuera, extrapolación (punteado). Bandas: IC 95 %."
 
 rango_obs <- range(glow$age)        # ~55–90: edad observada en GLOW
 grid <- expand_grid(
@@ -796,7 +798,7 @@ pA <- ggplot(grid, aes(age, eta, color = priorfrac, fill = priorfrac)) +
   geom_line(data = grid_obs, linewidth = 1.2) +          # rango observado
   labs(x = "Edad (años)", y = "log-odds (η)",
        color = "Fractura previa", fill = "Fractura previa",
-       title = "Escala log-odds", subtitle = "rectas paralelas (separación ≈ 0,84)")
+       title = "Escala log-odds", subtitle = "rectas paralelas (separación ≈ 0.84)")
 
 pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
   annotate("rect", xmin = rango_obs[1], xmax = rango_obs[2],
@@ -1114,8 +1116,8 @@ glance(fit_glm) |>
   select(null.deviance, df.null, deviance, df.residual, logLik, AIC, BIC)
 ```
 
-En GLOW, la deviance baja de **562,3** (nula) a **528,5** (residual) al añadir `age` y
-`priorfrac`: esa reducción de ≈ 33,8 puntos es la materia prima de los contrastes que
+En GLOW, la deviance baja de **562.3** (nula) a **528.5** (residual) al añadir `age` y
+`priorfrac`: esa reducción de ≈ 33.8 puntos es la materia prima de los contrastes que
 siguen. 
 
 La deviance residual **no** sirve como test *absoluto* de ajuste con datos
@@ -1142,7 +1144,7 @@ grandes, y **engañoso bajo separación** (da por no significativo un efecto que
 
 Por la misma razón, los **intervalos de
 confianza** se prefieren por **perfil de verosimilitud** antes que por Wald [@agresti2015]. El de **Wald**,
-$\hat\beta_k\pm1{,}96\,\widehat{\text{EE}}$, aproxima la log-verosimilitud por una **parábola**
+$\hat\beta_k\pm1.96\,\widehat{\text{EE}}$, aproxima la log-verosimilitud por una **parábola**
 y es siempre simétrico. El de **perfil** se obtiene **invirtiendo la razón de verosimilitudes**:
 es el conjunto de valores $b$ que el LRT no rechazaría, es decir, aquellos en los que la
 **log-verosimilitud perfil**
@@ -1150,11 +1152,11 @@ $$
 \ell_p(b)=\max_{\boldsymbol\beta_{-k}}\ \ell(b,\boldsymbol\beta_{-k})
 $$
 —la verosimilitud maximizada sobre el **resto** de parámetros con $\beta_k=b$ fijo— cae como
-mucho $1{,}92=\tfrac12\chi^2_{1,\,0{,}95}$ por debajo de su máximo:
+mucho $1.92=\tfrac12\chi^2_{1,\,0.95}$ por debajo de su máximo:
 $$
-\text{IC}_{95\%}(\beta_k)=\Bigl\{\,b:\ \ell(\hat{\boldsymbol\beta})-\ell_p(b)\le 1{,}92\,\Bigr\}.
+\text{IC}_{95\%}(\beta_k)=\Bigl\{\,b:\ \ell(\hat{\boldsymbol\beta})-\ell_p(b)\le 1.92\,\Bigr\}.
 $$
-Geométricamente, se corta la curva de verosimilitud perfil a $1{,}92$ del pico y se toman las
+Geométricamente, se corta la curva de verosimilitud perfil a $1.92$ del pico y se toman las
 dos abscisas del cruce. Como usa la **forma real** —a menudo **asimétrica**— de la
 verosimilitud, no asume normalidad de $\hat\beta$ y **no tiene por qué ser simétrico**: es más
 fiable justo cuando la parábola de Wald aproxima mal (muestras pequeñas, coeficientes grandes,
@@ -1189,7 +1191,7 @@ La recorremos sobre $\beta_2$, el coeficiente de `priorfracYes`.
    demás parámetros. El máximo que se alcanza así es $\ell_p(b)$.
 2. Repetirlo en una **rejilla** de valores de $b$: se obtiene la **curva** de
    log-verosimilitud perfil.
-3. **Cortarla a 1,92** por debajo del máximo $\ell(\hat{\boldsymbol\beta})$.
+3. **Cortarla a 1.92** por debajo del máximo $\ell(\hat{\boldsymbol\beta})$.
 4. Las **dos abscisas del corte** son los extremos del intervalo.
 
 El paso 1 no necesita un optimizador especial. Fijar $\beta_2=b$ equivale a **mover ese
@@ -1203,9 +1205,9 @@ es un `glm` ordinario con una covariable menos.
 #| fig-width: 8
 #| fig-height: 5
 #| out-width: "85%"
-#| fig-cap: "Construcción del IC de perfil al 95 % para $\\beta_2$ (`priorfracYes`) en GLOW: caída de la log-verosimilitud perfil respecto de su máximo, corte a 1,92 y las dos abscisas del cruce. La parábola de Wald se superpone casi por completo."
+#| fig-cap: "Construcción del IC de perfil al 95 % para $\\beta_2$ (`priorfracYes`) en GLOW: caída de la log-verosimilitud perfil respecto de su máximo, corte a 1.92 y las dos abscisas del cruce. La parábola de Wald se superpone casi por completo."
 
-caida_critica <- qchisq(0.95, df = 1) / 2   # 1,92 = medio cuantil chi-cuadrado, 1 gl
+caida_critica <- qchisq(0.95, df = 1) / 2   # 1.92 = medio cuantil chi-cuadrado, 1 gl
 
 b_hat  <- unname(coef(fit_glm)["priorfracYes"])
 ee_hat <- unname(sqrt(diag(vcov(fit_glm)))["priorfracYes"])
@@ -1225,7 +1227,7 @@ rejilla <- tibble(b = seq(b_hat - 4 * ee_hat, b_hat + 4 * ee_hat, length.out = 1
   mutate(perfil = l_max - map_dbl(b, logver_perfil),
          wald   = (b - b_hat)^2 / (2 * ee_hat^2))
 
-# Pasos 3 y 4: las raíces de «la caída vale exactamente 1,92». La tolerancia por
+# Pasos 3 y 4: las raíces de «la caída vale exactamente 1.92». La tolerancia por
 # defecto de uniroot es ~1e-4, del orden de la cifra que queremos comparar con
 # confint(): hay que apretarla.
 abscisa_corte <- function(desde, hasta) {
@@ -1265,13 +1267,13 @@ ggplot(rejilla_larga, aes(b, caida, color = curva, linetype = curva)) +
   theme(legend.position = "top")
 ```
 
-**Lo que se lee.** El máximo está en $\hat\beta_2$; el corte a 1,92 se produce en los dos
+**Lo que se lee.** El máximo está en $\hat\beta_2$; el corte a 1.92 se produce en los dos
 valores que `confint()` acaba de imprimir. Los **brazos no miden lo mismo**: el perfil no
 tiene por qué ser simétrico, mientras que Wald, al sustituir la curva por una parábola,
-está obligado a repartir $1{,}96\,\widehat{\text{EE}}$ a cada lado. En GLOW la asimetría
+está obligado a repartir $1.96\,\widehat{\text{EE}}$ a cada lado. En GLOW la asimetría
 es mínima —las dos curvas se superponen— porque la muestra es grande y no hay separación.
 
-**La curva contiene el LRT.** Si en vez de cortar a 1,92 se lee la caída en $b=0$ —la
+**La curva contiene el LRT.** Si en vez de cortar a 1.92 se lee la caída en $b=0$ —la
 hipótesis «`priorfrac` no aporta nada»—, su doble es el estadístico del contraste de
 razón de verosimilitudes de `priorfrac`, el mismo que devolverá `car::Anova(type = "II")`
 en el apartado siguiente. El IC de perfil y el LRT no son dos técnicas: son **la misma
@@ -1605,7 +1607,7 @@ deviance llegan a ser $\approx N(0,1)$. Hacen falta herramientas que **rescaten*
 conviene elegirlas **según para qué**:
 
 - **Diagnóstico general** (mala especificación de cualquier tipo: forma funcional, dispersión,
-  *outliers*) → los **residuos simulados / de cuantil** (DHARMa) [@dunnsmyth1996; @hartig2022]. Se
+  *outliers*) → los **residuos simulados / de cuantil** (DHARMa) [@dunnsmyth1996; @hartig2026]. Se
   simula muchas veces del modelo ajustado y se sitúa cada observación en su distribución simulada;
   bajo un modelo correcto son **uniformes** $(0,1)$ —con una salvedad en respuestas discretas que
   el recuadro de abajo detalla, y que es justo la que los hace funcionar en binaria—, comparables
@@ -1652,7 +1654,7 @@ $\hat\pi_i$ y mide $\hat\pi_i$, luego aporta también $1$. Densidad constante ig
 todo $(0,1)$.
 
 **La clave conceptual.** La uniformidad no afirma nada sobre cómo se reparten las $\hat\pi_i$
-—que pueden valer 0,05 en una mujer y 0,70 en otra—, sino que **cada observación cae en un
+—que pueden valer 0.05 en una mujer y 0.70 en otra—, sino que **cada observación cae en un
 lugar cualquiera de su propia distribución predicha**. Eso es lo que pone en una escala común
 a $n$ observaciones con $n$ distribuciones distintas, y la razón de fondo por la que estos
 residuos funcionan donde Pearson y deviance fracasan: aquellos arrastran la asimetría de cada
@@ -1686,14 +1688,44 @@ Los de Pearson y deviance, con `residuals(fit_glm, type = "pearson" | "deviance"
 #| fig-height: 4
 #| fig-cap: "Residuos simulados (DHARMa) del modelo logístico en GLOW. Izquierda: Q–Q de los residuos, que deberían seguir la diagonal uniforme. Derecha: residuos frente a predicción, sin patrón si el ajuste es adecuado."
 sim <- DHARMa::simulateResiduals(fit_glm, plot = FALSE)
+set.seed(SEMILLA_CURSO)   # el test de outliers del panel usa bootstrap: la semilla permite reproducirlo abajo
 plot(sim)
 ```
 
-En GLOW, los residuos simulados **no muestran ningún problema**: el Q–Q sigue la diagonal uniforme
-(test de Kolmogorov–Smirnov $p\approx0{,}81$) y no hay señal de **sobredispersión** ($p\approx0{,}87$)
-ni de **outliers** ($p\approx1$); a la derecha, los residuos se reparten **sin patrón** frente a la
-predicción. Ninguna evidencia, por tanto, de mala especificación —ni en la forma, ni en la
-dispersión, ni en casos atípicos—.
+Los tres $p$ que la figura rotula en el panel izquierdo se obtienen en texto con los contrastes
+correspondientes, sobre el mismo objeto `sim`:
+
+```{r}
+#| label: u12-dharma-tests
+set.seed(SEMILLA_CURSO)   # la misma semilla que antes de plot(sim): reproduce el bootstrap del panel
+t_out  <- DHARMa::testOutliers(sim, plot = FALSE)
+t_unif <- DHARMa::testUniformity(sim, plot = FALSE)
+t_disp <- DHARMa::testDispersion(sim, plot = FALSE)
+tibble(contraste   = c("Uniformidad (KS)", "Dispersión", "Outliers"),
+       estadistico = unname(c(t_unif$statistic, t_disp$statistic, t_out$statistic)),
+       p           = c(t_unif$p.value, t_disp$p.value, t_out$p.value)) |>
+  mutate(across(where(is.numeric), \(v) round(v, 3)))
+# formato español para citar los p en el texto
+fmt <- function(v) format(round(v, 2), decimal.mark = ".", nsmall = 2)
+```
+
+::: {.callout-note}
+## Cómo leer los tres contrastes de DHARMa
+- **Uniformidad** (test de Kolmogorov–Smirnov, el Q–Q del panel izquierdo). ¿Se reparten los
+  residuos como una $U(0,1)$? $D$ = `r fmt(t_unif$statistic)`, $p$ = `r fmt(t_unif$p.value)`: no hay
+  evidencia de que la distribución supuesta sea inadecuada.
+- **Dispersión.** Compara la variabilidad de los residuos observados con la de los simulados
+  (cociente `r fmt(t_disp$statistic)`, $p$ = `r fmt(t_disp$p.value)`). Con respuesta $0/1$ este
+  contraste **apenas informa**: la varianza de una Bernoulli, $\pi(1-\pi)$, queda fijada por su
+  media, así que no hay dispersión libre que contrastar. Cobra sentido con respuesta **binomial
+  agrupada** ([Sección 3.1](#sec-u13-gof-binomial)).
+- **Outliers.** ¿Caen más observaciones fuera de la envolvente simulada de lo que cabría esperar
+  por azar? $p$ = `r fmt(t_out$p.value)`: no hay exceso de casos atípicos.
+
+A la derecha, los residuos se reparten **sin patrón** frente a la predicción. Como en cualquier
+contraste, un $p$ alto señala **ausencia de evidencia** de mala especificación —ni en la forma ni
+en casos atípicos—, no prueba de que el modelo sea correcto.
+:::
 
 ### Calibración: ¿son fiables las probabilidades?
 
@@ -1728,7 +1760,7 @@ ajustada**, que es lo que devuelve `fitted()`.
 performance::performance_hosmer(fit_glm, n_bins = 10)
 ```
 
-En GLOW, $p\approx 0{,}21$: sin evidencia de mala calibración. Pero el HL tiene
+En GLOW, $p\approx 0.21$: sin evidencia de mala calibración. Pero el HL tiene
 **limitaciones conocidas** —sensible al número de grupos y poco potente—, así que la
 práctica moderna lo **acompaña de un gráfico de calibración** y de los residuos por tramos
 [@agresti2015; @harrell2015]:
@@ -1802,7 +1834,7 @@ X, con bandas de $\pm 2$ EE $\approx 95\,\%$):
 :::
 
 
-En GLOW (@fig-u12-calibracion), coherente con el HL ($p\approx0{,}21$): los residuos por tramos
+En GLOW (@fig-u12-calibracion), coherente con el HL ($p\approx0.21$): los residuos por tramos
 quedan dentro de las bandas y la calibración se ajusta a la diagonal, sin señales de descalibración
 ni de falta de ajuste en el rango observado.
 
@@ -1885,10 +1917,10 @@ $\text{EE}\approx1/\sqrt{n\,w}$ para las $n=12$ mujeres de la celda:
 
 | $\hat\pi$ de la celda | peso $w=\hat\pi(1-\hat\pi)$ | información $n\,w$ | $\text{EE}\approx1/\sqrt{n\,w}$ |
 |---|---|---|---|
-| $0{,}2$ | $0{,}16$ | $1{,}9$ | $0{,}7$ |
-| $10^{-2}$ | $9{,}9\times10^{-3}$ | $0{,}12$ | $2{,}9$ |
-| $10^{-4}$ | $10^{-4}$ | $1{,}2\times10^{-3}$ | $28{,}9$ |
-| $10^{-7}$ | $10^{-7}$ | $1{,}2\times10^{-6}$ | $913$ |
+| $0.2$ | $0.16$ | $1.9$ | $0.7$ |
+| $10^{-2}$ | $9.9\times10^{-3}$ | $0.12$ | $2.9$ |
+| $10^{-4}$ | $10^{-4}$ | $1.2\times10^{-3}$ | $28.9$ |
+| $10^{-7}$ | $10^{-7}$ | $1.2\times10^{-6}$ | $913$ |
 
 : Cómo se desploma la información de la celda separada a medida que su probabilidad ajustada
 se acerca a cero, y cómo crece en consecuencia el error estándar. {#tbl-separacion-ee}
@@ -1925,11 +1957,11 @@ c(n = sum(celda), pi_ajustada = mean(p_celda), informacion = sum(w))
 ```
 
 El chunk cuantifica el desastre: esas 12 mujeres tienen una probabilidad ajustada de
-$6{,}4\times10^{-8}$, de modo que **toda la celda aporta una información de
-$7{,}7\times10^{-7}$**, cuando una celda ordinaria aportaría del orden de la unidad. Como el
+$6.4\times10^{-8}$, de modo que **toda la celda aporta una información de
+$7.7\times10^{-7}$**, cuando una celda ordinaria aportaría del orden de la unidad. Como el
 error estándar sale de **invertir** esa información, un número tan próximo a cero es justo lo
 que produce los cientos que imprime la tabla. Y con un error estándar así, el estadístico de
-Wald se desploma: de ahí el $z\approx0{,}02$ y el $p\approx0{,}98$ de un efecto que, lejos de
+Wald se desploma: de ahí el $z\approx0.02$ y el $p\approx0.98$ de un efecto que, lejos de
 ser inexistente, es el más extremo que unos datos pueden mostrar.
 
 La solución es detectarla (`detectseparation::detect_separation`) y, si aparece, estimar por
@@ -1977,7 +2009,7 @@ eventos de no-eventos?—. Este enfoque de evaluación es distinto del que se re
 
 ### Del umbral a la matriz de confusión.
 
-Fijado un umbral $c \in [0,1]$,  por defecto $c=0{,}5$,  clasificamos con una observación en función de su predicción $\hat\pi_i$ con:
+Fijado un umbral $c \in [0,1]$,  por defecto $c=0.5$,  clasificamos con una observación en función de su predicción $\hat\pi_i$ con:
 
 $$\hat y_i=\mathbf{1}[\hat\pi_i\ge c]$$  
 
@@ -2121,7 +2153,7 @@ Alternativa: `caret::confusionMatrix(pred, obs, positive = "Yes")`.
 
 ### ROC y AUC
 
-Todas las métricas anteriores dependen de un **umbral fijo** para clasificar a los sujetos en Yes/No ($c=0{,}5$ por
+Todas las métricas anteriores dependen de un **umbral fijo** para clasificar a los sujetos en Yes/No ($c=0.5$ por
 defecto): cambiar el corte cambia sensibilidad, especificidad y precisión. Para evaluar el
 clasificador **con independencia del umbral** —y, como acabamos de ver, de la prevalencia— se
 recorre el corte de 0 a 1 y se resume el compromiso entre acertar eventos y evitar falsas
@@ -2144,7 +2176,7 @@ El **AUC** (*area under the curve*) es el área bajo esa curva,
 $$
 \text{AUC}=\int_0^1 \text{TPR}\,\mathrm{d}(\text{FPR}),
 $$
-con $0{,}5$ = azar y $1$ = perfecto. Tiene una lectura **probabilística** elegante (equivale al
+con $0.5$ = azar y $1$ = perfecto. Tiene una lectura **probabilística** elegante (equivale al
 estadístico de Mann–Whitney): es la **probabilidad de que el modelo asigne más riesgo a un evento
 que a un no-evento** tomados al azar,
 $$
@@ -2164,13 +2196,13 @@ pROC::ggroc(roc_obj) +
   labs(x = "Especificidad", y = "Sensibilidad")
 ```
 
-El AUC ≈ **0,68**: discriminación **modesta**, coherente con que la fractura depende de
+El AUC ≈ **0.68**: discriminación **modesta**, coherente con que la fractura depende de
 muchos factores no incluidos. Un AUC alto no garantiza buenas probabilidades: eso es
 **calibración**, ya vista en la [Sección 2.6](#sec-u12-diagnostico).
 
 **Elegir el umbral es una decisión, no un dato.** 
 
-El $0{,}5$ por defecto rara vez es óptimo:
+El $0.5$ por defecto rara vez es óptimo:
 depende del **coste relativo** de un falso positivo frente a un falso negativo. Un criterio habitual
 y **simétrico** (trata ambos errores por igual) es el **índice de Youden**,
 $$

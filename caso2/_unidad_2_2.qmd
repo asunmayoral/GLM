@@ -119,7 +119,7 @@ distintas [@christensen2025, cap. 1, §§1.4–1.5; @dunnsmyth2018, §10.4.3]:
 | **Multinomial-producto** | se fija el tamaño de cada grupo y se clasifica dentro | los **marginales de un factor** | multinomiales independientes por fila |
 
 Nuestra cartera es del segundo tipo: tenemos las pólizas que tenemos y las clasificamos. Un estudio que
-hubiera reclutado *a propósito* 1.000 pólizas de cada zona sería del tercero.
+hubiera reclutado *a propósito* 1000 pólizas de cada zona sería del tercero.
 
 El resultado que hace viable todo el capítulo es que **los tres conducen a las mismas estimaciones y a
 los mismos contrastes**, siempre que el modelo log-lineal incluya los términos que fijan los marginales
@@ -243,9 +243,9 @@ anova(m_ind, m_sat, test = "LRT")         # H0: independencia (estadístico G2 d
 chisq.test(tab2, correct = FALSE)         # el chi-cuadrado clásico de Pearson, para comparar
 ```
 
-Se **rechaza la independencia**: la zona y la asistencia están asociadas. El LRT da $G^2 = 11{,}43$
-(columna `Deviance` del `anova()`) y `chisq.test()` da $X^2 = 11{,}44$ (`X-squared`), los dos con los
-2 grados de libertad que contamos sobre la fórmula y con $p\approx 0{,}003$. Son dos versiones del mismo
+Se **rechaza la independencia**: la zona y la asistencia están asociadas. El LRT da $G^2 = 11.43$
+(columna `Deviance` del `anova()`) y `chisq.test()` da $X^2 = 11.44$ (`X-squared`), los dos con los
+2 grados de libertad que contamos sobre la fórmula y con $p\approx 0.003$. Son dos versiones del mismo
 contraste —la de razón de verosimilitudes y la de Pearson— y dan prácticamente lo mismo.
 
 El mismo contraste se puede leer como una **prueba de bondad de ajuste** del modelo de independencia, la
@@ -346,13 +346,13 @@ interacción hablan de asociación:
 
 - **Intercepto** ($e^{\lambda}=883$): la frecuencia esperada de la celda de referencia, pólizas urbanas
   **sin** asistencia ($\mu_{11}$).
-- **Efecto fila**, `zona_circulacionmixta` y `zona_circulacionrural` ($e^{\lambda^{A}_i}=0{,}826$ y
-  $0{,}460$): cuántas pólizas sin asistencia hay en cada zona respecto a la urbana ($\mu_{i1}/\mu_{11}$).
+- **Efecto fila**, `zona_circulacionmixta` y `zona_circulacionrural` ($e^{\lambda^{A}_i}=0.826$ y
+  $0.460$): cuántas pólizas sin asistencia hay en cada zona respecto a la urbana ($\mu_{i1}/\mu_{11}$).
   Recogen el **tamaño** de las zonas, no si la asistencia depende de ellas.
-- **Efecto columna**, `asistenciacon` ($e^{\lambda^{B}_2}=0{,}598$): la **odds** de asistencia en la zona
+- **Efecto columna**, `asistenciacon` ($e^{\lambda^{B}_2}=0.598$): la **odds** de asistencia en la zona
   de referencia, $\mu_{12}/\mu_{11}$.
 - **Interacción**, `zona_circulacionmixta:asistenciacon` y `zona_circulacionrural:asistenciacon`
-  ($e^{\lambda^{AB}_{i2}}=0{,}782$ y $0{,}758$): los **odds ratios** de cada zona frente a la urbana. Son
+  ($e^{\lambda^{AB}_{i2}}=0.782$ y $0.758$): los **odds ratios** de cada zona frente a la urbana. Son
   los únicos términos que miden la asociación entre zona y asistencia.
 
 **Los odds ratios.** Los aislamos, con su intervalo de confianza:
@@ -384,9 +384,9 @@ round(cadena, 3)
 ```
 
 Las probabilidades son las mismas que los porcentajes por fila de la @tbl-u22-pct-fila (el saturado
-reproduce la tabla): un 37,4 % de las pólizas urbanas pide alguna asistencia, frente a un 31,9 % en la
-zona mixta y un 31,2 % en la rural. El OR de la zona mixta, 0,782, dice que sus **odds** son un 22 %
-menores que las de la urbana; su **probabilidad** es un 15 % menor (0,852). No son lo mismo: el OR solo se
+reproduce la tabla): un 37.4 % de las pólizas urbanas pide alguna asistencia, frente a un 31.9 % en la
+zona mixta y un 31.2 % en la rural. El OR de la zona mixta, 0.782, dice que sus **odds** son un 22 %
+menores que las de la urbana; su **probabilidad** es un 15 % menor (0.852). No son lo mismo: el OR solo se
 parece al cociente de probabilidades cuando el suceso es raro, y aquí una de cada tres pólizas pide
 asistencia. Por eso, para comunicar, conviene dar las probabilidades junto al OR.
 
@@ -685,8 +685,8 @@ purrr::map_dfr(names(mods), ~ {
 
 La columna `p_ajuste` contrasta cada modelo **contra el saturado**: un $p$ grande significa que el
 modelo reproduce la tabla razonablemente bien. Con ella descartamos los dos primeros: la independencia
-mutua y la conjunta no ajustan ($p<0{,}01$). Pero **dos** modelos superan el filtro: la independencia
-condicional $[AC][BC]$ ($p=0{,}33$) y la asociación homogénea $[AB][AC][BC]$ ($p=0{,}14$). Fíjate en que
+mutua y la conjunta no ajustan ($p<0.01$). Pero **dos** modelos superan el filtro: la independencia
+condicional $[AC][BC]$ ($p=0.33$) y la asociación homogénea $[AB][AC][BC]$ ($p=0.14$). Fíjate en que
 el `p_ajuste` de la homogénea ya responde a una pregunta: como solo le falta el término de tres vías para
 ser el saturado, su contraste frente al saturado es el contraste de ese término. No rechazarlo dice que
 la asociación entre dos factores **no cambia** con el nivel del tercero.
@@ -700,7 +700,7 @@ comparando los dos modelos **entre sí**, con un LRT ordinario entre anidados:
 anova(mods$condicional, mods$homogenea, test = "LRT")     # ¿hay asociación zona-tipo dada la asistencia?
 ```
 
-Quitar $[AB]$ aumenta la deviance en solo $2{,}10$ con 4 gl ($p=0{,}72$): la asociación zona–tipo **no es
+Quitar $[AB]$ aumenta la deviance en solo $2.10$ con 4 gl ($p=0.72$): la asociación zona–tipo **no es
 necesaria** una vez fijada la asistencia. Nos quedamos con el modelo más sencillo que no se rechaza, la
 **independencia condicional** $[AC][BC]$, que además tiene el menor AIC de la tabla anterior: zona y tipo
 están asociados con la asistencia, pero **no entre sí** una vez fijada la asistencia. Es el grafo
@@ -720,16 +720,16 @@ drop1(mods$condicional, test = "LRT")
 ```
 
 1. **¿Influyen la zona y el tipo, cada uno por su cuenta, en que una póliza pida asistencia?** Sí, los
-   dos. Quitar la asociación zona–asistencia $[AC]$ empeora el ajuste con $p=0{,}003$, y quitar la
-   asociación tipo–asistencia $[BC]$, con $p=0{,}026$. Son las dos aristas que llegan a la asistencia en
-   el grafo. (El LRT de $[AC]$ es el mismo $11{,}43$ que obtuvimos en la tabla de dos vías; no es
+   dos. Quitar la asociación zona–asistencia $[AC]$ empeora el ajuste con $p=0.003$, y quitar la
+   asociación tipo–asistencia $[BC]$, con $p=0.026$. Son las dos aristas que llegan a la asistencia en
+   el grafo. (El LRT de $[AC]$ es el mismo $11.43$ que obtuvimos en la tabla de dos vías; no es
    casualidad, y lo explicamos en [¿Y en nuestra cartera?](#sec-u22-colapsar-cartera)).
 2. **¿Están la zona y el tipo relacionados entre sí?** No una vez fijada la asistencia: el término
-   $[AB]$ sobra ($p=0{,}72$ en el LRT frente a la homogénea). En el grafo, no hay arista entre zona y
+   $[AB]$ sobra ($p=0.72$ en el LRT frente a la homogénea). En el grafo, no hay arista entre zona y
    tipo. Si eso basta para fiarnos de lo que la [Sección 2.1](#sec-u22-dosvias) atribuyó a la zona es
    justo la cuestión de colapsar una tabla, que tratamos a continuación del diagnóstico.
 3. **¿Es la diferencia entre zonas la misma para todos los tipos de vehículo?** Sí: el término de tres
-   vías sobra (el `p_ajuste` de la homogénea, $p=0{,}14$). La asociación zona–asistencia no cambia de un
+   vías sobra (el `p_ajuste` de la homogénea, $p=0.14$). La asociación zona–asistencia no cambia de un
    tipo de vehículo a otro.
 
 Para la dirección, las tres respuestas caben en una frase: *«la zona y el tipo de vehículo influyen,
@@ -755,8 +755,8 @@ El mayor residuo apenas llega a $|2|$ —furgonetas de zona urbana con asistenci
 esperado—, y ninguno se acerca a $|3|$. Con **18 celdas**, esperar algún residuo por
 encima de 2 es lo normal: al 5 % tocaría casi uno por puro azar. Es la misma cautela de siempre con las
 comparaciones múltiples, y la razón de no leer el máximo de una lista como si fuera un contraste. La
-lectura correcta es la conjunta: la deviance residual del modelo, $9{,}10$ con 8 gl, no se aparta del
-saturado ($p=0{,}33$, su `p_ajuste` en la tabla de los cinco modelos) y ningún residuo destaca más de
+lectura correcta es la conjunta: la deviance residual del modelo, $9.10$ con 8 gl, no se aparta del
+saturado ($p=0.33$, su `p_ajuste` en la tabla de los cinco modelos) y ningún residuo destaca más de
 lo que cabe esperar por azar, así que el modelo de independencia condicional describe bien la tabla.
 
 Cuando un modelo **sí** falla, este listado señala **exactamente qué combinación** lo rompe, y eso
@@ -920,9 +920,9 @@ anova(update(m_ucb3, . ~ Admit * Dept + Gender * Dept), m_ucb3, test = "LRT")  #
 
 Las dos tablas cuentan historias opuestas:
 
-- **Dos vías**: OR $=1{,}84$, intervalo $[1{,}62;\ 2{,}09]$, LRT $=93{,}4$ con 1 gl ($p<0{,}001$). Una
+- **Dos vías**: OR $=1.84$, intervalo $[1.62,\ 2.09]$, LRT $=93.4$ con 1 gl ($p<0.001$). Una
   asociación **muy significativa** en contra de las mujeres.
-- **Tres vías**: OR $=0{,}905$, intervalo $[0{,}77;\ 1{,}06]$, LRT $=1{,}53$ con 1 gl ($p=0{,}22$). A
+- **Tres vías**: OR $=0.905$, intervalo $[0.77,\ 1.06]$, LRT $=1.53$ con 1 gl ($p=0.22$). A
   igualdad de departamento, **ninguna** asociación significativa, y si acaso a favor de las mujeres.
 
 **Paso 4. Por qué: el camino a través del departamento.** ¿Cómo puede el conjunto decir lo contrario
@@ -994,11 +994,11 @@ diferencia de Berkeley, añadir el factor **no cambia** la conclusión.
 
 La coincidencia exacta no es casual: es una consecuencia algebraica del modelo condicional, que no
 contiene el término zona × tipo y por eso deja intacta la asociación zona–asistencia al sumar sobre los
-tipos. Por la misma razón, en `drop1()` el LRT del término zona × asistencia daba el mismo $11{,}43$ que el
+tipos. Por la misma razón, en `drop1()` el LRT del término zona × asistencia daba el mismo $11.43$ que el
 contraste de independencia de la tabla de dos vías: sin el término zona × tipo, contrastar la asociación
 zona–asistencia en la tabla de tres vías o en la colapsada es el mismo contraste. Lo que convierte esa
 propiedad del modelo en una conclusión sobre **nuestros datos** es que el modelo ajusta y que el término
-zona × tipo no es necesario ($p=0{,}72$). Por eso la tabla de dos vías de la Sección 2.1 era legítima.
+zona × tipo no es necesario ($p=0.72$). Por eso la tabla de dos vías de la Sección 2.1 era legítima.
 
 ::: {.callout-important}
 ## Cuándo se puede colapsar una tabla
@@ -1144,11 +1144,11 @@ purrr::imap_dfr(m4v, \(m, nombre) {
 Como en la tabla de los cinco modelos, la columna `p_ajuste` es el **contraste de bondad de ajuste de
 cada modelo frente al saturado**: su deviance comparada con una $\chi^2$ con sus gl residuales. Y aquí
 el resultado merece una mirada atenta, porque es **inquietante**: el modelo de orden 1 —independencia
-mutua de los cuatro factores— **no se rechaza** ($p=0{,}079$). Pero con tres factores la independencia
-mutua sí se rechazaba, y con claridad ($p=0{,}0058$). ¿Ha desaparecido la asociación entre zona, tipo y
+mutua de los cuatro factores— **no se rechaza** ($p=0.079$). Pero con tres factores la independencia
+mutua sí se rechazaba, y con claridad ($p=0.0058$). ¿Ha desaparecido la asociación entre zona, tipo y
 asistencia al añadir `uso`?
 
-No: sigue ahí, entera. Lo que ha ocurrido es que la deviance ha subido poco (27,8 → 40,3) y los grados
+No: sigue ahí, entera. Lo que ha ocurrido es que la deviance ha subido poco (27.8 → 40.3) y los grados
 de libertad **mucho** (12 → 29). La misma señal repartida entre más del doble de celdas produce un
 contraste global que ya no la detecta. Añadir un factor no ha cambiado los datos: ha **diluido la
 potencia** del contraste frente al saturado.
@@ -1163,9 +1163,9 @@ Es un LRT entre modelos anidados, que concentra los grados de libertad en los t�
 anova(m4v[[1]], m4v[[2]], m4v[[3]], m4v[[4]], test = "LRT")   # cada fila: ¿aporta el orden siguiente?
 ```
 
-Pasar del orden 1 al 2 sí aporta: las seis dobles reducen la deviance en $26{,}2$ con 13 gl
-($p=0{,}016$). La asociación que el contraste global no veía aparece en cuanto se pregunta por ella. Pasar
-al orden 3 ya no aporta ($p=0{,}39$), ni al saturado ($p=0{,}84$). El orden máximo necesario es **2**.
+Pasar del orden 1 al 2 sí aporta: las seis dobles reducen la deviance en $26.2$ con 13 gl
+($p=0.016$). La asociación que el contraste global no veía aparece en cuanto se pregunta por ella. Pasar
+al orden 3 ya no aporta ($p=0.39$), ni al saturado ($p=0.84$). El orden máximo necesario es **2**.
 
 ### Podar dentro del orden elegido
 
@@ -1179,8 +1179,8 @@ drop1(m4v[[2]], test = "LRT")    # cada doble, quitada de una en una del modelo 
 ```
 
 Hay dos grupos nítidos. Las tres dobles **con la asistencia** —zona, tipo y uso— son necesarias
-($p=0{,}003$, $0{,}027$ y $0{,}035$). Las tres dobles **entre factores explicativos** —zona × tipo, zona ×
-uso y tipo × uso— no aportan nada ($p=0{,}72$, $0{,}96$ y $0{,}67$). Quitamos estas tres a la vez y
+($p=0.003$, $0.027$ y $0.035$). Las tres dobles **entre factores explicativos** —zona × tipo, zona ×
+uso y tipo × uso— no aportan nada ($p=0.72$, $0.96$ y $0.67$). Quitamos estas tres a la vez y
 comprobamos que el modelo resultante se sostiene:
 
 ```{r}
@@ -1196,8 +1196,8 @@ broom::tidy(m4_final, exponentiate = TRUE, conf.int = TRUE) |>
   dplyr::select(term, OR = estimate, conf.low, conf.high)
 ```
 
-Quitar las tres dobles a la vez no empeora el ajuste ($2{,}98$ con 8 gl, $p=0{,}94$); el modelo final
-ajusta frente al saturado ($p=0{,}85$), y cada uno de sus tres términos sigue siendo necesario. El modelo
+Quitar las tres dobles a la vez no empeora el ajuste ($2.98$ con 8 gl, $p=0.94$); el modelo final
+ajusta frente al saturado ($p=0.85$), y cada uno de sus tres términos sigue siendo necesario. El modelo
 elegido es $[AD][BD][CD]$:
 
 $$
@@ -1219,13 +1219,13 @@ dibuja_grafo(list(c("A", "D"), c("B", "D"), c("C", "D")), "[AD][BD][CD]", nodos 
 
 ### Responder a las preguntas
 
-1. **¿Influye el uso en la asistencia?** Sí: el término uso × asistencia es necesario ($p=0{,}034$). Las
-   odds de pedir asistencia son un 24 % mayores en los vehículos comerciales (OR $=1{,}24$, intervalo
-   $[1{,}02;\ 1{,}52]$), a igualdad de zona y tipo.
+1. **¿Influye el uso en la asistencia?** Sí: el término uso × asistencia es necesario ($p=0.034$). Las
+   odds de pedir asistencia son un 24 % mayores en los vehículos comerciales (OR $=1.24$, intervalo
+   $[1.02,\ 1.52]$), a igualdad de zona y tipo.
 2. **¿Se relaciona el uso con la zona o con el tipo?** No: zona × uso y tipo × uso sobran. Uso y tipo no
    se confunden, así que el efecto de cada uno sobre la asistencia es suyo.
 3. **¿Sigue valiendo lo de tres vías?** Sí: zona y tipo se asocian con la asistencia, no entre sí, y los
-   OR de zona son los mismos $0{,}782$ y $0{,}758$ de las secciones anteriores. Añadir el uso, que no se
+   OR de zona son los mismos $0.782$ y $0.758$ de las secciones anteriores. Añadir el uso, que no se
    asocia con la zona, no cambia la asociación zona–asistencia: es la colapsabilidad de la
    [Sección 2.2](#sec-u22-colapsar-cartera), ahora con un factor más.
 4. **¿Hace falta alguna interacción de orden superior?** No: el orden 3 no aporta. Cada asociación con la
@@ -1239,7 +1239,7 @@ lo que encontramos con tres factores, ampliado al cuarto.
 ::: {.callout-warning}
 ## El coste de añadir factores
 Cada factor nuevo multiplica las celdas sin añadir un solo dato. Al pasar de tres a cuatro vías hemos
-duplicado las celdas (18 → 36) repartiendo las mismas ~3.000 pólizas, y los términos de orden alto se
+duplicado las celdas (18 → 36) repartiendo las mismas ~3000 pólizas, y los términos de orden alto se
 estiman sobre recuentos cada vez más pequeños. El resultado típico es que el contraste de la interacción
 de orden superior **no tiene potencia**: no rechazarla no significa que no exista.
 
@@ -1555,12 +1555,12 @@ La lectura conjunta de los tres resultados es lo que responde a la pregunta del 
 
 | Contraste | Deviance | gl | $p$ | Conclusión |
 |:--|--:|--:|--:|:--|
-| Simetría (frente al saturado) | 89,92 | 10 | $6\times 10^{-15}$ | se rechaza |
-| Cuasi-simetría (frente al saturado) | 34,28 | 6 | $6\times 10^{-6}$ | se rechaza |
-| Homogeneidad marginal (simetría frente a cuasi-simetría) | 55,64 | 4 | $2\times 10^{-11}$ | se rechaza |
+| Simetría (frente al saturado) | 89.92 | 10 | $6\times 10^{-15}$ | se rechaza |
+| Cuasi-simetría (frente al saturado) | 34.28 | 6 | $6\times 10^{-6}$ | se rechaza |
+| Homogeneidad marginal (simetría frente a cuasi-simetría) | 55.64 | 4 | $2\times 10^{-11}$ | se rechaza |
 
 Estamos en la última fila de la tabla anterior: **hay deriva**, el reparto de niveles no es el mismo los
-dos años. De los 89,92 puntos de deviance que separan la simetría del saturado, 55,64 se deben a que los
+dos años. De los 89.92 puntos de deviance que separan la simetría del saturado, 55.64 se deben a que los
 marginales han cambiado; es lo que ya mostraban la @tbl-u22-cambio-marg y el mapa de calor, con la
 cartera abriéndose hacia los extremos.
 
@@ -1587,13 +1587,13 @@ c(nivel_medio_previo = round(mean(niv), 3),
 ```
 
 Una deriva positiva significa desplazamiento hacia el *malus*; negativa, hacia el *bonus*. Medida así,
-la deriva es mínima: el nivel medio pasa de 3,007 a 3,026, una diferencia de 0,020 en una escala de 1 a
-5, y las pólizas que empeoran (25,8 %) apenas superan a las que mejoran (22,0 %). Sin embargo, el
+la deriva es mínima: el nivel medio pasa de 3.007 a 3.026, una diferencia de 0.020 en una escala de 1 a
+5, y las pólizas que empeoran (25.8 %) apenas superan a las que mejoran (22.0 %). Sin embargo, el
 contraste de homogeneidad marginal se rechazaba con $p\approx 2\times 10^{-11}$. ¿Cómo encajan las dos
 cosas?
 
 Porque el cambio no está en la media, sino en el **reparto**. La última fila de la @tbl-u22-cambio-marg
-lo muestra: el nivel central pierde 4,8 puntos y los ganan los dos extremos, el 1 (+2,6) y el 5 (+3,7).
+lo muestra: el nivel central pierde 4.8 puntos y los ganan los dos extremos, el 1 (+2.6) y el 5 (+3.7).
 El aumento del nivel 1 tira de la media hacia abajo y el del nivel 5 hacia arriba; los dos efectos se
 compensan, y la media apenas se mueve.
 
@@ -1609,7 +1609,7 @@ tiene dos lecturas:
 
 ::: {.callout-warning}
 ## Significativo no es lo mismo que importante
-Con $n\approx 3.000$, los contrastes detectan cambios pequeños; por eso el $p$-valor no basta y hay que
+Con $n\approx 3000$, los contrastes detectan cambios pequeños; por eso el $p$-valor no basta y hay que
 dar siempre el **tamaño** del efecto. Pero este ejemplo añade una segunda lección: el tamaño depende de
 **cómo se mida**. Un resumen único, como el nivel medio, puede hacer parecer despreciable un cambio que
 existe en el reparto. La medida adecuada es la que responde a la pregunta del negocio —aquí, cuántas
@@ -1657,9 +1657,9 @@ c(beta_asociacion = round(coef(m_unif)["I(i * j)"], 4),
   OR_local        = round(exp(coef(m_unif)["I(i * j)"]), 3))
 ```
 
-El único $\beta$ resume toda la asociación: $e^{\beta}\approx 1{,}32$, el mismo para cualquier par de
+El único $\beta$ resume toda la asociación: $e^{\beta}\approx 1.32$, el mismo para cualquier par de
 niveles adyacentes. Y ese único término mejora enormemente sobre la independencia: la deviance baja de
-1.579,5 a 1.023,8, una ganancia de 555,7 puntos con **1 solo** gl. La asociación ordinal existe y es
+1579.5 a 1023.8, una ganancia de 555.7 puntos con **1 solo** gl. La asociación ordinal existe y es
 fuerte, y basta un parámetro para recogerla en lugar de 16.
 
 Pero ahora hay que hacer la pregunta que de verdad importa —**¿ajusta?**— y no confundirla con la
@@ -1673,9 +1673,9 @@ c(deviance  = round(deviance(m_unif), 1), gl = df.residual(m_unif),
 ```
 
 **No ajusta** lo suficiente (frente al saturado). Si el modelo fuera correcto, su deviance se movería en torno a sus 15 gl y rara vez
-pasaría de 25 (el percentil 95 de la $\chi^2_{15}$); sale 1.023,8. Y no se contradice con el contraste
+pasaría de 25 (el percentil 95 de la $\chi^2_{15}$); sale 1023.8. Y no se contradice con el contraste
 anterior, porque son dos preguntas distintas. El LRT comparaba **dos modelos entre sí**: $\beta$ elimina
-555,7 de los 1.579,5 puntos de falta de ajuste de la independencia, un 35 %. El ajuste absoluto compara
+555.7 de los 1579.5 puntos de falta de ajuste de la independencia, un 35 %. El ajuste absoluto compara
 el modelo **con los datos**: el 65 % restante sigue ahí. Mejorar mucho sobre un punto de partida muy malo
 no basta para llegar a un buen modelo. 
 
@@ -1715,19 +1715,19 @@ broom::tidy(m_mov, exponentiate = TRUE, conf.int = TRUE) |>
   as.data.frame()                  # para ver los tres decimales
 ```
 
-El salto es brutal: la deviance cae de 1.023,8 a 38,7 gastando **un** grado de libertad. La tabla de
+El salto es brutal: la deviance cae de 1023.8 a 38.7 gastando **un** grado de libertad. La tabla de
 efectos separa los dos componentes del movimiento:
 
-- **Inercia**: $e^{\delta}=4{,}10$, con intervalo $[3{,}75;\ 4{,}49]$. Las frecuencias de la diagonal son
-  unas cuatro veces las que daría solo el gradiente; es el efecto que domina, y el 52,2 % de las pólizas
+- **Inercia**: $e^{\delta}=4.10$, con intervalo $[3.75,\ 4.49]$. Las frecuencias de la diagonal son
+  unas cuatro veces las que daría solo el gradiente; es el efecto que domina, y el 52.2 % de las pólizas
   está en esa diagonal.
-- **Gradiente** (asociación uniforme): $e^{\beta}=1{,}031$, con intervalo $[1{,}004;\ 1{,}058]$ y
-  $p=0{,}024$. Sigue siendo significativo, pero es pequeño: sin la inercia valía 1,317, porque el modelo
+- **Gradiente** (asociación uniforme): $e^{\beta}=1.031$, con intervalo $[1.004,\ 1.058]$ y
+  $p=0.024$. Sigue siendo significativo, pero es pequeño: sin la inercia valía 1.317, porque el modelo
   uniforme cargaba sobre $\beta$ el pico de la diagonal que no podía explicar de otro modo.
 
-¿Ajusta ya? Todavía no del todo: frente al saturado, su deviance de 38,7 con 14 gl supera el percentil 95
-de la $\chi^2_{14}$ (23,7), y el contraste da $p=0{,}0004$. Queda, sobre todo, el flujo de un paso hacia
-arriba que tampoco recogía la cuasi-simetría. Pero el modelo ha eliminado el 97,6 % de la falta de ajuste
+¿Ajusta ya? Todavía no del todo: frente al saturado, su deviance de 38.7 con 14 gl supera el percentil 95
+de la $\chi^2_{14}$ (23.7), y el contraste da $p=0.0004$. Queda, sobre todo, el flujo de un paso hacia
+arriba que tampoco recogía la cuasi-simetría. Pero el modelo ha eliminado el 97.6 % de la falta de ajuste
 de la independencia con solo dos parámetros de asociación, y lo que queda es un rasgo concreto e
 identificado, no un desajuste general. La conclusión sustantiva se invierte respecto a lo que sugería el análisis anterior: **el
 rasgo dominante de esta tabla no es la asociación ordinal, sino la inercia**. Lo que explica el
@@ -1735,7 +1735,7 @@ bonus-malus es, sobre todo, que la mayoría de las pólizas **se quedan donde es
 entre niveles vecinos es un efecto de segundo orden.
 
 Y así hay que contárselo a la dirección: no «los niveles contiguos están asociados», sino «algo más de
-la **mitad** de las pólizas (el 52,2 %) no se mueve de nivel de un año a otro». Es un mensaje distinto y conduce a
+la **mitad** de las pólizas (el 52.2 %) no se mueve de nivel de un año a otro». Es un mensaje distinto y conduce a
 decisiones distintas —por ejemplo, sobre cada cuánto merece la pena reevaluar—.
 
 Cuidado con añadir «y las que se mueven dan saltos cortos». Que los saltos de un nivel abunden más que
@@ -1759,7 +1759,7 @@ c(media_subir_un_nivel = round(mean(pct[cuad$sube1 == 1]), 1),
   media_otros_cambios  = round(mean(pct[cuad$i != cuad$j & cuad$sube1 == 0]), 1))
 ```
 
-Subir un nivel recoge de media el 15,4 % de cada fila; cualquier otro cambio, el 11,0 %. Es el empujón de
+Subir un nivel recoge de media el 15.4 % de cada fila; cualquier otro cambio, el 11.0 %. Es el empujón de
 los siniestros que vimos en la cuasi-simetría. El modelo que lo recoge sustituye el gradiente por un
 indicador de esas cuatro celdas:
 
@@ -1797,15 +1797,15 @@ broom::tidy(m_sube, exponentiate = TRUE, conf.int = TRUE) |>
 ```
 
 Ahora sí: **ajusta**. Con los mismos 14 gl que el modelo de inercia y gradiente, la deviance baja de
-38,65 a 14,39, el contraste frente al saturado da $p=0{,}42$ y el AIC pasa de 220,3 a 196,0. Ni el
-gradiente ($p=0{,}91$) ni un término de bajar un nivel
-($p=0{,}19$) aportan nada: el «gradiente» que habíamos visto era, en realidad, este paso hacia arriba.
+38.65 a 14.39, el contraste frente al saturado da $p=0.42$ y el AIC pasa de 220.3 a 196.0. Ni el
+gradiente ($p=0.91$) ni un término de bajar un nivel
+($p=0.19$) aportan nada: el «gradiente» que habíamos visto era, en realidad, este paso hacia arriba.
 
 Los dos parámetros se leen directamente:
 
-- **Inercia**: $e^{\delta}=4{,}76$, intervalo $[4{,}40;\ 5{,}16]$. Quedarse en el nivel es casi cinco
+- **Inercia**: $e^{\delta}=4.76$, intervalo $[4.40,\ 5.16]$. Quedarse en el nivel es casi cinco
   veces más frecuente que un cambio cualquiera.
-- **Paso hacia arriba**: $e^{\gamma}=1{,}41$, intervalo $[1{,}25;\ 1{,}59]$. Subir exactamente un nivel es
+- **Paso hacia arriba**: $e^{\gamma}=1.41$, intervalo $[1.25,\ 1.59]$. Subir exactamente un nivel es
   un 41 % más frecuente que cualquier otro cambio.
 
 **Diagnóstico: los residuos.** Un $p$ de ajuste alto dice que el modelo no se aparta de la tabla en su
@@ -1823,8 +1823,8 @@ c(celdas_mas_de_2 = sum(abs(r_sube) > 2), max_abs = max(abs(r_sube)))
 ```
 
 El patrón ha desaparecido: los residuos de subir un nivel, que con el modelo anterior eran todos
-positivos (de 1,40 a 3,26), ahora oscilan en torno a cero (de $-0{,}99$ a $0{,}91$). De las 25 celdas, solo
-una pasa de $|2|$, la de bajar del nivel 2 al 1 ($-2{,}35$), y ninguna se acerca a $|3|$. Con 25 celdas,
+positivos (de 1.40 a 3.26), ahora oscilan en torno a cero (de $-0.99$ a $0.91$). De las 25 celdas, solo
+una pasa de $|2|$, la de bajar del nivel 2 al 1 ($-2.35$), y ninguna se acerca a $|3|$. Con 25 celdas,
 que una pase de 2 por azar es lo esperable (en torno a una de cada veinte), y no hay ningún grupo de
 celdas con un mismo signo que sugiera otro patrón.
 
@@ -1882,7 +1882,7 @@ $b=1,\dots,B$:
    $$\big(N^{(b)}_{i1},\dots,N^{(b)}_{i5}\big)\sim\text{Multinomial}\big(n^{\text{act}}_i;\
    P^{(b)}(1\mid i),\dots,P^{(b)}(5\mid i)\big),\qquad N^{(b)}_j=\sum_i N^{(b)}_{ij}.$$
 
-Con las $B$ réplicas, los percentiles 2,5 y 97,5 de $\{E^{(b)}_j\}$ dan el **intervalo de confianza**
+Con las $B$ réplicas, los percentiles 2.5 y 97.5 de $\{E^{(b)}_j\}$ dan el **intervalo de confianza**
 del número **esperado** de pólizas en el nivel $j$, y los de $\{N^{(b)}_j\}$ el **intervalo de
 predicción** del número que habrá **realmente**. La estimación puntual es $n^{\text{próx}}_j$, calculada
 con $\hat{\boldsymbol\theta}$.

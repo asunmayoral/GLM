@@ -357,7 +357,7 @@ lineal ordinaria, `lm(log(y / t) ~ ...)`. También da efectos multiplicativos, y
 estima lo mismo que el GLM, y con conteos tiene tres problemas [@ohara2010]:
 
 - **Los ceros.** $\log 0$ no existe, y en un conteo los ceros abundan. El parche habitual,
-  $\log(y+c)$, obliga a elegir una constante $c$ arbitraria (¿1?, ¿0,5?).
+  $\log(y+c)$, obliga a elegir una constante $c$ arbitraria (¿1?, ¿0.5?).
 - **Media frente a mediana.** El GLM modela $\log \operatorname{E}[Y]$, el logaritmo de la **media**; la
   regresión sobre el logaritmo modela $\operatorname{E}[\log Y]$, la media de los logaritmos. Por la
   desigualdad de Jensen, $\operatorname{E}[\log Y] \le \log \operatorname{E}[Y]$: exponenciar ese ajuste
@@ -387,7 +387,7 @@ tibble::tibble(termino     = names(coef(m_tasa))[-1],
 ```
 
 Dos de cada tres pólizas no tienen ninguna asistencia, y eso se nota. Los efectos de la regresión sobre
-el logaritmo quedan **mucho más cerca de 1** que los IRR (la moto pasa de 1,25 a 1,06 o 1,09): con tantos
+el logaritmo quedan **mucho más cerca de 1** que los IRR (la moto pasa de 1.25 a 1.06 o 1.09): con tantos
 ceros, $\log(y+c)$ está dominado por la constante y aplasta las diferencias. Y cambian con $c$, que es una
 elección arbitraria. Al volver a la escala de los conteos, el problema de Jensen aparece en la media
 predicha ($\hat y = t\,e^{\hat\eta} - c$):
@@ -684,7 +684,7 @@ conteo de media baja: ven patrones donde no los hay.
 
 ### Residuos simulados (DHARMa)
 
-La salida son los **residuos cuantil** [@dunnsmyth1996], que `DHARMa` [@hartig2022] obtiene por
+La salida son los **residuos cuantil** [@dunnsmyth1996], que `DHARMa` [@hartig2026] obtiene por
 simulación. Para cada póliza se simulan muchas respuestas del modelo ajustado (aquí, Poisson con media
 $\hat\mu_i$), y el residuo es la **posición** del valor observado dentro de esas simulaciones: la
 proporción de simulaciones por debajo de él, con un sorteo uniforme para repartir los empates, que en

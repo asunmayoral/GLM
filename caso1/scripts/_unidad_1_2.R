@@ -225,7 +225,9 @@ escala <- function(y, ylab, titulo, y0)
     scale_color_manual(values = col) +
     labs(x = "predictor x", y = ylab, color = NULL, title = titulo)
 
-p1 <- escala("log-odds", "log-odds (η)", "η = β₀ + βx  ·  recta (pendiente β)", 0)
+p1 <- escala("log-odds", "log-odds (η)",
+             # plotmath: el subíndice Unicode de β₀ no existe en la fuente del gráfico
+             expression(bold(eta == beta[0] + beta * x ~ "·  recta (pendiente" ~ beta * ")")), 0)
 p2 <- escala("odds",     "odds = e^η",   "odds  ·  multiplica e^β por unidad",            1)
 p3 <- escala("prob",     "P(evento)",    "probabilidad  ·  forma en S",        0.5) +
         scale_y_continuous(limits = c(0, 1), labels = scales::label_percent())
@@ -251,7 +253,7 @@ exp(cbind(OR = coef(fit_glm), confint(fit_glm)))   # OR e IC: exponencial del IC
 # Mismos datos, distinta escala del coeficiente según el enlace
 map_dfr(ajustes, \(m) tidy(m) |> select(term, estimate), .id = "enlace") |>
   pivot_wider(names_from = enlace, values_from = estimate) |>
-  mutate(razon_logit_probit = logit / probit)   # ~1,6-1,8 (salvo intercepto)
+  mutate(razon_logit_probit = logit / probit)   # ~1.6-1.8 (salvo intercepto)
 
 # -----------------------------------------------------------------------------
 # [u12-misma-mujer]
@@ -337,7 +339,7 @@ pA <- ggplot(grid, aes(age, eta, color = priorfrac, fill = priorfrac)) +
   geom_line(data = grid_obs, linewidth = 1.2) +          # rango observado
   labs(x = "Edad (años)", y = "log-odds (η)",
        color = "Fractura previa", fill = "Fractura previa",
-       title = "Escala log-odds", subtitle = "rectas paralelas (separación ≈ 0,84)")
+       title = "Escala log-odds", subtitle = "rectas paralelas (separación ≈ 0.84)")
 
 pB <- ggplot(grid, aes(age, p_hat, color = priorfrac, fill = priorfrac)) +
   annotate("rect", xmin = rango_obs[1], xmax = rango_obs[2],
@@ -440,7 +442,7 @@ list(perfil = confint(fit_glm),
 #     > 2.5 Inferencia, selección y bondad de ajuste
 #       > Inferencia sobre los coeficientes
 # -----------------------------------------------------------------------------
-caida_critica <- qchisq(0.95, df = 1) / 2   # 1,92 = medio cuantil chi-cuadrado, 1 gl
+caida_critica <- qchisq(0.95, df = 1) / 2   # 1.92 = medio cuantil chi-cuadrado, 1 gl
 
 b_hat  <- unname(coef(fit_glm)["priorfracYes"])
 ee_hat <- unname(sqrt(diag(vcov(fit_glm)))["priorfracYes"])
@@ -460,7 +462,7 @@ rejilla <- tibble(b = seq(b_hat - 4 * ee_hat, b_hat + 4 * ee_hat, length.out = 1
   mutate(perfil = l_max - map_dbl(b, logver_perfil),
          wald   = (b - b_hat)^2 / (2 * ee_hat^2))
 
-# Pasos 3 y 4: las raíces de «la caída vale exactamente 1,92». La tolerancia por
+# Pasos 3 y 4: las raíces de «la caída vale exactamente 1.92». La tolerancia por
 # defecto de uniroot es ~1e-4, del orden de la cifra que queremos comparar con
 # confint(): hay que apretarla.
 abscisa_corte <- function(desde, hasta) {
@@ -593,7 +595,25 @@ formula(MASS::stepAIC(global, direction = "both", trace = FALSE))  # ganador de 
 #       > Residuos
 # -----------------------------------------------------------------------------
 sim <- DHARMa::simulateResiduals(fit_glm, plot = FALSE)
+set.seed(SEMILLA_CURSO)   # el test de outliers del panel usa bootstrap: la semilla permite reproducirlo abajo
 plot(sim)
+
+# -----------------------------------------------------------------------------
+# [u12-dharma-tests]
+#   2 · Formulación de los GLM: estimación, inferencia, interpretación y evaluación
+#     > 2.6 Diagnóstico y validación
+#       > Residuos
+# -----------------------------------------------------------------------------
+set.seed(SEMILLA_CURSO)   # la misma semilla que antes de plot(sim): reproduce el bootstrap del panel
+t_out  <- DHARMa::testOutliers(sim, plot = FALSE)
+t_unif <- DHARMa::testUniformity(sim, plot = FALSE)
+t_disp <- DHARMa::testDispersion(sim, plot = FALSE)
+tibble(contraste   = c("Uniformidad (KS)", "Dispersión", "Outliers"),
+       estadistico = unname(c(t_unif$statistic, t_disp$statistic, t_out$statistic)),
+       p           = c(t_unif$p.value, t_disp$p.value, t_out$p.value)) |>
+  mutate(across(where(is.numeric), \(v) round(v, 3)))
+# formato español para citar los p en el texto
+fmt <- function(v) format(round(v, 2), decimal.mark = ".", nsmall = 2)
 
 # -----------------------------------------------------------------------------
 # [u12-hosmer]

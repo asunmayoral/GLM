@@ -158,6 +158,27 @@ avg_comparisons(fit_ind, variables = "priorfrac")                 # el mismo AME
 comparisons(fit_bin, variables = "priorfrac")   # el contraste celda a celda: no es constante
 
 # -----------------------------------------------------------------------------
+# [tbl-u13-ame-vs-or]
+#   3 · Extensión de la respuesta binaria: binomial y politómica
+#     > 3.1 Del dato individual al agrupado: respuesta binomial
+#       > Ajuste e interpretación
+# -----------------------------------------------------------------------------
+# Los seis perfiles de las demás covariables, cada uno en sus dos mundos contrafactuales
+perfiles  <- distinct(glow_agg, momfrac, raterisk) |> arrange(momfrac, raterisk)
+con_prior <- function(nivel) mutate(perfiles, priorfrac = factor(nivel, levels = levels(glow_agg$priorfrac)))
+odds_de   <- function(p) p / (1 - p)
+tabla_or <- perfiles |>
+  mutate(p_no  = predict(fit_bin, newdata = con_prior("No"),  type = "response"),
+         p_yes = predict(fit_bin, newdata = con_prior("Yes"), type = "response"),
+         salto = p_yes - p_no,                    # lo que devuelve comparisons() en cada perfil
+         OR    = odds_de(p_yes) / odds_de(p_no))  # constante: el modelo es lineal en el logit
+knitr::kable(tabla_or, digits = c(0, 0, 3, 3, 3, 2), format.args = list(decimal.mark = "."),
+             col.names = c("`momfrac`", "`raterisk`", "$\\hat\\pi$ con `priorfrac = No`",
+                           "$\\hat\\pi$ con `priorfrac = Yes`", "Salto absoluto", "Cociente de odds"))
+# formato español, en puntos porcentuales, para citar los saltos en el texto
+pp <- function(v) format(round(100 * v, 1), decimal.mark = ".", nsmall = 1)
+
+# -----------------------------------------------------------------------------
 # [(sin etiqueta)]
 #   3 · Extensión de la respuesta binaria: binomial y politómica
 #     > 3.1 Del dato individual al agrupado: respuesta binomial

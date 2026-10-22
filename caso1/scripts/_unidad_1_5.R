@@ -298,8 +298,8 @@ library(lmtest)
 lrtest(m_log, m_frail)   # estadístico Lambda (su p, contra la chi2_1, sin corregir)
 
 library(varTestnlme)
-varCompTest(m_frail, m_log)   # p corregido por la frontera (H0: sigma_u^2 = 0)
-
+y el corregido,
+$`r sci(vc_frail$p.value["pvalue.lowerbound"])`$.
 # -----------------------------------------------------------------------------
 # [u15-calibracion]
 #   5 · Supervivencia: el tiempo hasta el evento como GLM

@@ -544,13 +544,13 @@ broom::tidy(m_hom, exponentiate = TRUE, conf.int = TRUE) |>
 ```
 
 Y aquí la realidad nos regala una lección mejor que cualquier ejemplo de manual: sale
-$p \approx 0{,}057$. Justo al borde, cuando sabemos con **certeza** que en esta cartera `sexo` es ruido
-sorteado de forma independiente. Con la regla mecánica del 0,05 nos habríamos salvado por menos de siete
-milésimas; si hubiera salido 0,047, habríamos «descubierto» un proxy inexistente.
+$p \approx 0.057$. Justo al borde, cuando sabemos con **certeza** que en esta cartera `sexo` es ruido
+sorteado de forma independiente. Con la regla mecánica del 0.05 nos habríamos salvado por menos de siete
+milésimas; si hubiera salido 0.047, habríamos «descubierto» un proxy inexistente.
 
 Y aún hay más, mirando el tamaño en lugar del contraste global: el segundo odds ratio —
 `sexo × furgoneta`— tiene un intervalo de confianza que **no contiene el 1** (aproximadamente
-$[1{,}01;\ 1{,}58]$). Es decir: un término **individualmente «significativo»** en una asociación que por
+$[1.01,\ 1.58]$). Es decir: un término **individualmente «significativo»** en una asociación que por
 construcción **no existe**.
 
 ::: {.callout-warning}
@@ -559,16 +559,16 @@ Lo que enseña este resultado no es cómo está la cartera, sino cómo **no** ha
 
 - **La hipótesis nula es cierta y aun así hemos obtenido un $p$ casi significativo y un intervalo que
   excluye el 1.** No es mala suerte excepcional: bajo $H_0$ el $p$-valor se distribuye **uniforme**, así
-  que un valor por debajo de 0,10 ocurre una vez de cada diez, y aquí además hay **dos** términos de
+  que un valor por debajo de 0.10 ocurre una vez de cada diez, y aquí además hay **dos** términos de
   interacción, cada uno con su oportunidad de fallar.
 - **Con un umbral rígido, la conclusión depende del ruido**, no del fenómeno.
-- **Un intervalo que roza el 1 por su extremo inferior no es evidencia de nada.** $[1{,}01;\ 1{,}58]$ es
+- **Un intervalo que roza el 1 por su extremo inferior no es evidencia de nada.** $[1.01,\ 1.58]$ es
   compatible con «ningún efecto» y con «efecto moderado»: lo que dice es que **no hay información
   suficiente**, no que haya asociación.
 
 En el estudio de caso vas a contrastar **varias** covariables permitidas contra `sexo`. Con ocho
 covariables contrastadas al 5 %, la probabilidad de al menos una alerta falsa ya ronda una de cada tres
-($1-0{,}95^8\approx 0{,}34$), y más si cada covariable aporta varios términos. No llames proxy a nada sin mirar la
+($1-0.95^8\approx 0.34$), y más si cada covariable aporta varios términos. No llames proxy a nada sin mirar la
 **magnitud**, sin comprobar que el intervalo está claramente lejos del 1 y sin tener en cuenta cuántos
 contrastes has hecho. Aquí tienes la verdad del DGP para comprobarlo; con datos reales no la tendrás, y
 esa es exactamente la razón de ser prudente.

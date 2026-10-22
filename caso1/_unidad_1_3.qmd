@@ -117,7 +117,7 @@ tres covariables. Conviene, eso sí, leer cada barra junto al **tamaño de su ce
 las tres celdas basales (`priorfrac = No`, `momfrac = No`) concentran la mayor parte de los datos
 ($n = 127, 124, 76$), mientras que las que acumulan ambos antecedentes son **diminutas**
 ($n = 2, 6, 10$). Sus proporciones son muy inestables —la celda `Less` con ambos antecedentes y $n=2$
-cae a 0, y su análoga en `Same` con $n=6$ salta a 0,5—: es **ruido de muestreo** que no conviene
+cae a 0, y su análoga en `Same` con $n=6$ salta a 0.5—: es **ruido de muestreo** que no conviene
 sobreinterpretar y que, además, es justo el que degrada la aproximación $\chi^2$ del contraste de
 bondad de ajuste cuando hay celdas pequeñas (la cautela de la sección [Bondad de ajuste](#sec-u13-gof-binomial)).
 
@@ -137,8 +137,6 @@ fit_ind <- glm(fracture ~ priorfrac + momfrac + raterisk,
 cbind(agrupado = coef(fit_bin), individual = coef(fit_ind))   # idénticos
 ```
 
-La **interpretación de los coeficientes** (en términos de odds ratios, [Sección 2.3](#sec-u12-interpretacion))
-y 
 
 Un coeficiente sin intervalo dice poco, así que pedimos los **odds ratios con su IC**. `broom` lo
 resuelve en una llamada: `exponentiate = TRUE` pasa a la escala de odds y `conf.int = TRUE` añade el
@@ -159,7 +157,7 @@ sin más: que el IC del OR **contenga 1** es exactamente que el del coeficiente 
 
 Y merece la pena detenerse en `momfrac`, porque enseña algo que la [Sección 2.5](#sec-u12-inferencia)
 anticipaba en abstracto: su intervalo de perfil **contiene 1**, mientras que su $p$-valor de Wald (en la tabla)
-queda **por debajo de 0,05**. Los dos criterios se contradicen, justo en el borde. No es un error de
+queda **por debajo de 0.05**. Los dos criterios se contradicen, justo en el borde. No es un error de
 cálculo, sino la diferencia entre ambos métodos hecha visible: el de Wald supone simetría en la
 escala del coeficiente y se deteriora cerca de los límites, mientras que el de perfil invierte la
 razón de verosimilitudes y no necesita ese supuesto. Cuando discrepan, **manda el perfil**. Es
@@ -197,21 +195,29 @@ cada una, construye **dos mundos contrafactuales** —esa misma fila con `priorf
 y resta. Cada fila de su salida es, pues, la diferencia entre las dos probabilidades que el modelo
 asigna a un mismo perfil según tenga o no fractura previa:
 
-| Perfil (`momfrac`, `raterisk`) | $\hat\pi$ con `priorfrac = No` | $\hat\pi$ con `priorfrac = Yes` | Salto **absoluto** | Cociente de **odds** |
-|---|---:|---:|---:|---:|
-| `No`, `Less`     | 0,133 | 0,291 | **+0,157** | 2,66 |
-| `No`, `Same`     | 0,197 | 0,395 | **+0,198** | 2,66 |
-| `No`, `Greater`  | 0,232 | 0,445 | **+0,214** | 2,66 |
-| `Yes`, `Less`    | 0,215 | 0,422 | **+0,207** | 2,66 |
-| `Yes`, `Same`    | 0,303 | 0,537 | **+0,234** | 2,66 |
-| `Yes`, `Greater` | 0,349 | 0,588 | **+0,239** | 2,66 |
-
-: Lo que calcula `comparisons()`, perfil a perfil. La columna «salto absoluto» es exactamente su salida; el salto en probabilidad **cambia** según el punto de partida, mientras que el odds ratio **no**. {#tbl-u13-ame-vs-or}
+```{r}
+#| label: tbl-u13-ame-vs-or
+#| tbl-cap: "Lo que calcula `comparisons()`, perfil a perfil. La columna «salto absoluto» es exactamente su salida; el salto en probabilidad **cambia** según el punto de partida, mientras que el odds ratio **no**."
+# Los seis perfiles de las demás covariables, cada uno en sus dos mundos contrafactuales
+perfiles  <- distinct(glow_agg, momfrac, raterisk) |> arrange(momfrac, raterisk)
+con_prior <- function(nivel) mutate(perfiles, priorfrac = factor(nivel, levels = levels(glow_agg$priorfrac)))
+odds_de   <- function(p) p / (1 - p)
+tabla_or <- perfiles |>
+  mutate(p_no  = predict(fit_bin, newdata = con_prior("No"),  type = "response"),
+         p_yes = predict(fit_bin, newdata = con_prior("Yes"), type = "response"),
+         salto = p_yes - p_no,                    # lo que devuelve comparisons() en cada perfil
+         OR    = odds_de(p_yes) / odds_de(p_no))  # constante: el modelo es lineal en el logit
+knitr::kable(tabla_or, digits = c(0, 0, 3, 3, 3, 2), format.args = list(decimal.mark = "."),
+             col.names = c("`momfrac`", "`raterisk`", "$\\hat\\pi$ con `priorfrac = No`",
+                           "$\\hat\\pi$ con `priorfrac = Yes`", "Salto absoluto", "Cociente de odds"))
+# formato español, en puntos porcentuales, para citar los saltos en el texto
+pp <- function(v) format(round(100 * v, 1), decimal.mark = ".", nsmall = 1)
+```
 
 Las **doce** filas que imprime `comparisons()` son estos **seis** valores repetidos dos veces: el
 contraste depende solo de `momfrac` y `raterisk`, así que las dos celdas que comparten esos factores
-dan el mismo salto, tenga cada una el `priorfrac` que tenga. Y el salto va de **15,7** a **23,9**
-puntos, mientras que el odds ratio vale 2,66 en las seis: el modelo impone un efecto **constante en
+dan el mismo salto, tenga cada una el `priorfrac` que tenga. Y el salto va de **`r pp(min(tabla_or$salto))`** a **`r pp(max(tabla_or$salto))`**
+puntos, mientras que el odds ratio vale `r format(round(tabla_or$OR[1], 2), decimal.mark = ".")` en las seis: el modelo impone un efecto **constante en
 la escala del logit**, y al traducirlo a probabilidad cada perfil recibe un salto distinto según
 dónde arranque.
 
@@ -229,19 +235,19 @@ y luego resta: calcula la probabilidad predicha poniendo **todas** las celdas en
 avg_predictions(fit_bin, variables = "priorfrac", wts = "total")
 ```
 
-Salen **0,200** y **0,393**, las dos probabilidades medias que la frase anterior estaba restando. Y
+Salen **0.200** y **0.393**, las dos probabilidades medias que la frase anterior estaba restando. Y
 no es casualidad que su diferencia sea el AME: promediar las diferencias y restar los promedios son
 la **misma** operación,
 
 $$\frac{1}{n}\sum_i m_i\bigl[\hat\pi_i(\texttt{Yes})-\hat\pi_i(\texttt{No})\bigr]
 =\frac{1}{n}\sum_i m_i\hat\pi_i(\texttt{Yes})-\frac{1}{n}\sum_i m_i\hat\pi_i(\texttt{No}).$$
 
-Restando las cifras impresas sale 0,193 en lugar de 0,194, pero es solo el redondeo a tres cifras de
+Restando las cifras impresas sale 0.193 en lugar de 0.194, pero es solo el redondeo a tres cifras de
 cada una; con todos los decimales las dos rutas coinciden. Así, `avg_comparisons()` da el efecto y
 `avg_predictions()` da los **dos niveles** entre los que ocurre, que es lo que hace comunicable la
 cifra.
 
-El OR de 2,66 cuantifica la **fuerza** del efecto en la escala en la que el modelo es lineal, y el AME de 0,19 su
+El OR de 2.66 cuantifica la **fuerza** del efecto en la escala en la que el modelo es lineal, y el AME de 0.19 su
 **impacto absoluto** en la escala en la que se toman las decisiones, esto es, en probabilidades. El OR no depende del punto de partida; el AME sí, y por eso hay que promediarlo: es justo lo que enseña la @tbl-u13-ame-vs-or.
 
 :::: {.callout-tip}
@@ -481,8 +487,8 @@ c(referencia_cook = 4 / nrow(diag_bin))   # 4/k: nrow() cuenta CELDAS, no mujere
 
 En GLOW, el panel izquierdo de la @fig-u13-residuos muestra los **12 perfiles** con todos los
 residuos estandarizados dentro de la banda de ±2 y repartidos sin patrón alrededor de 0
-(rango −1,25 a +1,41). En el panel derecho, las distancias de Cook son pequeñas: la mayor (celda 9) es 0,326, por debajo
-de la referencia orientativa $4/k=4/12=0{,}333$ y muy lejos del umbral clásico $D\gtrsim 1$. Las
+(rango −1.25 a +1.41). En el panel derecho, las distancias de Cook son pequeñas: la mayor (celda 9) es 0.326, por debajo
+de la referencia orientativa $4/k=4/12=0.333$ y muy lejos del umbral clásico $D\gtrsim 1$. Las
 celdas 1–3 presentan un Cook moderado por su peso en el ajuste, no por desajuste.
 
 Los dos paneles coinciden: no hay indicio de mal ajuste en ninguna celda —todos los residuos dentro de la
@@ -513,7 +519,7 @@ influencia potencial sobre **todos** los ajustados, no solo el suyo.
 
 En OLS el leverage depende solo de $X$. En un GLM entra $W$, y en el binomial/logístico
 $w_i=m_i\hat\pi_i(1-\hat\pi_i)$, de modo que $h_{ii}$ mezcla dos ingredientes: cuánta
-**información** aporta la celda —crece con $m_i$ y con  $\hat\pi_i$ aproximándose a $0{,}5$— y cuán **extremo** es su perfil de covariables -la parte dependiente de $X$.
+**información** aporta la celda —crece con $m_i$ y con  $\hat\pi_i$ aproximándose a $0.5$— y cuán **extremo** es su perfil de covariables -la parte dependiente de $X$.
 
 La distancia de Cook refuerza aún más este efecto: si el ajuste pasa por ese punto es porque ese punto lo dicta, y quitarlo liberaría a la recta para irse a otro sitio. No basta con un residuo bajo, sino con un residuo bajo con leveraje bajo, esto es, un punto que el modelo acierta sin estar obligado a ello. 
 
@@ -522,7 +528,7 @@ leverage **medio** vale por tanto $\bar h = p/k$, y de ahí sale la regla clási
 las observaciones con $h_{ii}$ mayor que **dos o tres veces** ese promedio [@fox2016]—. Ojo, es un
 criterio sobre el **leverage**, no sobre la distancia de Cook, que tiene los suyos ($D_i>1$ y
 $D_i>4/k$). Y conviene saber que está pensado para $n\gg p$: aquí, con $p=5$ y $k=12$, el promedio es
-$0{,}42$, dos veces es $0{,}83$ y tres veces sería $1{,}25$ —imposible, porque $h_{ii}\le1$—, de modo
+$0.42$, dos veces es $0.83$ y tres veces sería $1.25$ —imposible, porque $h_{ii}\le1$—, de modo
 que la regla se queda sin margen y no marca ninguna celda.
 :::
 
@@ -565,7 +571,7 @@ identificable, la alternativa estructural pasa por incluir **efectos aleatorios*
 sum(residuals(fit_bin, type = "pearson")^2) / df.residual(fit_bin)
 ```
 
-En GLOW, $\hat\phi\approx 0{,}58$: **por debajo de 1**, así que **no hay rastro de sobredispersión**
+En GLOW, $\hat\phi\approx 0.58$: **por debajo de 1**, así que **no hay rastro de sobredispersión**
 —el binomial es de sobra suficiente— y el quasi-binomial no haría falta. Lo mostramos igualmente como
 herramienta para cuando $\hat\phi$ supere con claridad la unidad.
 
@@ -683,7 +689,7 @@ ggroc(roc_bin) +
   labs(x = "Especificidad", y = "Sensibilidad")
 ```
 
-El AUC es **0,664** en los dos ajustes —idéntico hasta el sexto decimal— y las puntuaciones
+El AUC es **0.664** en los dos ajustes —idéntico hasta el sexto decimal— y las puntuaciones
 distintas son exactamente **12**, una por celda, como anticipábamos.
 
 Los dos AUC coinciden, y a estas alturas ya no sorprende: es la **segunda** vez que ocurre lo mismo,
@@ -700,14 +706,14 @@ los perfiles** —dos mujeres del mismo perfil son indistinguibles para el model
 covariable **continua**, como la edad en la Unidad 2, la mejore: multiplica las puntuaciones
 disponibles.
 
-El valor en sí, **0,664**, indica una discriminación **modesta** —por encima del 0,5 del azar, lejos
-del 0,8 que se suele considerar bueno—, del mismo orden que el que obtuvo el modelo con `age` y
+El valor en sí, **0.664**, indica una discriminación **modesta** —por encima del 0.5 del azar, lejos
+del 0.8 que se suele considerar bueno—, del mismo orden que el que obtuvo el modelo con `age` y
 `priorfrac` en la [Sección 2.7](#sec-u12-evaluacion). Estas
 covariables ordenan algo mejor que el azar, pero la fractura depende de mucho más de lo que hay en
 el modelo.
 
 **Con un umbral fijo, la matriz de confusión.** La ROC recorre todos los umbrales; fijar uno —el
-0,5 habitual— devuelve un clasificador. Y aquí ni siquiera hace falta desplegar la tabla: `yardstick`
+0.5 habitual— devuelve un clasificador. Y aquí ni siquiera hace falta desplegar la tabla: `yardstick`
 admite **pesos de caso**, de modo que cada fila entra con su número de ensayos. Es la misma llamada
 de la [Sección 2.7](#sec-u12-evaluacion), con un argumento más.
 
@@ -727,17 +733,17 @@ metric_set(accuracy, sensitivity, specificity)(
 ```
 
 El resultado es elocuente. Solo dos celdas —las dos de `priorfrac = Yes`, `momfrac = Yes` y riesgo
-percibido `Same` o `Greater`— superan el 0,5, así que el modelo predice fractura para **16** mujeres
+percibido `Same` o `Greater`— superan el 0.5, así que el modelo predice fractura para **16** mujeres
 de las 500, y acierta en **8**: justo la mitad. Gana, pues, tantos aciertos como pierde, y el acierto
-global queda **exactamente** en el 0,75 que se obtendría prediciendo «No» a todas. La **sensibilidad**
+global queda **exactamente** en el 0.75 que se obtendría prediciendo «No» a todas. La **sensibilidad**
 es del **6 %**.
 
-No contradice al AUC. El 0,664 dice que el modelo **ordena** algo mejor que el azar; la matriz dice
-que ese orden no basta para que ninguna probabilidad ajustada llegue a 0,5 salvo en dos perfiles. Es
-el aviso de la [Sección 2.7](#sec-u12-evaluacion) repetido: con un evento minoritario, el umbral 0,5
+No contradice al AUC. El 0.664 dice que el modelo **ordena** algo mejor que el azar; la matriz dice
+que ese orden no basta para que ninguna probabilidad ajustada llegue a 0.5 salvo en dos perfiles. Es
+el aviso de la [Sección 2.7](#sec-u12-evaluacion) repetido: con un evento minoritario, el umbral 0.5
 rara vez es el que interesa.
 
-**Elegir el umbral: el índice de Youden.** Si 0,5 no es el corte adecuado, la ROC ofrece todos los
+**Elegir el umbral: el índice de Youden.** Si 0.5 no es el corte adecuado, la ROC ofrece todos los
 demás, y el **índice de Youden** ([Sección 2.7](#sec-u12-evaluacion)) elige uno:
 
 $$J(c)=\text{sensibilidad}(c)+\text{especificidad}(c)-1,$$
@@ -754,7 +760,7 @@ umbral <- coords(roc_bin, "best", best.method = "youden",
 umbral
 ```
 
-Con ese corte en lugar del 0,5, el clasificador cambia por completo:
+Con ese corte en lugar del 0.5, el clasificador cambia por completo:
 
 ```{r}
 #| label: u13-confusion-youden
@@ -771,19 +777,19 @@ metric_set(accuracy, sensitivity, specificity)(
   eval_youden, truth = obs, estimate = pred, case_weights = n, event_level = "second")
 ```
 
-**El corte óptimo está en 0,261**, muy por debajo del 0,5, y con él el clasificador cambia de
+**El corte óptimo está en 0.261**, muy por debajo del 0.5, y con él el clasificador cambia de
 carácter: la sensibilidad pasa del **6 %** al **53 %** y la especificidad baja del 98 % al **74 %**.
 En términos de celdas, se declaran positivas **ocho** de las doce en lugar de dos: entran todos los
-perfiles con probabilidad ajustada por encima de 0,26 y solo quedan fuera los cuatro más benignos.
+perfiles con probabilidad ajustada por encima de 0.26 y solo quedan fuera los cuatro más benignos.
 
-**Y hay una lección que conviene no pasar por alto: el acierto global baja**, de 0,750 a **0,690**,
-por debajo incluso del 0,75 que se lograría prediciendo «No» a todas. No es un fallo del método.
+**Y hay una lección que conviene no pasar por alto: el acierto global baja**, de 0.750 a **0.690**,
+por debajo incluso del 0.75 que se lograría prediciendo «No» a todas. No es un fallo del método.
 Youden maximiza sensibilidad **más** especificidad, **no** el acierto, y con un evento minoritario
 las dos cosas tiran en direcciones distintas: las 58 fracturas que ahora se detectan —de 8 a 66— se
 pagan con 88 falsas alarmas más —de 8 a 96—. Como hay tres veces más mujeres sin fractura que con
 ella, ese intercambio destruye aciertos brutos aunque mejore el equilibrio entre los dos errores.
 
-Ninguno de los dos umbrales es «el correcto». El de 0,5 acierta más veces pero es inútil, porque deja
+Ninguno de los dos umbrales es «el correcto». El de 0.5 acierta más veces pero es inútil, porque deja
 sin detectar el **94 %** de las fracturas; el de Youden detecta la mitad a costa de alarmar sobre una
 de cada cuatro mujeres sanas. La elección **no es una cuestión estadística**: depende de lo que cueste
 no detectar una fractura frente a lo que cueste una alarma en falso. Youden responde bajo un supuesto
@@ -974,11 +980,11 @@ aumentar el predictor $j$; $\beta_{jk}<0$, al revés—. Al exponenciar se obtie
 relativo**: $e^{\beta_{jk}}$ es el factor por el que se multiplican las odds de pertenecer a $k$ **en
 lugar de a `Same`**, manteniendo el resto constante.
 
-**En GLOW el motor es la fractura previa.** Tener una multiplica por **2,23** las odds de percibirse
-en **mayor** riesgo frente a «igual» y, a la vez, las reduce a **0,65** (−35 %) para percibirse en
+**En GLOW el motor es la fractura previa.** Tener una multiplica por **2.23** las odds de percibirse
+en **mayor** riesgo frente a «igual» y, a la vez, las reduce a **0.65** (−35 %) para percibirse en
 **menor** riesgo: empuja la percepción fuera de `Same` y hacia `Greater`, clínicamente coherente y
 buena señal de que el modelo capta algo real. La **edad**, en cambio, apenas influye: sus dos odds
-ratios rondan 1 (**1,01** para `Less`, **0,98** para `Greater`).
+ratios rondan 1 (**1.01** para `Less`, **0.98** para `Greater`).
 
 Los dos coeficientes de `age` apuntan, eso sí, **en el mismo sentido**: el positivo empuja `Less`
 frente a `Same`, y el negativo empuja `Same` frente a `Greater`; leídos juntos, con los años la
@@ -994,7 +1000,7 @@ infrarrepresentación de las más frágiles entre las mayores—, pero la hipót
 clínicamente relevante: quien no se percibe en riesgo difícilmente se protege.
 
 Conviene, eso sí, no adelantarse: la evidencia es **floja**. Ninguno de los dos coeficientes alcanza
-el 0,05 ($p=0{,}42$ para `Less`, $p=0{,}087$ para `Greater`), y esos $p$-valores **y** los intervalos
+el 0.05 ($p=0.42$ para `Less`, $p=0.087$ para `Greater`), y esos $p$-valores **y** los intervalos
 de la tabla son de **Wald**, porque `nnet::multinom` solo ofrece esa vía. No es una limitación del
 método sino del motor: el mismo modelo ajustado con `VGAM::vglm()` admite intervalos **por perfil**
 (véase el callout). Comprobados sobre este ajuste, ambos coinciden en la práctica, de modo que la
@@ -1004,7 +1010,7 @@ quedarse en el modelo lo decidiremos más abajo, con los criterios de selección
 
 Dos cautelas al leer la tabla. La primera: todas son odds **relativas a `Same`**, nunca frente al
 conjunto de las demás categorías; es siempre una comparación **por pares contra la referencia**. La
-segunda: los interceptos (OR de **0,49** para `Less` y **2,93** para `Greater`) corresponden a
+segunda: los interceptos (OR de **0.49** para `Less` y **2.93** para `Greater`) corresponden a
 `age = 0`, una extrapolación sin sentido sustantivo —para leer el modelo en probabilidad y a edades
 reales, la @fig-u13-pred-nominal—.
 
@@ -1016,9 +1022,9 @@ $$\log\frac{\Pr(Y=a)}{\Pr(Y=b)}=\eta_a-\eta_b,$$
 cualquier par de categorías sale de **restar sus predictores lineales**, y al hacerlo los términos de
 la referencia se cancelan. Para `priorfrac`:
 
-$$0{,}802-(-0{,}424)=1{,}226 \quad\Longrightarrow\quad e^{1{,}226}=3{,}41,$$
+$$0.802-(-0.424)=1.226 \quad\Longrightarrow\quad e^{1.226}=3.41,$$
 
-o, lo que es lo mismo, $2{,}23/0{,}65$. Una mujer con fractura previa tiene **3,4 veces** las odds de
+o, lo que es lo mismo, $2.23/0.65$. Una mujer con fractura previa tiene **3.4 veces** las odds de
 percibirse en riesgo **mayor** frente a **menor**, comparada con una sin ella. Que ese contraste no
 aparezca impreso no significa que el modelo no lo estime: la referencia solo decide cuáles se
 imprimen.
@@ -1027,8 +1033,8 @@ Con los coeficientes estimados, la **probabilidad predicha** sale de combinar lo
 lineales (con $\mathbf{I}_{\text{priorfrac}}$ y $\text{age}$ en años):
 
 \begin{eqnarray}
-\eta_{\text{Less}}   & =& -0{,}71 + 0{,}010\,\text{age} - 0{,}42\cdot\mathbf{I}_{\text{priorfrac}},\\
-\eta_{\text{Greater}} & =&  1{,}08 - 0{,}023\,\text{age} + 0{,}80\cdot\mathbf{I}_{\text{priorfrac}}.
+\eta_{\text{Less}}   & =& -0.71 + 0.010\,\text{age} - 0.42\cdot\mathbf{I}_{\text{priorfrac}},\\
+\eta_{\text{Greater}} & =&  1.08 - 0.023\,\text{age} + 0.80\cdot\mathbf{I}_{\text{priorfrac}}.
 \end{eqnarray}
 
 
@@ -1095,7 +1101,7 @@ estimación puntual, no un efecto establecido. Lo retomamos al interpretar los e
 
 **Entre paneles, la fractura previa.** Desplaza las tres curvas **a la vez** y en el mismo sentido:
 sube `Greater`, baja `Less` y deja `Same` como categoría de paso, del orden de veinte puntos de
-probabilidad en `Greater` y a todas las edades, acorde con los odds ratios de 2,23 y 0,65. Pero las
+probabilidad en `Greater` y a todas las edades, acorde con los odds ratios de 2.23 y 0.65. Pero las
 curvas homólogas **no se desplazan en paralelo**: en la escala del logit el efecto de `priorfrac` es
 constante, y en probabilidad la brecha se estrecha con la edad en `Greater` mientras se ensancha
 ligeramente en `Less`. Es la no linealidad del enlace, la misma razón por la que el AME no coincide
@@ -1119,7 +1125,7 @@ bajarlas a las tres; solo puede **traspasar** probabilidad de unas categorías a
 
 De ahí que el efecto de un predictor ya **no se pueda resumir en una cifra**: hay que contar el
 reparto entero. Y conviene ver que el binomial no era distinto, solo más pequeño. Allí también había
-**dos** efectos —$+0{,}194$ sobre `Yes` y $-0{,}194$ sobre `No`—, pero con $K=2$ el segundo es
+**dos** efectos —$+0.194$ sobre `Yes` y $-0.194$ sobre `No`—, pero con $K=2$ el segundo es
 exactamente menos el primero, así que no aporta nada y el software imprime uno solo. Siempre hubo $K$
 efectos; con dos categorías bastaba uno para determinarlos todos. Lo que aquí parece una complicación
 nueva es, en realidad, lo que la redundancia del caso binario mantenía oculto.
@@ -1143,20 +1149,20 @@ avg_slopes(m_nom) |>
   summarise(suma_efectos = sum(estimate))
 ```
 
-**Cómo se lee la tabla.** La **fractura previa** es el efecto nítido: suma **+21,7 puntos** de
-probabilidad a `Greater` y resta **−16,3** a `Less`, ambos con intervalos que excluyen el cero. La
+**Cómo se lee la tabla.** La **fractura previa** es el efecto nítido: suma **+21.7 puntos** de
+probabilidad a `Greater` y resta **−16.3** a `Less`, ambos con intervalos que excluyen el cero. La
 lectura correcta es la de un **contraste entre dos escenarios sobre las mismas mujeres**: si ninguna
 de las 500 tuviera fractura previa, frente a si todas la tuvieran, la proporción que se percibe en
-mayor riesgo subiría **21,7 puntos**. Y como el total sigue siendo 1, esos puntos tienen que salir de
-las otras dos categorías: **16,3** de `Less` y **5,4** de `Same`. De ahí que el trasvase venga sobre
+mayor riesgo subiría **21.7 puntos**. Y como el total sigue siendo 1, esos puntos tienen que salir de
+las otras dos categorías: **16.3** de `Less` y **5.4** de `Same`. De ahí que el trasvase venga sobre
 todo de `Less`, que aporta tres cuartas partes del desplazamiento.
 
-El tercer efecto, el de `Same`, **no es distinguible de cero** (su intervalo va de −15,3 a +4,6): la
+El tercer efecto, el de `Same`, **no es distinguible de cero** (su intervalo va de −15.3 a +4.6): la
 fractura previa no vacía la categoría central, traslada masa de un extremo al otro pasándole por
 encima.
 
-La **edad** es un efecto más débil y estimado con menos precisión. Resta **−0,54** puntos por año a
-`Greater` —el único de los tres cuyo intervalo excluye el cero— y suma **+0,43** a `Less`. Por año
+La **edad** es un efecto más débil y estimado con menos precisión. Resta **−0.54** puntos por año a
+`Greater` —el único de los tres cuyo intervalo excluye el cero— y suma **+0.43** a `Less`. Por año
 son cantidades minúsculas; acumuladas sobre el recorrido observado explican el cruce de curvas de la
 @fig-u13-pred-nominal, pero conviene no sobreinterpretarlas: dos de los tres efectos de la edad son
 compatibles con cero.
@@ -1261,7 +1267,7 @@ m_nulo <- multinom(relevel(raterisk, ref = "Same") ~ 1, data = glow, trace = FAL
 lmtest::lrtest(m_nulo, m_nom)
 ```
 
-El estadístico vale $\chi^2=21{,}88$ con **4** grados de libertad —los dos bloques por las dos
+El estadístico vale $\chi^2=21.88$ con **4** grados de libertad —los dos bloques por las dos
 covariables, tal como anticipaba la fórmula $(K-1)\,p$—. Un $p$ **bajo** ($0.0002<0.05$) dice que el modelo aporta información frente a no usar ninguna covariable. Si no se supera el umbral mínimo de significatividad, no tiene sentido seguir interpretando coeficientes. Si se supera,
 queda abierta la pregunta de **cuáles** de las covariables lo sostienen y si algunas de ellas son prescindibles, que es la *selección de variables* que se aborda a continuación.
 
@@ -1424,7 +1430,7 @@ c(acierto     = accuracy(eval_nom, truth = obs, estimate = pred)$.estimate,
   kappa       = kap(eval_nom, truth = obs, estimate = pred)$.estimate)
 ```
 
-**El resultado es aleccionador.** El modelo acierta el **42,0 %** de las veces, frente al **37,2 %**
+**El resultado es aleccionador.** El modelo acierta el **42.0 %** de las veces, frente al **37.2 %**
 que se lograría adjudicando «Same» a todas: gana **menos de cinco puntos** sobre no usar modelo
 alguno. Y la tabla muestra de dónde sale esa pobreza: el modelo predice `Same` para **291** de las
 500 mujeres, cuando en realidad solo son 186. Se refugia en la categoría central, que es justo la
@@ -1434,7 +1440,7 @@ solo el **28 %** de los `Less` y el **32 %** de los `Greater`.
 **Las dos tablas relativas no responden a la misma pregunta.** Por columna leemos la
 **sensibilidad**: de las mujeres que de verdad son `Greater`, cuántas detecta el modelo. Por fila, la
 **precisión**: de las que el modelo llama `Greater`, cuántas lo son de verdad. Y el contraste es
-revelador, porque la precisión sale casi plana —**43,8 %** en `Less`, **40,2 %** en `Same`, **45,2 %**
+revelador, porque la precisión sale casi plana —**43.8 %** en `Less`, **40.2 %** en `Same`, **45.2 %**
 en `Greater`— frente a una sensibilidad que va del 28 % al 63 %. El modelo compra sensibilidad en
 `Same` a base de predecirla en exceso, y lo paga en fiabilidad: la categoría que más predice es
 justo aquella cuya predicción menos vale. Ninguna clase se predice **bien**; una sola se predice
@@ -1444,7 +1450,7 @@ La $\kappa$ de Cohen resume todo esto en un número, descontando del acierto el 
 azar si predicción y respuesta fueran independientes conservando ambas distribuciones marginales,
 $p_e=\sum_k \hat\pi_k\hat\sigma_k$:
 $$\kappa=\frac{\text{acierto}-p_e}{1-p_e}.$$
-Aquí vale **0,111**, en una escala donde $0$ es el azar y $1$ el acierto perfecto.
+Aquí vale **0.111**, en una escala donde $0$ es el azar y $1$ el acierto perfecto.
 
 Es un recordatorio útil: un modelo puede tener coeficientes significativos, superar el contraste
 omnibus y estar bien calibrado, y aun así ser un **clasificador mediocre**. Significación y
@@ -1592,19 +1598,19 @@ columna `coef.type` separa: dos `coefficient` —los efectos $\beta$ de `age` y 
 segunda llamada exponencia **solo los efectos**, y por eso filtra por `coef.type == "coefficient"`:
 un umbral no es un odds ratio.
 
-**Los efectos.** La **fractura previa** multiplica por **2,46** las odds de percibirse en una
-categoría más alta, con intervalo **[1,65; 3,68]**, que deja el 1 lejos. Y es **un único** odds
+**Los efectos.** La **fractura previa** multiplica por **2.46** las odds de percibirse en una
+categoría más alta, con intervalo **[1.65, 3.68]**, que deja el 1 lejos. Y es **un único** odds
 ratio, común a los dos cortes: ahí está la parsimonia frente al nominal, que necesitaba uno por
-categoría. La **edad** va en sentido contrario, **0,977** por año, con intervalo **[0,959; 0,996]**
+categoría. La **edad** va en sentido contrario, **0.977** por año, con intervalo **[0.959, 0.996]**
 que excluye el 1 por poco. Por año es minúscula; acumulada sobre diez años el factor es
-$e^{10\beta_1}\approx0{,}80$, una reducción del 20 % en las odds de percibirse en riesgo alto.
+$e^{10\beta_1}\approx0.80$, una reducción del 20 % en las odds de percibirse en riesgo alto.
 
 Un aviso sobre la significación: `polr` **no imprime $p$-valores**, y la columna `statistic` es el
-valor $t$. Aquí vale **4,41** para `priorfrac` y **−2,34** para `age`, ambos más allá de
-$\pm1{,}96$, de acuerdo con lo que dicen los intervalos.
+valor $t$. Aquí vale **4.41** para `priorfrac` y **−2.34** para `age`, ambos más allá de
+$\pm1.96$, de acuerdo con lo que dicen los intervalos.
 
-**Los umbrales**, en cambio, no se interpretan sustantivamente: $\theta_{\text{Less}}\approx-2{,}06$ y
-$\theta_{\text{Same}}\approx-0{,}44$ son los logits de $\Pr(Y\le k)$ cuando $\eta=0$, es decir, en una
+**Los umbrales**, en cambio, no se interpretan sustantivamente: $\theta_{\text{Less}}\approx-2.06$ y
+$\theta_{\text{Same}}\approx-0.44$ son los logits de $\Pr(Y\le k)$ cuando $\eta=0$, es decir, en una
 mujer de **edad cero** sin fractura previa —una extrapolación sin sentido clínico, igual que los
 interceptos del nominal—. De ellos importa que estén **ordenados**, $\theta_{\text{Less}}<\theta_{\text{Same}}$,
 que es lo que garantiza probabilidades no negativas, y que su separación fija la anchura de la
@@ -1668,14 +1674,14 @@ avg_slopes(m_ord) |>
   summarise(suma_efectos = sum(estimate))
 ```
 
-**Cómo se lee la tabla.** La **fractura previa** suma **+19,7 puntos** de probabilidad a `Greater` y
-resta **−17,9** a `Less`, ambos con intervalos que excluyen el cero; a `Same` le quita **1,8**, sin
+**Cómo se lee la tabla.** La **fractura previa** suma **+19.7 puntos** de probabilidad a `Greater` y
+resta **−17.9** a `Less`, ambos con intervalos que excluyen el cero; a `Same` le quita **1.8**, sin
 distinguirse de cero. El trasvase va, pues, de un extremo al otro **pasando por encima** de la
-categoría central. Y las cifras se parecen mucho a las del nominal (**+21,7** y **−16,3**): resumir
+categoría central. Y las cifras se parecen mucho a las del nominal (**+21.7** y **−16.3**): resumir
 los dos bloques de efectos en uno solo no falsea la lectura.
 
-La **edad** repite la misma forma, en pequeño: **+0,49** puntos por año a `Less`, **−0,46** a
-`Greater` y **−0,03** a `Same`. Aquí sí hay una diferencia con el nominal, y es informativa: ahora
+La **edad** repite la misma forma, en pequeño: **+0.49** puntos por año a `Less`, **−0.46** a
+`Greater` y **−0.03** a `Same`. Aquí sí hay una diferencia con el nominal, y es informativa: ahora
 **los dos extremos** excluyen el cero, cuando en el nominal solo lo hacía `Greater`. Es la precisión
 que se gana al estimar **un** $\beta$ en lugar de dos, cuando el supuesto que lo permite se sostiene. 
 
@@ -1795,11 +1801,11 @@ en ambos casos: sin covariables, los dos se limitan a reproducir las tres propor
 `raterisk`, de modo que su log-verosimilitud coincide y los dos estadísticos son directamente
 comparables.
 
-**Y la economía sale a cuenta.** El estadístico vale $\chi^2=21{,}04$ con 2 gl
-($p=2{,}7\times10^{-5}$), frente a los $21{,}88$ con 4 gl del nominal: el ordinal recoge el **96 %**
+**Y la economía sale a cuenta.** El estadístico vale $\chi^2=21.04$ con 2 gl
+($p=2.7\times10^{-5}$), frente a los $21.88$ con 4 gl del nominal: el ordinal recoge el **96 %**
 del estadístico con **la mitad** de los grados de libertad. La columna `LogLik` lo enseña por dentro.
-El nulo repite exactamente el $-547{,}0166$ que ya imprimía el contraste del nominal —es el mismo
-modelo—, y el completo llega a $-536{,}50$, apenas **cuatro décimas** por detrás del $-536{,}07$ que
+El nulo repite exactamente el $-547.0166$ que ya imprimía el contraste del nominal —es el mismo
+modelo—, y el completo llega a $-536.50$, apenas **cuatro décimas** por detrás del $-536.07$ que
 alcanzaba el nominal con dos coeficientes más. Esas cuatro décimas son todo lo que cuesta imponer la
 proporcionalidad de odds; el apartado siguiente las pone en la balanza de AIC y BIC.
 
@@ -1840,15 +1846,15 @@ discrepancias
 
 La tabla resume el contraste. En **ajuste**, el ordinal emplea **4 parámetros** (dos umbrales + dos
 pendientes) frente a los **6** del nominal (dos bloques de tres), y con casi la misma verosimilitud
-—$-536{,}50$ frente a $-536{,}07$— gana en los **dos** criterios: AIC **1081,0** frente a 1084,1 y BIC
-**1097,9** frente a 1109,4. La proporcionalidad de odds sale, pues, barata. En
+—$-536.50$ frente a $-536.07$— gana en los **dos** criterios: AIC **1081.0** frente a 1084.1 y BIC
+**1097.9** frente a 1109.4. La proporcionalidad de odds sale, pues, barata. En
 **efectos**, la diferencia estructural es nítida: el nominal estima **un OR por categoría** y el
-ordinal los **colapsa en uno solo, acumulado**. Para `priorfrac`, el nominal da **0,65** sobre `Less`
-y **2,23** sobre `Greater` (frente a `Same`): leídos en el orden, ambos empujan **hacia arriba** (más
-`Greater`, menos `Less`), justo lo que resume el OR acumulado **2,46**. Con `age` la estructura se
-repite en **sentido contrario**: **1,01** sobre `Less` y **0,98** sobre `Greater`, es decir, `Less`
+ordinal los **colapsa en uno solo, acumulado**. Para `priorfrac`, el nominal da **0.65** sobre `Less`
+y **2.23** sobre `Greater` (frente a `Same`): leídos en el orden, ambos empujan **hacia arriba** (más
+`Greater`, menos `Less`), justo lo que resume el OR acumulado **2.46**. Con `age` la estructura se
+repite en **sentido contrario**: **1.01** sobre `Less` y **0.98** sobre `Greater`, es decir, `Less`
 gana terreno y `Greater` lo pierde, de modo que ambos empujan **hacia abajo** en el orden; el OR
-acumulado **0,98** lo resume. Como las dos lecturas nominales son **coherentes con el orden** en
+acumulado **0.98** lo resume. Como las dos lecturas nominales son **coherentes con el orden** en
 ambas covariables, el resumen ordinal es fiel y
 la @fig-u13-pred-ordinal se parece a la @fig-u13-pred-nominal; si un OR claramente $>1$ conviviera con
 otro $<1$ **incoherentes** con el orden, el ordinal estaría forzando —y el **test de líneas
@@ -1889,8 +1895,8 @@ rbind(corte_1            = coef(c1)[-1],
       `-beta (ordinal)`  = -coef(m_ord))
 ```
 
-**En GLOW las tres filas se parecen.** Para `age`, los dos cortes dan **0,019** y **0,027** frente al
-**0,023** del ordinal; para `priorfrac`, **−0,79** y **−0,99** frente a **−0,90**. En ambos casos el
+**En GLOW las tres filas se parecen.** Para `age`, los dos cortes dan **0.019** y **0.027** frente al
+**0.023** del ordinal; para `priorfrac`, **−0.79** y **−0.99** frente a **−0.90**. En ambos casos el
 valor común del ordinal cae **entre** los dos cortes, que es exactamente lo que cabe esperar si el
 supuesto se sostiene: el ordinal está promediando dos efectos que ya eran parecidos. Ninguna
 covariable cambia de signo ni de orden de magnitud entre cortes.
@@ -1927,9 +1933,9 @@ nominal_test(m_clm)   # LRT: relaja la proporcionalidad término a término
 ```
 
 **Los dos contrastes coinciden, y con holgura.** El de Brant no rechaza ni globalmente
-—$X^2=0{,}78$ con 2 gl, $p=0{,}68$— ni variable a variable: $p=0{,}53$ para `age` y $p=0{,}43$ para
-`priorfrac`. El LRT de `nominal_test()` dice lo mismo con estadísticos aún menores: $0{,}19$
-($p=0{,}66$) para `age` y $0{,}39$ ($p=0{,}53$) para `priorfrac`. No hay ni rastro de violación.
+—$X^2=0.78$ con 2 gl, $p=0.68$— ni variable a variable: $p=0.53$ para `age` y $p=0.43$ para
+`priorfrac`. El LRT de `nominal_test()` dice lo mismo con estadísticos aún menores: $0.19$
+($p=0.66$) para `age` y $0.39$ ($p=0.53$) para `priorfrac`. No hay ni rastro de violación.
 
 Que ambos concuerden es tranquilizador, porque son contrastes de naturaleza distinta —Wald y razón
 de verosimilitudes— y podrían haber discrepado, como discreparon en §3.1 el $p$ de Wald y el
@@ -2154,8 +2160,8 @@ generalhoslem::lipsitz.test(m_ord)                          # agrupa por riesgo 
 generalhoslem::pulkrob.chisq(m_ord, catvars = "priorfrac")  # agrupa por patrón categórico
 ```
 
-**Ninguno de los dos detecta problemas.** El de Lipsitz da $\text{LR}=8{,}32$ con 9 gl y
-$p=0{,}50$; el de Pulkstenis–Robinson, $X^2=1{,}71$ con 4 gl y $p=0{,}79$. Concuerdan, pues, con lo
+**Ninguno de los dos detecta problemas.** El de Lipsitz da $\text{LR}=8.32$ con 9 gl y
+$p=0.50$; el de Pulkstenis–Robinson, $X^2=1.71$ con 4 gl y $p=0.79$. Concuerdan, pues, con lo
 que muestran los tres paneles.
 
 Con la cautela de siempre —**no rechazar no demuestra el ajuste**— y con un motivo extra para no
@@ -2180,7 +2186,7 @@ $$\operatorname{logit}\bigl[\Pr(Y>\texttt{Less})\bigr]=\eta-\theta_L,\qquad
 
 Abreviando $s_k\equiv\Pr(Y>k)$ —el **score del corte** $k$: $s_{\texttt{Less}}$ es la probabilidad
 de **no** ser `Less` y $s_{\texttt{Same}}$ la de ser `Greater`—, uno es el otro trasladado una
-constante, la distancia entre umbrales, aquí $1{,}62$:
+constante, la distancia entre umbrales, aquí $1.62$:
 
 $$\operatorname{logit}(s_{\texttt{Same}})=\operatorname{logit}(s_{\texttt{Less}})-(\theta_S-\theta_L).$$
 
@@ -2208,13 +2214,13 @@ ggroc(list(`Y > Less` = roc_c1, `Y > Same` = roc_c2)) +
   labs(x = "Especificidad", y = "Sensibilidad", colour = "Corte")
 ```
 
-Que el ordenamiento sea único es la pieza que hacía falta, porque permite leer los dos AUC —**0,589**
-en el corte `Less` y **0,624** en el corte `Same`— como lo que son: **una única capacidad de ordenar,
+Que el ordenamiento sea único es la pieza que hacía falta, porque permite leer los dos AUC —**0.589**
+en el corte `Less` y **0.624** en el corte `Same`— como lo que son: **una única capacidad de ordenar,
 evaluada contra dos preguntas distintas**. El primer corte enfrenta a las `Less` contra el resto; el
 segundo, a las `Greater` contra el resto: dos particiones de la muestra, con prevalencias distintas, y
 un mismo orden acierta más o menos según dónde caiga la frontera.
 
-Ambos valores son **modestos** —lejos del 0,8 convencional, y no muy por encima del 0,5 del azar—:
+Ambos valores son **modestos** —lejos del 0.8 convencional, y no muy por encima del 0.5 del azar—:
 la edad y la fractura previa ordenan la percepción de riesgo algo mejor que una moneda, poco más.
 
 De ahí dos consecuencias. Ninguno de los dos números es «el AUC del modelo», así que no tiene sentido
@@ -2229,7 +2235,7 @@ como medio acierto—.
 $$c=\frac{\#\{\text{pares concordantes}\}+\tfrac12\,\#\{\text{empates en el score}\}}
 {\#\{\text{pares comparables}\}}$$
 
-Vale $0{,}5$ si el modelo ordena al azar y $1$ si lo hace perfectamente, igual que el AUC — del que
+Vale $0.5$ si el modelo ordena al azar y $1$ si lo hace perfectamente, igual que el AUC — del que
 es la generalización exacta: con $K=2$ las dos cantidades coinciden. No necesita paquete: sale de
 comparar todos los pares.
 
@@ -2252,20 +2258,20 @@ c(concordancia = (sum(concordante & comparable) + 0.5 * sum(empate & comparable)
 Hmisc::rcorr.cens(s_same, y_num)[c("C Index", "Relevant Pairs", "Concordant")]
 ```
 
-El resultado, **0,594**, se lee directamente: de cada cien pares de mujeres en categorías distintas,
+El resultado, **0.594**, se lee directamente: de cada cien pares de mujeres en categorías distintas,
 el modelo coloca por delante a la correcta en unas **59**, frente a las 50 que acertaría ordenando al
 azar.
 
-La comprobación cuadra: `C Index` devuelve **0,59427**, el mismo número. Una salvedad de lectura:
+La comprobación cuadra: `C Index` devuelve **0.59427**, el mismo número. Una salvedad de lectura:
 `Relevant Pairs` imprime **165 906**, el doble de los
 82 953 pares que cuenta `sum(comparable)`, porque `rcorr.cens` recorre cada par en las **dos**
 direcciones. El factor 2 aparece igual arriba y abajo, así que el índice no cambia; y el `Concordant`
-que imprime ya incluye el medio punto de los empates, porque $98\,593/165\,906=0{,}59427$.
+que imprime ya incluye el medio punto de los empates, porque $98\,593/165\,906=0.59427$.
 
 
 **Y el acierto como clasificador.** Igual que en el nominal, asignar a cada mujer su categoría
 **más probable** permite cruzar predicho con observado. Aquí la comparación es doble: contra el
-**37,2 %** de la clase modal, que es el suelo, y contra el **42,0 %** que alcanzó el nominal —porque
+**37.2 %** de la clase modal, que es el suelo, y contra el **42.0 %** que alcanzó el nominal —porque
 el ordinal usa **la mitad de coeficientes**, y conviene saber si esa parsimonia se paga en acierto.
 
 ```{r}
@@ -2281,7 +2287,7 @@ c(acierto     = accuracy(eval_ord, truth = obs, estimate = pred)$.estimate,
   clase_modal = max(prop.table(table(glow_ord$raterisk))))
 ```
 
-**El ordinal acierta el 39,8 %**: dos puntos por debajo del nominal y apenas dos y medio por encima
+**El ordinal acierta el 39.8 %**: dos puntos por debajo del nominal y apenas dos y medio por encima
 del suelo de la clase modal. La matriz dice de dónde viene la diferencia: el ordinal **se refugia
 menos** en la categoría central —predice `Same` para **253** mujeres, frente a las **291** del
 nominal—, lo que le hace acertar bastantes más `Less` (**61** frente a 46) a costa de acertar menos
@@ -2294,8 +2300,8 @@ traslada al acierto clasificatorio**. Son preguntas distintas —«¿qué modelo
 con menos piezas?» frente a «¿cuál acierta más veces la categoría?»— y aquí responden distinto,
 igual que discreparon AIC y BIC ante la edad en el nominal.
 
-Y todo **concuerda**: concordancia de **0,594**, un acierto del **39,8 %** que apenas despega del
-**37,2 %** de la clase modal, y la franja estrechísima de probabilidades predichas para `Same`. Tres
+Y todo **concuerda**: concordancia de **0.594**, un acierto del **39.8 %** que apenas despega del
+**37.2 %** de la clase modal, y la franja estrechísima de probabilidades predichas para `Same`. Tres
 medidas distintas —ordenación, clasificación y calibración— apuntando a lo mismo: la señal existe, el
 omnibus la detecta con claridad, pero es **débil** para predecir a nivel individual. Que un efecto
 sea real no lo hace grande.

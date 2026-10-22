@@ -74,7 +74,7 @@ m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + 
 c(deviance = round(deviance(m_pois), 1), gl = df.residual(m_pois))
 ```
 
-La deviance residual, 6.465,4 con 3.063 gl, **duplica de sobra** sus grados de libertad: si la Poisson
+La deviance residual, 6465.4 con 3063 gl, **duplica de sobra** sus grados de libertad: si la Poisson
 describiera bien los datos, deberían ser del mismo orden. Es el primer indicio de que algo falla. Pero con
 conteos pequeños como estos la deviance no sigue bien una $\chi^2$ (lo vimos en la
 [Unidad 2.1](#sec-u21-diagnostico)), así que no la usamos como contraste: la tomamos como señal de alarma
@@ -468,7 +468,7 @@ Que la quasi-Poisson no tenga verosimilitud no nos deja sin diagnóstico. Convie
 
 Para lo **primero**, el análisis de residuos sigue en pie. Con conteos, el estándar son los **residuos
 cuantil aleatorizados** [@dunnsmyth1996] —que bajo un modelo correcto se distribuyen como una normal—,
-pero `DHARMa` [@hartig2022] los obtiene **simulando** del modelo ajustado, y la quasi-Poisson **no es
+pero `DHARMa` [@hartig2026] los obtiene **simulando** del modelo ajustado, y la quasi-Poisson **no es
 generativa** (no define una distribución de la que simular). Hay dos salidas: (a) mirar los **residuos
 de Pearson (o de deviance) frente al valor ajustado**, que deben formar una **banda sin tendencia ni
 embudo** en torno a 0 —una curva delataría no linealidad, y un abanico, una media mal especificada—; y

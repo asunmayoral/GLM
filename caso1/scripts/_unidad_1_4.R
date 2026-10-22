@@ -304,7 +304,7 @@ ggplot(coefs, aes(estimate, term, color = modelo)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey60") +
   geom_pointrange(aes(xmin = estimate - 1.96 * se, xmax = estimate + 1.96 * se),
                   position = position_dodge(width = 0.5)) +
-  labs(x = "Coeficiente (log-odds), ± 1,96·EE", y = NULL, color = NULL)
+  labs(x = "Coeficiente (log-odds), ± 1.96·EE", y = NULL, color = NULL)
 
 # -----------------------------------------------------------------------------
 # [fig-u14-cohorte-caterpillar]
@@ -536,8 +536,17 @@ lrtest(m_pool, m_int, m_slope)   # LRT secuencial: pooled -> intercepto -> pendi
 #         > El LRT de una varianza: la corrección de frontera
 # -----------------------------------------------------------------------------
 library(varTestnlme)
-varCompTest(m_int, m_pool)    # H0: sigma_u^2 = 0
-varCompTest(m_slope, m_int)   # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
+# varCompTest() informa con message() y devuelve el resultado de forma invisible: lo guardamos
+vc_int   <- varCompTest(m_int, m_pool, output = FALSE)   # H0: sigma_u^2 = 0
+vc_slope <- varCompTest(m_slope, m_int, output = FALSE)  # H0: sigma_u1^2 = 0 (y, con ella, sigma_01 = 0)
+gl_salto <- function(m1, m0) attr(logLik(m1), "df") - attr(logLik(m0), "df")  # parámetros que añade el salto
+tibble(salto          = c("pooled → intercepto", "intercepto → pendiente"),
+       Lambda         = unname(c(vc_int$statistic, vc_slope$statistic)),
+       gl             = c(gl_salto(m_int, m_pool), gl_salto(m_slope, m_int)),
+       p_sin_corregir = pchisq(Lambda, gl, lower.tail = FALSE),   # chi^2 estándar
+       p_corregido    = unname(c(vc_int$p.value["pvalue.lowerbound"],
+                                 vc_slope$p.value["pvalue.lowerbound"]))) |>  # mezcla de chi^2
+  mutate(Lambda = round(Lambda, 2), across(starts_with("p_"), \(v) signif(v, 2)))
 
 # -----------------------------------------------------------------------------
 # [u14-r2]

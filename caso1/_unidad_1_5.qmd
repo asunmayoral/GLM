@@ -477,7 +477,7 @@ Es un **GLM binomial** sobre el banco persona-periodo `pp` ([Sección 5.1](#sec-
 #| label: fig-u15-enlaces
 #| code-fold: true
 #| code-summary: "Código de la figura"
-#| fig-cap: "De los enlaces comparados en la Unidad 2, aquí retenemos solo logit y cloglog —los relevantes en supervivencia discreta—. El cloglog es asimétrico: se aproxima a 1 más despacio que a 0."
+#| fig-cap: "De los enlaces comparados en la Unidad 2, aquí retenemos solo logit y cloglog —los relevantes en supervivencia discreta—. El cloglog es asimétrico: se acerca a 0 como el logit, pero a 1 mucho más deprisa."
 
 tibble(eta = seq(-4, 4, by = 0.02)) |>
   mutate(logit   = plogis(eta),
@@ -787,11 +787,15 @@ library(lmtest)
 lrtest(m_log, m_frail)   # estadístico Lambda (su p, contra la chi2_1, sin corregir)
 
 library(varTestnlme)
-varCompTest(m_frail, m_log)   # p corregido por la frontera (H0: sigma_u^2 = 0)
+# varCompTest() informa con message() y devuelve el resultado de forma invisible: lo guardamos
+vc_frail <- varCompTest(m_frail, m_log, output = FALSE)   # p corregido por la frontera (H0: sigma_u^2 = 0)
+c(Lambda = unname(vc_frail$statistic), p_corregido = unname(vc_frail$p.value["pvalue.lowerbound"]))
+# notación científica para citar el p en el texto
+sci <- function(v) { e <- floor(log10(v)); sprintf("%.1f\\times10^{%d}", v / 10^e, e) }
 ```
 
 El estadístico es $\Lambda=15.72$; el $p$ sin corregir, $7.3\times10^{-5}$, y el corregido,
-$3.7\times10^{-5}$. La variación entre clínicas es significativa, así que el **modelo final** es
+$`r sci(vc_frail$p.value["pvalue.lowerbound"])`$. La variación entre clínicas es significativa, así que el **modelo final** es
 `m_frail`: riesgo base logarítmico, efectos de fragilidad y tratamiento, y fragilidad de centro. Es
 el que evaluamos, diagnosticamos y usamos para predecir en lo que queda de la sección.
 

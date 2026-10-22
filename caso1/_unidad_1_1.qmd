@@ -144,7 +144,7 @@ Cuatro problemas qurgen todos ellos críticos [@dobson2018, caps. 1–3; @fox201
    recae sobre la distribución condicional, que es la que aquí es falsa.
 4. **Linealidad implausible.** OLS impone que el efecto de una covariable sobre
    la probabilidad sea **constante**: la misma pendiente $\beta$ tanto si $\pi$
-   ronda $0{,}5$ como si ya está pegada a 0 o a 1. Eso no es creíble, porque en
+   ronda $0.5$ como si ya está pegada a 0 o a 1. Eso no es creíble, porque en
    los extremos apenas queda margen para moverse: si una paciente tiene una
    probabilidad de fractura casi nula (o casi segura), un año más de edad casi no
    puede cambiarla; en cambio, en la zona central ese mismo año podría desplazar bastante la
