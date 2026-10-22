@@ -84,10 +84,8 @@ website:
             href: caso2/caso2_conteos.qmd#sec-u25
           - text: "2.6 · Del conteo al reloj"
             href: caso2/caso2_conteos.qmd#sec-u26
-          - text: "2.7 · Selección y regularización"
+          - text: "2.7 · Estudio de caso"
             href: caso2/caso2_conteos.qmd#sec-u27
-          - text: "2.8 · Estudio de caso"
-            href: caso2/caso2_conteos.qmd#sec-u28
       - section: "Caso 3 · Continuas positivas"
         href: caso3/caso3_continuas_positivas.qmd
         contents:

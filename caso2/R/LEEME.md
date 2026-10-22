@@ -3,7 +3,7 @@
 En el Caso 2 conviven **dos procesos generadores de datos (DGP) distintos** que comparten
 contexto (seguro de automóvil) y nombres de variables, pero **no** son el mismo banco de datos:
 
-| | **Teoría** (unidades 2.1–2.7) | **Estudio de caso** (Unidad 2.8) y Caso 3 |
+| | **Teoría** (unidades 2.1–2.6) | **Estudio de caso** (Unidad 2.7) y Caso 3 |
 |---|---|---|
 | Script generador | `dgp_conteos.R` | `dgp_auto.R` |
 | Función que simula | `simular_cartera("auto")` | `simular_cartera_auto()` |
@@ -38,7 +38,7 @@ contexto (seguro de automóvil) y nombres de variables, pero **no** son el mismo
   simular si el fichero no existe, si se pide `refrescar = TRUE` o si `dgp_conteos.R` es más reciente
   que la caché.
 - **La verdad** de la simulación va en `attr(cartera, "verdad")`.
-- **Quién lo usa.** `caso2_conteos.qmd` (y, por inclusión, las unidades 2.1–2.7) y los scripts
+- **Quién lo usa.** `caso2_conteos.qmd` (y, por inclusión, las unidades 2.1–2.6) y los scripts
   `caso2/scripts/unidad_2_X.R`.
 - **Peculiaridad (exceso de ceros).** La parte de conteo de `n_fraude` tiene media alta
   (`log(3.5)` en el intercepto) a propósito: así los ceros estructurales no se confunden con los ceros
@@ -59,7 +59,7 @@ contexto (seguro de automóvil) y nombres de variables, pero **no** son el mismo
 - **`cargar_cartera_auto()`** genera (y guarda en `caso2/datos/cartera_auto_full_<semilla>.rds`) una
   cartera con los parámetros por defecto. **No** es la cartera de teoría ni la de ningún equipo.
 - **Quién lo usa.** `generar_datos_equipos_auto.R` y `validar_dgp_auto.R`. Es la base del estudio de
-  caso de la Unidad 2.8 y del estudio de caso del Caso 3 (Unidad 3.8).
+  caso de la Unidad 2.7 y del estudio de caso del Caso 3 (Unidad 3.8).
 - **Peculiaridades.**
   - `tipo_vehiculo` está asociado a `sexo` por construcción (`p_moto_sexo`): es el *proxy* del factor
     prohibido.

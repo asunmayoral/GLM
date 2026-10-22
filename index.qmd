@@ -23,7 +23,7 @@ format:
      `sidebar.contents` de _quarto.yml).
      PENDIENTE: los enlaces de entrega, en recursos.qmd.
 
-     PÓSTER: el banner NO va de cabecera. Con su ratio 2,03 a todo ancho medía
+     PÓSTER: el banner NO va de cabecera. Con su ratio 2.03 a todo ancho medía
      948 px de alto en una pantalla Full HD —más que la propia ventana— y la
      franja inferior caía bajo el pliegue. Va, por tanto, como ilustración a
      ancho de contenido (tope 1100 px => 458 px de alto), con la barra naranja
@@ -170,11 +170,11 @@ Quince semanas y **60 horas de clase**, generalmente con dos sesiones de dos hor
 | 3 | Caso 1 | Binomial y Politómicas; datos agrupados (efectos aleatorios) | `nnet`/`MASS`; `glmer`; persona-periodo con `cloglog` | 1.3–1.4 |
 | 4 | Caso 1 | Tiempo discreto y supervivencia: del *hazard* al GLM | `survfit()`, `ggsurvplot()`, `family=binomial("cloglog")` |  1.5 |
 | 5 | Caso 1 | — | **Estudio de caso**, exposiciones y defensas | 1.6 |
-| 6 | Caso 2 | Poisson; tasas, *offset* e IRR; inferencia y predicción | `glm(poisson)` + *offset*; `marginaleffects` | 2.1 |
+| 6 | Caso 2 | Poisson; tasas, *offset* e IRR; inferencia y predicción; selección, CV y regularización | `glm(poisson)` + *offset*; `marginaleffects`; `glmnet`, `cv.glmnet` | 2.1 |
 | 7 | Caso 2 | Modelos log-lineales para tablas; sobredispersión | Tablas de contingencia y cuadradas; `glm.nb`, quasi-Poisson | 2.2, 2.3 |
 | 8 | Caso 2 | Exceso de ceros; conteos agrupados | `pscl`/`glmmTMB`; `glmer`; ICC y BLUP | 2.4, 2.5 |
-| 9 | Caso 2 | Riesgos a trozos ≡ Poisson; selección, CV y regularización | Persona-periodo; `glmnet`, `cv.glmnet` | 2.6, 2.7 |
-| 10 | Caso 2 | — | **Estudio de caso**, exposiciones y defensas | 2.8 |
+| 9 | Caso 2 | Riesgos a trozos ≡ Poisson | Persona-periodo; `survival` | 2.6 |
+| 10 | Caso 2 | — | **Estudio de caso**, exposiciones y defensas | 2.7 |
 | 11 | Caso 3 | Gamma e inversa gaussiana; enlaces; media-varianza y log-OLS | `glm(Gamma(link="log"))`; *smearing*; comparación por AIC | 3.1, 3.2 |
 | 12 | Caso 3 | GLMM Gamma; la familia **Tweedie** y el índice $p$ | `glmmTMB` (Gamma y `tweedie`); `DHARMa`; `group_vfold_cv` | 3.3, 3.4 |
 | 13 | Caso 3 | Tiempo hasta el fallo: censura y modelos **AFT** | `Surv`, `survfit`, `survreg`; `survminer` | 3.5 |
@@ -282,7 +282,7 @@ salvarse con su propio voto.
 $$\text{Coi}_j \;=\; \min\!\left(1,\; \frac{R_j}{0{,}80}\right)$$
 
 Es una función continua y acotada en $[0, 1]$: no hay bandas ni escalones, y una diferencia mínima en
-las puntuaciones no puede producir una caída brusca de la nota. El umbral 0,80 actúa como **franja de
+las puntuaciones no puede producir una caída brusca de la nota. El umbral 0.80 actúa como **franja de
 indiferencia**: hasta un 20 % de desigualdad percibida no penaliza, porque ningún equipo reparte el
 trabajo en partes exactamente iguales.
 
@@ -293,19 +293,19 @@ indicadas, cuando el equipo coincide y los otros dos son valorados *plenamente* 
 
 | $P_1$ · su parte | $P_2$ · la de los demás | $s$ | *Coi* |
 |:--|:--|:--:|:--:|
-| Plenamente | Plenamente | 3,00 | 1,00 |
-| Plenamente | En gran parte | 2,67 | 1,00 |
-| Plenamente | A medias | 2,33 | 1,00 |
-| Plenamente | Apenas o nada | 2,00 | 0,94 |
-| En gran parte | En gran parte | 2,00 | 0,94 |
-| En gran parte | A medias | 1,67 | 0,82 |
-| En gran parte | Apenas o nada | 1,33 | 0,68 |
-| A medias | Plenamente | 1,67 | 0,82 |
-| A medias | A medias | 1,00 | 0,54 |
-| A medias | Apenas o nada | 0,67 | 0,38 |
-| Apenas o nada | Plenamente | 1,00 | 0,54 |
-| Apenas o nada | En gran parte | 0,67 | 0,38 |
-| Apenas o nada | Apenas o nada | 0,00 | 0,00 |
+| Plenamente | Plenamente | 3.00 | 1.00 |
+| Plenamente | En gran parte | 2.67 | 1.00 |
+| Plenamente | A medias | 2.33 | 1.00 |
+| Plenamente | Apenas o nada | 2.00 | 0.94 |
+| En gran parte | En gran parte | 2.00 | 0.94 |
+| En gran parte | A medias | 1.67 | 0.82 |
+| En gran parte | Apenas o nada | 1.33 | 0.68 |
+| A medias | Plenamente | 1.67 | 0.82 |
+| A medias | A medias | 1.00 | 0.54 |
+| A medias | Apenas o nada | 0.67 | 0.38 |
+| Apenas o nada | Plenamente | 1.00 | 0.54 |
+| Apenas o nada | En gran parte | 0.67 | 0.38 |
+| Apenas o nada | Apenas o nada | 0.00 | 0.00 |
 
 Un nivel de diferencia respecto a los compañeros no descuenta nada; hacen falta dos niveles
 sostenidos para que el factor se active de forma apreciable. El doble peso de $P_1$ impide que la
@@ -464,7 +464,7 @@ Los tres casos están **desarrollados y completos** en esta web, cada uno como u
 | Caso | Unidades |
 |:--|:--|
 | [**Caso 1 · ¿Ocurre el evento? ¿Y cuándo?**](caso1/caso1_binaria.qmd) | 1.1 Cuando la recta no llega · 1.2 Logística: ajuste e interpretación · 1.3 Más de dos categorías · 1.4 Sujetos agrupados (GLMM) · 1.5 ¿Y cuándo ocurre? Supervivencia · 1.6 Estudio de caso |
-| [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Selección y regularización · 2.8 Estudio de caso |
+| [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Estudio de caso |
 | [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 Tweedie: el coste agregado · 3.5 AFT: del coste al tiempo · 3.6 Cox como frontera · 3.7 Más allá: las tres lentes · 3.8 Estudio de caso |
 
 **El código viene plegado**, para que la narrativa se lea sin interrupciones. Tienes dos formas de desplegarlo:

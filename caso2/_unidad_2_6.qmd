@@ -1256,7 +1256,7 @@ Conteo y supervivencia no son dos modelos, sino dos preguntas sobre el mismo pro
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.6) — Preguntas 13 a 15 del caso
-Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.8](#sec-u28)):
+Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.7](#sec-u27)):
 
 - **P13 · El primer siniestro.** Expande a **persona-periodo** y ajusta el modelo de **riesgos a trozos**
   (Poisson + offset) sobre `t_primer_sin`/`evento` —en tu cartera el tiempo es **continuo**: córtalo en

@@ -9,12 +9,11 @@ Lo detectamos al final de 2.1 con el índice de dispersión de `n_danos`. Esta u
 en serio, porque es la patología más frecuente del conteo y la puerta de entrada a los ceros
 ([Unidad 2.4](#sec-u24)) y al agrupamiento ([Unidad 2.5](#sec-u25)).
 
-Seguimos el mismo recorrido de la Unidad 2.1 —contexto, modelización, interpretación, selección y
-bondad de ajuste—, pero con un giro: como ahora hay **varios modelos candidatos** para un mismo
-problema, no repetimos el recorrido en cada uno. Lo aplicamos al **problema** (identificarlo) y a la
-**familia** (compararla): primero **qué es y cómo se identifica** (§3.1), luego **qué estructuras
-puede tener la varianza** (§3.2), un **bloque breve por modelo** (§3.3–3.4), y al final la **comparación y
-selección** (§3.5).
+Primero vemos **qué es y cómo se identifica** la sobredispersión (§3.1) y **qué estructuras puede
+tener la varianza** (§3.2). Después, cada modelo candidato recorre el mismo camino de la Unidad 2.1
+—modelización y ajuste; selección, bondad de ajuste y diagnóstico; predicción—: la quasi-Poisson
+(§3.3) y la binomial negativa (§3.4), que termina comparando formalmente las distribuciones. Cerramos
+con las conclusiones y la validación contra el DGP (§3.5).
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -74,7 +73,7 @@ m_pois <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + 
 c(deviance = round(deviance(m_pois), 1), gl = df.residual(m_pois))
 ```
 
-La deviance residual, 6465.4 con 3063 gl, **duplica de sobra** sus grados de libertad: si la Poisson
+La deviance residual, 6465.4 con 3063 gl, **más que duplica** sus grados de libertad: si la Poisson
 describiera bien los datos, deberían ser del mismo orden. Es el primer indicio de que algo falla. Pero con
 conteos pequeños como estos la deviance no sigue bien una $\chi^2$ (lo vimos en la
 [Unidad 2.1](#sec-u21-diagnostico)), así que no la usamos como contraste: la tomamos como señal de alarma
@@ -93,44 +92,52 @@ phi_dev     <- deviance(m_pois) / df.residual(m_pois)
 c(pearson = phi_pearson, deviance = phi_dev)
 ```
 
-En `n_danos`, $\hat\phi$ sale **muy por encima de 1** (en torno a **2.4** por Pearson, 2.1 por
-deviance): cada póliza varía bastante más de lo que la Poisson tolera. Un matiz sobre las dos versiones. La basada en la **deviance** (`deviance/gl`) es
-popular pero **traicionera** con conteos escasos: cuando las medias son bajas o hay muchos patrones de
-covariables, la deviance no sigue una $\chi^2$ y el cociente puede rondar 1 **aunque haya
-sobredispersión real**. Por eso nos quedamos con el de **Pearson** como indicador rápido y no nos
-fiamos de un número suelto sin un contraste que lo respalde.
+En `n_danos`, $\hat\phi$ sale **muy por encima de 1**: 2.39 por Pearson y 2.11 por deviance. Cada póliza
+varía bastante más de lo que la Poisson tolera. Nos quedamos con la versión de Pearson, porque la de la
+deviance puede rondar 1 con conteos escasos aunque haya sobredispersión
+([Unidad 2.1](#sec-u21-diagnostico)).
 
-El cociente cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** es la
-varianza. Lo primero se ve mejor que se cuenta; lo segundo se intuye con un gráfico y se contrasta al final
-de la sección. Empecemos por mirar.
+El índice cuantifica el exceso, pero no dice **dónde** falla el ajuste ni **de qué forma** crece la
+varianza. Lo primero lo enseña el rootograma; lo segundo, la [Sección 3.2](#sec-u23-estructuras).
 
-**El rootograma: dónde falla el ajuste.** El **rootograma**, que construimos en la [Unidad 2.1](#sec-u21-diagnostico) (@fig-u21-rootograma), enseña la
-sobredispersión **conteo a conteo**: enfrenta, para cada valor $k$, el número de pólizas con $k$ partes
-con el que espera el modelo, $\sum_i \mathrm{dpois}(k,\hat\mu_i)$. Aquí usamos una versión lado a lado,
-más directa de leer, en lugar de la colgante. Su valor está en que muestra **dónde** falla el modelo,
-no solo cuánto (@fig-u23-rootograma):
+**El rootograma: dónde falla el ajuste.** El **rootograma**, que definimos en la
+[Unidad 2.1](#sec-u21-diagnostico) (@fig-u21-rootograma), enseña la sobredispersión **conteo a
+conteo**: para cada valor $k$, la barra mide la raíz del número de pólizas con $k$ partes y cuelga de la
+curva de la raíz del número que espera el modelo, $\sum_i\widehat{\Pr}(Y_i=k)$. Si el modelo acierta, el
+pie de la barra queda sobre el cero; si no llega, el modelo espera más pólizas de las que hay, y si lo
+atraviesa, menos. Primero la tabla, para leer las cifras, y después el gráfico (@fig-u23-rootograma):
+
+```{r}
+#| label: u23-rootograma-tabla
+mu_pois <- fitted(m_pois); K <- 0:8
+# la última clase agrupa 8 o más partes, para que las esperadas sumen n
+rootograma <- tibble::tibble(
+  k         = K,
+  observado = as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K))),
+  Poisson   = sapply(K, \(k) if (k < 8) sum(dpois(k, mu_pois)) else sum(1 - ppois(7, mu_pois))))
+rootograma |> dplyr::mutate(Poisson = round(Poisson, 1))
+```
 
 ```{r}
 #| label: fig-u23-rootograma
-#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson ajustada. La Poisson se queda corta en los ceros y en la cola alta, y sobra en los valores intermedios: el patrón típico de la sobredispersión."
+#| fig-cap: "Rootograma colgante de la Poisson ajustada a `n_danos` (la última clase agrupa 8 o más partes). Curva: raíz de la frecuencia esperada; barras: raíz de la observada, colgando de la curva. Los pies atraviesan el cero en el 0 y en la cola, y no llegan en los valores intermedios."
 #| fig-width: 6.5
 #| fig-height: 3.6
-mu <- fitted(m_pois); K <- 0:8
-esperado  <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu)) else sum(1 - ppois(7, mu)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, `Poisson ajustada` = esperado) |>
-  tidyr::pivot_longer(c(Observado, `Poisson ajustada`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, fill = fuente)) +
-  geom_col(position = "dodge") +
-  scale_fill_manual(values = c("Observado" = "steelblue", "Poisson ajustada" = "darkorange")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", fill = NULL)
+ggplot(rootograma) +
+  geom_rect(aes(xmin = k - 0.4, xmax = k + 0.4,
+                ymin = sqrt(Poisson) - sqrt(observado), ymax = sqrt(Poisson)),
+            fill = "steelblue", alpha = 0.7) +
+  geom_line(aes(k, sqrt(Poisson)), colour = "darkorange", linewidth = 0.8) +
+  geom_point(aes(k, sqrt(Poisson)), colour = "darkorange") +
+  geom_hline(yintercept = 0) +
+  scale_x_continuous(breaks = K, labels = c(0:7, "8+")) +
+  labs(x = "nº de partes por daños", y = "raíz de la frecuencia")
 ```
 
-El patrón es el típico de la sobredispersión: la Poisson **subestima los ceros** y **la cola** (las
-pocas pólizas que acumulan muchos partes) y **sobreestima los valores intermedios**. No acierta con la
-forma de la distribución, solo con su promedio. En la [Sección 3.4](#sec-u23-nb) repetiremos este
-rootograma con la binomial negativa, que endereza los dos extremos.
+El patrón es el típico de la sobredispersión. La Poisson **subestima los ceros** (espera 965 pólizas sin
+partes y hay 1418) y **la cola** (4.4 con ocho o más, frente a 58), y **sobreestima los valores
+intermedios** (979 con un parte, frente a 713). Acierta con el promedio, pero no con la forma de la
+distribución. En la [Sección 3.4](#sec-u23-nb) repetiremos este rootograma con la binomial negativa.
 
 ### Efectos: por qué importa
 
@@ -138,8 +145,7 @@ Ignorar la sobredispersión **no** sesga mucho los coeficientes, pero **subestim
 estándar** (aproximadamente en un factor $\sqrt{\phi}$, con $\phi$ el índice de dispersión). La
 consecuencia es una inferencia **demasiado optimista**: estadísticos de Wald inflados, intervalos de
 confianza demasiado estrechos y contrastes (LRT incluido) que declaran significativo lo que no lo es.
-Por eso, vistos los indicios, conviene confirmarla con un contraste formal
-—lo hacemos al final de la sección— antes de fiarse de ningún $p$-valor.
+Por eso conviene confirmarla con un contraste formal antes de fiarse de ningún $p$-valor.
 
 ### Causas: de dónde viene y dónde aparece
 
@@ -189,14 +195,12 @@ acumulan visitas e ingresos), **individuos por parcela** en ecología (hábitat 
 por lote** en fiabilidad, **casos por región** en epidemiología o **accidentes por conductor**. En
 todos, unas pocas unidades acumulan mucho y la mayoría casi nada.
 
-Vistos los indicios, sus efectos y sus causas, falta confirmarla formalmente y averiguar de qué tipo es.
-
 ### Contrastes: ¿hay sobredispersión? {#sec-u23-contrastes}
 
-Los indicios apuntan con claridad, pero conviene confirmarlo con un contraste formal. 
+Los indicios apuntan con claridad; tres contrastes lo confirman:
 
 1. El test de sobredispersión basado en el índice de Pearson y su $\chi^2$ (`performance::check_overdispersion`).
-2. El test de sobredispersión con residuos DHARMA es más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea.
+2. El test de sobredispersión con residuos `DHARMa` [@hartig2026], más fiable cuando las medias son bajas y la aproximación $\chi^2$ flojea.
 3. El contraste de referencia es el de **Cameron–Trivedi** [@cameron1990] (`AER::dispersiontest`), que 
 enfrenta $H_0:\mathrm{Var}=\mu$ a la alternativa $\mathrm{Var}=\mu+\alpha\,g(\mu)$ y decide si
 $\alpha>0$. 
@@ -238,7 +242,7 @@ Las tres herramientas que desarrollamos en esta unidad, ordenadas por la **forma
 | Modelo | Varianza | En una frase | Se desarrolla en |
 |---|---|---|---|
 | **quasi-Poisson** | $\phi\,\mu$ (lineal) | corrige los errores estándar, sin distribución propia | [§3.3](#sec-u23-quasi) |
-| **NB1** | $\mu(1+\alpha)$ (lineal) | la gemela de la quasi, pero con verosimilitud | [§3.4](#sec-u23-nb) |
+| **NB1** | $\mu(1+\alpha)$ (lineal) | misma varianza que la quasi, con verosimilitud propia | [§3.4](#sec-u23-nb) |
 | **NB2** | $\mu+\alpha\,\mu^2$, con $\alpha=1/\theta$ (cuadrática) | mezcla Poisson–Gamma; la opción por defecto | [§3.4](#sec-u23-nb) |
 
 Las dos primeras hacen crecer la varianza de forma **lineal** con $\mu$; la NB2, de forma
@@ -264,7 +268,7 @@ cuatro pasos:
 
 ```{r}
 #| label: fig-u23-media-varianza
-#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan muy por encima de la recta Var = media (sobredispersión) y, entre las dos formas de dispersión, siguen la curva cuadrática (NB2), no la recta lineal (quasi/NB1): la varianza crece con el cuadrado de la media."
+#| fig-cap: "Varianza frente a media de `n_danos`, por 12 grupos de pólizas de riesgo parecido (según `m_pois`), con tres formas de referencia. Los puntos quedan por encima de la recta Var = media (sobredispersión) y, en los grupos de mayor riesgo, se acercan más a la curva cuadrática (NB2) que a la recta lineal (quasi/NB1)."
 #| fig-width: 8
 #| fig-height: 4
 mu_i  <- fitted(m_pois); y <- cartera$n_danos
@@ -296,10 +300,10 @@ ggplot() +
 
 - **Qué esperamos.** Si la Poisson describiera bien los datos, en cada grupo la varianza igualaría a la
 media y los doce puntos caerían sobre la recta $\mathrm{Var}=\mathrm{media}$. 
-- **Qué vemos.** Todos los puntos quedan muy por encima de esa recta —hay sobredispersión— y, además, **no siguen la recta lineal**
-($\hat\phi\,\mathrm{media}$) sino que se **curvan hacia arriba**, pegándose a la curva cuadrática: la
-varianza crece con el **cuadrado** de la media. No es un fallo al predecir el promedio —`m_pois` acierta
-con el nivel—, sino en la dispersión. Esa forma cuadrática anticipa un ajuste mejorado que conseguiremos en la [Sección 3.4](#sec-u23-nb) con un modelo binomial-negativo, alternativo al Poisson para asumir la sobredispersión observada.
+- **Qué vemos.** Todos los puntos quedan por encima de esa recta: hay sobredispersión. En las medias
+  bajas, la recta lineal y la curva cuadrática apenas se distinguen; en los grupos de mayor riesgo, los
+  puntos se separan de la recta y quedan cerca de la curva, o por encima: la varianza **crece más deprisa
+  que la media**. Con solo doce grupos el gráfico es ruidoso: sugiere la forma, pero no la decide.
 
 **La elección no es cosmética.** Si la varianza real crece de forma cuadrática y aplicamos una corrección
 lineal (quasi-Poisson o NB1), nos quedaremos cortos justo en la **cola** —donde están las pólizas más
@@ -339,8 +343,11 @@ print(AER::dispersiontest(m_pois, trafo = 2))   # Var = mu + alpha·mu^2  (cuadr
 ```
 
 Las dos versiones rechazan con claridad $H_0:\alpha=0$, tanto con la estructura lineal
-($\mathrm{Var}=\mu+\alpha\,\mu$) como con la cuadrática ($\mathrm{Var}=\mu+\alpha\,\mu^2$). Para decidir qué versión cuadrática utilizar habremos de ajustar alternativas y compararlas. Los ajustamos
-en la [Sección 3.4](#sec-u23-nb) y los comparamos formalmente en la [Sección 3.5](#sec-u23-elegir).
+($\mathrm{Var}=\mu+\alpha\,\mu$) como con la cuadrática ($\mathrm{Var}=\mu+\alpha\,\mu^2$). No es
+contradictorio: entre las pólizas, $\mu$ y $\mu^2$ están muy correlacionadas, así que cualquiera de las
+dos alternativas recoge el exceso. El contraste confirma la sobredispersión, pero no decide su forma:
+para eso ajustamos las alternativas (Secciones [3.3](#sec-u23-quasi) y [3.4](#sec-u23-nb)) y las
+comparamos al final de la 3.4.
 
 
 
@@ -353,20 +360,17 @@ modelos**, no sólo con estos tests.
 
 **Forma de la varianza**
 
-— `AER::dispersiontest(m, trafo = 1)` prueba la lineal (quasi / NB1) y
-- `trafo = 2` la cuadrática (NB2). 
-  
-**Aviso:** ambas salen significativas porque $\mu$ y $\mu^2$ están muy
-  correlacionadas; la forma se decide **ajustando** los modelos y comparándolos por AIC, no con estos
-  contrastes.
+- `AER::dispersiontest(m, trafo = 1)` prueba la lineal (quasi / NB1) y
+- `trafo = 2` la cuadrática (NB2).
 :::
 
 ## 3.3 Quasi-Poisson {#sec-u23-quasi}
 
-La respuesta más económica a la sobredispersión es no cambiar de distribución, sino **relajar la
-restricción de la varianza**.
+La respuesta más económica a la sobredispersión es **renunciar a especificar una distribución**: la
+quasi-Poisson solo fija cómo se relacionan la media y la varianza, y estima de los datos la intensidad de
+esa relación.
 
-### El modelo y su estimación
+### Modelización y ajuste
 
 La quasi-Poisson mantiene la media $\mu=\exp(\eta)$ pero admite
 
@@ -395,14 +399,13 @@ $$\hat\phi=\frac{1}{n-p}\sum_{i=1}^{n}\frac{(y_i-\hat\mu_i)^2}{\hat\mu_i},$$
 $\hat{\boldsymbol\beta}$, que queda **inflada** en un factor $\hat\phi$: por eso los **errores estándar
 se multiplican por $\sqrt{\hat\phi}$**, aunque las estimaciones puntuales sean las de la Poisson.
 
-### Ajuste e interpretación
-
-Ajustamos con `family = quasipoisson` y leemos el $\hat\phi$ estimado:
+En R ajustamos con `family = quasipoisson` y leemos el $\hat\phi$ estimado:
 
 ```{r}
 #| label: u23-quasi-fit
 m_quasi <- glm(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
                  offset(log(exposicion)), family = quasipoisson, data = cartera)
+broom::tidy(m_quasi) # ajuste
 summary(m_quasi)$dispersion   # phi estimado
 ```
 
@@ -418,69 +421,111 @@ dplyr::left_join(
 ```
 
 Los `se_quasi` son aproximadamente `se_poisson` $\times\sqrt{\hat\phi}$. Al ensancharse los errores,
-algún efecto que la Poisson daba por significativo puede dejar de serlo: esa es, precisamente, la
-corrección que buscábamos.
+un efecto que la Poisson daba por significativo puede dejar de serlo. Aquí ninguno deja de ser significativo
+al 5 %: el menos claro, el uso comercial, mantiene $p=0.033$ en la quasi-Poisson.
 
-### Qué se puede (y qué no) contrastar
+### Selección, bondad de ajuste y diagnóstico
 
-La quasi-Poisson **no es una verosimilitud propia**, sino una **cuasi-verosimilitud**: solo especifica
-la media y la varianza, no una distribución completa. Por eso:
+La quasi-Poisson **no es una verosimilitud propia**, sino una **cuasi-verosimilitud**: solo especifica la
+media y la varianza, no una distribución completa. Eso tiene tres consecuencias, que ordenan esta
+subsección:
 
-- No hay `logLik` ni `AIC` (R los devuelve como `NA`); para comparar modelos anidados se usa el contraste
-  **F** —`anova(m1, m2, test = "F")`—, no el LRT, y para selección, el **QAIC** [@burnham2002], el AIC
-  penalizado por la sobredispersión.
+- **No hay log-verosimilitud** (`logLik` y `AIC` salen `NA`), así que no hay AIC ni LRT. Para seleccionar
+  se usan sus sustitutos: el **QAIC** y el **contraste F**.
+- **No hay contraste de bondad de ajuste**, porque no hay una distribución de referencia contra la que
+  comparar la deviance.
+- **No es un modelo generativo**: no se puede simular de él. El diagnóstico se apoya en los residuos.
 
-- Al no ser un modelo generativo, no produce probabilidades de cada conteo ni un rootograma propio: es
-  una **corrección de los errores estándar**, no una descripción de la forma de la distribución.
-
-El **QAIC** sustituye la log-verosimilitud por su versión escalada por el factor de sobredispersión
-$\hat c=\hat\phi$:
+**Selección: el QAIC y el contraste F.** El **QAIC** [@burnham2002] es el AIC corregido por la
+sobredispersión: divide la log-verosimilitud del modelo base, la Poisson con la misma media, entre un
+factor de sobredispersión $\hat c$,
 
 $$\mathrm{QAIC} = -\,\frac{2\,\ell(\hat{\boldsymbol\beta})}{\hat c} + 2K,$$
 
-con $\ell$ la log-verosimilitud del modelo base (aquí la Poisson), $K$ el número de parámetros —incluido
-el de dispersión— y $\hat c$ **común** a todos los modelos comparados (si $\hat c = 1$, se recupera el
-AIC ordinario).
+con $K$ el número de parámetros —los $p$ coeficientes más el de dispersión— y $\hat c=\hat\phi$
+estimado en el modelo **más completo** de los que se comparan, y **común** a todos ellos. Si $\hat c=1$
+se recupera el AIC. Como el AIC, el QAIC sirve también para modelos no anidados: se elige el menor, y
+diferencias inferiores a 2 no permiten distinguir entre modelos [@burnham2002].
 
-::: {.callout-tip}
-## 🔧 En R. Ajustar una quasi-Poisson
-```r
-m <- glm(y ~ ..., family = quasipoisson, data = ...)   # mismos beta que poisson; solo cambian los EE
-summary(m)$dispersion                                  # phi estimado (indice de Pearson)
+El contraste F para modelos anidados se construye con la **cuasi-deviance**, que sí existe aunque no
+haya verosimilitud: se define a partir de la cuasi-log-verosimilitud $Q$, como dos veces la distancia
+entre el ajuste perfecto ($\mu_i=y_i$) y el ajustado [@mccullagh1989],
+
+$$D=2\phi\sum_{i=1}^{n}\bigl[Q(y_i;y_i)-Q(\hat\mu_i;y_i)\bigr]
+   =2\sum_{i=1}^{n}\Bigl[y_i\log\frac{y_i}{\hat\mu_i}-(y_i-\hat\mu_i)\Bigr],$$
+
+donde la segunda igualdad sale de integrar la derivada de $Q$ con $V(\mu)=\mu$. Es, por tanto, una
+medida de la **discrepancia entre observados y ajustados**, y con esta función de varianza coincide con
+la deviance de la Poisson (lo comprueba el chunk siguiente). Para $M_0\subset M_1$, con $p_0<p_1$
+parámetros y cuasi-deviances $D_0\ge D_1$,
+
+$$F=\frac{(D_0-D_1)/(p_1-p_0)}{\hat\phi_1}\ \stackrel{H_0}{\approx}\ F_{\,p_1-p_0,\ n-p_1},$$
+
+con $\hat\phi_1$ la dispersión de Pearson del modelo mayor. Es viable porque el numerador y el
+denominador estiman, cada uno por su lado, $\phi$: bajo $H_0$, $(D_0-D_1)/\phi$ se distribuye
+aproximadamente como una $\chi^2_{p_1-p_0}$, y $(n-p_1)\hat\phi_1/\phi$ como una $\chi^2_{n-p_1}$,
+aproximadamente independiente de la anterior. El cociente de dos $\chi^2$ divididas por sus gl es una
+$F$, y $\phi$, que no conocemos, se cancela. Es el mismo argumento que el contraste F de la regresión
+lineal, con $\phi$ en el papel de $\sigma^2$.
+
+Los aplicamos a dos preguntas: ¿hace falta alguna **interacción doble** entre los predictores?, y ¿es
+necesario cada **efecto principal**? Para la primera partimos del modelo con todas las dobles,
+`m_quasi2`, y contrastamos cada interacción en presencia de las demás:
+
+```{r}
+#| label: u23-quasi-sel
+c(poisson = deviance(m_pois), quasi = deviance(m_quasi))   # la cuasi-deviance es la de la Poisson
+
+m_quasi2 <- update(m_quasi, . ~ (edad_conductor + potencia_cv + zona_circulacion + uso +
+                                   tipo_vehiculo)^2 + offset(log(exposicion)))   # todas las dobles
+drop1(m_quasi2, test = "F")                 # cada interacción, una a una
+
+m_quasi_eu <- update(m_quasi, . ~ . + edad_conductor:uso)   # la única con p < 0.05
+anova(m_quasi, m_quasi_eu, test = "F")
+
+drop1(m_quasi, test = "F")                  # ¿hace falta cada efecto principal?
+
+# QAIC a mano: log-verosimilitud de la Poisson con la misma media, c común (el del modelo más completo)
+c_hat <- summary(m_quasi2)$dispersion
+qaic  <- function(m) -2 * as.numeric(logLik(update(m, family = poisson))) / c_hat +
+  2 * (length(coef(m)) + 1)
+round(c_hat, 2)
+round(c(principales = qaic(m_quasi), mas_edad_uso = qaic(m_quasi_eu),
+        todas_dobles = qaic(m_quasi2)), 1)
 ```
 
-- **`family = quasipoisson`** deja los coeficientes **idénticos** a los de `poisson` y multiplica los
-  errores estándar por $\sqrt{\hat\phi}$. El $\hat\phi$ se lee en `summary(m)$dispersion`.
-- **No hay `logLik` ni `AIC`** (es cuasi-verosimilitud; R los da como `NA`). Para modelos anidados se usa
-  **`anova(m1, m2, test = "F")`** —no el LRT—, y para seleccionar, el **QAIC** —el AIC escalado por
-  $\hat\phi$— (p. ej. `bbmle::qAICc`, o a mano).
-- Al no ser generativa, **no admite rootograma ni residuos simulados**: su ajuste se juzga por los
-  residuos de Pearson (media bien especificada) y por que la varianza sea de verdad **lineal**.
-:::
+De las diez interacciones, solo `edad_conductor:uso` baja de 0.05, y por poco ($F=3.85$,
+$p=0.0498$); con diez contrastes al 5 %, que alguno lo haga por azar es lo esperable. Añadida sola al
+modelo de efectos principales, no llega a ser significativa ($p=0.081$), y el QAIC apenas cambia:
+4528.7 frente a 4529.7, una diferencia de 1, por debajo del umbral de 2. Con todas las dobles el QAIC
+empeora claramente, hasta 4547.7. Por parsimonia, nos quedamos **sin interacciones**. Y todos los
+efectos principales son necesarios: `drop1(m_quasi)` da $p<0.001$ para la edad, la potencia, la zona y
+el tipo de vehículo, y $p=0.025$ para el uso. El modelo elegido es `m_quasi`.
 
-### Bondad de ajuste y diagnóstico
+**Bondad de ajuste: no hay contraste.** La cuasi-deviance $D$ se puede calcular, pero no tiene con qué
+compararse. En la Poisson la referencia $\chi^2_{n-p}$ sale de la distribución, con $\phi=1$; aquí no
+hay distribución. Y escalarla por $\hat\phi$ no arregla nada: $\hat\phi$ se estima precisamente para que
+$X^2/\hat\phi=n-p$, así que $D/\hat\phi$ queda cerca de sus gl por construcción. La adecuación del modelo
+se juzga con los **residuos**.
 
-Que la quasi-Poisson no tenga verosimilitud no nos deja sin diagnóstico. Conviene primero tener claro
-**qué queremos verificar**, que son dos cosas distintas:
+**¿Y el rootograma?** Compara, para cada valor $k$, la frecuencia observada con la esperada,
+$\sum_i\widehat{\Pr}(Y_i=k)$. Esas probabilidades se calculan con la distribución supuesta para la
+respuesta y las estimaciones de sus parámetros. Como la quasi-Poisson no especifica ninguna
+distribución, no hay con qué calcular las frecuencias esperadas, y no hay rootograma para la
+quasi-Poisson.
 
-1. **La estructura de la media**, esto es, que $\log\mu=\eta$ esté bien especificada, con los predictores correctos y forma funcional adecuada, y sin indicios de no-linealidad ignorada.
-2. **La estructura de la varianza**: que se cumpla el supuesto $\mathrm{Var}=\phi\,\mu$, es decir, que la dispersión crezca proporcional a la media, y no más deprisa.
+**Diagnóstico.** Los dos supuestos del modelo, media y varianza, se comprueban con los **residuos de
+Pearson**, $r_i=(y_i-\hat\mu_i)/\sqrt{\hat\mu_i}$, frente al valor ajustado (@fig-u23-quasi-resid):
 
-Para lo **primero**, el análisis de residuos sigue en pie. Con conteos, el estándar son los **residuos
-cuantil aleatorizados** [@dunnsmyth1996] —que bajo un modelo correcto se distribuyen como una normal—,
-pero `DHARMa` [@hartig2026] los obtiene **simulando** del modelo ajustado, y la quasi-Poisson **no es
-generativa** (no define una distribución de la que simular). Hay dos salidas: (a) mirar los **residuos
-de Pearson (o de deviance) frente al valor ajustado**, que deben formar una **banda sin tendencia ni
-embudo** en torno a 0 —una curva delataría no linealidad, y un abanico, una media mal especificada—; y
-(b) como la quasi-Poisson comparte los mismos $\hat\mu$ que la Poisson, **aprovechar los residuos
-simulados de la Poisson equivalente** (`m_pois`) —con una cautela: esos residuos recogen **también** la
-sobredispersión, de modo que la **media** se juzga por la ausencia de **tendencias** frente al predicho,
-no por el test global de dispersión (que saldrá significativo por la propia sobredispersión)—. Usamos
-aquí la vía directa, esto es, residuos de Pearson frente a valores ajustados (@fig-u23-quasi-resid):
+- **Media**, $\log\mu=\eta$. Buscamos que la línea suavizada sea **plana sobre el 0**; una curva delataría
+  un predictor omitido o mal especificado.
+- **Varianza**, $\mathrm{Var}=\phi\,\mu$. Como $r_i$ ya está dividido por $\sqrt{\hat\mu_i}$, si el
+  supuesto se cumple su varianza es $\phi$ en todo el rango: una **banda de anchura constante**. Si la
+  varianza crece más deprisa que la media, la banda se **abre en abanico** hacia la derecha.
 
 ```{r}
 #| label: fig-u23-quasi-resid
-#| fig-cap: "Residuos de Pearson de la quasi-Poisson frente al valor ajustado. Buscamos una nube sin tendencia ni embudo, con la línea suavizada plana en torno a 0: eso indica que la media está bien especificada. (La hipótesis sobre la varianza se contrasta aparte.)"
+#| fig-cap: "Residuos de Pearson de la quasi-Poisson frente al valor ajustado, con una línea suavizada. Las «franjas» curvas son las pólizas con 0, 1, 2… partes, la huella de una respuesta discreta. La línea suavizada sale plana en torno a 0."
 #| fig-width: 6
 #| fig-height: 3.4
 tibble::tibble(ajustado = fitted(m_quasi),
@@ -492,51 +537,201 @@ tibble::tibble(ajustado = fitted(m_quasi),
   labs(x = "valor ajustado", y = "residuo de Pearson")
 ```
 
-Para lo **segundo** —el supuesto sobre la varianza— hay dos miradas complementarias. La primera es
-**visual**: en la relación media–varianza (@fig-u23-media-varianza) se aprecia la **forma**. Si los
-puntos siguen una **recta** ($\mathrm{Var}=\phi\,\mu$), la dispersión es lineal y la quasi-Poisson es
-adecuada; si se **curvan hacia arriba** ($\mathrm{Var}=\mu+\mu^2/\theta$), crece de forma cuadrática y un
-$\hat\phi$ único se queda corto. Eso es justo lo que significa que «la varianza crece más deprisa»: la
-nube se despega de la recta. La segunda mirada es **decisiva**: como ese gráfico es ruidoso (pocos
-grupos, y estimar una varianza es inestable), la elección firme entre la varianza lineal
-(quasi-Poisson / NB1) y la cuadrática (NB2) se toma **ajustando ambos modelos y comparándolos por AIC**
-([Sección 3.4](#sec-u23-nb)). El gráfico **sugiere** la forma; el AIC la **confirma**.
+La **media** está bien especificada: la línea suavizada sale plana sobre el 0. La **anchura** de la
+banda es difícil de juzgar a ojo, porque las franjas de los conteos 0, 1, 2… la enmascaran, así que la
+medimos: la media de $r_i^2$ por quintiles del valor ajustado debería mantenerse en torno a
+$\hat\phi$.
 
-**Bondad de ajuste.** Al no ser generativa, la quasi-Poisson no admite rootograma ni residuos simulados;
-su ajuste se juzga por los **residuos de Pearson** (media bien especificada, sin patrón) y por que la
-varianza sea realmente **lineal**. Aquí lo primero se cumple, pero lo segundo **no** —la varianza es
-cuadrática—, así que la quasi-Poisson corrige los errores pero no es el mejor modelo para estos datos.
+```{r}
+#| label: u23-quasi-var
+tibble::tibble(ajustado = fitted(m_quasi), r2 = residuals(m_quasi, type = "pearson")^2) |>
+  dplyr::mutate(quintil = dplyr::ntile(ajustado, 5)) |>
+  dplyr::summarise(mu_medio = mean(ajustado), var_pearson = mean(r2), .by = quintil) |>
+  dplyr::arrange(quintil)
+```
 
-En resumen, la quasi-Poisson es la opción adecuada cuando la varianza crece de forma **aproximadamente
-lineal** con la media y solo buscamos una inferencia honesta con una variación mínima de los
-supuestos; cuando crece más deprisa, o cuando necesitamos un modelo generativo (probabilidades,
+No se mantiene. En los quintiles centrales oscila entre 2.00 y 2.52, pero en los extremos va de 1.57,
+en el de menor riesgo, a 3.74, en el de mayor, frente al $\hat\phi=2.39$ común que supone el modelo. La varianza crece **más deprisa que la media**, como ya
+apuntaba la relación media–varianza de la Sección 3.2 (@fig-u23-media-varianza): el supuesto
+$\mathrm{Var}=\phi\,\mu$ no se cumple.
+
+Los residuos simulados de `DHARMa` no sirven aquí: se obtienen simulando del modelo ajustado, y la
+quasi-Poisson, sin distribución, no permite simular.
+
+### Predicción
+Con el modelo quasi-Poisson se puede predecir, pero solo la **media**; la predicción puntual es la misma $\hat\mu$ de la
+Poisson, y su intervalo de confianza es más ancho, porque los errores estándar se multiplican por
+$\sqrt{\hat\phi}$ (`predict(m_quasi, newdata, type = "link", se.fit = TRUE)` ya los incorpora). Lo que no
+puede dar es la **distribución** del conteo de una póliza nueva: ni $\Pr(Y=k)$ ni un intervalo de
+predicción exacto para el número de partes. Para eso hace falta un modelo generativo, como la binomial
+negativa.
+
+Lo vemos con un **perfil de referencia**: un turismo de uso particular, en zona urbana, con la potencia
+mediana de la cartera y un año de exposición, cuya edad recorre todo el rango. Las bandas son intervalos
+de confianza al 95 % para la media, construidos en la escala del predictor lineal y devueltos con
+$\exp(\cdot)$, de modo que no bajan de 0 (@fig-u23-quasi-pred):
+
+```{r}
+#| label: fig-u23-quasi-pred
+#| fig-cap: "Número medio de partes predicho por la Poisson y por la quasi-Poisson para el perfil de referencia, según la edad del conductor, con su intervalo de confianza al 95 %. La curva es la misma; la banda de la quasi-Poisson es más ancha."
+#| fig-width: 6.5
+#| fig-height: 3.6
+perfil <- tidyr::expand_grid(
+  edad_conductor   = 18:85,
+  potencia_cv      = median(cartera$potencia_cv),
+  zona_circulacion = factor("urbana",     levels(cartera$zona_circulacion)),
+  uso              = factor("particular", levels(cartera$uso)),
+  tipo_vehiculo    = factor("turismo",    levels(cartera$tipo_vehiculo)),
+  exposicion       = 1)                                  # un año: la media es la frecuencia anual
+
+# IC en la escala del predictor lineal y vuelta con exp(): la banda no puede bajar de 0
+banda <- function(m, modelo) {
+  p <- predict(m, perfil, type = "link", se.fit = TRUE)
+  dplyr::mutate(perfil, modelo = modelo, mu = exp(p$fit),
+                inf = exp(p$fit - 1.96 * p$se.fit), sup = exp(p$fit + 1.96 * p$se.fit))
+}
+pred_q <- dplyr::bind_rows(banda(m_pois, "Poisson"), banda(m_quasi, "quasi-Poisson"))
+
+ggplot(pred_q, aes(edad_conductor, mu, colour = modelo, fill = modelo)) +
+  geom_ribbon(aes(ymin = inf, ymax = sup), alpha = 0.25, colour = NA) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_manual(values = c("Poisson" = "darkorange", "quasi-Poisson" = "steelblue"),
+                      aesthetics = c("colour", "fill")) +
+  labs(x = "edad del conductor", y = "nº medio de partes al año", colour = NULL, fill = NULL)
+```
+
+```{r}
+#| label: u23-quasi-pred-tabla
+pred_q |>
+  dplyr::filter(edad_conductor %in% c(25, 45, 65)) |>
+  dplyr::select(modelo, edad_conductor, mu, inf, sup)
+sqrt(summary(m_quasi)$dispersion)   # factor que ensancha la banda en la escala log
+```
+
+Las dos curvas coinciden, porque comparten $\hat{\boldsymbol\beta}$: para un conductor de 45 años, 2.07
+partes al año. Lo que cambia es la incertidumbre. La Poisson da un intervalo de [1.97; 2.18], y la
+quasi-Poisson, de [1.92; 2.24]: en la escala logarítmica, la semianchura se multiplica por
+$\sqrt{\hat\phi}\approx 1.55$. La banda de la Poisson es engañosamente estrecha, porque supone una
+varianza que los datos no tienen.
+
+En resumen: la quasi-Poisson especifica bien la media y corrige los errores estándar, pero su supuesto
+sobre la varianza no se cumple en estos datos. Es la opción adecuada cuando la varianza crece de forma
+**aproximadamente lineal** con la media y solo buscamos una inferencia honesta con una variación mínima
+de los supuestos; cuando crece más deprisa, o cuando necesitamos un modelo generativo (probabilidades,
 predicción de conteos), damos el paso a la binomial negativa.
+
+::: {.callout-tip}
+## 🔧 En R. Ajustar y evaluar una quasi-Poisson
+```r
+m <- glm(y ~ ..., family = quasipoisson, data = ...)   # mismos beta que poisson; solo cambian los EE
+summary(m)$dispersion                                  # phi estimado (indice de Pearson)
+```
+
+- **Coeficientes y errores** — `family = quasipoisson` deja los coeficientes **idénticos** a los de
+  `poisson` y multiplica los errores estándar por $\sqrt{\hat\phi}$.
+- **Selección** — no hay `logLik` ni `AIC` (salen `NA`). Para cada término, en presencia de los demás,
+  **`drop1(m, test = "F")`**; para dos modelos anidados, **`anova(m0, m1, test = "F")`**. Ambos usan la
+  cuasi-deviance, `deviance(m)`. Para comparar por criterio de información, el **QAIC**, a mano: la
+  log-verosimilitud de `update(m, family = poisson)` dividida por $\hat c$ (el $\hat\phi$ del modelo más
+  completo), con $K$ = coeficientes + 1.
+- **Bondad de ajuste** — no hay contraste; se juzga con los residuos.
+- **Predicción** — `predict(m, newdata, type = "link", se.fit = TRUE)` da la media y su error, ya
+  inflado por $\sqrt{\hat\phi}$; no hay probabilidades de cada conteo.
+- **Diagnóstico** — `residuals(m, type = "pearson")` frente a `fitted(m)`: la línea suavizada, para la
+  media; la media de $r^2$ por grupos del ajustado, para la varianza. `DHARMa` no se aplica, porque
+  necesita simular del modelo.
+:::
 
 ## 3.4 Binomial negativa {#sec-u23-nb}
 
-La quasi-Poisson corrige los errores estándar, pero no da una distribución. La **binomial negativa**
-(NB) sí: es un modelo generativo completo que nace, precisamente, del mecanismo que simulamos en la
-[Sección 3.1](#sec-u23-causas) —la **mezcla Poisson–Gamma**—.
+La **binomial negativa** (NB) es un modelo generativo completo que nace del mecanismo que simulamos en
+la [Sección 3.1](#sec-u23-causas): la **mezcla Poisson–Gamma**.
 
-### El modelo: una mezcla Poisson–Gamma
+### Modelización y ajuste
 
-Las dos binomiales negativas más habituales son la NB1 y NB2, y cada una captura una estructura específica para la varianza. Ambas se pueden obtener como una mixtura de una distribución de Poisson $Y|V \sim Po(\mu \cdot V)$ y una Gamma para la variable de confusión $V$, que debe tener una media de 1, $E(V)=1$:
+**El modelo: una mezcla Poisson–Gamma.**
+Las dos binomiales negativas habituales, la **NB1** y la **NB2** [@hilbe2014], salen del mismo
+mecanismo. Cada póliza tiene un **multiplicador de riesgo no observado** $V$, con $\mathrm{E}(V)=1$, y,
+condicionado a él, el conteo es Poisson: $Y\mid V\sim\mathrm{Po}(\mu V)$. Por la ley de la varianza
+total,
 
-- **NB1** (varianza **lineal**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu=\mu(1+\alpha)$. Es la misma forma que
-  la quasi-Poisson (con $\phi=1+\alpha$), pero con distribución propia. Se ajusta con
-  `glmmTMB(family = nbinom1)`. Aquí $V \sim \mathrm{Ga}(\text{shape}=\mu/\alpha,\ \text{rate}=\mu/\alpha)$, con $\mathrm{Var}(V)=\alpha/\mu$, de modo que $\mathrm{Var}(Y)=\mu+\mu^2\,\mathrm{Var}(V)=\mu+\mu^2(\alpha/\mu)=\mu+\alpha\,\mu$.
-- **NB2** (varianza **cuadrática**): $\mathrm{Var}[Y]=\mu+\alpha\,\mu^2$. Es la de `MASS::glm.nb` y `glmmTMB(family = nbinom2)`, que  la reparametriza con $\theta=1/\alpha$: $\mathrm{Var}[Y]=\mu+\mu^2/\theta$. Un $\theta$ **grande**
-  ($\alpha$ pequeño) acerca a la Poisson, y $\theta\to\infty$ la recupera. Aquí $V \sim \mathrm{Ga}(\text{shape}=\theta,\ \text{rate}=\theta)$, con $\mathrm{Var}(V)=1/\theta$, de modo que $\mathrm{Var}(Y)=\mu+\mu^2\,\mathrm{Var}(V)=\mu+\mu^2/\theta$.
+$$\mathrm{E}(Y)=\mu,\qquad
+\mathrm{Var}(Y)=\mathrm{E}\bigl[\mathrm{Var}(Y\mid V)\bigr]+\mathrm{Var}\bigl[\mathrm{E}(Y\mid V)\bigr]
+=\mu+\mu^2\,\mathrm{Var}(V).$$
 
+Si $V$ sigue una Gamma, la distribución marginal de $Y$ es una binomial negativa. Las dos variantes
+difieren **solo** en cómo es esa Gamma, y en particular en su varianza:
+
+| | NB2 | NB1 |
+|---|---|---|
+| Multiplicador $V$ | $\mathrm{Ga}(\text{shape}=\theta,\ \text{rate}=\theta)$ | $\mathrm{Ga}(\text{shape}=\mu/\alpha,\ \text{rate}=\mu/\alpha)$ |
+| $\mathrm{Var}(V)$ | $1/\theta=\alpha$: **la misma** para todas las pólizas | $\alpha/\mu$: **menor** cuanto mayor es el riesgo |
+| $\mathrm{Var}(Y)$ | $\mu+\alpha\,\mu^2$ (cuadrática) | $\mu+\alpha\,\mu=\mu(1+\alpha)$ (lineal) |
+| Índice $\mathrm{Var}(Y)/\mu$ | $1+\alpha\,\mu$: crece con el riesgo | $1+\alpha$: constante |
+
+: Las dos binomiales negativas como mezclas Poisson–Gamma. En la NB2 se escribe $\alpha=1/\theta$. {#tbl-u23-nb-mezclas}
+
+La @fig-u23-nb-mezcla lo muestra con el mismo $\alpha=1$ en las dos y dos perfiles de póliza, uno de
+riesgo bajo ($\mu=0.5$) y otro alto ($\mu=2.5$):
+
+```{r}
+#| label: fig-u23-nb-mezcla
+#| fig-cap: "Distribución del multiplicador de riesgo no observado $V$ en la NB1 y en la NB2, con $\\alpha=1$, para una póliza de riesgo bajo y otra de riesgo alto. En la NB2 las dos curvas coinciden (la discontinua cubre a la continua); en la NB1 se estrecha alrededor de 1 cuando el riesgo crece."
+#| fig-width: 7
+#| fig-height: 3.2
+alpha_ej <- 1                                   # mismo alfa en las dos: solo cambia el reparto
+perfiles <- c("riesgo bajo (mu = 0.5)" = 0.5, "riesgo alto (mu = 2.5)" = 2.5)
+mezclas  <- tidyr::expand_grid(modelo = c("NB1", "NB2"), perfil = factor(names(perfiles), names(perfiles))) |>
+  dplyr::mutate(mu    = unname(perfiles[as.character(perfil)]),
+                forma = ifelse(modelo == "NB1", mu / alpha_ej, 1 / alpha_ej))   # shape = rate
+
+mezclas |>
+  tidyr::expand_grid(v = seq(0.01, 3, length.out = 300)) |>
+  dplyr::mutate(densidad = dgamma(v, shape = forma, rate = forma)) |>
+  ggplot(aes(v, densidad, colour = perfil, linetype = perfil)) +   # trazo distinto: en la NB2 se solapan
+  geom_line(linewidth = 0.8) +
+  facet_wrap(~ modelo) +
+  coord_cartesian(ylim = c(0, 1.6)) +
+  scale_colour_manual(values = c("darkorange", "steelblue")) +
+  labs(x = "multiplicador de riesgo V", y = "densidad", colour = NULL, linetype = NULL) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: u23-nb-mezcla-tabla
+mezclas |>
+  dplyr::mutate(var_V   = 1 / forma,                 # varianza de una Ga(shape = rate = forma)
+                var_Y   = mu + mu^2 * var_V,
+                indice  = var_Y / mu) |>
+  dplyr::select(modelo, mu, var_V, var_Y, indice)
+```
+
+En la **NB2** la heterogeneidad no observada es **igual para todos los perfiles**: $\mathrm{Var}(V)=1$
+tanto en la póliza de riesgo bajo como en la de riesgo alto. Como ese multiplicador actúa sobre una
+media mayor, la varianza del conteo sube de 0.75 a 8.75, y el índice de dispersión, de 1.5 a 3.5. En la
+**NB1**, en cambio, la heterogeneidad relativa **se reduce** al aumentar el riesgo, de
+$\mathrm{Var}(V)=2$ a $0.4$, justo lo necesario para que la varianza del conteo crezca solo en
+proporción a la media: de 1 a 5, con un índice constante de 2.
+
+**Interpretación.** Los coeficientes significan lo mismo en las dos —son log-IRR sobre la media, como
+en la Poisson—, porque ambas comparten $\mathrm{E}(Y)=\mu=\exp(\eta)$. Lo que cambia es el parámetro de
+dispersión:
+
+- El $\alpha=1/\theta$ de la **NB2** es la **varianza del multiplicador de riesgo**: mide cuánto difieren
+  entre sí, por factores no observados, pólizas con el mismo perfil.
+- El $\alpha$ de la **NB1** es el **exceso de varianza relativo a la media**, $\mathrm{Var}(Y)/\mu-1$: el
+  análogo exacto de $\phi-1$ en la quasi-Poisson.
+
+**¿Es la NB1 la quasi-Poisson con distribución?** Por la varianza, sí: las dos suponen
+$\mathrm{Var}(Y)=\phi\,\mu$, con $\phi=1+\alpha$. Y, a diferencia de la quasi-Poisson, la NB1 es un
+modelo generativo: da $\Pr(Y=k)$, permite simular, tiene AIC y puede predecir conteos con su
+intervalo. Si además coincide con la quasi-Poisson en las estimaciones lo comprobamos al ajustarla.
 
 La NB2 es el **caballo de batalla** —la opción por defecto— y la que encaja con la huella cuadrática que
 vimos en la cartera de seguros; la NB1 nos servirá para contrastarla con la quasi-Poisson.
 
-### Estimación
-
-Ambas son verosimilitudes propias. Lo más limpio es ver **cómo contribuye cada observación** a la
-log-verosimilitud, $\ell=\sum_i \ell_i$, con $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ (más el
-*offset*):
+**Estimación.** Las dos son verosimilitudes propias. La contribución de cada observación a la log-verosimilitud,
+$\ell=\sum_i \ell_i$, con $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ (más el *offset*), es:
 
 - **NB2** (tamaño $\theta$ **constante**):
 $$\ell_i(\boldsymbol\beta,\theta)=\log\frac{\Gamma(y_i+\theta)}{\Gamma(\theta)\,y_i!}+\theta\log\frac{\theta}{\theta+\mu_i}+y_i\log\frac{\mu_i}{\theta+\mu_i}.$$
@@ -544,15 +739,20 @@ $$\ell_i(\boldsymbol\beta,\theta)=\log\frac{\Gamma(y_i+\theta)}{\Gamma(\theta)\,
   constante $p=\tfrac{1}{1+\alpha}$):
 $$\ell_i(\boldsymbol\beta,\alpha)=\log\frac{\Gamma(y_i+r_i)}{\Gamma(r_i)\,y_i!}+r_i\log p+y_i\log(1-p),\qquad r_i=\frac{\mu_i}{\alpha}.$$
 
-La clave está en el **tamaño**: constante en la NB2 (de ahí la varianza cuadrática) y proporcional a
-$\mu_i$ en la NB1 (de ahí la lineal). Ambas se maximizan por **máxima verosimilitud**: `MASS::glm.nb`
-estima la NB2 de forma **alternada** (fijado $\theta$, un GLM por IWLS —como en la
-[Sección 1.2](#sec-u21-modelizacion)—; luego actualiza $\theta$; itera), y `glmmTMB` estima la NB1 (y
-también la NB2) por ML numérica directa.
+El tamaño es el *shape* de la Gamma de la @tbl-u23-nb-mezclas: constante en la NB2 y proporcional a
+$\mu_i$ en la NB1. Las dos se estiman por **máxima verosimilitud**, pero esa diferencia decide qué
+algoritmo puede usarse:
 
-### Ajuste e interpretación
+- **IWLS alternado (NB2).** Con $\theta$ fijo, la NB2 es de la familia exponencial: es un GLM con función
+  de varianza $V(\mu)=\mu+\mu^2/\theta$, y sus $\boldsymbol\beta$ se obtienen por IWLS, como en la
+  [Sección 1.2](#sec-u21-modelizacion). Fijados los $\boldsymbol\beta$, se actualiza $\theta$
+  maximizando la verosimilitud, y se alternan los dos pasos hasta converger [@venablesripley2002].
+- **Optimización numérica directa (NB1 y NB2).** En la NB1 ese atajo no existe: aun con $\alpha$ fijo,
+  $\mu_i$ entra en el tamaño $r_i$, dentro de las funciones $\Gamma$, y la distribución no es de la
+  familia exponencial en $\mu$. Por eso se maximiza $\ell(\boldsymbol\beta,\alpha)$ con un optimizador
+  numérico, todos los parámetros a la vez. Esta vía sirve igualmente para la NB2.
 
-**NB2**, con `MASS::glm.nb`:
+**Ajuste e interpretación.** Ajustamos primero la **NB2**, con `MASS::glm.nb`:
 
 ```{r}
 #| label: u23-nb-fit
@@ -575,48 +775,65 @@ m_nb1 <- glmmTMB::glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulac
 sigma(m_nb1)   # dispersion alpha de la NB1
 ```
 
-Su dispersión sale $\hat\alpha\approx 1.47$, de modo que $1+\hat\alpha\approx 2.5$ reproduce —salvo el
-método de estimación— el $\hat\phi\approx 2.39$ de la quasi-Poisson: primera señal de que NB1 y quasi
-son la misma cosa vista de dos maneras. Se confirma comparando los errores estándar término a término
-(la columna `cociente` es `se_nb1 / se_quasi`):
+Su dispersión sale $\hat\alpha\approx 1.47$, de modo que $1+\hat\alpha\approx 2.5$, muy cerca del
+$\hat\phi\approx 2.39$ de la quasi-Poisson: las dos describen la misma **estructura de la varianza**.
+¿Dan también las mismas estimaciones? Comparamos coeficientes y errores estándar término a término (la
+columna `variacion` es `(se_nb1 - se_quasi) / se_quasi`):
 
 ```{r}
 #| label: u23-nb1-quasi
+b_q    <- coef(m_quasi)
+b_nb1  <- glmmTMB::fixef(m_nb1)$cond
 se_q   <- summary(m_quasi)$coefficients[, "Std. Error"]
 se_nb1 <- summary(m_nb1)$coefficients$cond[, "Std. Error"]
-data.frame(term = names(se_q), se_quasi = round(se_q, 4),
-           se_nb1 = round(se_nb1[names(se_q)], 4),
-           cociente = round(se_nb1[names(se_q)] / se_q, 3))
+data.frame(term = names(b_q),
+           coef_quasi = round(b_q, 4), coef_nb1 = round(b_nb1[names(b_q)], 4),
+           se_quasi   = round(se_q, 4), se_nb1   = round(se_nb1[names(b_q)], 4),
+           variacion  = round((se_nb1[names(b_q)] - se_q) / se_q, 3))
 ```
 
-Los de la NB1 salen entre un 4 % y un 12 % por debajo de los de la quasi-Poisson, por estimarlos con
-verosimilitud en vez de por momentos: muy parecidos, pero no idénticos. La
-diferencia de fondo es **conceptual**: la quasi-Poisson corrige los errores estándar por momentos
-(estima $\phi$ con Pearson, sin verosimilitud), mientras que la NB1 es un **modelo generativo con
-verosimilitud propia** —tiene `logLik`/`AIC` y predice probabilidades—. La NB1 le da a la quasi el
-estatus de distribución que le faltaba. (La comparación formal por AIC de **todos** los modelos
-va en la [Sección 3.5](#sec-u23-elegir).)
+No: **los coeficientes no coinciden**. El de la edad pasa de $-0.0150$ en la quasi-Poisson a
+$-0.0112$ en la NB1, y el de la zona rural, de $-0.388$ a $-0.271$. La razón está en las
+ecuaciones de estimación. Las de la quasi-Poisson son las de la Poisson, $\sum_i(y_i-\mu_i)\mathbf{x}_i=\mathbf{0}$,
+que solo dependen de la media y la varianza. Las de la NB1 salen de su verosimilitud, en la que $\mu_i$
+también entra en el tamaño $r_i$, dentro de las funciones $\Gamma$: ponderan las observaciones de otra
+manera y, si la distribución no es la correcta, desplazan los $\hat{\boldsymbol\beta}$. Por eso los
+errores estándar tampoco son comparables uno a uno: son los de coeficientes distintos.
 
-::: {.callout-tip}
-## 🔧 En R. Ajustar una binomial negativa (NB1 y NB2)
-```r
-MASS::glm.nb(y ~ ..., data = ...)             # NB2: Var = mu + mu^2/theta  (varianza cuadratica)
-glmmTMB::glmmTMB(y ~ ..., family = nbinom2)   # la misma NB2, por ML directa
-glmmTMB::glmmTMB(y ~ ..., family = nbinom1)   # NB1: Var = mu(1 + alpha)    (varianza lineal)
+La NB1, por tanto, **no es la quasi-Poisson con una distribución añadida**. Comparte con ella la
+función de varianza, pero es otro modelo: tiene verosimilitud propia —`logLik`, AIC, probabilidades de
+cada conteo— y, a cambio, sus estimaciones dependen de que la distribución supuesta sea la adecuada. La
+quasi-Poisson, que no supone ninguna, mantiene las de la Poisson. (La comparación formal por AIC entre
+los modelos se hace tras diagnosticarlos.)
+
+
+### Selección, bondad de ajuste y diagnóstico {#sec-u23-nb-diagnostico}
+
+A diferencia de la quasi-Poisson, la binomial negativa tiene **verosimilitud**, así que vuelven las
+herramientas de la Poisson: el **LRT** para modelos anidados y el **AIC**. Repetimos con la NB2 las dos
+preguntas de la quasi-Poisson: ¿hace falta alguna interacción doble?, y ¿es necesario cada efecto
+principal?
+
+```{r}
+#| label: u23-nb-sel
+m_nb_dobles <- update(m_nb, . ~ (edad_conductor + potencia_cv + zona_circulacion + uso +
+                                   tipo_vehiculo)^2 + offset(log(exposicion)))
+drop1(m_nb_dobles, test = "Chisq")   # LRT de cada interacción, con theta fijo en el del modelo mayor
+anova(m_nb, m_nb_dobles)             # LRT global, reestimando theta en cada modelo
+drop1(m_nb, test = "Chisq")          # ¿hace falta cada efecto principal?
+round(c(AIC_principales = AIC(m_nb), AIC_dobles = AIC(m_nb_dobles)), 1)
 ```
 
-- **NB2** (por defecto) — `MASS::glm.nb` la estima alternando IWLS y actualización de $\theta$; el
-  parámetro está en **`m$theta`** (con $\alpha = 1/\theta$). También `glmmTMB(family = nbinom2)`.
-- **NB1** — la «gemela con verosimilitud» de la quasi-Poisson (misma varianza lineal), solo en
-  `glmmTMB(family = nbinom1)`; su dispersión $\hat\alpha$ se lee con **`sigma(m)`**.
-- Los coeficientes se leen en **IRR** igual que en la Poisson —`broom::tidy(m, exponentiate = TRUE)`—, y
-  al ser generativas **sí** tienen `logLik` / `AIC` y predicen probabilidades
-  (`dnbinom(k, size = theta, mu = ...)`).
-:::
+La conclusión es la misma que con la quasi-Poisson. Ninguna interacción es significativa: la de menor
+$p$ vuelve a ser `edad_conductor:uso`, con $p=0.062$. El LRT global de las 19 da $p=0.31$, y el
+AIC sube de 9417.7 a 9434.1 al añadirlas. Todos los efectos principales son necesarios: $p<0.001$
+para la edad, la potencia, la zona y el tipo de vehículo, y $p=0.021$ para el uso. `drop1()` mantiene
+$\theta$ fijo en el valor del modelo mayor; `anova()` lo reestima en cada modelo.
 
-### Bondad de ajuste y diagnóstico
-
-Ajustadas las dos NB, ¿han **absorbido** de verdad la sobredispersión? Verificamos tres cosas, en ambos
+**Bondad de ajuste.** Ahora sí hay una distribución de referencia: la deviance de la NB2 puede
+compararse con una $\chi^2_{n-p}$. Pero esa aproximación falla con medias bajas, como en la Poisson
+([Sección 1.5](#sec-u21-diagnostico)), así que tampoco aquí la usamos como veredicto. Ajustadas las dos
+NB, ¿han **absorbido** de verdad la sobredispersión? Verificamos tres cosas, en ambos
 modelos: que la varianza ya cuadre (índice de dispersión $\approx 1$), que los residuos no muestren
 patrón, y que la **forma** de la distribución predicha reproduzca la observada (rootograma).
 
@@ -640,92 +857,70 @@ test de dispersión no debe rechazar. Para la NB2 (el modelo elegido) (@fig-u23-
 DHARMa::simulateResiduals(m_nb, plot = TRUE)
 ```
 
-Y, para comparar, la NB1 (@fig-u23-nb1-dharma):
+Con la NB2 no queda nada que señalar: el QQ-plot sigue la diagonal, ninguno de los tres contrastes
+rechaza y las líneas de cuantil salen planas. Y, para comparar, la NB1 (@fig-u23-nb1-dharma):
 
 ```{r}
 #| label: fig-u23-nb1-dharma
-#| fig-cap: "Residuos simulados (DHARMa) de la NB1. Al imponer una varianza lineal, puede quedarse algo corta en la cola frente a la NB2, cuya varianza cuadrática se ajusta mejor a estos datos."
+#| fig-cap: "Residuos simulados (DHARMa) de la NB1: QQ-plot frente a la uniforme (izquierda) y residuos frente al predicho (derecha)."
 #| fig-width: 8
 #| fig-height: 5.5
 DHARMa::simulateResiduals(m_nb1, plot = TRUE)
 ```
 
-Tercero, el **rootograma**. Recordemos ([Sección 3.1](#sec-u23-diagnostico)) que enfrenta, conteo a
-conteo, las frecuencias **observadas** con las **esperadas** por el modelo ($\sum_i\Pr(Y_i=k)$): muestra
-**dónde** ajusta. Aquí lo leemos comprobando que la NB «se pega» a los observados en el 0 y en la cola,
-justo donde la Poisson fallaba (@fig-u23-nb-rootograma):
+La NB1 no sale tan limpia. El QQ-plot sigue la diagonal, pero el contraste de dispersión rechaza por
+poco, y en el panel derecho el cuartil inferior se hunde en las pólizas de mayor riesgo predicho: ahí
+hay más conteos bajos de los que la NB1 espera. Es lo que cabe esperar de su varianza lineal. Las
+varianzas estimadas de la NB1, $\mu(1+\hat\alpha)$, y de la NB2, $\mu+\mu^2/\hat\theta$, se cruzan en
+$\mu=\hat\alpha\,\hat\theta\approx 1.43$ partes: por debajo, la NB1 supone más varianza que la NB2; por
+encima, menos. Su índice de dispersión global ronda 1 porque promedia los dos tramos.
+
+Tercero, el **rootograma** de la [Sección 3.1](#sec-u23-diagnostico), ahora con la NB2 junto a la
+Poisson, para ver si endereza el 0 y la cola (@fig-u23-nb-rootograma):
+
+```{r}
+#| label: u23-nb-rootograma-tabla
+# añade a la tabla de la Sección 3.1 las frecuencias esperadas por la NB2
+raiz_nb <- dplyr::mutate(rootograma,
+  NB2 = sapply(K, \(k) if (k < 8) sum(dnbinom(k, size = m_nb$theta, mu = fitted(m_nb)))
+                       else sum(1 - pnbinom(7, size = m_nb$theta, mu = fitted(m_nb)))))
+raiz_nb |> dplyr::mutate(dplyr::across(c(Poisson, NB2), \(x) round(x, 1)))
+```
 
 ```{r}
 #| label: fig-u23-nb-rootograma
-#| fig-cap: "Frecuencias observadas de `n_danos` frente a las esperadas por la Poisson y por la NB2. La NB sigue de cerca los ceros y la cola; la Poisson se queda corta en ambos extremos."
-#| fig-width: 6.5
-#| fig-height: 3.8
-mu_p <- fitted(m_pois); mu_n <- fitted(m_nb); th <- m_nb$theta; K <- 0:8
-esp_pois <- sapply(K, function(k) if (k < 8) sum(dpois(k, mu_p))              else sum(1 - ppois(7, mu_p)))
-esp_nb   <- sapply(K, function(k) if (k < 8) sum(dnbinom(k, size = th, mu = mu_n)) else sum(1 - pnbinom(7, size = th, mu = mu_n)))
-observado <- as.numeric(table(factor(pmin(cartera$n_danos, 8), levels = K)))
-
-tibble::tibble(k = K, Observado = observado, Poisson = esp_pois, `NB2` = esp_nb) |>
-  tidyr::pivot_longer(c(Observado, Poisson, `NB2`), names_to = "fuente", values_to = "frec") |>
-  ggplot(aes(k, frec, colour = fuente, group = fuente)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 2) +
-  scale_colour_manual(values = c("Observado" = "grey30", "Poisson" = "darkorange", "NB2" = "steelblue")) +
-  labs(x = "nº de partes por daños", y = "nº de pólizas", colour = NULL)
+#| fig-cap: "Rootogramas colgantes de la Poisson y de la NB2 ajustadas a `n_danos` (la última clase agrupa 8 o más partes). Curva: raíz de la frecuencia esperada; barras: raíz de la observada, colgando de la curva. Con la Poisson, los pies de las barras atraviesan el cero en el 0 y en la cola, y no llegan en los valores intermedios; con la NB2 quedan prácticamente sobre el cero en todos los conteos."
+#| fig-width: 8
+#| fig-height: 3.6
+raiz_nb |>
+  tidyr::pivot_longer(c(Poisson, NB2), names_to = "modelo", values_to = "esperado") |>
+  dplyr::mutate(modelo = factor(modelo, c("Poisson", "NB2"))) |>
+  ggplot() +
+  geom_rect(aes(xmin = k - 0.4, xmax = k + 0.4,
+                ymin = sqrt(esperado) - sqrt(observado), ymax = sqrt(esperado)),
+            fill = "steelblue", alpha = 0.7) +
+  geom_line(aes(k, sqrt(esperado)), colour = "darkorange", linewidth = 0.8) +
+  geom_point(aes(k, sqrt(esperado)), colour = "darkorange") +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ modelo) +
+  scale_x_continuous(breaks = K, labels = c(0:7, "8+")) +
+  labs(x = "nº de partes por daños", y = "raíz de la frecuencia")
 ```
+
+Con la NB2 todos los pies quedan sobre el cero: espera 1420 pólizas sin partes, frente a 1418, y 60.4
+con ocho o más, frente a 58. La binomial negativa reproduce la forma de la distribución, y no solo su
+media.
 
 **Conclusión de bondad de ajuste.** La **NB2** pasa las tres pruebas —índice de dispersión $\approx 1$,
 residuos de `DHARMa` sin desviaciones marcadas y rootograma que sigue de cerca ceros y cola—: describe
-bien estos conteos. La **NB1** cumple casi igual (su dispersión también baja a $\approx 1$), pero, al
-imponer una varianza lineal, se queda algo corta en la cola; el AIC ratificará la ventaja de la NB2
-([Sección 3.5](#sec-u23-elegir)). Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
+bien estos conteos. La **NB1** baja también el índice global a $\approx 1$, pero sus residuos muestran
+que su varianza lineal se queda corta en las pólizas de mayor riesgo; el AIC ratifica la ventaja de la
+NB2 a continuación. Y si tras la NB **aún** quedara desajuste —típicamente un exceso de
 ceros que la NB no explica—, el paso siguiente serían los modelos de la [Unidad 2.4](#sec-u24). La
-comparación integral de los cuatro modelos y la validación contra el DGP van en la
-[Sección 3.5](#sec-u23-elegir).
+validación contra el DGP cierra la unidad, en la [Sección 3.5](#sec-u23-validacion).
 
-## 3.5 Elegir, comparar y conectar {#sec-u23-elegir}
-
-Hemos ajustado cuatro modelos para el mismo problema —**Poisson**, **quasi-Poisson**, **NB1** y
-**NB2**—. Toca ponerlos frente a frente: comparar coeficientes y errores, decidir formalmente por
-información, ver qué cambia en la predicción, y **validar** el resultado contra el DGP.
-
-### Los cuatro modelos, lado a lado
-
-El modelo de la media es el mismo en los cuatro, de modo que los **coeficientes** (y las IRR) son casi
-idénticos; lo que cambia son los **errores estándar**. Se ve mejor en un gráfico que en una tabla,
-poniendo cada término en su propia escala (van de $\sim 0.007$ a $\sim -0.34$) (@fig-u23-comp-modelos):
-
-```{r}
-#| label: fig-u23-comp-modelos
-#| fig-cap: "Estimaciones (punto) y ±1 error estándar (barra) de tres coeficientes en los cuatro modelos, cada término en su propia escala. Los puntos apenas se mueven entre modelos —la media es la misma—; lo que cambia es la longitud de la barra: la Poisson da el EE más pequeño, y la quasi-Poisson y la NB1 lo agrandan de forma parecida (misma varianza lineal)."
-#| fig-width: 8.5
-#| fig-height: 3.4
-ee <- function(m) {                                   # estimación y EE, robusto a glm/glm.nb/glmmTMB
-  s <- if (inherits(m, "glmmTMB")) summary(m)$coefficients$cond else summary(m)$coefficients
-  data.frame(term = rownames(s), estimate = s[, 1], std.error = s[, 2])
-}
-mods <- list(Poisson = m_pois, `Quasi-Poisson` = m_quasi, NB1 = m_nb1, NB2 = m_nb)
-
-purrr::imap_dfr(mods, ~ dplyr::mutate(ee(.x), modelo = .y)) |>
-  dplyr::filter(term %in% c("potencia_cv", "zona_circulacionrural", "usocomercial")) |>
-  dplyr::mutate(modelo = factor(modelo, levels = names(mods))) |>
-  ggplot(aes(modelo, estimate, colour = modelo)) +
-  geom_hline(yintercept = 0, linetype = 3, colour = "grey60") +
-  geom_pointrange(aes(ymin = estimate - std.error, ymax = estimate + std.error)) +
-  facet_wrap(~ term, scales = "free_y") +
-  labs(x = NULL, y = "estimación (± 1 EE)", colour = NULL) +
-  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-```
-
-Las estimaciones apenas se mueven (los puntos quedan casi a la misma altura en cada faceta); lo que
-cambia es la **longitud de la barra**: la Poisson da los errores más pequeños; la quasi-Poisson y la
-**NB1** los agrandan de forma parecida —del orden de $\sqrt{\hat\phi}\approx 1.5$ veces— (son la misma varianza
-lineal); y la **NB2** queda en una magnitud parecida, con su propia varianza cuadrática.
-
-### La decisión formal: AIC y LRT
-
-El **AIC** solo compara modelos con verosimilitud propia —Poisson, NB1 y NB2, **no** la quasi-Poisson—.
-No es una laguna: como la **NB1 es la gemela con verosimilitud de la quasi-Poisson** (misma varianza
-lineal), su AIC hace de sustituto del que la quasi no tiene.
+**La decisión formal entre distribuciones.** Diagnosticadas las dos NB, queda compararlas entre sí
+y con la Poisson. Las tres tienen verosimilitud, así que el **AIC** las ordena:
 
 ```{r}
 #| label: u23-aic-comp
@@ -736,12 +931,11 @@ data.frame(modelo = names(mods_lik),
   dplyr::arrange(AIC)
 ```
 
-La **NB2** gana con holgura (AIC $\approx$ 9418, frente a 9488 de la NB1 y 10766 de la Poisson): su
-varianza **cuadrática** es la que piden estos datos, coherente con la huella del gráfico media–varianza
-y con que se generaron como mezcla Poisson–Gamma; y que la NB2 supere también a la NB1 confirma que la
-forma es cuadrática, no lineal. Como la Poisson está **anidada** en la NB2 (su límite $\theta\to\infty$),
-un LRT lo remacha —con la cautela de que $\theta\to\infty$ cae en el **borde** del espacio de
-parámetros, lo que reparte a la mitad el $p$-valor—:
+La **NB2** gana con holgura: 9417.7, frente a 9487.7 de la NB1 y 10765.9 de la Poisson. Su varianza
+cuadrática es la que piden estos datos, coherente con la curvatura del gráfico media–varianza, y que
+supere también a la NB1 confirma que la forma es cuadrática y no lineal. Como la Poisson está
+**anidada** en la NB2 (es su límite cuando $\theta\to\infty$), un LRT lo remacha, con la cautela de que
+$\theta\to\infty$ cae en el **borde** del espacio de parámetros, lo que divide a la mitad el $p$-valor:
 
 ```{r}
 #| label: u23-lrt
@@ -749,95 +943,178 @@ LR <- 2 * (as.numeric(logLik(m_nb)) - as.numeric(logLik(m_pois)))
 c(LR = round(LR, 1), p_valor = pchisq(LR, df = 1, lower.tail = FALSE) / 2)   # /2 por el borde
 ```
 
-### Una lectura estándar de bondad de ajuste
+$LR=1350.2$, con un $p$-valor prácticamente nulo.
 
-`performance::compare_performance()` reúne de un vistazo las medidas habituales de bondad de ajuste
-—**AIC**, **BIC** y **RMSE**— de los modelos con verosimilitud (la quasi-Poisson queda fuera por carecer
-de ella). Omitimos el pseudo-$R^2$ porque la NB1 de `glmmTMB` no lo admite:
+¿Y la quasi-Poisson? **No entra en esta comparación.** No tiene AIC, y su QAIC no sirve de sustituto:
+divide la log-verosimilitud de la Poisson entre $\hat c=2.38$, así que queda en otra escala (4529.7,
+frente a más de 9400 en las NB). Para comparar por QAIC, todos los modelos del conjunto tendrían que
+compartir el mismo $\hat c$ [@burnham2002]. Con las NB en el conjunto, el $\hat c$ adecuado es su
+índice de dispersión, que ronda 1 (1.012 en la NB2), y con $\hat c\approx 1$ el QAIC de la
+quasi-Poisson no es más que el AIC de la Poisson. La quasi-Poisson se descarta por su diagnóstico: su
+varianza no crece en proporción a la media ([Sección 3.3](#sec-u23-quasi)).
 
-```{r}
-#| label: u23-perf
-performance::compare_performance(Poisson = m_pois, NB1 = m_nb1, NB2 = m_nb,
-                                 metrics = c("AIC", "BIC", "RMSE"))
-```
+### Predicción
 
-El **RMSE** sale casi igual en los tres (≈ 1.92): todos predicen la misma **media**. Lo que separa es el
-**AIC/BIC**, y ahí la **NB2** se lleva todo el peso de Akaike ($\approx 1$). Otra cara de lo mismo que ya
-sabíamos: el promedio no distingue los modelos; su **forma** (la distribución), sí.
-
-::: {.callout-tip}
-## 🔧 En R. Bondad de ajuste en modelos de conteo
-
-No hay un único $R^2$ como en la regresión lineal. El repertorio estándar es:
-
-- **Índice de dispersión** (Pearson/gl): la cifra rápida; $\approx 1$ es buen ajuste, $\gg 1$ señala
-  estructura sin modelar.
-- **Contraste de deviance / Pearson $\chi^2$** frente a $\chi^2_{n-p}$: el «de libro», pero **solo
-  válido con medias altas o datos agrupados**; con conteos escasos (nuestro caso) **no es fiable**.
-- **AIC / BIC**: ajuste **relativo**, para **comparar** modelos, no absoluto.
-- **Pseudo-$R^2$** (McFadden y otros): análogo del $R^2$; `performance::r2()` (no todas las clases de
-  modelo lo admiten —p. ej. la NB1 de `glmmTMB`—).
-- **Rootograma** y **residuos simulados** (`DHARMa`): agnósticos a la distribución y fiables con
-  conteos escasos → los que más usamos.
-
-**Ojo con la quasi-Poisson:** al no tener verosimilitud, se queda **sin** AIC/BIC ni pseudo-$R^2$; su
-bondad se juzga solo por **dispersión + residuos**. La NB, ZIP/ZINB y hurdle sí admiten todo lo demás.
-:::
-
-### Predicciones: misma media, distinto riesgo
-
-Un punto clave y a menudo malentendido: la **predicción de la media** es casi idéntica en los cuatro
-modelos, porque comparten $\mu=\exp(\eta)$. Lo que difiere es la **distribución** predicha —y con ella
-la probabilidad de valores extremos—. Para verlo tomamos la **póliza de mayor riesgo esperado**
-(`i`, la de mayor $\hat\mu$ según la NB, donde la diferencia se nota más) y calculamos, bajo la Poisson
-y la NB2, tres cantidades:
-
-- `media_pois`, `media_nb`: la **media predicha** de partes para esa póliza ($\hat\mu$, con
-  `predict(type = "response")`);
-- `P0_pois`, `P0_nb`: la probabilidad de que esa póliza tenga **cero** partes, $P(Y=0)$;
-- `Pge10_pois`, `Pge10_nb`: la probabilidad de que tenga **diez o más**, $P(Y\ge 10)=1-P(Y\le 9)$.
+La binomial negativa predice la **media** igual que la Poisson, $\hat\mu=\exp(\mathbf{x}'\hat{\boldsymbol\beta})$,
+con su intervalo de confianza. Con el mismo perfil de referencia de la quasi-Poisson
+(@fig-u23-nb-pred):
 
 ```{r}
-#| label: u23-pred-comp
-i    <- which.max(fitted(m_nb))                          # la póliza de mayor riesgo esperado
-mu_p <- unname(predict(m_pois, cartera[i, ], type = "response"))   # media predicha (Poisson)
-mu_n <- unname(predict(m_nb,   cartera[i, ], type = "response"))   # media predicha (NB2)
-round(c(media_pois = mu_p, media_nb = mu_n,                        # casi iguales
-        P0_pois    = dpois(0, mu_p),        P0_nb    = dnbinom(0, size = m_nb$theta, mu = mu_n),      # P(Y = 0)
-        Pge10_pois = 1 - ppois(9, mu_p),    Pge10_nb = 1 - pnbinom(9, size = m_nb$theta, mu = mu_n)), # P(Y >= 10)
-      3)
+#| label: fig-u23-nb-pred
+#| fig-cap: "Número medio de partes predicho por la Poisson, la NB1 y la NB2 para el perfil de referencia, según la edad del conductor, con su intervalo de confianza al 95 %. La NB2 sigue de cerca a la Poisson con una banda más ancha; la NB1 suaviza el efecto de la edad."
+#| fig-width: 6.5
+#| fig-height: 3.6
+pred_nb <- dplyr::bind_rows(banda(m_pois, "Poisson"), banda(m_nb1, "NB1"), banda(m_nb, "NB2"))
+
+ggplot(pred_nb, aes(edad_conductor, mu, colour = modelo, fill = modelo)) +
+  geom_ribbon(aes(ymin = inf, ymax = sup), alpha = 0.2, colour = NA) +
+  geom_line(linewidth = 0.8) +
+  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue"),
+                      aesthetics = c("colour", "fill")) +
+  labs(x = "edad del conductor", y = "nº medio de partes al año", colour = NULL, fill = NULL)
 ```
 
-Para esa misma póliza (media $\approx 5$ partes), Poisson y NB predicen casi el **mismo promedio**, pero
-la NB lo reparte sobre una distribución mucho **más dispersa**: acumula bastante más probabilidad en el
-**0** (0.17 frente a 0.006) y en la **cola lejana** ($P(Y\ge 10)$ pasa de 0.04 a 0.17), a costa de
-vaciar el centro. Mismo promedio, mucha más varianza. Se ve en la distribución predicha (@fig-u23-pred-dist):
+```{r}
+#| label: u23-nb-pred-tabla
+pred_nb |>
+  dplyr::filter(edad_conductor %in% c(25, 45, 65)) |>
+  dplyr::select(modelo, edad_conductor, mu, inf, sup)
+```
+
+La **NB2** predice casi lo mismo que la Poisson —2.04 partes al año a los 45 años, frente a 2.07—, pero
+con una banda tan ancha como la de la quasi-Poisson: [1.89; 2.21]. La **NB1** se separa: con su
+coeficiente de edad más pequeño, la curva es más plana, y predice menos que la Poisson a los 25 años
+(2.64 frente a 2.80) y más a los 65 (1.69 frente a 1.54). Es la consecuencia práctica de que sus
+$\hat{\boldsymbol\beta}$ no sean los de la Poisson.
+
+Lo que la quasi-Poisson no podía dar, la NB sí lo da: la **distribución** del conteo,
+$\Pr(Y=k\mid\mathbf{x})$. La vemos en la póliza de **mayor riesgo** (`i`, la de mayor $\hat\mu$ según la
+NB2), comparada con la de la Poisson. Esa distribución ya expresa la incertidumbre del **conteo**; falta
+la de la **estimación**, porque se calcula con $\hat{\boldsymbol\beta}$ y $\hat\theta$. La añadimos por
+simulación paramétrica, como en la proyección de la [Unidad 2.2](#sec-u22-cuadradas). Para
+$b=1,\dots,B$:
+
+$$\boldsymbol\beta^{(b)}\sim N\bigl(\hat{\boldsymbol\beta},\widehat V(\hat{\boldsymbol\beta})\bigr),\qquad
+\theta^{(b)}\sim N\bigl(\hat\theta,\widehat{\mathrm{se}}(\hat\theta)^2\bigr),\qquad
+\mu_i^{(b)}=t_i\,e^{\mathbf{x}_i'\boldsymbol\beta^{(b)}},$$
+
+$$p_k^{(b)}=\Pr\bigl(Y=k\mid\mu_i^{(b)},\theta^{(b)}\bigr),\qquad
+y^{(b)}\sim\mathrm{NB}\bigl(\mu_i^{(b)},\theta^{(b)}\bigr).$$
+
+$\boldsymbol\beta$ y $\theta$ se simulan por separado porque en la NB2 sus estimadores son
+asintóticamente independientes [@lawless1987]. Los percentiles 2.5 y 97.5 de $p_k^{(b)}$ dan el
+**intervalo de confianza** de cada probabilidad; los percentiles 5 y 95 de $y^{(b)}$, que suman las dos
+incertidumbres, el **intervalo de predicción** al 90 % del número de partes. Para la Poisson, lo mismo
+sin $\theta$.
+
+```{r}
+#| label: u23-pred-sim
+i   <- which.max(fitted(m_nb))                     # la póliza de mayor riesgo esperado
+x_i <- model.matrix(m_nb)[i, ]
+t_i <- cartera$exposicion[i]
+B   <- 4000
+k_pred <- 0:16
+set.seed(SEMILLA_CURSO)
+
+# 1. parámetros simulados; beta y theta por separado: en la NB2 son asintóticamente independientes
+beta_nb  <- MASS::mvrnorm(B, coef(m_nb),   vcov(m_nb))
+theta_b  <- rnorm(B, m_nb$theta, m_nb$SE.theta)
+beta_poi <- MASS::mvrnorm(B, coef(m_pois), vcov(m_pois))
+
+# 2. media de la póliza en cada réplica
+mu_sim_nb  <- t_i * exp(drop(beta_nb  %*% x_i))
+mu_sim_poi <- t_i * exp(drop(beta_poi %*% x_i))
+
+# 3. probabilidad de cada conteo en cada réplica (filas: réplicas; columnas: k = 0, 1, ..., 16)
+p_sim_nb  <- sapply(k_pred, \(k) dnbinom(k, size = theta_b, mu = mu_sim_nb))
+p_sim_poi <- sapply(k_pred, \(k) dpois(k, mu_sim_poi))
+
+# 4. un conteo por réplica: suma la incertidumbre de la estimación y la del propio conteo
+y_sim_nb  <- rnbinom(B, size = theta_b, mu = mu_sim_nb)
+y_sim_poi <- rpois(B, mu_sim_poi)
+
+ic95  <- \(v) quantile(v, c(0.025, 0.975))
+mu_nb <- unname(fitted(m_nb)[i]); mu_poi <- unname(fitted(m_pois)[i])
+round(rbind(
+  media_Poisson   = c(estimacion = mu_poi, ic95(mu_sim_poi)),
+  media_NB2       = c(mu_nb, ic95(mu_sim_nb)),
+  P0_Poisson      = c(dpois(0, mu_poi), ic95(p_sim_poi[, 1])),
+  P0_NB2          = c(dnbinom(0, size = m_nb$theta, mu = mu_nb), ic95(p_sim_nb[, 1])),
+  P_ge_10_Poisson = c(1 - ppois(9, mu_poi), ic95(1 - ppois(9, mu_sim_poi))),
+  P_ge_10_NB2     = c(1 - pnbinom(9, size = m_nb$theta, mu = mu_nb),
+                      ic95(1 - pnbinom(9, size = theta_b, mu = mu_sim_nb)))), 3)
+
+# intervalo de predicción al 90 % para el número de partes de esta póliza
+rbind(Poisson = quantile(y_sim_poi, c(0.05, 0.95)), NB2 = quantile(y_sim_nb, c(0.05, 0.95)))
+```
+
+La media apenas distingue los modelos: 5.12 partes con la Poisson y 5.14 con la NB2, con intervalos que
+se solapan ampliamente. La forma, sí, y la incertidumbre de la estimación no cambia la conclusión: los
+intervalos no se solapan ni en el 0 ($\Pr(Y=0)$: [0.003; 0.010] frente a [0.139; 0.201]) ni en la cola
+($\Pr(Y\ge 10)$: [0.019; 0.065] frente a [0.123; 0.223]). El intervalo de predicción lo resume: en el
+90 % de los casos, esta póliza tendría entre 2 y 9 partes según la Poisson, y entre 0 y 17 según la NB2
+(@fig-u23-pred-dist).
 
 ```{r}
 #| label: fig-u23-pred-dist
-#| fig-cap: "Distribución de conteos predicha para una póliza de alto riesgo (media ≈ 5), con la misma media en todos los modelos. La NB2 (varianza cuadrática) acumula más probabilidad en el 0 y en la cola lejana; la NB1 (varianza lineal) queda entre la Poisson y la NB2; la Poisson concentra todo en el centro."
+#| fig-cap: "Distribución predicha del número de partes para la póliza de mayor riesgo, con el intervalo de confianza al 95 % de cada probabilidad (simulación paramétrica, 4000 réplicas). Con casi la misma media, la NB2 acumula probabilidad en el 0 y en la cola, y la Poisson la concentra en el centro."
 #| fig-width: 6.5
 #| fig-height: 3.6
-K <- 0:16
-mu_n1 <- unname(predict(m_nb1, cartera[i, ], type = "response"))
-dist <- tibble::tibble(k = K,
-                       Poisson = dpois(K, mu_p),
-                       NB1 = dnbinom(K, size = mu_n1 / sigma(m_nb1), mu = mu_n1),   # NB1: Var = mu(1+alpha)
-                       NB2 = dnbinom(K, size = m_nb$theta, mu = mu_n))
-dist |>
-  tidyr::pivot_longer(-k, names_to = "modelo", values_to = "prob") |>
-  ggplot(aes(k, prob, colour = modelo, group = modelo)) +
-  geom_line(linewidth = 0.7) + geom_point(size = 1.6) +
-  scale_colour_manual(values = c("Poisson" = "darkorange", "NB1" = "seagreen", "NB2" = "steelblue")) +
+dist_pred <- dplyr::bind_rows(
+  tibble::tibble(modelo = "Poisson", k = k_pred, prob = dpois(k_pred, mu_poi),
+                 inf = apply(p_sim_poi, 2, quantile, 0.025), sup = apply(p_sim_poi, 2, quantile, 0.975)),
+  tibble::tibble(modelo = "NB2", k = k_pred, prob = dnbinom(k_pred, size = m_nb$theta, mu = mu_nb),
+                 inf = apply(p_sim_nb, 2, quantile, 0.025), sup = apply(p_sim_nb, 2, quantile, 0.975)))
+
+ggplot(dist_pred, aes(k, prob, colour = modelo)) +
+  geom_line(linewidth = 0.6) +
+  geom_pointrange(aes(ymin = inf, ymax = sup), size = 0.3) +
+  scale_colour_manual(values = c("Poisson" = "darkorange", "NB2" = "steelblue")) +
   labs(x = "nº de partes", y = "probabilidad", colour = NULL)
 ```
 
-La consecuencia es práctica: si lo que importa es el **promedio** (p. ej. la prima media), los cuatro
-modelos coinciden; si importa la **cola** (probabilidad de muchos siniestros, reservas, percentiles
-altos), la Poisson —y, en menor medida, la NB1— **infravaloran el riesgo extremo** frente a la NB2, que
-es la que mejor describe esa cola.
+La consecuencia es práctica: si lo que importa es el **promedio** (la prima media), la Poisson y la NB2
+coinciden; si importa la **cola** (probabilidad de muchos siniestros, reservas, percentiles altos), la
+Poisson **infravalora el riesgo extremo**.
 
-### quasi-Poisson, NB1 y NB2: cuándo cada una
+::: {.callout-tip}
+## 🔧 En R. Ajustar una binomial negativa (NB1 y NB2)
+```r
+MASS::glm.nb(y ~ ..., data = ...)             # NB2: Var = mu + mu^2/theta  (varianza cuadratica)
+glmmTMB::glmmTMB(y ~ ..., family = nbinom2)   # la misma NB2, por ML directa
+glmmTMB::glmmTMB(y ~ ..., family = nbinom1)   # NB1: Var = mu(1 + alpha)    (varianza lineal)
+```
+
+- **NB2** (por defecto) — `MASS::glm.nb` la estima alternando IWLS y actualización de $\theta$; el
+  parámetro está en **`m$theta`** (con $\alpha = 1/\theta$). También `glmmTMB(family = nbinom2)`, que
+  maximiza la verosimilitud numéricamente.
+- **NB1** — comparte la varianza lineal de la quasi-Poisson, pero no sus estimaciones; solo en
+  `glmmTMB(family = nbinom1)`; su dispersión $\hat\alpha$ se lee con **`sigma(m)`**.
+- Los coeficientes se leen en **IRR** igual que en la Poisson —`broom::tidy(m, exponentiate = TRUE)`—, y
+  al ser generativas **sí** tienen `logLik` / `AIC` y predicen probabilidades
+  (`dnbinom(k, size = theta, mu = ...)`).
+- **Selección** — `drop1(m, test = "Chisq")` para cada término (con `glm.nb`, a $\theta$ fijo) y
+  `anova(m0, m1)` para dos modelos anidados (reestima $\theta$ en cada uno); `AIC(m)`.
+- **Diagnóstico** — el índice de dispersión de Pearson, `DHARMa::simulateResiduals(m)` y el rootograma.
+- **Predicción** — `predict(m, newdata, type = "link", se.fit = TRUE)` para la media y su IC;
+  `dnbinom(k, size = theta, mu = mu)` para la probabilidad de cada conteo (en la NB1, `size = mu / alpha`).
+  Para su incertidumbre, simulación paramétrica: `MASS::mvrnorm(B, coef(m), vcov(m))` para $\beta$ y
+  `rnorm(B, m$theta, m$SE.theta)` para $\theta$; `rnbinom()` sobre cada réplica da el intervalo de
+  predicción.
+:::
+
+## 3.5 Conclusiones y validación {#sec-u23-conclusiones}
+
+La pregunta de la unidad era si la Poisson capta la variabilidad de los partes por daños. No la capta:
+su índice de dispersión es 2.39, y su rootograma se queda corto en los ceros y en la cola. La
+quasi-Poisson corrige los errores estándar, pero su supuesto de varianza proporcional a la media no se
+cumple: la varianza de los residuos crece de 1.57 a 3.74 entre el quintil de menor y el de mayor
+riesgo. La **NB2** sí la capta: su índice de dispersión queda en 1.012, reproduce la distribución
+conteo a conteo y gana por AIC (9417.7, frente a 9487.7 de la NB1 y 10765.9 de la Poisson). En la
+práctica, la elección apenas cambia la prima media, pero sí la **cola**: para la póliza de mayor
+riesgo, la probabilidad de diez o más partes pasa de 0.036 con la Poisson a 0.170 con la NB2.
+
+### Cuándo cada una y una estrategia general {#sec-u23-sintesis}
 
 ::: {.callout-note}
 ## Cuándo cada una
@@ -852,7 +1129,43 @@ Si el exceso es **exceso de ceros**, ve a la [Unidad 2.4](#sec-u24); si es **agr
 [Unidad 2.5](#sec-u25): a veces lo que parece sobredispersión es una de esas dos cosas.
 :::
 
-### Validación contra el DGP
+::: {.callout-tip}
+## Receta para conteos sobredispersos
+
+1. **Ajusta la Poisson** (con `offset` si hay exposición) como punto de partida y lee las IRR.
+2. **Diagnostica**: índice de dispersión, rootograma y residuos simulados. Si $\hat\phi\approx 1$, la
+   Poisson basta y aquí acabas.
+3. Si $\hat\phi>1$, **identifica la causa** con el rootograma y los residuos: ¿exceso de ceros
+   ([2.4](#sec-u24)), agrupamiento ([2.5](#sec-u25)) o heterogeneidad general?
+4. Para la heterogeneidad, **confirma el exceso** con Cameron–Trivedi (`AER::dispersiontest`). La forma
+   de la varianza (lineal → quasi-Poisson / NB1; cuadrática → NB2) la **sugiere** el gráfico
+   media–varianza y la **decide** el paso siguiente.
+5. **Ajusta la alternativa** y **re-diagnostica** (dispersión $\approx 1$, `DHARMa`); compara por AIC
+   los modelos con verosimilitud. La quasi-Poisson se juzga por su diagnóstico: su QAIC solo compara
+   modelos quasi entre sí.
+6. **Interpreta** en IRR (idénticas en la quasi-Poisson, parecidas en la NB2) con los EE corregidos, y **predice** con la distribución
+   adecuada, según necesites la media o la cola.
+7. **Valida**: contra el DGP (en el curso) y fuera de muestra en la práctica ([Sección 1.6](#sec-u21-regularizacion)).
+:::
+
+::: {.callout-tip}
+## 🔧 En R. Bondad de ajuste en modelos de conteo
+
+El repertorio estándar de bondad de ajuste para conteos:
+
+- **Índice de dispersión** (Pearson/gl): la cifra rápida; $\approx 1$ es buen ajuste, $\gg 1$ señala
+  estructura sin modelar.
+- **Contraste de deviance / Pearson $\chi^2$** frente a $\chi^2_{n-p}$: el «de libro», pero **solo
+  válido con medias altas o datos agrupados**; con conteos escasos (nuestro caso) **no es fiable**.
+- **AIC / BIC**: ajuste **relativo**, para **comparar** modelos, no absoluto.
+- **Rootograma** y **residuos simulados** (`DHARMa`): no dependen de aproximaciones asintóticas, así
+  que son fiables con conteos escasos → los que más usamos.
+
+**Ojo con la quasi-Poisson:** al no tener verosimilitud, se queda **sin** AIC/BIC; su
+bondad se juzga solo por **dispersión + residuos**. La NB, ZIP/ZINB y hurdle sí admiten todo lo demás.
+:::
+
+### Validación contra el DGP {#sec-u23-validacion}
 
 Como la cartera es **simulada**, podemos hacer lo que en un caso real no: contrastar el resultado con la
 **verdad**. El proceso generó `n_danos` como una mezcla Poisson–Gamma (una NB2) con dispersión
@@ -872,29 +1185,9 @@ $\hat\alpha\approx 1.03$, en línea con el $1/\theta=1$ del DGP. Es decir: no so
 ajustado un modelo que encaja, sino **el modelo correcto**. Ese es el sentido del control de calidad que
 pediremos en el estudio de caso —ajustar a ciegas y validar al final contra `attr(., "verdad")`—.
 
-### Una estrategia general
-
-::: {.callout-tip}
-## Receta para conteos sobredispersos
-
-1. **Ajusta la Poisson** (con `offset` si hay exposición) como punto de partida y lee las IRR.
-2. **Diagnostica**: índice de dispersión, rootograma y residuos simulados. Si $\hat\phi\approx 1$, la
-   Poisson basta y aquí acabas.
-3. Si $\hat\phi>1$, **identifica la causa** con el rootograma y los residuos: ¿exceso de ceros
-   ([2.4](#sec-u24)), agrupamiento ([2.5](#sec-u25)) o heterogeneidad general?
-4. Para la heterogeneidad, **confirma el exceso** con Cameron–Trivedi (`AER::dispersiontest`). La forma
-   de la varianza (lineal → quasi-Poisson / NB1; cuadrática → NB2) la **sugiere** el gráfico
-   media–varianza y la **decide** el paso siguiente.
-5. **Ajusta la alternativa** y **re-diagnostica** (dispersión $\approx 1$, `DHARMa`); compara por AIC
-   (o QAIC con la quasi-Poisson).
-6. **Interpreta** en IRR (no cambian) con los EE corregidos, y **predice** con la distribución
-   adecuada, según necesites la media o la cola.
-7. **Valida**: contra el DGP (en el curso) y fuera de muestra en la práctica ([Unidad 2.7](#sec-u27)).
-:::
-
 ::: {.callout-important}
 ## Tarea del estudiante (2.3) — Preguntas 6 y 7 del caso
-Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.8](#sec-u28)):
+Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.7](#sec-u27)):
 
 - **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
   la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**

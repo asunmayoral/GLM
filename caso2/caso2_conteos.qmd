@@ -27,8 +27,8 @@ editor:
 
 <!-- ============================================================================
      Caso 2 (Poisson).
-       - TEORÍA (unidades 2.1-2.7): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
-       - ESTUDIO DE CASO (Unidad 2.8) y Caso 3: R/dgp_auto.R -> cartera de auto de cada
+       - TEORÍA (unidades 2.1-2.6): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
+       - ESTUDIO DE CASO (Unidad 2.7) y Caso 3: R/dgp_auto.R -> cartera de auto de cada
          equipo (datos_equipos_auto/equipo_XX/).
 ============================================================================ -->
 
@@ -46,7 +46,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(glmnet)       # regularización (2.7)
+library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -65,7 +65,7 @@ supervivencia** (riesgos a trozos) y culmina en el de **comunicar y reproducir**
 Al completar el Caso 2, el estudiante será capaz de:
 
 - **RA1 · Poisson, tasas e IRR.** Reconocer cuándo la respuesta es un conteo, ajustar una regresión de Poisson (enlace log) e interpretar sus coeficientes como razones de tasas (IRR), usando el *offset* de la exposición para modelar **tasas** en lugar de recuentos brutos.
-- **RA2 · Modelos log-lineales.** Analizar tablas de contingencia y de cambio como una regresión de Poisson sobre los **recuentos de celda**: esquemas de muestreo y grados de libertad, **jerarquía** de modelos en tres vías (independencia mutua, conjunta y condicional, asociación homogénea), paradoja de **Simpson** y colapsabilidad, diagnóstico de celdas, y modelos de **tablas cuadradas** (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal). Aplicarlo a la detección de **variables *proxy*** de un factor prohibido.
+- **RA2 · Modelos log-lineales.** Analizar tablas de contingencia y de cambio como una regresión de Poisson sobre los **recuentos de celda**: esquemas de muestreo y grados de libertad, **jerarquía** de modelos en tres vías (independencia mutua, conjunta y condicional, asociación homogénea), paradoja de **Simpson** y colapsabilidad, diagnóstico de celdas, y modelos de **tablas cuadradas** (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal).
 - **RA3 · Sobredispersión.** Diagnosticar la sobredispersión (índice de dispersión, relación media–varianza, contraste de Cameron–Trivedi) y tratarla con **quasi-Poisson** y **binomial negativa** (NB1/NB2), sabiendo cuál elegir.
 - **RA4 · Exceso de ceros.** Detectar el exceso de ceros y modelarlo con modelos **inflados de ceros** (ZIP/ZINB) y de **barrera** (*hurdle*), distinguiendo el mecanismo de mezcla del de barrera.
 - **RA5 · Conteos agrupados (mixtos).** Ajustar e interpretar **GLMM de Poisson** con estructura anidada: componentes de varianza, ICC, BLUP y la distinción entre media **condicional** y **marginal**.
@@ -84,27 +84,25 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 
 | Unidad | Contenido | Objetivo y datos |
 |:--:|:----------------------------------------------------------------|:------------------|
-| **2.1** | *«¿Cuántas veces y a qué ritmo?»* — Regresión de Poisson para tasas: *Contexto* (recuentos y exposición) · *Modelización y estimación* (la tasa $\lambda$ y el *offset*) · *Interpretación y predicción* (IRR, predicción con intervalo) · *Inferencia y selección* · *Bondad de ajuste y diagnóstico* · *Validación*. | **RA1** (y primer contacto con RA7 y RA8)<br>**Datos:** `cartera` (`n_asistencia`) |
+| **2.1** | *«¿Cuántas veces y a qué ritmo?»* — Regresión de Poisson para tasas: *Contexto* (recuentos y exposición) · *Modelización y estimación* (la tasa $\lambda$ y el *offset*) · *Interpretación y predicción* (IRR, predicción con intervalo) · *Inferencia y selección* · *Bondad de ajuste y diagnóstico* · *Validación* · *¿Qué predictores retener?* (validación cruzada y regularización con `glmnet`). | **RA1** y **RA8** (y primer contacto con RA7)<br>**Datos:** `cartera` (`n_asistencia`) |
 | **2.2** | *«¿Y si el dato es la celda?»* — Modelos log-lineales. *Asociación:* dos vías (la tabla como dato, esquemas de muestreo, el modelo y sus grados de libertad, contraste de independencia, odds ratio, puente con la logística) · tres vías (**jerarquía** con **grafos de asociación**, diagnóstico, **Simpson** con Berkeley) · más de tres vías. *Cambio:* **tablas cuadradas** del bonus-malus (simetría, cuasi-simetría, homogeneidad marginal, asociación ordinal e inercia). | **RA2**<br>**Datos:** `cartera` (`n_asistencia`, bonus-malus) y `UCBAdmissions` |
 | **2.3** | *«¿Y si la varianza supera a la media?»* — Sobredispersión: causas, diagnóstico, estructuras de la varianza, quasi-Poisson y binomial negativa (con OLRE y conexiones). | **RA3** (y RA7 en el diagnóstico)<br>**Datos:** `cartera` |
 | **2.4** | *«¿Y si sobran ceros?»* — Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | **RA4** (y RA7)<br>**Datos:** `cartera` |
 | **2.5** | *«¿Y si las pólizas se agrupan por agencia?»* — Conteos agrupados: GLMM de Poisson. | **RA5** (espiral de mixtos; y RA7)<br>**Datos:** `cartera` (por `agencia`/`region`) |
 | **2.6** | *«¿Del conteo al reloj?»* — Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | **RA6** (espiral de supervivencia; y RA7)<br>**Datos:** `cartera` (persona-periodo) |
-| **2.7** | *«¿Qué predictores retener, y generaliza?»* — Selección, validación cruzada y regularización (`glmnet` Poisson) · seleccionar con un factor prohibido: ***proxies***. | **RA8** (y RA2 en los proxies)<br>**Datos:** `cartera` |
-| **2.8** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cartera de auto de cada equipo |
+| **2.7** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cartera de auto de cada equipo |
 
 **Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso2/scripts/`):
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **2.1** | ajuste y *offset*: [`glm(family = poisson, offset = log(exposicion))`](#sec-u21-modelizacion) · interpretación y predicción: [IRR con `broom::tidy(exponentiate = TRUE)` · `predict` · `marginaleffects::predictions`](#sec-u21-interpretacion) · inferencia: [`anova` · `drop1` · `AIC`/`BIC` · `update`](#sec-u21-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::check_overdispersion`](#sec-u21-diagnostico) |
+| **2.1** | ajuste y *offset*: [`glm(family = poisson, offset = log(exposicion))`](#sec-u21-modelizacion) · interpretación y predicción: [IRR con `broom::tidy(exponentiate = TRUE)` · `predict` · `marginaleffects::predictions`](#sec-u21-interpretacion) · inferencia: [`anova` · `drop1` · `AIC`/`BIC` · `update`](#sec-u21-inferencia) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::check_overdispersion`](#sec-u21-diagnostico) · selección: [validación cruzada · `glmnet` · `cv.glmnet` · `model.matrix` · `lambda.min`/`lambda.1se`](#sec-u21-regularizacion) |
 | **2.2** | tablas: [`xtabs` · `as.data.frame` · `addmargins` · `prop.table` · `glm(Freq ~ ..., poisson)` · `MASS::loglm`](#sec-u22-dosvias) · jerarquía: [`anova` · `ftable` · `margin.table` · `pchisq`](#sec-u22-orden-superior) · grafos y diagnóstico: [`rstandard(type = "pearson")` · `vcd::mosaic`](#sec-u22-tresvias) · tablas cuadradas: [simetría, cuasi-simetría, asociación uniforme](#sec-u22-cuadradas) |
-| **2.3** | detección: [`AER::dispersiontest` · `DHARMa::testDispersion` · `countreg::rootogram`](#sec-u23-diagnostico) · quasi-Poisson: [`glm(family = quasipoisson)`](#sec-u23-quasi) · binomial negativa: [`MASS::glm.nb` · `glmmTMB` (NB1 y NB2) · `sigma`](#sec-u23-nb) · bondad de ajuste: [`performance::r2` · AIC/BIC · rootograma](#sec-u23-elegir) |
+| **2.3** | detección: [`AER::dispersiontest` · `DHARMa::testDispersion` · `countreg::rootogram`](#sec-u23-diagnostico) · quasi-Poisson: [`glm(family = quasipoisson)`](#sec-u23-quasi) · binomial negativa: [`MASS::glm.nb` · `glmmTMB` (NB1 y NB2) · `sigma`](#sec-u23-nb) · bondad de ajuste: [índice de dispersión · AIC/BIC · rootograma](#sec-u23-sintesis) |
 | **2.4** | detección: [`DHARMa::testZeroInflation` · `vcdExtra::zero.test` · `countreg::zitest`](#sec-u24-ceros) · ZIP/ZINB: [`pscl::zeroinfl` · `glmmTMB(ziformula = )`](#sec-u24-zi) · hurdle: [`pscl::hurdle`](#sec-u24-hurdle) · comparación: [AIC · ceros predichos frente a observados](#sec-u24-elegir) |
 | **2.5** | GLMM Poisson: [`lme4::glmer` · anidamiento `(1 \| a/b)` · `VarCorr` · `isSingular`](#sec-u25-modelo) · bondad de ajuste: [`DHARMa` · dispersión residual · $R^2$ de Nakagawa · ICC](#sec-u25-diagnostico) · OLRE: [`(1 \| id_obs)` · `performance::compare_performance`](#sec-u25-olre) |
 | **2.6** | riesgos a trozos: [`glm(poisson, offset)` · `survival::Surv` · `survfit` · `broom::tidy`](#sec-u26-piecewise) · Cox como contraste: [`coxph` · `cox.zph` (Schoenfeld)](#sec-u26-clasicos) |
-| **2.7** | validación cruzada: [`boot::cv.glm`](#sec-u27-cv) · regularización: [`glmnet` · `cv.glmnet` · `model.matrix` · `lambda.min`/`lambda.1se`](#sec-u27-reg) · proxies: [independencia condicional en tabla](#sec-u27-proxy) · alcance: [qué familias cubre `glmnet`](#sec-u27-binomial) |
-| **2.8** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
+| **2.7** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 
 # Presentación del caso {#sec-presentacion2}
@@ -114,7 +112,7 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 Para la teoría trabajamos con una **cartera de seguros de auto simulada**: una compañía sigue a sus
 pólizas durante un periodo y registra, para cada una, cuántas veces ocurre cada tipo de incidencia.
 Al ser **simulada** conocemos su proceso generador (la «verdad»), lo que nos permitirá **validar** los
-ajustes —como hicimos con la cohorte del Caso 1—. El estudio de caso ([Unidad 2.8](#sec-u28)) usará
+ajustes —como hicimos con la cohorte del Caso 1—. El estudio de caso ([Unidad 2.7](#sec-u27)) usará
 una cartera de auto **más rica**, distinta para cada equipo.
 
 Cada fila es una **póliza**. `exposicion` mide **cuánto tiempo llevamos con ese cliente**: su tiempo
@@ -198,7 +196,7 @@ cartera |>
 
 {{< include _unidad_2_7.qmd >}}
 
-{{< include _unidad_2_8.qmd >}}
+
 
 # Reproducibilidad {#sec-repro2}
 

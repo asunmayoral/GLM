@@ -200,7 +200,7 @@ completo de un tirón, sin ir desplegando bloque a bloque.
 |:--|:--|:--|
 | **Antes de empezar · Paquetes de R** | [`_scripts/instalar_paquetes.R`](https://github.com/asunmayoral/GLM/blob/master/_scripts/instalar_paquetes.R) | Instala los paquetes de R que faltan para ejecutar los scripts de los tres casos |
 | **Caso 1 · Respuestas binarias** | [`caso1/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso1/scripts) | Un `.R` por unidad (1.1 a 1.6) y el del documento completo |
-| **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) | Un `.R` por unidad (2.1 a 2.8) y el del documento completo |
+| **Caso 2 · Conteos y tasas** | [`caso2/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso2/scripts) | Un `.R` por unidad (2.1 a 2.7) y el del documento completo |
 | **Caso 3 · Continuas positivas** | [`caso3/scripts`](https://github.com/asunmayoral/GLM/tree/master/caso3/scripts) | Un `.R` por unidad (3.1 a 3.8) y el del documento completo |
 
 : Código R de la teoría de cada caso, por unidades, y script de instalación de paquetes. {.striped .hover tbl-colwidths="[28,26,46]"}

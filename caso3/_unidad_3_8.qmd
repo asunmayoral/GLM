@@ -1,10 +1,10 @@
 <!-- Partial · Incluir con {{< include _unidad_3_8.qmd >}}. Sin YAML. Sin chunks de código:
-     es unidad de ENCARGO y EVALUACIÓN. Espejo de 1.6 y 2.8.
+     es unidad de ENCARGO y EVALUACIÓN. Espejo de 1.6 y 2.7.
      Tipología de informe del Caso 3 (guía docente): ARTÍCULO DE INVESTIGACIÓN.
 
      DATOS: NO son los del banco de averías de la teoría del Caso 3, sino la CARTERA DE AUTO del
      Caso 2 (caso2/R/dgp_auto.R), ya repartida por equipos en caso2/datos_equipos_auto/.
-     La 2.8 la usó para FRECUENCIA; aquí se usan las lentes que allí quedaron reservadas:
+     La 2.7 la usó para FRECUENCIA; aquí se usan las lentes que allí quedaron reservadas:
      COSTE (Gamma/IG/Tweedie) y DURACIÓN de la póliza (AFT/Cox).
 
      CIFRAS VERIFICADAS sobre caso2/datos_equipos_auto (20 equipos, septiembre 2026):
@@ -49,7 +49,7 @@ hay teoría nueva —se integra y se evalúa todo lo anterior— y el objetivo e
 evaluado: **comunicar y reproducir**. El entregable es un **artículo de investigación**.
 
 **Datos:** la **cartera de auto del Caso 2**, la misma con la que trabajaste la frecuencia en la
-[Unidad 2.8](../caso2/caso2_conteos.qmd#sec-u28). No el banco de averías de la teoría de este bloque.
+[Unidad 2.7](../caso2/caso2_conteos.qmd#sec-u27). No el banco de averías de la teoría de este bloque.
 :::
 
 ## 8.1 El banco de datos: lo que ya conoces y lo que no {#sec-u38-datos}
@@ -61,7 +61,7 @@ agencias** repartidas en **6 regiones**. Cada póliza se sigue desde que entra e
 se da de baja o hasta que termina la ventana de estudio: de ahí que la **antigüedad** observada vaya
 desde poco más de un mes hasta casi diez años, y que la **exposición** sea muy desigual entre pólizas.
 
-En el Caso 2 miraste esa cartera con una sola lente: **¿cuántos partes, y a qué ritmo?**. La 2.8 te
+En el Caso 2 miraste esa cartera con una sola lente: **¿cuántos partes, y a qué ritmo?**. La 2.7 te
 avisó de que la cartera llevaba dentro otras dos preguntas, reservadas para este bloque:
 
 > **¿Cuánto cuesta un siniestro?** — la severidad, en euros. Y su agregado: **¿cuánto costará el año
@@ -79,7 +79,7 @@ misma que en el Caso 2: **ajusta con los `.csv`, y abre el `.rds` solo al final*
 calidad.
 
 **`cartera.csv` — una fila por póliza.** Es la tabla que ya conoces: la
-[Unidad 2.8](../caso2/caso2_conteos.qmd#sec-u28) describe su estructura, sus predictores de riesgo,
+[Unidad 2.7](../caso2/caso2_conteos.qmd#sec-u27) describe su estructura, sus predictores de riesgo,
 las variables de ruido, el bonus-malus y el factor **prohibido** (`sexo`). Aquí solo repasamos las
 columnas que allí **no** usaste, porque son las respuestas de este caso:
 
@@ -265,14 +265,18 @@ de la vía A estiman por separado.
 **La pregunta.** La ley prohíbe tarificar con el sexo (*Test-Achats*, TJUE C-236/09). ¿Basta con
 quitarlo del modelo?
 
-**Por qué es interesante.** El Caso 2 abrió esta pregunta y solo llegó hasta la **frecuencia**. La
-severidad es el otro canal, y nada garantiza que la fuga sea del mismo tamaño en los dos.
+**Por qué es interesante.** En el Caso 2 dejaste `sexo` fuera de la tarifa, pero no comprobaste si su
+información se colaba a través de otra variable permitida. Aquí lo compruebas en los dos canales de la
+prima, **frecuencia** y **severidad**: nada garantiza que la fuga sea del mismo tamaño en ambos.
 
 **El camino recomendado.**
 
 1. Cuantifica primero la **asociación** entre `sexo` y las demás covariables. Una de ellas es un
    *proxy*: transporta información del factor prohibido aunque el factor no esté en el modelo. Las
-   demás son **controles negativos** y deberían salir limpias.
+   demás son **controles negativos** y deberían salir limpias. La herramienta es el contraste de
+   **independencia condicional** en una tabla de tres vías de la
+   [Unidad 2.2](../caso2/caso2_conteos.qmd#sec-u22-tresvias); como harás un contraste por covariable,
+   alguno saldrá significativo por azar, así que mira el **tamaño** de la asociación y no solo el $p$.
 2. Ajusta la **Gamma de severidad** sobre `coste_k` en dos versiones —con y sin el *proxy*— y mide
    cuánto se mueve el efecto **marginal** del sexo entre una y otra. Repite el ejercicio en
    **frecuencia** y en **prima pura** (propuesta 1, vía A) y compara los tres tamaños de fuga.

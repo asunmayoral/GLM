@@ -16,7 +16,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(glmnet)       # regularización (2.7)
+library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -25,7 +25,7 @@ set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 ```
 
-## 8.1 El estudio de caso (entregable) {#sec-u28-caso}
+## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
 
 ### El encargo
 
@@ -75,31 +75,26 @@ Caso 1, tú **eliges y justificas** el modelo en cada caso.
 >     el del primero, o distinto?
 > 15. ¿Cada cuánto conviene **revisar** a las pólizas de más riesgo?
 >
-> *Sobre un modelo sencillo, fiable y responsable*
+> *Sobre un modelo sencillo y fiable*
 >
 > 16. Manejamos **muchísimas variables**: ¿cuáles merece la pena **conservar** para anticipar la
 >     siniestralidad, sin perder fiabilidad?
-> 17. Tenemos el **sexo** del conductor y sabemos que predice, pero la ley **prohíbe** tarificar con él:
->     ¿cómo hacéis una selección que lo **respete** y no lo cuele por la puerta de atrás (proxies)?
-> 18. Y si lo quitamos del modelo, ¿estamos ya tranquilos? ¿Hay alguna de las variables que **sí** podemos
->     usar que vaya tan de la mano del sexo que en realidad lo esté sustituyendo? Si es así, decidnos
->     **cuál** y **cuánto** de la diferencia entre hombres y mujeres se nos sigue colando por ahí.
-> 19. Última cosa, y va sin ánimo de ofender: estos números los vamos a usar para fijar precios. ¿Cómo
+> 17. Última cosa, y va sin ánimo de ofender: estos números los vamos a usar para fijar precios. ¿Cómo
 >     comprobáis vosotros mismos que no os habéis equivocado? Si el mismo dato se puede analizar de dos
 >     maneras distintas, ¿os dan lo mismo?
 
 | Preguntas | Qué se pregunta | Dónde se trabaja |
 |:--|:--|:--|
 | **P1–P3** | Ritmo de siniestros y factores; predicción para una póliza nueva; comparación con las asistencias | [Unidad 2.1](#sec-u21) |
+| **P16** | Qué variables conservar: validación cruzada y regularización | [Unidad 2.1](#sec-u21-regularizacion) |
 | **P4–P5** | Asociación entre factores; movilidad del bonus-malus | [Unidad 2.2](#sec-u22) |
 | **P6–P7** | Variabilidad de más y su origen | [Unidad 2.3](#sec-u23) (con [2.5](#sec-u25) y [2.6](#sec-u26)) |
 | **P8** | Pólizas que no levantan revisión antifraude | [Unidad 2.4](#sec-u24) |
 | **P9–P12** | Agencias y territorio | [Unidad 2.5](#sec-u25) |
 | **P13–P15** | Evolución del riesgo en el tiempo | [Unidad 2.6](#sec-u26) |
-| **P16–P18** | Selección de variables, factor prohibido y sus *proxies* | [Unidad 2.7](#sec-u27) |
-| **P19** | Control de calidad: log-lineal frente a logística | [Unidad 2.2](#sec-u22) |
+| **P17** | Control de calidad: log-lineal frente a logística | [Unidad 2.2](#sec-u22) |
 
-: Correspondencia entre las preguntas de la dirección y la unidad en que se trabaja cada una. {#tbl-u28-mapa-preguntas}
+: Correspondencia entre las preguntas de la dirección y la unidad en que se trabaja cada una. {#tbl-u27-mapa-preguntas}
 
 ## Los datos
 
@@ -122,7 +117,7 @@ tiempo expuesto**, no en bruto.
 | Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (`antiguedad / 10`: la misma antigüedad medida en **décadas**, entre 0.01 y 1 → *offset*; la tasa se lee como partes por cada 10 años de póliza); `antiguedad` (años en la cartera) |
 | Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia); `tuvo_siniestro` (1 si `n_siniestros > 0`: versión binaria, útil para las tablas de P4) |
 | Predictores de riesgo | `edad_conductor` (y en tramos, `edad_tramo`: 18-25 / 25-35 / 35-65 / 65+); `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
-| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Úsalo para **discutir** *fairness* y variables *proxy*, no para el modelo final. Aviso: excluirlo del modelo **no garantiza** que su información quede fuera —eso es lo que te toca averiguar en P18— |
+| Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Exclúyelo de los modelos de tarificación y de la selección de P16 |
 | Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
 | Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**; su cambio se analiza como tabla cuadrada |
 | Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
@@ -191,15 +186,15 @@ z_de <- function(nm, valor_bruto) (valor_bruto - centros[nm]) / escalas[nm]
 ## Unidad 2.1
 
 ::: {.callout-important}
-## Tarea del estudiante (2.1) — Preguntas 1 a 3 del caso
-Sobre la cartera de tu equipo abordas el primer bloque de la dirección:
+## Tarea del estudiante (2.1) — Preguntas 1 a 3 y 16 del caso
+Sobre la cartera de tu equipo abordas el primer bloque de la dirección ([Unidad 2.7](#sec-u27)):
 
 1. **Ritmo y perfiles (P1).** Modela la **tasa** de `n_siniestros` con Poisson y `offset(log(exposicion))`
    y lee los factores en **IRR** con sus intervalos.
    *Pistas:* interpreta al menos un IRR con la frase completa de la
    [Sección 1.3](#sec-u21-interpretacion) («a igualdad de…, la tasa esperada es … veces …»). En tu
    cartera `exposicion` es la antigüedad en **décadas** (`antiguedad / 10`), así que la tasa se lee como
-   siniestros por cada 10 años de póliza. No incluyas `sexo`: es el factor prohibido ([Unidad 2.8](#sec-u28)).
+   siniestros por cada 10 años de póliza. No incluyas `sexo`: es el factor prohibido ([Unidad 2.7](#sec-u27)).
 2. **Predicción (P2).** Estima el ritmo esperado —con intervalo— de una **póliza nueva** de un perfil dado.
    *Pistas:* en el `newdata`, `exposicion = 0.1` equivale a **un año** de póliza. Distingue en tu
    respuesta el intervalo de la **tasa media** de ese perfil del número de siniestros que tendrá **una**
@@ -209,18 +204,32 @@ Sobre la cartera de tu equipo abordas el primer bloque de la dirección:
    *Pista:* une las dos tablas de `broom::tidy(..., exponentiate = TRUE, conf.int = TRUE)` por `term` y
    dibuja los IRR de las dos respuestas, lado a lado, con sus intervalos.
 
+4. **Qué variables conservar (P16).** La dirección quiere un modelo **sencillo y fiable** que diga qué
+   variables conservar. Con `n_siniestros` y su *offset*, compara por **validación cruzada** (*deviance*
+   de Poisson en 10 bloques) el modelo nulo, uno con los predictores que consideres «del riesgo» y otro
+   con todos los candidatos permitidos. Ajusta después un **lasso** Poisson con `cv.glmnet`, presenta la
+   ruta y la curva de validación, **justifica** tu elección de $\lambda$ (`min` frente a `1se`) y di qué
+   variables conserva y con qué IRR.
+   *Pistas:* fija la partición una sola vez y pásala a `cv.glmnet` con `foldid`, como en la
+   [Sección 1.6](#sec-u21-regularizacion), para que todas las comparaciones usen los mismos bloques.
+   `sexo` no entra en la matriz `x`. Si `n_siniestros` resulta sobredispersa, la media que estima la
+   Poisson es la misma que dará la quasi-Poisson de la [Unidad 2.3](#sec-u23): la comparación por
+   validación cruzada sigue siendo legítima, pero no informes de ningún error estándar sin corregirlo.
+   Para dar los IRR con su intervalo, reajusta un `glm()` con las variables elegidas.
+
 **Diagnóstico.** Para cada respuesta, comprueba si la Poisson basta con el **índice de dispersión**, el
 **rootograma** y los **residuos simulados** de `DHARMa` ([Sección 1.5](#sec-u21-diagnostico)). Si el
 índice se dispara, los intervalos de P1 y P2 son **demasiado estrechos**: anótalo y no los des por
 buenos; lo resolverás en la [Unidad 2.3](#sec-u23) (P6–P7).
 
 **Validación.** Al final, y solo al final, compara tus estimaciones con la verdad de tu cartera
-(`attr(cartera, "verdad")`, en `cartera.rds`). Sus nombres y escalas no coinciden con los de la
+(`attr(cartera, "verdad")`, en `cartera.rds`); en P16, comprueba además qué predictores activos conserva
+el lasso y qué ruido descarta. Sus nombres y escalas no coinciden con los de la
 cartera de teoría, así que el código de la validación de esta unidad no te sirve tal cual: el prompt del
 recuadro anterior está pensado para ese emparejamiento.
 
-Las preguntas **P4** (asociación en tablas), **P5** (movilidad del bonus-malus) y **P19** (control de
-calidad) se abordan con la [Unidad 2.2](#sec-u22); la **P18** (proxies), con la [Unidad 2.7](#sec-u27-proxy).
+Las preguntas **P4** (asociación en tablas), **P5** (movilidad del bonus-malus) y **P17** (control de
+calidad) se abordan con la [Unidad 2.2](#sec-u22).
 :::
 
 
@@ -446,8 +455,8 @@ ggplot(irr_zona, aes(km_anuales, ratio, colour = contrast)) +
 ## Unidad 2.2
 
 ::: {.callout-important}
-## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
-Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
+## Tarea del estudiante (2.2) — Preguntas 4, 5 y 17 del caso
+Sobre la cartera de tu equipo ([Unidad 2.7](#sec-u27)):
 
 **P4 · ¿Qué factores se asocian con tener un siniestro, y cómo se relacionan entre sí?** Cruza
 `tipo_vehiculo`, `zona_circulacion` y `combustible` con `tuvo_siniestro` (tener o no al menos un
@@ -494,7 +503,7 @@ tiene el movimiento? Cierra con lo que significa para los ingresos y la retenci�
 - Para el negocio: el efecto de un cambio en el reparto sobre la prima media depende de cuánto
   descuenta o recarga cada nivel; razónalo, aunque no tengas la tarifa.
 
-**P19 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
+**P17 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
 asociaciones de P4 como logística de `tuvo_siniestro` y compara sus odds ratios con los del log-lineal
 saturado.
 
@@ -509,16 +518,13 @@ saturado.
 
 Da siempre el **tamaño** del efecto junto al $p$-valor, y **valida** al final contra
 `attr(cartera, "verdad")`: ¿coincide la estructura que has elegido con la del proceso generador?
-
-La pregunta **P18** (proxies del factor prohibido) usa estas mismas herramientas, pero se plantea con la
-selección de variables, en la [Unidad 2.7](#sec-u27-proxy).
 :::
 
 ## Unidad 2.3
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.3) — Preguntas 6 y 7 del caso
-Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.8](#sec-u28)):
+Sobre la cartera de tu equipo abordas la variabilidad de `n_siniestros` ([Unidad 2.7](#sec-u27)):
 
 - **P6 · ¿Capta el modelo la variabilidad?** Unas pocas pólizas concentran muchísimos partes. **Diagnostica**
   la sobredispersión (índice, rootograma, residuos simulados y contraste de estructura), **ajusta**
@@ -535,7 +541,7 @@ Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`a
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.4) — Pregunta 8 del caso
-Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.8](#sec-u28)): *la mayoría
+Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.7](#sec-u27)): *la mayoría
 de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
 frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
 exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
@@ -549,7 +555,7 @@ parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
 ::: {.callout-important}
 ## Tarea del estudiante (2.5) — Preguntas 9 a 12 del caso
 Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, intercepto aleatorio por
-**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.8](#sec-u28)):
+**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.7](#sec-u27)):
 
 - **P9 · ¿Cuánta variación es de agencia?** Interpreta los efectos fijos en IRR (condicionales a la agencia)
   y cuantifica el **ICC**.
@@ -567,7 +573,7 @@ $\sigma_a$ y $\sigma_{reg}$ del DGP (`attr(cartera, "verdad")$sigma_ag`, `$sigma
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.6) — Preguntas 13 a 15 del caso
-Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.8](#sec-u28)):
+Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Unidad 2.7](#sec-u27)):
 
 - **P13 · El primer siniestro.** Expande a **persona-periodo** y ajusta el modelo de **riesgos a trozos**
   (Poisson + offset) sobre `t_primer_sin`/`evento` —en tu cartera el tiempo es **continuo**: córtalo en
@@ -582,37 +588,4 @@ Sobre la cartera de tu equipo abordas la evolución del riesgo en el tiempo ([Un
   riesgo.
 
 **Valida** el hazard base contra la forma Weibull del DGP (`attr(cartera, "verdad")$weib_shape`, `$lambda0`).
-:::
-
-## Unidad 2.7
-
-::: {.callout-important}
-## Tarea del estudiante (2.7) — Preguntas 16, 17 y 18 del caso
-Sobre **la cartera de tu equipo**, la dirección pide un modelo **sencillo, fiable y responsable** para anticipar
-la **siniestralidad**, diciendo **qué variables conservar** ([Unidad 2.8](#sec-u28)). Con `n_siniestros` y su
-*offset* de exposición:
-
-1. **Selección (P16).** Compara, por **validación cruzada** (*deviance* de Poisson en 10 bloques), el modelo
-   nulo, uno con los predictores que a priori consideres «del riesgo» y el modelo con **todas** las variables.
-   Contrástalo con **AIC** y **BIC**, y comenta las discrepancias.
-2. **Regularización (P16).** Ajusta un **Poisson regularizado** con `cv.glmnet` (*lasso*; prueba también *ridge*
-   y *elastic-net*). Presenta la **ruta de regularización** y la **curva de validación cruzada**, y **justifica**
-   tu elección de $\lambda$ (`min` frente a `1se`).
-3. **Modelo final (P16).** **Qué variables retiene** el *lasso* y qué **IRR** tienen. Interpreta las dos o tres
-   más relevantes en términos que la dirección entienda («la zona urbana multiplica por … la tasa de siniestros»).
-4. **Fairness (P17).** `sexo` predice, pero es **factor prohibido** (primas unisex, *Test-Achats*): **exclúyelo**
-   de la tarifa, detecta posibles **proxies** —variables permitidas que lo correlacionan— y razona una selección
-   **responsable**.
-5. **Proxies (P18).** Contrasta la **independencia condicional** entre `sexo` y cada covariable permitida
-   ([Sección 7.3](#sec-u27-proxy)). Identifica los proxies, distingue los que lo son de los que no —habrá
-   controles negativos— y **mide la fuga** comparando el efecto marginal y el ajustado de `sexo`. Recuerda
-   que vas a hacer **varios** contrastes: algún $p$ pequeño saldrá por azar, así que no llames proxy a nada
-   sin mirar la magnitud. Lleva la conclusión a la reflexión individual: ¿qué haces con la variable, y a
-   qué coste?
-6. **Control de calidad contra el DGP.** Con `attr(cartera, "verdad")`, comprueba si el *lasso* **conserva los
-   activos** y **descarta el ruido**. Discute los **activos débiles**: ¿los retiene? ¿Por qué la selección por
-   predicción no coincide exactamente con la verdad, y por qué eso **no** es un error del método?
-
-Entrega, como siempre, un cuaderno **reproducible** (semilla fija) y ajusta **a ciegas**: mira la verdad solo al
-final, para validar.
 :::

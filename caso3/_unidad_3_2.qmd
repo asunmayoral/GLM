@@ -353,7 +353,7 @@ familia es la Gamma. Que coincidan es tranquilizador, pero conviene fijar el ord
 :::
 
 Una última observación que enlaza con lo que viene. La familia está bien elegida, y sin embargo
-$\hat\phi$ (en torno a **0,33**) **dobla** su valor verdadero (**0,17**); ninguna de las tres familias
+$\hat\phi$ (en torno a **0.33**) **dobla** su valor verdadero (**0.17**); ninguna de las tres familias
 arregla eso, porque no es un problema de **familia** sino de **estructura**. Sobra variabilidad porque las
 averías se **agrupan por máquina** —cada máquina aporta varias, correlacionadas— y el modelo no lo sabe.
 Es la misma señal que ya vimos inflar $\hat\phi$ en la 3.1 y asomar en la dispersión de la

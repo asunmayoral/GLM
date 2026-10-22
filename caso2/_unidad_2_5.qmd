@@ -602,7 +602,7 @@ m <- glmer(TICKS ~ YEAR + HEIGHT + (1 | BROOD) + (1 | LOCATION) + (1 | INDEX),
 ::: {.callout-important}
 ## Tarea del estudiante (2.5) — Preguntas 9 a 12 del caso
 Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, intercepto aleatorio por
-**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.8](#sec-u28)):
+**agencia** `(1 | id_agencia)` —y **región** por encima— y `offset(log(exposicion))` ([Unidad 2.7](#sec-u27)):
 
 - **P9 · ¿Cuánta variación es de agencia?** Interpreta los efectos fijos en IRR (condicionales a la agencia)
   y cuantifica el **ICC**.

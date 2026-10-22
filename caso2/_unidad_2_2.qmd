@@ -5,7 +5,7 @@
            diagnóstico, Simpson con Berkeley) · 2.3 más de tres vías.
        B · Cambio (tabla cuadrada del bonus-malus): 2.4.
      Respuesta de la tabla: indicador de ALGUNA ASISTENCIA (n_asistencia > 0), la misma respuesta
-     de la Unidad 2.1. Los proxies del factor prohibido se tratan en la Unidad 2.7.
+     de la Unidad 2.1.
      Cifras verificadas (13-oct-2026, cartera_auto_20252026.rds): % con asistencia urbana 37.4 /
      mixta 31.9 / rural 31.2; independencia 2 vías G2 = 11.43 (2 gl, p = 0.0033); 3 vías con tipo:
      mutua p = 0.0058, condicional p = 0.33; 4 vías (+uso) orden 1 p = 0.079. Berkeley: OR marginal
@@ -2080,8 +2080,8 @@ paso hacia arriba»: añadirlo reproduce el mecanismo del DGP —una probabilida
 azar y el empujón de los siniestros—.
 
 ::: {.callout-important}
-## Tarea del estudiante (2.2) — Preguntas 4, 5 y 19 del caso
-Sobre la cartera de tu equipo ([Unidad 2.8](#sec-u28)):
+## Tarea del estudiante (2.2) — Preguntas 4, 5 y 17 del caso
+Sobre la cartera de tu equipo ([Unidad 2.7](#sec-u27)):
 
 **P4 · ¿Qué factores se asocian con tener un siniestro, y cómo se relacionan entre sí?** Cruza
 `tipo_vehiculo`, `zona_circulacion` y `combustible` con `tuvo_siniestro` (tener o no al menos un
@@ -2131,7 +2131,7 @@ tiene el movimiento? Cierra con lo que significa para los ingresos y la retenci�
 - Con el modelo que ajuste, proyecta el reparto del año próximo con sus intervalos de confianza y de
   predicción, y di de qué supuestos depende.
 
-**P19 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
+**P17 · Control de calidad: ¿dicen lo mismo el log-lineal y la logística?** Reajusta al menos una de las
 asociaciones de P4 como logística de `tuvo_siniestro` y compara sus odds ratios con los del log-lineal
 saturado.
 
@@ -2146,7 +2146,4 @@ saturado.
 
 Da siempre el **tamaño** del efecto junto al $p$-valor, y **valida** al final contra
 `attr(cartera, "verdad")`: ¿coincide la estructura que has elegido con la del proceso generador?
-
-La pregunta **P18** (proxies del factor prohibido) usa estas mismas herramientas, pero se plantea con la
-selección de variables, en la [Unidad 2.7](#sec-u27-proxy).
 :::

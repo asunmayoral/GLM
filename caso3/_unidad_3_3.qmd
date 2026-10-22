@@ -328,7 +328,7 @@ lrt_boot <- vapply(sim, function(y) {
 mean(lrt_boot >= lrt_obs, na.rm = TRUE)         # p-valor bootstrap
 ```
 
-El $p$ que arroja ronda **0,03**, en línea con la regla del ½: aquí la corrección de frontera no engaña.
+El $p$ que arroja ronda **0.03**, en línea con la regla del ½: aquí la corrección de frontera no engaña.
 
 ### Correlación intercepto–pendiente
 
@@ -424,7 +424,7 @@ DHARMa::testDispersion(sim, plot = FALSE)
 
 No es significativo: **ni sobre- ni infradispersión**. Es decir, una vez que los efectos aleatorios se
 llevan la variabilidad **entre máquinas**, lo que queda en los residuos es exactamente la dispersión que
-la Gamma espera. La $\hat\phi$ que en 3.1 salía **inflada** (≈ 0,33) ha vuelto a su sitio —y lo
+la Gamma espera. La $\hat\phi$ que en 3.1 salía **inflada** (≈ 0.33) ha vuelto a su sitio —y lo
 confirmamos aquí sin necesitar el DGP; la validación de abajo lo rematará con la verdad en la mano—.
 
 ::: {.callout-tip}

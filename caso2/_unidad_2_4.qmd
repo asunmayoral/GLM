@@ -515,7 +515,7 @@ bondad de ajuste **distribucional** (AIC/BIC), sí.
 ::: {.callout-tip}
 ## 🔧 En R. Bondad de ajuste con exceso de ceros
 
-Vale todo lo del [compendio de la Unidad 2.3](#sec-u23-elegir) —dispersión, AIC/BIC, pseudo-$R^2$,
+Vale todo lo del [compendio de la Unidad 2.3](#sec-u23-sintesis) —dispersión, AIC/BIC,
 rootograma, `DHARMa`—, con **tres añadidos** propios del exceso de ceros:
 
 - **Contrasta frente a la NB, no a la Poisson**: la NB ya fabrica ceros; el exceso genuino es el que
@@ -595,12 +595,12 @@ control de calidad que pediremos en el estudio de caso—.
    sobredispersos) por **AIC** y re-diagnóstico.
 4. **Compara** ZI vs hurdle por AIC **y por la pregunta** (suelen empatar en ajuste).
 5. **Interpreta las dos partes** (estructural/barrera + intensidad) y **predice** la media marginal.
-6. **Valida** (contra el DGP en el curso; fuera de muestra en la práctica → [Unidad 2.7](#sec-u27)).
+6. **Valida** (contra el DGP en el curso; fuera de muestra en la práctica → [Sección 1.6](#sec-u21-regularizacion)).
 :::
 
 ::: {.callout-important}
 ## Tarea del estudiante (2.4) — Pregunta 8 del caso
-Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.8](#sec-u28)): *la mayoría
+Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.7](#sec-u27)): *la mayoría
 de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
 frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
 exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
