@@ -66,7 +66,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(glmnet)       # regularización (2.7)
+library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 
@@ -726,11 +726,12 @@ round(P, 3)
 set.seed(SEMILLA_CURSO)
 X <- model.matrix(m_sube)
 sims <- t(replicate(5000, {
-  b  <- MASS::mvrnorm(1, coef(m_sube), vcov(m_sube))              # 1) incertidumbre de la estimación
-  M  <- matrix(0, 5, 5); M[cbind(cuad$i, cuad$j)] <- exp(X %*% b)
-  Pb <- M / rowSums(M)
-  realizado <- rowSums(sapply(1:5, \(i) rmultinom(1, n_act[i], Pb[i, ])))   # 2) azar del año próximo
-  c(drop(n_act %*% Pb), realizado)
+  b  <- MASS::mvrnorm(1, coef(m_sube), vcov(m_sube))                          # paso 1
+  M  <- matrix(0, 5, 5); M[cbind(cuad$i, cuad$j)] <- exp(X %*% b)             # paso 2: mu_ij
+  Pb <- M / rowSums(M)                                                        #         P(j | i)
+  esperado  <- drop(n_act %*% Pb)                                             # paso 3
+  realizado <- rowSums(sapply(1:5, \(i) rmultinom(1, n_act[i], Pb[i, ])))     # paso 4
+  c(esperado, realizado)
 }))
 data.frame(nivel = 1:5, actual = as.vector(n_act), proximo = round(n_prox),
            ic_low  = round(apply(sims[, 1:5],  2, quantile, 0.025)),

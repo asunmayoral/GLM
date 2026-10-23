@@ -67,7 +67,7 @@ library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
-library(glmnet)       # regularización (2.7)
+library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
 

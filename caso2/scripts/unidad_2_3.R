@@ -290,14 +290,6 @@ tibble::tibble(ajustado = fitted(m_quasi), r2 = residuals(m_quasi, type = "pears
   dplyr::arrange(quintil)
 
 # -----------------------------------------------------------------------------
-# [fig-u23-quasi-dharma]
-#   3 · Sobredispersión
-#     > 3.3 Quasi-Poisson
-#       > Selección, bondad de ajuste y diagnóstico
-# -----------------------------------------------------------------------------
-DHARMa::simulateResiduals(m_pois, plot = TRUE)
-
-# -----------------------------------------------------------------------------
 # [fig-u23-quasi-pred]
 #   3 · Sobredispersión > 3.3 Quasi-Poisson > Predicción
 # -----------------------------------------------------------------------------

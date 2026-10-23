@@ -830,12 +830,15 @@ vimos en el Caso 1. Esta sección da dos pasos: primero, medir el error donde im
 muestra**— con la **validación cruzada**; después, dejar que el propio ajuste **encoja** los coeficientes
 y descarte los inútiles: la **regularización**.
 
-### Ajustar bien no es predecir bien {#sec-u21-cv}
+### Ajustar bien no es predecir bien. Validación cruzada {#sec-u21-cv}
 
 Tomamos los candidatos tal como los clasifica la tabla de variables del caso, sin mirar todavía el DGP, y
 ajustamos cuatro modelos de complejidad creciente: el nulo, nuestro `m_tasa`, el de los siete predictores
-del riesgo y el que mete los diecisiete. Para comparar en la misma escala, dividimos la *deviance* de
-cada uno entre el número de pólizas:
+del riesgo y el que mete los diecisiete. Para las comparaciones de esta sección expresamos la
+*deviance* **por póliza**, dividiéndola entre el número de pólizas. Entre estos cuatro modelos no cambia
+nada, porque todos se ajustan sobre las mismas pólizas, pero es la escala en la que `cv.glmnet` da su
+error de validación, y así podremos comparar con él más adelante. Junto a ella, el AIC y el BIC de cada
+modelo, en su escala habitual:
 
 ```{r}
 #| label: u21-reg-candidatos
@@ -858,20 +861,112 @@ ajustes <- lapply(formulas, \(f) glm(f, family = poisson, data = cartera))
 comparacion <- tibble::tibble(
   modelo                 = names(ajustes),
   parametros             = sapply(ajustes, \(m) length(coef(m))),
-  deviance_entrenamiento = sapply(ajustes, deviance) / nrow(cartera))
+  deviance               = sapply(ajustes, deviance) / nrow(cartera),   # de entrenamiento, por póliza
+  AIC                    = sapply(ajustes, AIC),
+  BIC                    = sapply(ajustes, BIC))
 comparacion
 ```
 
 La *deviance* de entrenamiento **baja siempre** al añadir parámetros, también cuando lo que se añade
 son los diez candidatos adicionales: el ajuste aprovecha sus fluctuaciones de muestra para pegarse un
 poco más a los datos. Es el **optimismo** del error *in-sample*, y por eso esa *deviance* no sirve para
-elegir: premiaría siempre al modelo más grande. El AIC y el BIC lo corrigen con una penalización
-analítica; la **validación cruzada** [@stone1974] lo corrige midiendo directamente lo que nos interesa.
-La idea: partir la cartera en $k$ bloques; por turnos, ajustar el modelo con $k-1$ y predecir el bloque
-que ha quedado fuera; cada póliza se predice así **una vez**, siempre con un modelo que **no la vio**. La
-métrica es la misma *deviance* de Poisson, ahora calculada sobre las pólizas predichas. Tomamos
-$k = 10$, el término medio habitual entre el sesgo de usar pocos bloques y la variabilidad de usar
-muchos [@james2021, cap. 5].
+elegir: premiaría siempre al modelo más grande.
+
+El AIC y el BIC de la [Sección 1.4](#sec-u21-inferencia) corrigen ese optimismo con una penalización
+analítica: a $-2\ell$ suman $2k$ el AIC [@akaike1974] y $k\log n$ el BIC [@schwarz1978], con $k$ el
+número de parámetros. Entre modelos ajustados a los mismos datos, la diferencia de $-2\ell$ es la
+diferencia de *deviance* (total, sin escalar), así que un parámetro de más tiene que rebajarla en más de
+$2$ para que el AIC lo acepte, y en más de $\log n =$ `r round(log(nrow(cartera)), 2)` para que lo
+acepte el BIC. Los dos castigan el modelo con los diecisiete candidatos: sus catorce coeficientes de más
+no compran *deviance* suficiente, y el BIC lo pone incluso por detrás del modelo nulo. Discrepan en las
+dos antigüedades: pasar de `m_tasa` a `riesgo` rebaja la *deviance* en
+`r round(deviance(ajustes$m_tasa) - deviance(ajustes$riesgo), 1)` con dos parámetros más, por encima del
+umbral del AIC ($4$) y por debajo del del BIC (`r round(2 * log(nrow(cartera)), 1)`). El AIC se queda
+con `riesgo` y el BIC, con `m_tasa`.
+
+Las dos penalizaciones son aproximaciones al error de predicción. La **validación cruzada**
+[@stone1974] lo mide directamente: se parte la cartera en $k$ bloques y, por turnos, se ajusta el modelo
+con $k-1$ de ellos y se predice el bloque que ha quedado fuera. Cada póliza $i$ recibe así **una sola**
+predicción, $\hat\mu_i^{(-b)}$, hecha con el modelo que se ajustó sin su bloque $b$, y esa predicción le
+da un residuo de *deviance* como los de la [Sección 1.5](#sec-u21-diagnostico), ahora fuera de muestra.
+Su cuadrado es la contribución de la póliza, y la **deviance de validación**, $\mathrm{DV}$, es la media
+de las $n$ contribuciones:
+
+$$
+d_i \;=\; 2\left[\,y_i\log\frac{y_i}{\hat\mu_i^{(-b)}}-\bigl(y_i-\hat\mu_i^{(-b)}\bigr)\right] \;=\; \bigl(r_i^{D,(-b)}\bigr)^2,
+\qquad\qquad
+\mathrm{DV} \;=\; \frac{1}{n}\sum_{i=1}^{n} d_i .
+$$
+
+Lo vemos primero en pequeño, con $k = 5$ y el modelo `m_tasa`. La función guarda la contribución de cada
+póliza en lugar de sumarlas, para poder seguirlas una a una:
+
+```{r}
+#| label: u21-cv-contribuciones
+# d_i de cada póliza, rellenado bloque a bloque con el modelo ajustado SIN ese bloque.
+# poisson()$dev.resids() es la fórmula que R suma en deviance(fit), aquí evaluada en pólizas
+# que el modelo no vio.
+cv_contribuciones <- function(formula, bloque) {
+  d <- rep(NA_real_, nrow(cartera))
+  for (b in sort(unique(bloque))) {
+    test <- bloque == b
+    fit  <- glm(formula, family = poisson, data = cartera[!test, ])
+    mu   <- predict(fit, newdata = cartera[test, ], type = "response")  # lleva el offset
+    d[test] <- poisson()$dev.resids(cartera$n_asistencia[test], mu, wt = 1)
+  }
+  d
+}
+
+set.seed(SEMILLA_CURSO)
+bloque5 <- sample(rep(1:5, length.out = nrow(cartera)))   # asignación aleatoria a 5 bloques
+d5 <- cv_contribuciones(formula(m_tasa), bloque5)
+
+# comprobación: cada póliza está en validación exactamente una vez y recibe su contribución
+veces <- tabulate(unlist(lapply(1:5, \(b) which(bloque5 == b))), nbins = nrow(cartera))
+table(veces_en_validacion = veces)
+c(polizas = nrow(cartera), con_contribucion = sum(!is.na(d5)), deviance_cv = mean(d5))
+```
+
+Las `r nrow(cartera)` pólizas están en validación una sola vez, y todas tienen su contribución. La
+@fig-u21-cv-esquema sigue el proceso sobre 25 de ellas, cinco de cada bloque:
+
+```{r}
+#| label: fig-u21-cv-esquema
+#| fig-width: 9
+#| fig-height: 6.5
+#| fig-cap: "Validación cruzada con k = 5 sobre 25 pólizas de la cartera (las cinco primeras de cada bloque), con el modelo `m_tasa`. Arriba: el papel de cada póliza en cada iteración; en cada iteración el modelo se ajusta con las grises y predice las naranjas, y cada columna tiene una sola casilla naranja, de modo que cada póliza se predice una vez y con un modelo que no la vio. Abajo: la contribución $d_i$ de cada póliza a la deviance de validación (el cuadrado de su residuo de deviance fuera de muestra), coloreada por la iteración en que se predijo; encima de cada barra, sus asistencias observadas. La deviance de validación es la media de las contribuciones de todas las pólizas de la cartera."
+# 25 pólizas para el dibujo: las cinco primeras de cada bloque, ordenadas por bloque
+muestra <- unlist(lapply(1:5, \(b) head(which(bloque5 == b), 5)))
+etiq    <- factor(cartera$id_poliza[muestra], levels = cartera$id_poliza[muestra])
+
+papel <- expand.grid(poliza = etiq, iteracion = 1:5) |>
+  dplyr::mutate(papel = ifelse(bloque5[muestra][as.integer(poliza)] == iteracion,
+                               "validación: se predice", "entrenamiento: se ajusta"))
+p_papel <- ggplot(papel, aes(poliza, factor(iteracion, levels = 5:1), fill = papel)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  scale_fill_manual(values = c("grey80", "darkorange")) +
+  labs(x = NULL, y = "iteración", fill = NULL) +
+  theme(axis.text.x = element_blank(), legend.position = "top")
+
+contrib <- tibble::tibble(poliza = etiq, y = cartera$n_asistencia[muestra], d = d5[muestra],
+                          iteracion = factor(bloque5[muestra]))
+p_contrib <- ggplot(contrib, aes(poliza, d, fill = iteracion)) +
+  geom_col() +
+  geom_text(aes(label = y), vjust = -0.3, size = 3) +
+  labs(x = "póliza (id_poliza)", y = expression(d[i]), fill = "iteración en que se predice") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5), legend.position = "bottom")
+
+patchwork::wrap_plots(p_papel, p_contrib, ncol = 1, heights = c(1, 1.3))
+```
+
+La parte inferior muestra qué pesa en la *deviance* de validación. Una póliza sin asistencias aporta
+$d_i = 2\hat\mu_i^{(-b)}$: poco si el modelo esperaba poco, más si su perfil hacía esperar asistencias
+que no llegaron. Las barras más altas son las de pólizas con más asistencias de las que el modelo
+predijo para ellas. La media de las `r nrow(cartera)` contribuciones, `r round(mean(d5), 4)`, es la
+*deviance* de validación de `m_tasa` con $k = 5$.
+
+Para el resto de la sección usamos $k = 10$, el término medio habitual entre el sesgo de usar pocos
+bloques (cada modelo se entrena con menos datos) y la variabilidad de usar muchos [@james2021, cap. 5]:
 
 ```{r}
 #| label: u21-cv
@@ -879,25 +974,15 @@ muchos [@james2021, cap. 5].
 # más abajo) se evalúan sobre los mismos repartos, así que sus errores son comparables.
 set.seed(SEMILLA_CURSO)
 bloque <- sample(rep(1:10, length.out = nrow(cartera)))
-
-# poisson()$dev.resids() da las contribuciones que R suma en deviance(fit); aplicadas a la y del
-# bloque retenido frente a la mu predicha, dan la deviance fuera de muestra
-cv_deviance <- function(formula) {
-  dev <- 0
-  for (b in 1:10) {
-    fit <- glm(formula, family = poisson, data = cartera[bloque != b, ])
-    mu  <- predict(fit, newdata = cartera[bloque == b, ], type = "response")  # lleva el offset
-    dev <- dev + sum(poisson()$dev.resids(cartera$n_asistencia[bloque == b], mu, wt = 1))
-  }
-  dev / nrow(cartera)
-}
+cv_deviance <- function(formula) mean(cv_contribuciones(formula, bloque))
 comparacion <- dplyr::mutate(comparacion, deviance_cv = sapply(formulas, cv_deviance))
 comparacion
 ```
 
-Fuera de la muestra el orden cambia. El modelo de los siete predictores del riesgo es el que mejor
-predice (`r round(comparacion$deviance_cv[3], 4)`), apenas por delante de `m_tasa`
-(`r round(comparacion$deviance_cv[2], 4)`): las dos antigüedades que dejamos fuera aportan, pero poco. Y
+Fuera de la muestra, el orden ya no es el del entrenamiento: coincide con el del AIC. El modelo de los
+siete predictores del riesgo es el que mejor predice (`r round(comparacion$deviance_cv[3], 4)`), apenas por delante de `m_tasa`
+(`r round(comparacion$deviance_cv[2], 4)`): las dos antigüedades que dejamos fuera aportan, pero poco,
+y por eso el castigo más severo del BIC bastaba para descartarlas. Y
 el modelo con los diecisiete, el mejor en entrenamiento, **empeora** al predecir
 (`r round(comparacion$deviance_cv[4], 4)`): lo que ganaba con los adicionales era ruido de esta muestra.
 Fíjate también en la escala de la ganancia: del modelo nulo al mejor, la *deviance* de validación baja
@@ -907,9 +992,22 @@ eso marcará todo lo que sigue.
 
 ### *Ridge*, *lasso* y *elastic-net* {#sec-u21-reg}
 
-La validación cruzada dice cuál de unos modelos dados predice mejor, pero alguien tiene que proponerlos.
-La **regularización** evita esa enumeración: ajusta **un solo** modelo con todos los candidatos y añade a
-la función objetivo un castigo por coeficientes grandes. Se minimiza
+El problema que tenemos delante es el habitual cuando se modeliza con datos reales: **muchos
+predictores candidatos** (los diecisiete de la cartera ocupan más de veinte columnas en cuanto los factores
+se convierten en indicadoras), sin saber cuáles importan, y **algunos correlacionados entre sí**, como la
+edad y la antigüedad de carnet de la [Sección 1.2](#sec-u21-modelizacion). Las dos cosas perjudican a la
+máxima verosimilitud. Con muchos predictores, el ajuste aprovecha el ruido de la muestra, como acabamos
+de ver con el modelo de los diecisiete. Con predictores correlacionados, los datos no saben a cuál
+atribuir un efecto común, y los coeficientes se vuelven inestables: errores estándar grandes y
+estimaciones que cambian mucho, incluso de signo, de una muestra a otra. Lo que buscamos es el modelo
+**óptimo para predecir**: el que equilibra lo que gana al incluir un predictor con la variabilidad que
+eso le añade.
+
+La validación cruzada dice cuál de unos modelos dados predice mejor, pero alguien tiene que proponerlos,
+y con más de veinte columnas los subconjuntos posibles ya se cuentan por millones ($2^{20}$ supera el
+millón). La **regularización** evita
+esa enumeración: ajusta **un solo** modelo con todos los candidatos y añade a la función objetivo un
+castigo por coeficientes grandes. Se minimiza
 
 $$
 -\,\ell(\boldsymbol\beta) \;+\; \lambda\,P(\boldsymbol\beta),
@@ -920,30 +1018,50 @@ cambiada de signo y $P(\boldsymbol\beta)$ crece con el tamaño de los coeficient
 penaliza). El parámetro $\lambda \ge 0$ —la notación habitual en regularización; no es la tasa
 $\lambda_i$ de este capítulo— fija el precio: con $\lambda = 0$ recuperamos `glm()`, y al subirlo los
 coeficientes se **encogen** hacia cero. Encoger introduce sesgo a propósito, pero recorta varianza, y en
-predicción ese intercambio suele salir a cuenta. La forma del castigo da tres métodos:
+predicción ese intercambio suele salir a cuenta.
 
-- **Ridge** [@hoerl1970]: $P(\boldsymbol\beta) = \sum_j \beta_j^2$. Encoge todos los coeficientes, pero
-  **ninguno llega a cero**: reparte, no selecciona.
-- **Lasso** [@tibshirani1996]: $P(\boldsymbol\beta) = \sum_j |\beta_j|$. Al apretar, algunos coeficientes
-  llegan a **cero exacto**: selecciona variables mientras ajusta.
-- **Elastic-net** [@zou2005]: $P(\boldsymbol\beta) = \alpha\sum_j|\beta_j| + \tfrac{1-\alpha}{2}\sum_j\beta_j^2$,
-  con $\alpha\in[0,1]$ ($\alpha = 1$ es el lasso; $\alpha = 0$, el ridge). Selecciona como el lasso, pero
+Para medir el «tamaño» del vector de coeficientes $\boldsymbol\beta = (\beta_1,\dots,\beta_p)$, sin el
+intercepto, se usan dos **normas**: la norma $L_1$, que suma los valores absolutos, y la norma $L_2$, la
+longitud euclídea de siempre,
+
+$$
+\|\boldsymbol\beta\|_1 \;=\; \sum_{j=1}^{p} |\beta_j|,
+\qquad\qquad
+\|\boldsymbol\beta\|_2 \;=\; \Bigl(\sum_{j=1}^{p} \beta_j^2\Bigr)^{1/2}.
+$$
+
+Según cuál se use como castigo, salen tres métodos:
+
+- **Ridge** [@hoerl1970]: $P(\boldsymbol\beta) = \|\boldsymbol\beta\|_2^2 = \sum_j \beta_j^2$, la norma
+  $L_2$ al cuadrado. Encoge todos los coeficientes, pero **ninguno llega a cero**: reparte, no selecciona.
+- **Lasso** [@tibshirani1996]: $P(\boldsymbol\beta) = \|\boldsymbol\beta\|_1 = \sum_j |\beta_j|$, la norma
+  $L_1$. Al apretar, algunos coeficientes llegan a **cero exacto**: selecciona variables mientras ajusta.
+- **Elastic-net** [@zou2005]: $P(\boldsymbol\beta) = \alpha\,\|\boldsymbol\beta\|_1 + \tfrac{1-\alpha}{2}\,\|\boldsymbol\beta\|_2^2$,
+  una combinación de las dos, con $\alpha\in[0,1]$ ($\alpha = 1$ es el lasso; $\alpha = 0$, el ridge). Selecciona como el lasso, pero
   ante predictores correlacionados tiende a conservarlos juntos en lugar de quedarse con uno al azar.
 
 ::: {.callout-tip}
 ## Por qué el lasso pone ceros y el ridge no
-Penalizar equivale a obligar a los coeficientes a caer dentro de una región alrededor del origen. Con el
-ridge esa región es un círculo, liso: la solución lo toca en un punto con todas las coordenadas distintas
-de cero. Con el lasso es un rombo, con los **vértices sobre los ejes**: la solución tiende a tocarlo en
-un vértice, y en un vértice algunas coordenadas valen cero [@hastie2009, sec. 3.4].
+Penalizar con $\lambda$ equivale a maximizar la verosimilitud con los coeficientes obligados a caer
+dentro de una **bola** de la norma correspondiente, $\|\boldsymbol\beta\|_2 \le t$ o
+$\|\boldsymbol\beta\|_1 \le t$, con un radio $t$ que se encoge al crecer $\lambda$. Con dos coeficientes
+se ve la diferencia: la bola $L_2$ es un círculo, liso, y la solución lo toca en un punto con las dos
+coordenadas distintas de cero; la bola $L_1$, $|\beta_1| + |\beta_2| \le t$, es un rombo con los
+**vértices sobre los ejes**, y la solución tiende a tocarlo en un vértice, donde una de las coordenadas
+vale cero [@hastie2009, sec. 3.4].
 :::
 
 El paquete **`glmnet`** [@friedman2010] ajusta los tres para la familia Poisson, y lo hace para toda una
 rejilla de valores de $\lambda$ de una vez. Pide la información de otra forma que `glm()`: una **matriz**
-de predictores `x`, que construimos con `model.matrix()` (los factores se convierten en indicadoras), y la
-exposición en el argumento **`offset`**. Además **estandariza** los predictores antes de penalizar,
-porque el castigo depende de la escala: sin estandarizar, castigaría más a `km_declarados`, medida en
-miles, que a `potencia_cv`, medida en decenas. Los coeficientes los devuelve en las unidades originales.
+de predictores `x` y la exposición en el argumento **`offset`**. La matriz la construimos con
+`model.matrix()`, como hace `glm()` por dentro: cada variable continua ocupa una columna, y cada factor
+de $k$ niveles, $k-1$ **indicadoras** frente a su categoría de referencia (la zona, de tres niveles, da
+`zona_circulacionmixta` y `zona_circulacionrural`, frente a *urbana*). Además **estandariza** todas las
+columnas antes de penalizar, también las indicadoras,
+porque el castigo depende de la escala: el coeficiente de `km_declarados`, medida en kilómetros, es
+diminuto por construcción, y sin estandarizar apenas se castigaría, mientras que una indicadora 0/1 con
+el mismo efecto real cargaría con todo el castigo. Los coeficientes los devuelve en las unidades
+originales.
 
 ```{r}
 #| label: u21-glmnet-matriz
@@ -953,7 +1071,9 @@ os <- log(cartera$exposicion)
 dim(x)
 ```
 
-Los diecisiete candidatos ocupan `r ncol(x)` columnas. La ruta del lasso muestra cómo entra cada una al
+Los diecisiete candidatos ocupan `r ncol(x)` columnas, y es sobre ellas, no sobre las variables, sobre
+las que trabaja `glmnet`: penaliza y selecciona **columna a columna**, sin saber qué indicadoras
+proceden de un mismo factor. Volveremos sobre esta consecuencia. La ruta del lasso muestra cómo entra cada una al
 relajar el castigo (@fig-u21-ruta-lasso):
 
 ```{r}
@@ -965,20 +1085,58 @@ fit_lasso <- glmnet(x, y, family = "poisson", offset = os, alpha = 1)
 plot(fit_lasso, xvar = "lambda", label = TRUE)
 ```
 
-Falta elegir $\lambda$, y aquí vuelve la validación cruzada: `cv.glmnet` recorre la rejilla, calcula la
-*deviance* fuera de muestra en cada punto y marca dos valores de referencia. **`lambda.min`** es el de
-menor error; **`lambda.1se`**, el mayor $\lambda$ —el modelo más corto— cuyo error no supera al mínimo en
-más de **un error estándar**. Le pasamos la misma partición `bloque` que a los `glm()`
-(@fig-u21-cvglmnet):
+Falta elegir $\lambda$, y aquí vuelve la validación cruzada. `glmnet` ajusta el modelo sobre una rejilla
+decreciente $\lambda_1 > \lambda_2 > \dots > \lambda_M$ (por defecto, hasta $M = 100$ valores, empezando
+por el menor $\lambda$ que anula todos los coeficientes). Para cada valor de la rejilla, `cv.glmnet` repite
+la validación cruzada de la [subsección anterior](#sec-u21-cv), pero lleva la cuenta **bloque a bloque**.
+En la iteración $b$ ajusta el modelo penalizado sin el bloque $b$, predice sus $n_b$ pólizas,
+$\hat\mu_i^{(-b)}(\lambda)$, y promedia sus contribuciones $d_i(\lambda)$. Eso da una *deviance* de
+validación por bloque, y sus $K$ valores se resumen en una media y en un error estándar:
+
+$$
+\mathrm{DV}_b(\lambda) \;=\; \frac{1}{n_b}\sum_{i\,\in\,b} d_i(\lambda),
+\qquad
+\mathrm{DV}(\lambda) \;=\; \frac{1}{K}\sum_{b=1}^{K}\mathrm{DV}_b(\lambda),
+\qquad
+\mathrm{EE}(\lambda) \;=\; \frac{s_b(\lambda)}{\sqrt{K}},
+$$
+
+donde $s_b(\lambda)$ es la desviación típica de $\mathrm{DV}_1(\lambda),\dots,\mathrm{DV}_K(\lambda)$, con los bloques como observaciones. Así $\mathrm{EE}(\lambda)$ mide
+cuánto podría moverse $\mathrm{DV}(\lambda)$ por azar, a partir de lo que varía la *deviance* de un bloque a
+otro. En realidad, `cv.glmnet` pondera cada bloque por su tamaño $n_b$ (a veces la partición no lleva a bloques iguales), pero con bloques de tamaño casi igual, como los
+nuestros, la diferencia es despreciable, y $\mathrm{DV}(\lambda)$ es la misma media de las $n$
+contribuciones de la subsección anterior. En su salida, $\mathrm{DV}(\lambda)$ es `cvm` y
+$\mathrm{EE}(\lambda)$ es `cvsd`.
+
+Al recorrer la rejilla se obtiene una curva, una *deviance* de validación por cada $\lambda$ con su error
+estándar, que es la que dibuja la @fig-u21-cvglmnet. Con ella se definen los dos valores de referencia:
+
+$$
+\lambda_{\min} \;=\; \arg\min_{\lambda}\ \mathrm{DV}(\lambda),
+\qquad
+\lambda_{1\mathrm{se}} \;=\; \max\bigl\{\lambda \;:\; \mathrm{DV}(\lambda) \le \mathrm{DV}(\lambda_{\min}) + \mathrm{EE}(\lambda_{\min})\bigr\}.
+$$
+
+- $\lambda_{\min}$ (`lambda.min`) es el $\lambda$ de menor *deviance* de validación: el que mejor predice
+  según la estimación.
+- $\lambda_{1\mathrm{se}}$ (`lambda.1se`) es el mayor $\lambda$, es decir, el modelo más encogido y más
+  corto, cuya *deviance* de validación no se distingue de la mínima porque queda a menos de un error
+  estándar de ella: la regla de un error estándar [@hastie2009, sec. 7.10].
+
+Le pasamos a `cv.glmnet` la misma partición `bloque` que a los `glm()` (@fig-u21-cvglmnet):
 
 ```{r}
 #| label: fig-u21-cvglmnet
 #| fig-width: 8
 #| fig-height: 5
-#| fig-cap: "Validación cruzada del lasso Poisson: deviance fuera de muestra (con ± 1 error estándar) según log(lambda). Línea de puntos izquierda: lambda.min; derecha: lambda.1se. Los números de arriba cuentan los coeficientes distintos de cero."
+#| fig-cap: "Validación cruzada del lasso Poisson: deviance fuera de muestra (con ± 1 error estándar) según log(lambda). Líneas verticales de puntos: lambda.min (izquierda) y lambda.1se (derecha). Línea horizontal continua: la deviance mínima, DV(lambda.min); discontinuas: esa deviance ± 1 error estándar, EE(lambda.min). lambda.1se es el mayor lambda cuya deviance queda por debajo de la discontinua superior. Los números de arriba cuentan los coeficientes distintos de cero."
 cv_lasso <- cv.glmnet(x, y, family = "poisson", offset = os, alpha = 1,
                       type.measure = "deviance", foldid = bloque)
 plot(cv_lasso)
+# la regla 1se se lee contra estas tres alturas: el mínimo y su banda de ± 1 EE
+i_min <- cv_lasso$index["min", 1]
+abline(h = cv_lasso$cvm[i_min] + c(-1, 0, 1) * cv_lasso$cvsd[i_min],
+       lty = c(2, 1, 2), lwd = 1.5, col = "darkorange")
 ```
 
 ```{r}
@@ -1001,14 +1159,82 @@ frente a `r round(comparacion$deviance_cv[3], 4)`), **sin que nadie le haya dich
 mejor que el `glm()` con todos los candidatos. Ese es el valor práctico de la regularización: protege
 contra los predictores inútiles sin tener que identificarlos de antemano.
 
-Con `lambda.1se` el modelo se reduce a `r lasso_ref$coef_vivos[2]` columnas, pero su error de
-validación (`r round(lasso_ref$deviance_cv[2], 4)`) es peor que el de nuestro `m_tasa`. La razón está en
-la columna `ee_cv`: el error estándar de la estimación, `r round(lasso_ref$ee_cv[1], 4)`, equivale al
-`r round(100 * lasso_ref$ee_cv[1] / (comparacion$deviance_cv[1] - min(comparacion$deviance_cv)))` % de
-toda la mejora que puede conseguirse sobre el modelo nulo (la calculada en la subsección anterior). Con una señal tan débil, «a un error estándar del mínimo» es un margen enorme, y la regla
-del `1se` acaba aceptando un modelo que encoge demasiado. Elegir $\lambda$ es, por tanto, una decisión con
-consecuencias: el `1se` cuando se quiere una lista corta y conservadora, el `min` cuando lo que importa
-es predecir.
+Con `lambda.1se` el modelo se reduce a `r lasso_ref$coef_vivos[2]` columnas, a cambio de predecir
+peor: su *deviance* de validación, `r round(lasso_ref$deviance_cv[2], 4)`, queda entre la del modelo
+nulo (`r round(comparacion$deviance_cv[1], 4)`) y la de cualquiera de los modelos con predictores (de
+`r round(min(comparacion$deviance_cv[-1]), 4)` a `r round(max(comparacion$deviance_cv[-1]), 4)`). ¿Por
+qué la regla acepta un modelo así? Por el tamaño de su margen. La regla tolera un error estándar en
+$\lambda_{\min}$, `r round(lasso_ref$ee_cv[1], 4)` (el `r round(lasso_ref$ee_cv[2], 4)` de la segunda
+fila es el error estándar en el propio $\lambda_{1\mathrm{se}}$, que la regla no usa). Y toda la mejora
+que se puede conseguir sobre el modelo nulo es de solo `r round(comparacion$deviance_cv[1] - min(comparacion$deviance_cv), 4)`
+por póliza, la calculada en la subsección anterior. Un error estándar equivale, pues, al
+`r round(100 * lasso_ref$ee_cv[1] / (comparacion$deviance_cv[1] - min(comparacion$deviance_cv)))` % de esa
+mejora: la regla permite renunciar a cerca de la mitad de lo ganado, y el modelo de `lambda.1se`
+conserva solo el `r round(100 * (comparacion$deviance_cv[1] - lasso_ref$deviance_cv[2]) / (comparacion$deviance_cv[1] - min(comparacion$deviance_cv)))` %.
+Elegir $\lambda$ es, por tanto, una decisión con consecuencias: el `1se` da una lista corta y
+conservadora a costa de buena parte de la capacidad predictiva; el `min` es la opción cuando lo que
+importa es predecir.
+
+**¿Qué columnas retiene cada solución?** La tabla solo las cuenta; la @fig-u21-coef-lasso muestra
+cuáles, agrupadas por la variable de la que proceden. Para que los coeficientes sean comparables, las
+continuas se expresan por desviación típica, la escala en la que `glmnet` las penaliza, y las
+indicadoras, en su escala 0/1:
+
+```{r}
+#| label: fig-u21-coef-lasso
+#| fig-width: 8
+#| fig-height: 7.5
+#| fig-cap: "Coeficientes del lasso Poisson con lambda.min y con lambda.1se, columna a columna de `x`, agrupados por la variable de la que procede cada columna. Las continuas, por desviación típica; las indicadoras, frente a la categoría de referencia de su factor. Con lambda.1se solo sobreviven tres continuas. Con lambda.min, en `estado_civil` y en `color_vehiculo` unas indicadoras sobreviven y otras quedan a cero: el lasso parte esos factores."
+asignacion <- attr(model.matrix(reformulate(candidatos), data = cartera), "assign")[-1]  # variable de cada columna
+continua   <- !apply(x, 2, \(z) all(z %in% c(0, 1)))
+escala_x   <- ifelse(continua, apply(x, 2, sd), 1)       # continuas por desviación típica
+coef_lasso <- tibble::tibble(
+  variable   = factor(candidatos[asignacion], levels = candidatos),
+  nivel      = substring(colnames(x), nchar(candidatos[asignacion]) + 1),   # el nivel, sin el nombre
+  columna    = dplyr::case_when(continua ~ "(por 1 DT)", nivel == "" ~ "(0/1)", .default = nivel),
+  lambda.min = as.matrix(coef(cv_lasso, s = "lambda.min"))[-1, 1] * escala_x,
+  lambda.1se = as.matrix(coef(cv_lasso, s = "lambda.1se"))[-1, 1] * escala_x) |>
+  tidyr::pivot_longer(c(lambda.min, lambda.1se), names_to = "criterio", values_to = "coef")
+
+ggplot(coef_lasso, aes(coef, columna, colour = criterio)) +
+  geom_vline(xintercept = 0, colour = "grey60") +
+  geom_linerange(aes(xmin = 0, xmax = coef), position = position_dodge(width = 0.6)) +
+  geom_point(position = position_dodge(width = 0.6), size = 1.8) +
+  facet_grid(variable ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  scale_colour_manual(values = c(lambda.min = "steelblue", lambda.1se = "darkorange")) +
+  labs(x = "coeficiente (escala log de la tasa)", y = NULL, colour = NULL) +
+  theme(strip.text.y.left = element_text(angle = 0, hjust = 1), strip.placement = "outside",
+        legend.position = "top")
+```
+
+```{r}
+#| label: u21-coef-parciales
+# factores que lambda.min deja partidos: alguna indicadora viva y alguna a cero
+coef_lasso |>
+  dplyr::filter(criterio == "lambda.min") |>
+  dplyr::summarise(columnas = dplyr::n(), vivas = sum(coef != 0), .by = variable) |>
+  dplyr::filter(vivas > 0, vivas < columnas)
+```
+
+Con `lambda.1se` solo quedan la edad, la antigüedad de carnet y la potencia. Con `lambda.min` entran casi
+todos los predictores del riesgo, y aparece la consecuencia de trabajar por columnas: en `estado_civil`
+y en `color_vehiculo` sobreviven unas indicadoras y otras no. Una indicadora a cero no elimina el
+efecto del factor, sino que **funde** ese nivel con la categoría de referencia. Que el color *otro*
+quede a cero significa que se trata como el *blanco*, la referencia; con otra referencia, la selección
+habría sido otra. Como decisión de modelización no tiene sentido: un factor se retiene o se descarta
+entero.
+
+::: {.callout-note}
+## El lasso por grupos
+El **lasso por grupos** [@yuan2006] penaliza la norma $L_2$ de cada bloque de columnas que forma una
+variable, $\sum_g \sqrt{p_g}\,\|\boldsymbol\beta_g\|_2$, con $p_g$ el número de columnas del grupo $g$, y
+por eso retiene o descarta cada factor entero. En R lo implementa `grpreg` [@breheny2015], con
+`penalty = "grLasso"` y un vector `group` que indica la variable de cada columna. Tiene dos
+limitaciones: solo admite las familias gaussiana, binomial y Poisson, y no acepta *offset*, así que la
+exposición tendría que entrar como una columna sin penalizar, con un coeficiente estimado en lugar de
+fijado en 1. Con `glmnet`, la alternativa es decidir **por variable**: un factor se retiene si sobrevive
+alguna de sus indicadoras.
+:::
 
 Los tres castigos, con la misma partición:
 
@@ -1043,6 +1269,65 @@ la práctica habitual es usar el lasso para **seleccionar** y reajustar después
 variables elegidas, sabiendo que esos intervalos siguen siendo algo optimistas [@harrell2015].
 :::
 
+### Reajustar con las variables seleccionadas {#sec-u21-reajuste}
+
+Rematamos con la práctica que recomienda el recuadro anterior: usar el lasso para elegir **variables**
+—un factor entra entero si sobrevive alguna de sus indicadoras— y reajustar un `glm()` con ellas, sin
+castigo. Para saber cómo predice ese `glm()` hay que validar **el procedimiento completo**. Si se valida
+el `glm()` con las variables ya elegidas, la elección se hizo con todos los datos, incluidos los bloques
+que después sirven para validar, y el error sale optimista. La validación correcta es **anidada**: en
+cada iteración $b$, con los datos de entrenamiento se repite `cv.glmnet` (con su propia partición
+interna), se eligen las variables y se reajusta el `glm()`, y solo entonces se predice el bloque $b$,
+que no ha intervenido en nada:
+
+```{r}
+#| label: u21-reajuste
+vars_sel   <- function(cvfit, s) unique(candidatos[asignacion[as.matrix(coef(cvfit, s = s))[-1, 1] != 0]])
+formula_de <- function(v) reformulate(c(v, "offset(log(exposicion))"), response = "n_asistencia")
+v_min <- vars_sel(cv_lasso, "lambda.min")
+v_1se <- vars_sel(cv_lasso, "lambda.1se")
+
+# anidada: selección y reajuste se repiten sin ver el bloque que se predice
+d_anidada <- matrix(NA_real_, nrow(cartera), 2, dimnames = list(NULL, c("lambda.min", "lambda.1se")))
+set.seed(SEMILLA_CURSO)
+for (b in 1:10) {
+  ent  <- bloque != b
+  cv_b <- cv.glmnet(x[ent, ], y[ent], family = "poisson", offset = os[ent],
+                    type.measure = "deviance", nfolds = 10)
+  for (s in colnames(d_anidada)) {
+    fit_b <- glm(formula_de(vars_sel(cv_b, s)), family = poisson, data = cartera[ent, ])
+    d_anidada[!ent, s] <- poisson()$dev.resids(y[!ent], predict(fit_b, cartera[!ent, ], type = "response"),
+                                               wt = 1)
+  }
+}
+
+reajuste <- tibble::tibble(
+  criterio     = c("lambda.min", "lambda.1se"),
+  variables    = c(length(v_min), length(v_1se)),
+  deviance_lasso      = lasso_ref$deviance_cv,
+  deviance_cv_ingenua = c(mean(cv_contribuciones(formula_de(v_min), bloque)),
+                          mean(cv_contribuciones(formula_de(v_1se), bloque))),
+  deviance_cv_anidada = colMeans(d_anidada))
+reajuste
+```
+
+Con `lambda.min` se retienen `r length(v_min)` variables; con `lambda.1se`, `r length(v_1se)`. La
+validación ingenua engaña: para `lambda.min` promete `r round(reajuste$deviance_cv_ingenua[1], 4)`, el menor error de
+toda la sección, cuando el procedimiento completo da `r round(reajuste$deviance_cv_anidada[1], 4)`. Y la validación
+anidada dice cosas distintas para cada criterio:
+
+- Con `lambda.min`, reajustar **empeora** respecto al propio lasso (`r round(reajuste$deviance_cv_anidada[1], 4)`
+  frente a `r round(reajuste$deviance_lasso[1], 4)`). Al quitar el castigo, las variables de poca o ninguna señal que el
+  lasso había dejado pasar, pero encogidas, recuperan todo su tamaño y añaden ruido a la predicción.
+- Con `lambda.1se`, reajustar **mejora** mucho (`r round(reajuste$deviance_cv_anidada[2], 4)` frente a
+  `r round(reajuste$deviance_lasso[2], 4)`). El lasso había elegido bien pero encogido de más, y el `glm()` devuelve a las
+  tres variables su tamaño. Aun así, no alcanza a `m_tasa` (`r round(comparacion$deviance_cv[2], 4)`): deja
+  fuera variables que también predicen, como la zona o el uso.
+
+La regla práctica: reajustar tras el `1se` corrige su exceso de encogimiento; tras el `min`, conviene
+depurar antes la lista, con el conocimiento del problema y los contrastes de la
+[Sección 1.4](#sec-u21-inferencia), para no devolver su tamaño a lo que el lasso solo toleraba encogido.
+
 ::: {.callout-tip}
 ## 🔧 En R. Validación cruzada y regularización de un Poisson
 ```r
@@ -1053,18 +1338,62 @@ plot(cv)                                                            # curva de v
 coef(cv, s = "lambda.min")                                          # coeficientes (0 = descartada)
 ```
 
-- **Validación cruzada de un `glm()`**: partir con `sample(rep(1:k, length.out = n))`, ajustar sin el
-  bloque y predecirlo con `predict(fit, newdata, type = "response")` (el *offset* va en la fórmula y
-  viaja solo). La *deviance* fuera de muestra se suma con `poisson()$dev.resids(y, mu, wt = 1)`.
-  `boot::cv.glm()` hace lo mismo con una función de coste.
+- **Deviance de validación de un `glm()`**, con la partición `bloque <- sample(rep(1:K, length.out = n))`.
+  Para cada póliza $i$ del bloque $b$, el modelo ajustado sin ese bloque predice
+  $\hat\mu_i^{(-b)}$ = `predict(fit, newdata, type = "response")` (el *offset* va en la fórmula), y
+  $$d_i = 2\Bigl[y_i\log\frac{y_i}{\hat\mu_i^{(-b)}}-\bigl(y_i-\hat\mu_i^{(-b)}\bigr)\Bigr],
+  \qquad \mathrm{DV}=\frac{1}{n}\sum_{i=1}^{n} d_i,$$
+  con $d_i$ = `poisson()$dev.resids(y, mu, wt = 1)`. Si el modelo sale de una selección, la selección se
+  repite dentro de cada iteración (validación anidada).
 - **`glmnet` no usa fórmula**: matriz `x` y vector `y`; el *offset* va en su argumento, no dentro de `x`.
   Estandariza por defecto y devuelve los coeficientes en las unidades originales.
 - **`foldid = bloque`** obliga a `cv.glmnet` a usar una partición dada, para comparar con otros modelos
   sobre los mismos bloques; sin él, la sortea con `nfolds`.
+- **`alpha` elige el castigo y $\lambda$, su fuerza**: `alpha = 1` es el lasso, `alpha = 0` el ridge y
+  un valor intermedio el *elastic-net*. Para cada `alpha`, `cv.glmnet` recorre su propia rejilla de
+  $\lambda$.
 - **`lambda.min`** (menor error) y **`lambda.1se`** (el modelo más corto a un error estándar del
   mínimo); `cv$cvm` y `cv$cvsd` guardan el error y su error estándar en cada $\lambda$.
-- `glmnet` cubre también `binomial` (la logística del Caso 1), `cox` y, desde la versión 4.0, cualquier
-  familia de `glm()` pasada como objeto [@tay2023].
+- **Reajustar con las variables elegidas** y validar el procedimiento completo: el bucle de la
+  validación anidada de esta sección, con la selección por variables, no por columnas.
+- **La escala de $\lambda$.** `glmnet` minimiza $-\frac{1}{n}\ell(\boldsymbol\beta) + \lambda P(\boldsymbol\beta)$,
+  con la log-verosimilitud promediada por póliza [@friedman2010]. Es la función objetivo de esta sección
+  con $\lambda$ reescalado: el $\lambda$ de aquella equivale a $n$ veces el de `glmnet`, y los valores
+  de `lambda.min` y `lambda.1se` que imprime están en la escala de `glmnet`.
+- **El error estándar es una aproximación.** `cvsd` trata los $K$ bloques como si fueran independientes,
+  y no lo son: los modelos de dos iteraciones comparten $K-2$ de sus $K-1$ bloques de entrenamiento. No
+  existe un estimador insesgado de la varianza de la validación cruzada en $K$ bloques [@bengio2004], así
+  que $\mathrm{EE}(\lambda)$ sirve de guía para la regla de un error estándar, no como un intervalo de
+  confianza riguroso.
+- `glmnet` no es solo para la Poisson: el recuadro siguiente resume qué otros GLM regulariza.
+:::
+
+::: {.callout-note}
+## `glmnet` más allá de la Poisson
+Todo lo de esta sección (la matriz `x`, `cv.glmnet`, $\lambda_{\min}$ y $\lambda_{1\mathrm{se}}$) vale para
+cualquier GLM. Solo cambia el argumento `family`, y con él el formato de la respuesta, la lectura de los
+coeficientes y las métricas de validación disponibles en `type.measure`.
+
+- **Familias integradas**, que se pasan como texto y usan el algoritmo más rápido del paquete:
+  `"gaussian"`, `"binomial"`, `"poisson"`, `"multinomial"`, `"mgaussian"` (respuesta normal
+  multivariante) y `"cox"` [@friedman2010].
+- **La logística** (`family = "binomial"`), la del Caso 1. La respuesta es un vector 0/1, un factor de dos
+  niveles o, con datos agrupados, una matriz de dos columnas con éxitos y fracasos. `exp(coef)` es un
+  **odds ratio**, no una razón de tasas. Además de `type.measure = "deviance"`, admite `"class"` (tasa de
+  error de clasificación), `"auc"` (solo con dos clases: elige $\lambda$ maximizando el AUC fuera de
+  muestra, la versión honesta de la evaluación de clasificadores del Caso 1) y `"mse"` (con respuesta
+  binaria, el índice de Brier).
+- **Cualquier otra familia de `glm()`**, pasada como objeto, desde la versión 4.0 del paquete
+  [@tay2023]: otros enlaces de la binomial, como `binomial(link = "probit")` o `binomial(link = "cloglog")`
+  (el del tiempo discreto del Caso 1); `Gamma(link = "log")`, la del Caso 3; `quasipoisson()`; o la
+  binomial negativa con $\theta$ fijo, `MASS::negative.binomial(theta = ...)`. Es más lento que las
+  familias integradas, así que solo compensa cuando la familia no está entre ellas.
+- **El límite.** La penalización actúa sobre los coeficientes del predictor lineal; los parámetros propios
+  de la familia no se estiman en el camino. La $\theta$ de la binomial negativa hay que fijarla de
+  antemano, por ejemplo con la que estima `MASS::glm.nb()` sin penalizar.
+- **Lo que no cubre.** `glmnet` no tiene efectos aleatorios ni modelos de dos partes: los modelos mixtos
+  de la [Unidad 2.5](#sec-u25) y los inflados de ceros o *hurdle* de la [Unidad 2.4](#sec-u24) quedan
+  fuera de su alcance.
 :::
 
 ### Validación contra el DGP
@@ -1083,44 +1412,84 @@ verdad_x[c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_veh
   c(b_dgp[["z_edad"]], b_dgp[["z_exp"]], b_dgp[["z_pot"]], b_dgp[["z_antv"]],
     b_dgp[["mixta"]] - b_dgp[["urbana"]], -b_dgp[["urbana"]], b_dgp[["comercial"]],
     b_dgp[["moto"]], b_dgp[["furgoneta"]])
-# glmnet devuelve unidades originales: las continuas se llevan a «por desviación típica»
-continua <- !apply(x, 2, \(z) all(z %in% c(0, 1)))
-escala_x <- ifelse(continua, apply(x, 2, sd), 1)
-coef_dgp <- function(s) as.matrix(coef(cv_lasso, s = s))[-1, 1] * escala_x
+# el glm reajustado, con su IC de Wald al 95 %, en las columnas y la escala de x (escala_x);
+# NA en las columnas de las variables no retenidas
+coef_glm <- function(v, criterio) {
+  m   <- glm(formula_de(v), family = poisson, data = cartera)
+  ic  <- cbind(coef(m), confint.default(m))[-1, , drop = FALSE]
+  out <- matrix(NA_real_, ncol(x), 3, dimnames = list(colnames(x), c("est", "inf", "sup")))
+  out[rownames(ic), ] <- ic
+  tibble::tibble(termino = colnames(x), criterio = criterio, as.data.frame(out * escala_x))
+}
+val_reg <- dplyr::bind_rows(coef_glm(v_min, "lambda.min"), coef_glm(v_1se, "lambda.1se")) |>
+  dplyr::mutate(verdadero = unname(verdad_x[termino]),
+                en_el_dgp = ifelse(verdadero != 0, "activa", "nula"),
+                cubre     = inf <= verdadero & verdadero <= sup)
 
-val_reg <- tibble::tibble(termino   = colnames(x),
-                          verdadero = verdad_x,
-                          lasso_min = coef_dgp("lambda.min"),
-                          lasso_1se = coef_dgp("lambda.1se"))
-val_reg |> dplyr::mutate(dplyr::across(where(is.numeric), \(v) round(v, 3)))
-
-# recuento: ¿cuántas columnas activas y cuántas nulas conserva cada criterio?
+# recuento: columnas retenidas, intervalos que cubren la verdad e intervalos que excluyen el 0
 resumen_sel <- val_reg |>
-  dplyr::group_by(en_el_dgp = ifelse(verdadero != 0, "activa", "nula")) |>
-  dplyr::summarise(columnas = dplyr::n(), retenidas_min = sum(lasso_min != 0),
-                   retenidas_1se = sum(lasso_1se != 0))
+  dplyr::summarise(columnas = dplyr::n(), retenidas = sum(!is.na(est)),
+                   cubren = sum(cubre, na.rm = TRUE),
+                   excluyen_cero = sum(inf > 0 | sup < 0, na.rm = TRUE),
+                   .by = c(criterio, en_el_dgp))
 resumen_sel
 ```
 
-Los dos criterios fallan, pero por lados opuestos. Con `lambda.min`, el lasso conserva
-`r resumen_sel$retenidas_min[resumen_sel$en_el_dgp == "activa"]` de las
-`r resumen_sel$columnas[resumen_sel$en_el_dgp == "activa"]` columnas activas, con los signos del DGP,
-pero deja pasar `r resumen_sel$retenidas_min[resumen_sel$en_el_dgp == "nula"]` de las
-`r resumen_sel$columnas[resumen_sel$en_el_dgp == "nula"]` nulas. Con `lambda.1se` no entra ninguna nula,
-pero solo sobreviven `r resumen_sel$retenidas_1se[resumen_sel$en_el_dgp == "activa"]` activas, muy
-encogidas, y se pierden efectos verdaderos como la zona o el uso. La verdad queda entre los dos.
+```{r}
+#| label: fig-u21-reg-validacion
+#| fig-width: 8
+#| fig-height: 7.5
+#| fig-cap: "Coeficientes de los `glm()` reajustados con las variables elegidas por lambda.min y por lambda.1se, con su intervalo de confianza de Wald al 95 %, frente al valor verdadero del DGP (rombo negro). Las continuas, por desviación típica; las indicadoras, frente a la categoría de referencia de su factor. Sin punto ni intervalo: variable no retenida por ese criterio. Todos los intervalos de las columnas activas cubren la verdad; con lambda.min, dos variables sin efecto tienen intervalos que excluyen el 0."
+etiquetas <- tibble::tibble(termino  = colnames(x),
+                            variable = factor(candidatos[asignacion], levels = candidatos),
+                            columna  = coef_lasso$columna[coef_lasso$criterio == "lambda.min"])
+val_reg |>
+  dplyr::left_join(etiquetas, by = "termino") |>
+  ggplot(aes(est, columna, colour = criterio)) +
+  geom_vline(xintercept = 0, colour = "grey60") +
+  geom_pointrange(aes(xmin = inf, xmax = sup), position = position_dodge(width = 0.6),
+                  size = 0.25, na.rm = TRUE) +
+  geom_point(aes(x = verdadero, shape = "verdadero (DGP)"), colour = "black", size = 2.5) +
+  facet_grid(variable ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  scale_colour_manual(values = c(lambda.min = "steelblue", lambda.1se = "darkorange")) +
+  scale_shape_manual(values = c("verdadero (DGP)" = 18)) +
+  labs(x = "coeficiente (escala log de la tasa)", y = NULL, colour = "glm() reajustado", shape = NULL) +
+  theme(strip.text.y.left = element_text(angle = 0, hjust = 1), strip.placement = "outside",
+        legend.position = "top")
+```
+
+Los dos criterios fallan, pero por lados opuestos (@fig-u21-reg-validacion). Con `lambda.min`, el
+`glm()` reajustado incluye las
+`r resumen_sel$retenidas[resumen_sel$criterio == "lambda.min" & resumen_sel$en_el_dgp == "activa"]`
+columnas activas, pero también
+`r resumen_sel$retenidas[resumen_sel$criterio == "lambda.min" & resumen_sel$en_el_dgp == "nula"]` de las
+`r resumen_sel$columnas[resumen_sel$criterio == "lambda.min" & resumen_sel$en_el_dgp == "nula"]` nulas.
+Con `lambda.1se` no entra ninguna nula, pero solo
+`r resumen_sel$retenidas[resumen_sel$criterio == "lambda.1se" & resumen_sel$en_el_dgp == "activa"]`
+activas: se pierden efectos verdaderos como la zona, el uso o el tipo de vehículo. La verdad queda
+entre los dos.
+
+Frente al DGP, los intervalos dicen dos cosas. La buena: con los dos criterios, todos los de las
+columnas activas cubren el valor verdadero. La mala es la advertencia del recuadro sobre la inferencia
+tras la selección: con `lambda.min`,
+`r resumen_sel$excluyen_cero[resumen_sel$criterio == "lambda.min" & resumen_sel$en_el_dgp == "nula"]`
+variables sin efecto, el valor del vehículo y la antigüedad como cliente, tienen intervalos que
+excluyen el 0. Entraron justamente porque en esta muestra parecían tener efecto, y el `glm()`
+reajustado, que no sabe que hubo una selección previa, las da por significativas.
 
 No es un fallo del método. El lasso no selecciona por «ser verdad», sino por **aportar a la
 predicción**, y aquí hay dos razones para que no coincidan:
 
-- **La señal es débil.** El mayor de los coeficientes nulos que entran con `lambda.min`
-  (`r round(max(abs(val_reg$lasso_min[val_reg$verdadero == 0])), 3)`, en valor absoluto) supera al
-  verdadero de la antigüedad del vehículo
-  (`r round(val_reg$verdadero[val_reg$termino == "antiguedad_vehiculo"], 3)`): con estos datos, un
-  efecto real pequeño y una fluctuación de muestra no se distinguen.
+- **La señal es débil.** El mayor de los coeficientes nulos del `glm()` reajustado con `lambda.min`
+  (`r round(max(abs(val_reg$est[val_reg$criterio == "lambda.min" & val_reg$verdadero == 0]), na.rm = TRUE), 3)`,
+  en valor absoluto) supera al verdadero de la antigüedad del vehículo
+  (`r round(verdad_x[["antiguedad_vehiculo"]], 3)`): con estos datos, un efecto real pequeño y una
+  fluctuación de muestra no se distinguen.
 - **Los predictores correlacionados se reparten el efecto.** Edad y antigüedad de carnet están muy
-  correlacionadas (lo vimos en la [Sección 1.2](#sec-u21-modelizacion)), y el lasso reparte entre ellas
-  un efecto conjunto que el DGP asigna sobre todo a la edad.
+  correlacionadas (lo vimos en la [Sección 1.2](#sec-u21-modelizacion)), y los dos modelos reparten
+  entre ellas un efecto conjunto que el DGP asigna sobre todo a la edad: la edad queda por debajo de su
+  valor verdadero en valor absoluto y la antigüedad de carnet, por encima, aunque sus intervalos aún
+  cubren la verdad.
 
 La lectura práctica: el lasso es una buena herramienta para **predecir** y para **cribar** candidatos, no
 un oráculo que devuelva el modelo verdadero. Lo que retiene con `lambda.min` es una lista de candidatos
