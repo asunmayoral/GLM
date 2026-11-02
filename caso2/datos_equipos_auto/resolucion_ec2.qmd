@@ -56,8 +56,9 @@ Caso 1, tú **eliges y justificas** el modelo en cada caso.
 >    números?
 > 7. ¿A qué se debe esa variabilidad de más: hay pólizas **intrínsecamente más siniestrosas** que las
 >    variables no capturan?
-> 8. La mayoría de reclamaciones **nunca pasa por revisión antifraude**. ¿Hay pólizas que por su naturaleza
->    **no la levantan**, frente a otras que aún no lo han hecho? ¿Cómo las distinguimos?
+> 8. La mayoría de las pólizas **no ha levantado nunca una alerta antifraude**. Sospechamos que parte de
+>    la cartera queda, en la práctica, **fuera del alcance del sistema**: ¿podéis distinguir esas pólizas de
+>    las que, vigiladas, aún no han dado motivo?
 >
 > *Sobre las agencias y el territorio*
 >
@@ -89,7 +90,7 @@ Caso 1, tú **eliges y justificas** el modelo en cada caso.
 | **P16** | Qué variables conservar: validación cruzada y regularización | [Unidad 2.1](#sec-u21-regularizacion) |
 | **P4–P5** | Asociación entre factores; movilidad del bonus-malus | [Unidad 2.2](#sec-u22) |
 | **P6–P7** | Variabilidad de más y su origen | [Unidad 2.3](#sec-u23) (con [2.5](#sec-u25) y [2.6](#sec-u26)) |
-| **P8** | Pólizas que no levantan revisión antifraude | [Unidad 2.4](#sec-u24) |
+| **P8** | Pólizas fuera del alcance del sistema antifraude | [Unidad 2.4](#sec-u24) |
 | **P9–P12** | Agencias y territorio | [Unidad 2.5](#sec-u25) |
 | **P13–P15** | Evolución del riesgo en el tiempo | [Unidad 2.6](#sec-u26) |
 | **P17** | Control de calidad: log-lineal frente a logística | [Unidad 2.2](#sec-u22) |
@@ -115,7 +116,7 @@ tiempo expuesto**, no en bruto.
 | Papel | Variables |
 |---|---------|
 | Estructura | `id_poliza`; `id_agencia` (agencia que **gestiona** la póliza — variable de agrupación); `id_region` (agrupa las agencias); `exposicion` (`antiguedad / 10`: la misma antigüedad medida en **décadas**, entre 0.01 y 1 → *offset*; la tasa se lee como partes por cada 10 años de póliza); `antiguedad` (años en la cartera) |
-| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (reclamaciones **sometidas a revisión antifraude**), `n_gestiones` (gestiones de siniestro tramitadas por su agencia); `tuvo_siniestro` (1 si `n_siniestros > 0`: versión binaria, útil para las tablas de P4) |
+| Respuestas (conteos) | `n_siniestros` (partes de siniestro), `n_asistencia` (asistencias en carretera), `n_fraude` (**alertas del sistema antifraude** acumuladas por la póliza; no van ligadas a un parte concreto), `n_gestiones` (gestiones de siniestro tramitadas por su agencia); `tuvo_siniestro` (1 si `n_siniestros > 0`: versión binaria, útil para las tablas de P4) |
 | Predictores de riesgo | `edad_conductor` (y en tramos, `edad_tramo`: 18-25 / 25-35 / 35-65 / 65+); `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
 | Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Exclúyelo de los modelos de tarificación y de la selección de P16 |
 | Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
@@ -542,11 +543,12 @@ Interpreta en IRR y **valida** el $\theta$ estimado contra la verdad del DGP (`a
 ::: {.callout-important}
 ## Tarea del estudiante (2.4) — Pregunta 8 del caso
 Sobre la cartera de tu equipo abordas la **Pregunta 8** de la dirección ([Unidad 2.7](#sec-u27)): *la mayoría
-de reclamaciones **nunca pasa por revisión antifraude**; ¿hay pólizas que por su naturaleza **no la levantan**,
-frente a otras que **aún no** lo han hecho, y cómo las distinguimos?* Sobre `n_fraude`: **diagnostica** el
+de las pólizas **no ha levantado nunca una alerta antifraude**; sospechamos que parte de la cartera queda, en
+la práctica, **fuera del alcance del sistema**: ¿podéis distinguir esas pólizas de las que, vigiladas, **aún
+no** han dado motivo?* Sobre `n_fraude`: **diagnostica** el
 exceso de ceros (frente a la NB, no a la Poisson), **ajusta** un modelo de ceros —zero-inflated y/o hurdle— y
-**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación que nunca la levanta,
-o proceso en dos etapas?). Interpreta las **dos partes** (quién puede levantarla / a qué ritmo) y **valida** la
+**decide y justifica** cuál encaja, tanto por AIC como por la **historia** (¿subpoblación fuera del perímetro,
+o proceso en dos etapas?). Interpreta las **dos partes** (quién está vigilado / a qué ritmo acumula alertas) y **valida** la
 parte estructural contra la verdad del DGP (`attr(cartera, "verdad")$g_cero`).
 :::
 

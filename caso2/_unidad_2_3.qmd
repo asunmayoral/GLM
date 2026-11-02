@@ -159,7 +159,7 @@ causas típicas:
   medidos, los conteos dentro de un grupo se parecen entre sí: correlación positiva que infla la
   varianza (lo trataremos como efecto aleatorio en la [Unidad 2.5](#sec-u25)).
 - **Exceso de ceros.** A veces el problema no es la cola, sino un montón de ceros «de más» respecto a
-  los que la Poisson espera (pólizas que sencillamente nunca reclaman). La [Unidad 2.4](#sec-u24) lo
+  los que la Poisson espera (pólizas que nunca pueden registrar el evento). La [Unidad 2.4](#sec-u24) lo
   separa; a menudo se confunde con sobredispersión.
 - **Predictores omitidos o mal especificados.** Una covariable relevante que falta, o una relación no
   lineal ignorada, reaparece como varianza extra.

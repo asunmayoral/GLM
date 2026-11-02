@@ -11,6 +11,11 @@
 #      source("_scripts/generar_scripts_unidades.R")   # define la función
 #      generar_scripts()                # todos los casos que encuentre
 #      generar_scripts(casos = 2)       # solo el caso 1
+#
+#      Para generar un fichero solo:
+#      file.remove("caso2/scripts/unidad_2_4.R")
+#      generar_scripts(casos = 2, solo_faltantes = TRUE)
+#
 #      generar_scripts(casos = 3, solo_faltantes = TRUE)   # sin pisar lo existente
 #      generar_scripts(simular = TRUE)  # enseña qué haría, sin escribir nada
 #
