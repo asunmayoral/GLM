@@ -172,6 +172,11 @@ glmer(y ~ efectos_fijos + offset(log(t)) + (1 | region/agencia),
   **`isSingular(m)`**: una varianza colapsada a 0 avisa de un modelo sobreparametrizado.
 - Un intercepto aleatorio **por observación**, `(1 | id_obs)`, es un **OLRE** —modela sobredispersión, no
   agrupamiento— ([§5.6](#sec-u25-olre)).
+- **Con exceso de ceros** ([Unidad 2.4](#sec-u24)) — `glmmTMB` combina los efectos aleatorios con las
+  dos partes: `glmmTMB(y ~ x1 + offset(log(t)) + (1 | region/agencia), ziformula = ~ z1, family = poisson)`
+  es un **ZIP mixto** (`nbinom2` para el ZINB), y con `family = truncated_poisson` (o `truncated_nbinom2`),
+  un **hurdle mixto**. El efecto aleatorio puede ir también en la parte de ceros
+  (`ziformula = ~ z1 + (1 | agencia)`), si los grupos difieren en su proporción de ceros estructurales.
 :::
 
 ## 5.3 Interpretación {#sec-u25-interpretacion}

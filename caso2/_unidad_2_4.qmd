@@ -134,7 +134,29 @@ El contraste es el de `DHARMa::testZeroInflation` [@hartig2026]:
   número de ceros tan extremo como el observado, por las dos colas. Su resolución es, por tanto,
   $1/B$, con $B$ el número de simulaciones: con 1000 no puede distinguir valores por debajo de 0.001.
 
-Las fórmulas de este estadístico y del siguiente contraste están reunidas en el recuadro de más abajo.
+::: {.callout-note}
+## El estadístico del contraste y su distribución bajo $H_0$
+Sea $n_0=\#\{i: y_i=0\}$ el número de ceros observado. Se simulan $B$ conjuntos de respuestas $y^{(b)}$
+desde el modelo ajustado y en cada uno se cuentan sus ceros, $n_0^{(b)}=\#\{i: y_i^{(b)}=0\}$. El
+estadístico es el cociente entre los ceros observados y la media de los simulados:
+$$T=\frac{n_0}{\bar n_0^{\,\text{sim}}},\qquad \bar n_0^{\,\text{sim}}=\frac1B\sum_{b=1}^{B}n_0^{(b)}.$$
+
+**¿Frente a qué distribución se compara?** Bajo $H_0$, cada póliza es cero con la probabilidad que le
+asigna el modelo, $p_i=\hat P(Y_i=0)$, independientemente de las demás. El número de ceros es entonces
+una suma de variables de Bernoulli de probabilidades distintas (una distribución **binomial de
+Poisson**), con
+$$E[n_0]=\sum_i p_i,\qquad \mathrm{Var}(n_0)=\sum_i p_i(1-p_i),$$
+de modo que $T$ se centra en 1. `DHARMa` no usa esta fórmula ni su aproximación normal: compara $n_0$
+con la distribución **empírica** de los $B$ valores simulados $n_0^{(b)}$, que es su aproximación por
+Monte Carlo. El $p$-valor bilateral es
+$$p=2\min\Bigl\{\tfrac1B\textstyle\sum_b \mathbb 1\bigl(n_0^{(b)}\ge n_0\bigr),\ \tfrac1B\sum_b \mathbb 1\bigl(n_0^{(b)}\le n_0\bigr)\Bigr\}.$$
+
+**Un contraste que verás a menudo y que aquí no sirve.** El *score test* de Van den Broek
+[@vandenbroek1995] (`vcdExtra::zero.test`) compara los ceros con los de una **Poisson** de media común,
+sin covariables ni *offset*. Cualquier conjunto de datos sobredisperso tiene más ceros que una Poisson,
+así que lo rechaza aunque no haya ceros estructurales: no distingue la inflación de ceros de la
+sobredispersión, que es justo lo que necesitamos distinguir.
+:::
 
 ```{r}
 #| label: u24-nb-zerotest
@@ -144,162 +166,74 @@ set.seed(2024)   # el p-valor sale de simular: fijamos la semilla para que se re
 sim_fnb <- DHARMa::simulateResiduals(m_fnb, n = 1000)
 zt_fnb  <- DHARMa::testZeroInflation(sim_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
 zt_fnb
-# cuántas de las 1000 simulaciones igualan o superan los ceros observados
-sum(colSums(sim_fnb$simulatedResponse == 0) >= sum(cartera$n_fraude == 0))
+n0_obs <- sum(cartera$n_fraude == 0)
+n0_sim <- colSums(sim_fnb$simulatedResponse == 0)   # ceros de cada una de las 1000 simulaciones
+c(observados = n0_obs, media_sim = mean(n0_sim), dt_sim = sd(n0_sim),
+  sims_que_alcanzan = sum(n0_sim >= n0_obs))
 ```
-
-El cociente es `r round(zt_fnb$statistic, 2)`: la NB **casi iguala** los ceros, y solo sobra en torno a
-un `r round(100 * (zt_fnb$statistic - 1))` % sobre los que genera. ¿Cuántas de las 1000 simulaciones
-alcanzan los ceros observados? `r sum(colSums(sim_fnb$simulatedResponse == 0) >= sum(cartera$n_fraude == 0))`.
-El $p$-valor queda, pues, por debajo de la resolución de la simulación, y **rechazamos $H_0$**: el exceso es pequeño en magnitud, pero **sistemático**, y con $n\approx 3000$ pólizas no puede
-atribuirse al azar. Significación y tamaño son cosas distintas: una NB flexible **imita** bastante bien
-la inflación de ceros, y por eso la distinción fina no la zanja este contraste, sino la comparación de
-modelos ([Sección 4.5](#sec-u24-elegir)) y la **pregunta** —¿hay una subpoblación que el sistema nunca
-vigila?—.
-
-La alternativa **paramétrica** clásica es el test de score de **Van den Broek** [@vandenbroek1995],
-implementado en `vcdExtra::zero.test()`. Contrasta otra cosa:
-
-- **$H_0$**: los datos son **Poisson con una media común** a todas las pólizas, $\hat\lambda=\bar y$.
-- **$H_1$**: son un **ZIP** con esa misma media, es decir, hay una proporción $\pi>0$ de ceros estructurales.
-- **Estadístico**: un *score* $S$ que compara los ceros observados con los que espera esa Poisson. Bajo
-  $H_0$ sigue aproximadamente una $\chi^2$ con 1 grado de libertad, y el $p$-valor sale de esa
-  distribución, no de simular.
-
-::: {.callout-note}
-## Los estadísticos de los dos contrastes
-Los dos comparan el número de ceros observado, $n_0=\#\{i: y_i=0\}$, con el que espera un modelo. Se
-diferencian en **qué modelo** y en **cómo** obtienen la distribución bajo $H_0$.
-
-**`DHARMa::testZeroInflation` (por simulación).** Se simulan $B$ conjuntos de respuestas $y^{(b)}$ desde
-el modelo ajustado, y en cada uno se cuentan sus ceros, $n_0^{(b)}=\#\{i: y_i^{(b)}=0\}$. El estadístico
-es el cociente entre los ceros observados y la media de los simulados:
-$$T=\frac{n_0}{\bar n_0^{\,\text{sim}}},\qquad \bar n_0^{\,\text{sim}}=\frac1B\sum_{b=1}^{B}n_0^{(b)}.$$
-El $p$-valor sitúa $n_0$ dentro de la distribución de los $n_0^{(b)}$, por las dos colas:
-$$p=2\min\Bigl\{\tfrac1B\textstyle\sum_b \mathbb 1\bigl(n_0^{(b)}\ge n_0\bigr),\ \tfrac1B\sum_b \mathbb 1\bigl(n_0^{(b)}\le n_0\bigr)\Bigr\}.$$
-
-**Van den Broek (score, analítico).** Con la media común $\hat\lambda=\bar y$, la Poisson espera
-$n\,e^{-\hat\lambda}$ ceros. El *score* eleva al cuadrado la diferencia con los observados y la divide por
-su varianza, corregida por haber estimado $\lambda$ [@vandenbroek1995]:
-$$S=\frac{\bigl(n_0-n\,e^{-\hat\lambda}\bigr)^2}{n\,e^{-\hat\lambda}\bigl(1-e^{-\hat\lambda}\bigr)-n\,\hat\lambda\,e^{-2\hat\lambda}}\;\overset{H_0}{\sim}\;\chi^2_1.$$
-:::
 
 ```{r}
-#| label: u24-scoretest
-vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
-
-# el mismo estadístico, calculado a mano con la fórmula
-y_f <- cartera$n_fraude; n_f <- length(y_f); n0_f <- sum(y_f == 0)
-lam_f <- mean(y_f); p0_f <- exp(-lam_f)            # tasa común y P(Y = 0) de la Poisson
-(n0_f - n_f * p0_f)^2 / (n_f * p0_f * (1 - p0_f) - n_f * lam_f * p0_f^2)
+#| label: fig-u24-nb-zerodist
+#| fig-cap: "Distribución bajo $H_0$ del número de ceros: los de las 1000 respuestas simuladas desde la NB ajustada. La línea discontinua marca los ceros observados en la cartera, fuera de esa distribución."
+#| fig-width: 6
+#| fig-height: 3.2
+ggplot(tibble::tibble(n0 = n0_sim), aes(n0)) +
+  geom_histogram(bins = 30, fill = "steelblue", colour = "white") +
+  geom_vline(xintercept = n0_obs, linetype = "dashed", linewidth = 0.8) +
+  labs(x = "nº de pólizas con cero alertas (simulaciones bajo la NB)", y = "nº de simulaciones")
 ```
 
-El $\chi^2$ es enorme (≈ **2913**, $p<2\times10^{-16}$; el cálculo a mano con la fórmula da el mismo valor), y se rechaza que los datos sean una Poisson de
-media común. Pero ese $H_0$ es **marginal**: usa la media muestral como tasa e **ignora covariables y
-*offset***, así que el contraste atribuye a los ceros parte de lo que en realidad explican las
-covariables y **exagera** la inflación (su exceso es mayor que el $1.7$ de la Poisson ajustada). Para un
-modelo con covariables es más fiel el contraste por simulación de `DHARMa`, cuyo $H_0$ es el propio
-modelo ajustado (existe también `countreg::zitest()`, pero `countreg` no está en CRAN).
+Bajo $H_0$, la NB genera de media `r round(mean(n0_sim))` ceros, con una desviación típica de
+`r round(sd(n0_sim))`; en la cartera hay `r n0_obs`, a `r round((n0_obs - mean(n0_sim)) / sd(n0_sim), 1)`
+desviaciones típicas de esa media (@fig-u24-nb-zerodist). El cociente es
+`r round(zt_fnb$statistic, 2)`: la NB **casi iguala** los ceros, y solo sobra en torno a un
+`r round(100 * (zt_fnb$statistic - 1))` % sobre los que genera. Pero ninguna simulación llega tan lejos
+(las que alcanzan los ceros observados son `r sum(n0_sim >= n0_obs)` de 1000), de modo que el $p$-valor
+queda por debajo de la resolución de la simulación y **rechazamos $H_0$**: el exceso es pequeño en
+magnitud, pero **sistemático**, y con $n\approx 3000$ pólizas no puede atribuirse al azar. Significación
+y tamaño son cosas distintas: una NB flexible **imita** bastante bien la inflación de ceros, y por eso
+la distinción fina no la zanja este contraste, sino la comparación de modelos
+([Sección 4.5](#sec-u24-elegir)) y la **pregunta** —¿hay una subpoblación que el sistema nunca vigila?—.
 
 Confirmado el exceso, ¿son esos ceros **estructurales** o **muestrales**? El dato no lo dice; lo fijan
 el **modelo** y su interpretación. Antes de ajustar ninguno, conviene ver qué opciones hay y hacia cuál
 apuntan los datos.
 
-::: {.callout-tip}
-## 🔧 En R. Detectar el exceso de ceros
-- **Frente a la NB, no a la Poisson** — se ajusta primero la mejor NB (`MASS::glm.nb`), porque su
-  sobredispersión ya fabrica ceros de más; el exceso **genuino** es el que sobra por encima de ella.
-- **Contraste por simulación** — `DHARMa::testZeroInflation(DHARMa::simulateResiduals(m, n = 1000))`:
-  $H_0$ es el modelo ajustado; respeta covariables y *offset*. Fija la semilla, y recuerda que el
-  $p$-valor no baja de $1/n_\text{sim}$.
-- **Score test de Van den Broek** — `vcdExtra::zero.test(y)`: $H_0$ es una Poisson de media común, sin
-  covariables ni *offset*, así que **exagera** la inflación. Útil como primer vistazo, no como veredicto.
-:::
-
 ## 4.2 Estructuras para los ceros {#sec-u24-estructuras}
 
-La sección anterior ha confirmado que sobran ceros, incluso frente a la NB. Antes de ajustar ningún
-modelo, conviene saber **qué posibilidades hay** y **hacia cuál apuntan los datos**: los modelos para el
-exceso de ceros se diferencian, sobre todo, en **de dónde hacen salir cada cero**.
+La [Sección 4.1](#sec-u24-ceros) ha respondido a la primera pregunta: sobran ceros **incluso frente a
+la NB**, que es el mejor modelo de un solo proceso. Muchos ceros no implican por sí solos inflación de
+ceros [@warton2005]; aquí sí la hay, y los ceros necesitan un **proceso propio**. Para elegir el modelo
+quedan dos decisiones, y cada una tiene dos opciones:
 
-### Las opciones: de dónde sale cada cero {#sec-u24-opciones}
+| | conteo **Poisson** | conteo **NB** |
+|---|---|---|
+| **Mezcla** (*zero-inflated*, [§4.3](#sec-u24-zi)) | **ZIP** | ZINB |
+| **Barrera** (*hurdle*, [§4.4](#sec-u24-hurdle)) | hurdle-Poisson | hurdle-NB |
 
-| Modelo | De dónde salen los ceros | En una frase | Se desarrolla en |
-|---|---|---|---|
-| **Poisson / NB** | de un único proceso: el azar del conteo (la NB fabrica más por su heterogeneidad) | basta si los ceros cuadran con los esperados | Unidades [2.1](#sec-u21) y [2.3](#sec-u23) |
-| **Zero-inflated ZIP / ZINB** | de una **mezcla** de dos distribuciones: una para los conteos (que modela los ceros aleatorios) y otra degenerada en el cero (que modela los ceros estructurales) | una subpoblación que no puede generar el evento, mezclada con la que sí | [Sección 4.3](#sec-u24-zi) |
-| **Hurdle** (Poisson o NB) | todos de una distribución distinta a la que genera los conteos distintos de cero (truncada en 0) | dos etapas: «¿ocurre algo?» y, si ocurre, «¿cuánto?» | [Sección 4.4](#sec-u24-hurdle) |
+- **Las filas: de dónde sale cada cero.**
+  - En la **mezcla** [@lambert1992] hay dos tipos de cero: los
+  **estructurales**, de una distribución degenerada en el 0 (las pólizas fuera del perímetro), y los
+  **aleatorios** del conteo (las vigiladas que no han tenido alertas). Solo puede **añadir** ceros a los
+  del conteo. 
+  - En la **barrera** [@mullahy1986] todos los ceros salen de un mismo proceso binario,
+  «¿ocurre algo?», y los positivos, de un conteo truncado en 0; por eso admite tanto más ceros como
+  menos de los que daría el conteo [@feng2021].
+- **Las columnas: cómo se reparten los positivos.** Poisson o NB, según estén o no sobredispersos una
+  vez apartados los ceros.
 
-Los *zero-inflated* [@lambert1992] separan dos tipos de cero (aleatorios y estructurales) y solo pueden **añadir** ceros a los que da el conteo (Poisson o NB). Los *hurdle* [@mullahy1986] separan dos modelos: uno para los ceros (y de ahí que admitan más o menos ceros de los que daría un conteo [@feng2021]), y otro de conteos truncados en el cero. Dentro de cada
-familia, la versión NB se reserva para cuando los **positivos** están sobredispersos. Las revisiones de
-@ridout1998 y @zeileis2008 presentan las cuatro variantes con un marco común.
+Las revisiones de @ridout1998 y @zeileis2008 presentan las cuatro variantes con un marco común. Las
+dos preguntas que siguen deciden la casilla [@blascomoreno2019].
 
-**¿Hacia cuál apuntan los datos?** La elección se resuelve con tres preguntas, en este orden, porque
-cada una decide una pieza del modelo y la siguiente parte de esa decisión [@blascomoreno2019]:
+### Pregunta 1 · ¿Poisson o NB para el conteo?
 
-| Pregunta | Qué decide | Qué se mira | Si la respuesta es «sí» |
-|---|---|---|---|
-| **1 · ¿Sobran ceros incluso frente a la NB?** | si los ceros necesitan un **proceso propio** | ceros observados frente a los que espera la NB | ZI o hurdle; si no, basta Poisson o NB |
-| **2 · Apartados los ceros, ¿siguen sobredispersos los positivos?** | la **distribución del conteo** | dispersión de una Poisson truncada en 0, ajustada solo a los positivos | versión NB (ZINB, hurdle-NB); si no, versión Poisson |
-| **3 · ¿Hay grupos con menos ceros de los que da ese conteo?** | **mezcla** o **barrera** | ceros observados frente a los del conteo elegido en la pregunta 2, por grupos | hurdle; si no, ZI (si la historia es de mezcla) |
-
-La pregunta 1 es la de @warton2005: muchos ceros no significan inflación de ceros. Lo que importa no es
-cuántos ceros hay, sino si hay **más de los que puede generar** el mejor modelo de un solo proceso, y
-ese modelo es la NB, no la Poisson. La pregunta 2 no repite la 1: para reproducir los ceros, la NB usa
-un único $\theta$ que mezcla la dispersión de los ceros y la de los positivos; si los ceros tienen su
-propio proceso, la distribución del conteo se decide mirando los positivos por separado.
-
-### Pregunta 1 · ¿Sobran ceros incluso frente a la NB?
-
-**Qué hacemos.** El contraste de la [Sección 4.1](#sec-u24-ceros) ya respondió en conjunto; aquí lo
-miramos **grupo a grupo**, con el gemelo del gráfico media-varianza de la
-[Unidad 2.3](#sec-u23-estructuras). Repartimos las pólizas en **12 grupos** de riesgo parecido (según el
-$\hat\mu_i$ de la Poisson, `m_fp`) y, en cada grupo, comparamos la proporción **observada** de ceros con
-la que **espera** cada modelo, que es la media de la probabilidad de cero de sus pólizas:
-$\overline{e^{-\hat\mu_i}}$ en la Poisson y $\overline{(1+\hat\mu_i/\hat\theta)^{-\hat\theta}}$ en la NB
-(`m_fnb`). La tabla da las cifras y la @fig-u24-ceros-grupos, la forma:
-
-```{r}
-#| label: u24-ceros-grupos-tabla
-ceros_grupo <- tibble::tibble(
-  grupo     = dplyr::ntile(fitted(m_fp), 12),          # 12 grupos de riesgo esperado parecido
-  media     = fitted(m_fp),
-  Observado = cartera$n_fraude == 0,
-  Poisson   = dpois(0, fitted(m_fp)),                  # P(Y = 0) de cada póliza según cada modelo
-  NB        = dnbinom(0, size = m_fnb$theta, mu = fitted(m_fnb))) |>
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(dplyr::across(c(media, Observado, Poisson, NB), mean))
-ceros_grupo
-```
-
-```{r}
-#| label: fig-u24-ceros-grupos
-#| fig-cap: "Proporción de ceros de `n_fraude`, observada y esperada por la Poisson y por la NB, en 12 grupos de pólizas de riesgo parecido (según la Poisson). La Poisson se queda cada vez más corta al crecer el riesgo: con esas medias no puede generar tantos ceros. La NB casi los iguala, pero queda por debajo de lo observado en la mayoría de los grupos."
-#| fig-width: 7
-#| fig-height: 3.8
-ceros_grupo |>
-  tidyr::pivot_longer(c(Observado, Poisson, NB), names_to = "fuente", values_to = "p0") |>
-  ggplot(aes(media, p0, colour = fuente)) +
-  geom_line(linewidth = 0.7) +
-  geom_point(size = 2) +
-  scale_colour_manual(values = c("Observado" = "grey20", "Poisson" = "darkorange", "NB" = "steelblue")) +
-  labs(x = "nº esperado de alertas en el grupo (Poisson)", y = "proporción de ceros", colour = NULL)
-```
-
-**Qué concluimos.** **Sí sobran ceros.** La Poisson se queda corta en todos los grupos, y más cuanto mayor
-es el riesgo: en el de mayor riesgo hay un `r round(100 * ceros_grupo$Observado[12])` % de ceros y espera
-un `r round(100 * ceros_grupo$Poisson[12])` %. La NB casi los iguala, pero aún queda por debajo en
-`r sum(ceros_grupo$Observado > ceros_grupo$NB)` de los 12 grupos: un exceso pequeño y sistemático. Los
-ceros necesitan, por tanto, un **proceso propio**: ZI o hurdle.
-
-### Pregunta 2 · ¿Poisson o NB para el conteo? Los positivos
-
-**Qué hacemos.** Para reproducir tantos ceros, la NB necesita mucha heterogeneidad entre pólizas:
+Para reproducir tantos ceros, la NB de la Sección 4.1 necesita mucha heterogeneidad entre pólizas:
 $\hat\theta$ = `r round(m_fnb$theta, 2)` (cuanto menor es $\theta$, mayor es la varianza,
-$\mu+\mu^2/\theta$, y más ceros genera; la Poisson es el límite $\theta\to\infty$). ¿Está esa
-heterogeneidad en el **conteo**, o la fabrican los **ceros**? Ajustamos a las pólizas con alguna alerta una
-**Poisson truncada en 0**, de media $m=\lambda/(1-e^{-\lambda})$ y varianza $m(1+\lambda-m)$, con
-$\lambda$ la media sin truncar, y calculamos su índice de dispersión: si ronda 1, el conteo es Poisson.
+$\mu+\mu^2/\theta$, y más ceros genera; la Poisson es el límite $\theta\to\infty$). Pero ese único
+$\theta$ tiene que explicar a la vez los ceros y la dispersión de los positivos. ¿Está la heterogeneidad
+en el **conteo**, o la fabrican los **ceros**? Para saberlo apartamos los ceros: ajustamos a las pólizas
+con alguna alerta una **Poisson truncada en 0**, de media $m=\lambda/(1-e^{-\lambda})$ y varianza
+$m(1+\lambda-m)$, con $\lambda$ la media sin truncar, y calculamos su índice de dispersión.
 
 ```{r}
 #| label: u24-positivos
@@ -315,22 +249,37 @@ disp_pos <- sum((pos$n_fraude - m_tr)^2 / v_tr) / df.residual(m_ztp)
 disp_pos
 ```
 
-**Qué concluimos.** **Poisson.** El índice es `r round(disp_pos, 2)`: los positivos no están
-sobredispersos. La heterogeneidad que necesitaba la NB la fabricaban los ceros, no el conteo. Usamos la versión
-**Poisson** (ZIP o hurdle-Poisson); la comparación formal entre ZIP y ZINB llega en la
-[Sección 4.3](#sec-u24-zi).
+**Poisson.** El índice es `r round(disp_pos, 2)`: los positivos no están sobredispersos, y la
+heterogeneidad que necesitaba la NB la fabricaban los ceros. Columna **Poisson**: ZIP o hurdle-Poisson.
 
-### Pregunta 3 · ¿Mezcla o barrera? ¿Faltan ceros en algún grupo?
+### Pregunta 2 · ¿Mezcla o barrera?
 
-**Qué hacemos.** El total de ceros no distingue mezcla de barrera: ZIP y hurdle pueden reproducirlo
-igual. Pero un ZI solo puede **añadir** ceros a los del conteo, mientras que un hurdle admite también
-grupos con **menos** (deflación) [@feng2021]. Buscamos en la @fig-u24-ceros-grupos algún grupo con menos
-ceros de los que espera la Poisson, el conteo elegido en la pregunta 2.
+El total de ceros no distingue las dos filas: ZIP y hurdle pueden reproducirlo igual. Dos criterios sí
+lo hacen:
 
-**Qué concluimos.** **No hay ninguno**: la menor diferencia entre observados y esperados es
-`r round(min(ceros_grupo$Observado - ceros_grupo$Poisson), 3)`, positiva. No hace falta la flexibilidad
-del hurdle, y la historia de la cartera —un perímetro que deja fuera a parte de las pólizas— es la de una
-mezcla. **Empezamos por el ZIP.**
+- **La historia del problema.** Un perímetro de vigilancia que deja fuera a parte de las pólizas es una
+  **mezcla** de dos subpoblaciones, no una barrera que todas pueden cruzar.
+- **La deflación.** Un ZI solo puede **añadir** ceros; un hurdle admite también grupos con **menos** ceros
+  de los que da el conteo. Si en algún grupo de pólizas faltaran ceros, solo el hurdle podría
+  reproducirlo. Lo comprobamos con 12 grupos de riesgo parecido (según la Poisson, `m_fp`), comparando en
+  cada uno la proporción observada de ceros con la que espera el conteo Poisson elegido en la pregunta 1:
+
+```{r}
+#| label: u24-deflacion
+ceros_grupo <- tibble::tibble(
+  grupo      = dplyr::ntile(fitted(m_fp), 12),   # 12 grupos de riesgo esperado parecido
+  observados = cartera$n_fraude == 0,
+  esperados  = dpois(0, fitted(m_fp))) |>        # P(Y = 0) de cada póliza según la Poisson
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(dplyr::across(c(observados, esperados), mean)) |>
+  dplyr::mutate(diferencia = observados - esperados)
+ceros_grupo
+```
+
+**Mezcla.** Ningún grupo tiene menos ceros de los esperados: la menor diferencia es
+`r round(min(ceros_grupo$diferencia), 3)`, positiva. No hace falta la flexibilidad del hurdle, y la
+historia es la de una mezcla. **Empezamos por el ZIP**, y ajustaremos también los otros tres para
+compararlos ([Sección 4.5](#sec-u24-elegir)).
 
 Un aviso para no convertir estos indicios en una receta automática. Encadenar contrastes previos (de
 sobredispersión, de exceso de ceros) para elegir el modelo, y después hacer inferencia con él como si
@@ -349,9 +298,52 @@ comparación de los modelos ajustados ([Sección 4.5](#sec-u24-elegir)).
   (`ziformula` con `family = compois` o `genpois`), o las familias ZIP/ZINB de `gamlss`.
 :::
 
+::: {.callout-tip}
+## 🔧 En R. Del exceso de ceros a la estructura del modelo
+Los tres pasos de las secciones 4.1 y 4.2, en orden. Cada uno decide algo y el siguiente parte de esa
+decisión.
+
+**1 · ¿Sobran ceros frente a la NB?** ([§4.1](#sec-u24-ceros)) Decide si los ceros necesitan un proceso
+propio.
+
+```r
+m_nb <- MASS::glm.nb(y ~ x1 + x2 + offset(log(t)), data = d)    # la NB, no la Poisson
+set.seed(1)                                                      # el p-valor sale de simular
+sim  <- DHARMa::simulateResiduals(m_nb, n = 1000)
+DHARMa::testZeroInflation(sim, plot = FALSE)    # ratioObsSim > 1 y p pequeño: sobran ceros
+colSums(sim$simulatedResponse == 0)             # distribución de los ceros bajo H0
+```
+
+$H_0$ es el modelo ajustado, con sus covariables y su *offset*. El $p$-valor no baja de $1/n_\text{sim}$.
+No uses `vcdExtra::zero.test`: contrasta frente a una Poisson sin covariables.
+
+**2 · ¿Poisson o NB para el conteo?** (pregunta 1 de la [§4.2](#sec-u24-estructuras)) Decide la columna.
+
+```r
+pos  <- subset(d, y > 0)                                         # solo los positivos
+m_tp <- glmmTMB::glmmTMB(y ~ x1 + x2 + offset(log(t)), data = pos,
+                         family = glmmTMB::truncated_poisson())
+lam  <- exp(predict(m_tp, type = "link"))                        # media SIN truncar
+m_tr <- lam / (1 - exp(-lam)); v_tr <- m_tr * (1 + lam - m_tr)   # media y varianza truncadas
+sum((pos$y - m_tr)^2 / v_tr) / df.residual(m_tp)                 # ~ 1: Poisson; >> 1: NB
+```
+
+**3 · ¿Mezcla o barrera?** (pregunta 2 de la [§4.2](#sec-u24-estructuras)) Decide la fila, con la
+historia del problema y la deflación: si algún grupo tiene **menos** ceros de los que da el conteo, solo
+el hurdle puede reproducirlo.
+
+```r
+m_p <- glm(y ~ x1 + x2 + offset(log(t)), family = poisson, data = d)
+tibble::tibble(grupo = dplyr::ntile(fitted(m_p), 12),
+               obs = d$y == 0, esp = dpois(0, fitted(m_p))) |>
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(dif = mean(obs) - mean(esp))   # alguna dif < 0: deflación -> hurdle
+```
+:::
+
 ## 4.3 Modelos zero-inflated (ZIP / ZINB) {#sec-u24-zi}
 
-### El modelo: una mezcla de dos poblaciones
+### El modelo: una mezcla de dos poblaciones, y su estimación
 
 El *zero-inflated* [@lambert1992] toma en serio las dos historias del cero y las **modela como una
 mezcla**. Con probabilidad $\pi_i$ la póliza es un **cero estructural** (fuera del perímetro: aporta un 0
@@ -370,139 +362,191 @@ Son, en el fondo, **dos submodelos** con enlaces distintos, que pueden usar pred
 Si $f$ es la Poisson tenemos el **ZIP**; si los positivos están además sobredispersos, se usa la NB y
 tenemos el **ZINB**.
 
-### Verosimilitud y estimación
+**Verosimilitud y estimación.** Cada observación contribuye a la log-verosimilitud según sea cero o
+positiva. Con
+$f(\,\cdot\,;\mu_i)$ la función de probabilidad del conteo, de media
+$\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ (más el *offset*), y $\pi_i$ la probabilidad del logit:
 
-Cada observación contribuye a la log-verosimilitud según sea cero o positiva (con
-$\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$, más el *offset*, y $\pi_i$ del logit):
+$$\ell_i=\begin{cases}\log\bigl(\pi_i+(1-\pi_i)\,f(0;\mu_i)\bigr) & y_i=0,\\[4pt]\log(1-\pi_i)+\log f(y_i;\mu_i) & y_i>0.\end{cases}$$
 
-$$\ell_i=\begin{cases}\log\!\bigl(\pi_i+(1-\pi_i)\,e^{-\mu_i}\bigr) & y_i=0,\\[2pt]\log(1-\pi_i)+y_i\log\mu_i-\mu_i-\log(y_i!) & y_i>0.\end{cases}$$
+Un cero puede venir de las dos fuentes, y por eso su probabilidad es una **suma**; un positivo solo puede
+venir del conteo. Basta sustituir la $f$ de cada familia:
 
-En el **ZINB** cambia la distribución del conteo, que pasa a ser la NB de media $\mu_i$ y parámetro
-$\theta$ (la de la [Unidad 2.3](#sec-u23-nb)),
-$f(y)=\frac{\Gamma(y+\theta)}{\Gamma(\theta)\,y!}\bigl(\frac{\theta}{\theta+\mu}\bigr)^{\theta}\bigl(\frac{\mu}{\theta+\mu}\bigr)^{y}$,
-y con ella su probabilidad de cero, $f(0)=\bigl(\theta/(\theta+\mu_i)\bigr)^{\theta}$:
-
-$$\ell_i=\begin{cases}\log\!\Bigl(\pi_i+(1-\pi_i)\bigl(\tfrac{\theta}{\theta+\mu_i}\bigr)^{\theta}\Bigr) & y_i=0,\\[4pt]\log(1-\pi_i)+\log\Gamma(y_i+\theta)-\log\Gamma(\theta)-\log(y_i!)+\theta\log\dfrac{\theta}{\theta+\mu_i}+y_i\log\dfrac{\mu_i}{\theta+\mu_i} & y_i>0.\end{cases}$$
+| | $f(y;\mu)$ | $f(0;\mu)$ |
+|---|---|---|
+| **ZIP** (Poisson) | $\dfrac{e^{-\mu}\mu^{y}}{y!}$ | $e^{-\mu}$ |
+| **ZINB** (NB de la [Unidad 2.3](#sec-u23-nb)) | $\dfrac{\Gamma(y+\theta)}{\Gamma(\theta)\,y!}\Bigl(\dfrac{\theta}{\theta+\mu}\Bigr)^{\theta}\Bigl(\dfrac{\mu}{\theta+\mu}\Bigr)^{y}$ | $\Bigl(\dfrac{\theta}{\theta+\mu}\Bigr)^{\theta}$ |
 
 Con $\theta\to\infty$ la NB tiende a la Poisson y se recupera el ZIP. En los dos casos la
 log-verosimilitud total es $\ell=\sum_i\ell_i$, y las dos partes se estiman **conjuntamente** por
 máxima verosimilitud: los ceros están «repartidos» entre ambos procesos, así que no se pueden separar.
 Al haber una **pertenencia latente** (¿es esta póliza un cero estructural o un cero muestral?), el
 método natural es el algoritmo **EM** [@dempster1977], que alterna estimar esa pertenencia y reajustar
-los dos submodelos. También se puede maximizar $\ell$ directamente, que es lo que hace por defecto
-`pscl::zeroinfl` (con `optim`; el EM se activa con `zeroinfl.control(EM = TRUE)`). La otra vía en R es
-`glmmTMB` con `ziformula`.
+los dos submodelos. También se puede maximizar $\ell$ directamente, que es lo que hace `glmmTMB`
+[@brooks2017], el paquete con el que ajustamos todos los modelos de esta unidad: calcula las derivadas
+de $\ell$ de forma automática y la maximiza con un optimizador numérico.
 
 ::: {.callout-note collapse="true"}
 ## Cómo funciona el algoritmo EM en un ZIP
 La dificultad de $\ell$ es el logaritmo de una **suma** en los ceros. El EM la esquiva imaginando que
-conociéramos la variable latente $z_i$, que vale 1 si la póliza es un cero estructural y 0 si está en
+conociéramos la variable latente $u_i$, que vale 1 si la póliza es un cero estructural y 0 si está en
 riesgo [@lambert1992]. Con ella, la log-verosimilitud **completa** se separa en dos sumandos, uno para
 cada parte del modelo:
 
-$$\ell_c=\underbrace{\sum_i\bigl[z_i\log\pi_i+(1-z_i)\log(1-\pi_i)\bigr]}_{\text{logit: depende de }\boldsymbol\gamma}
-\;+\;\underbrace{\sum_i(1-z_i)\log f(y_i;\mu_i)}_{\text{conteo: depende de }\boldsymbol\beta}.$$
+$$\ell_c=\underbrace{\sum_i\bigl[u_i\log\pi_i+(1-u_i)\log(1-\pi_i)\bigr]}_{\text{logit: depende de }\boldsymbol\gamma}
+\;+\;\underbrace{\sum_i(1-u_i)\log f(y_i;\mu_i)}_{\text{conteo: depende de }\boldsymbol\beta}.$$
 
-Como $z_i$ no se observa, el algoritmo alterna dos pasos hasta que $\ell$ deja de crecer:
+Como $u_i$ no se observa, el algoritmo alterna dos pasos hasta que $\ell$ deja de crecer:
 
 1. **Paso E (esperanza).** Con los parámetros actuales, calcula la probabilidad de que cada póliza sea
-   un cero estructural. Si $y_i>0$, es imposible: $\hat z_i=0$. Si $y_i=0$, por el teorema de Bayes,
-   $$\hat z_i=\frac{\pi_i}{\pi_i+(1-\pi_i)\,f(0;\mu_i)},$$
+   un cero estructural. Si $y_i>0$, es imposible: $\hat u_i=0$. Si $y_i=0$, por el teorema de Bayes,
+   $$\hat u_i=\frac{\pi_i}{\pi_i+(1-\pi_i)\,f(0;\mu_i)},$$
    que en el ZIP es $\pi_i/\bigl(\pi_i+(1-\pi_i)e^{-\mu_i}\bigr)$.
-2. **Paso M (maximización).** Sustituye $z_i$ por $\hat z_i$ en $\ell_c$ y maximiza cada sumando por
+2. **Paso M (maximización).** Sustituye $u_i$ por $\hat u_i$ en $\ell_c$ y maximiza cada sumando por
    separado, con dos GLM que ya conocemos:
-   - una **regresión logística** de $\hat z_i$ (una respuesta fraccionaria entre 0 y 1) sobre los
+   - una **regresión logística** de $\hat u_i$ (una respuesta fraccionaria entre 0 y 1) sobre los
      predictores de la parte de ceros, que actualiza $\boldsymbol\gamma$;
    - una **regresión de Poisson** de $y_i$ sobre los predictores del conteo, con *offset* y con **pesos**
-     $1-\hat z_i$, que actualiza $\boldsymbol\beta$. Un cero que probablemente es estructural apenas
+     $1-\hat u_i$, que actualiza $\boldsymbol\beta$. Un cero que probablemente es estructural apenas
      pesa en el conteo. En el ZINB, esta regresión es una NB ponderada, que actualiza también $\theta$.
 
 Cada iteración **no puede hacer bajar** $\ell$ [@dempster1977], así que el algoritmo converge de forma
-estable, aunque despacio cerca del máximo. Por eso `pscl::zeroinfl` maximiza $\ell$ directamente por
-defecto y ofrece el EM como alternativa, por ejemplo para obtener buenos valores iniciales.
+estable, aunque despacio cerca del máximo. Por eso los programas actuales, como `glmmTMB`, maximizan
+$\ell$ directamente; el EM sigue siendo la mejor forma de **entender** qué hace el modelo con cada cero.
 :::
 
-### Ajuste e interpretación
+### Exploración: qué predictor va en cada parte
 
-Antes de ajustar, conviene ver **qué mueve cada parte**, para decidir qué predictores lleva cada
-submodelo. Resumir los datos por grupos con la proporción de ceros o con la media de alertas no basta,
-porque los dos resúmenes **mezclan** las partes: un cero puede ser estructural o muestral, y la media
-junta las pólizas vigiladas con las que no lo están. Hay que separarlas, y para eso nos apoyamos en las
-pólizas con alguna alerta, que seguro están vigiladas. En cada grupo de pólizas (cada nivel de un
-predictor):
+Antes de ajustar hay que decidir **qué predictores lleva cada parte**: cuáles mueven la probabilidad de
+quedar fuera del perímetro (el logit) y cuáles el ritmo de alertas de las pólizas vigiladas (el
+conteo). La exploración habitual, resumir por grupos la proporción de ceros o la tasa de alertas, aquí
+**engaña**, porque los dos resúmenes mezclan las partes. Un grupo puede tener más ceros porque más
+pólizas suyas están fuera del perímetro o porque sus pólizas vigiladas tienen un ritmo más bajo; y su
+tasa de alertas baja tanto si hay más pólizas fuera como si las de dentro van más despacio.
 
-1. **El ritmo de las vigiladas.** Ajustamos a las pólizas del grupo con alguna alerta una Poisson
-   truncada en 0, como en la pregunta 2. Su tasa $\hat r$ estima el ritmo de alertas **dentro del
-   perímetro**: es el resumen de la parte de **conteo**.
-2. **Los ceros estructurales.** Con ese ritmo, la Poisson daría en el grupo una proporción de ceros
-   **muestrales** $p_0^{\text{conteo}}=\overline{e^{-\hat r\,t_i}}$. Como la proporción observada es
-   $p_0^{\text{obs}}=\pi+(1-\pi)\,p_0^{\text{conteo}}$, despejando se estima la proporción de ceros
-   estructurales, que es el resumen de la parte **estructural**:
-   $$\hat\pi=\frac{p_0^{\text{obs}}-p_0^{\text{conteo}}}{1-p_0^{\text{conteo}}}.$$
+La salida es **separar las dos partes dentro de cada grupo**. La clave está en las pólizas con alguna
+alerta: esas, seguro, están vigiladas. Para cada predictor candidato (`potencia_cv` en terciles, `uso`,
+`zona_circulacion` y `tipo_vehiculo`) y cada uno de sus niveles hacemos cuatro cálculos:
 
-Lo hacemos para los **cuatro** predictores candidatos, con la potencia en terciles:
+1. **El ritmo de las vigiladas, $\hat r$.** Es el número medio de alertas **por unidad de exposición**
+   de las pólizas vigiladas de ese nivel: una **tasa**, no una razón de tasas. (Una IRR compararía dos
+   niveles, $\hat r_B/\hat r_A$; aquí queremos el ritmo de cada uno.) Se estima con las pólizas del nivel
+   que tienen alguna alerta, ajustando una **Poisson truncada en 0** con *offset* —la de la pregunta 1 de
+   la [Sección 4.2](#sec-u24-estructuras)—:
+   `n_fraude ~ 0 + predictor_cat + offset(log(exposicion))`, donde `predictor_cat` es el predictor
+   categorizado (la potencia en terciles, o el uso, la zona o el tipo tal cual). Sin intercepto, el
+   modelo da un coeficiente por nivel, $\hat\beta_{\text{nivel}}$, y por el *offset* ese coeficiente es el
+   logaritmo de una tasa: $\hat r=e^{\hat\beta_{\text{nivel}}}$. Es el ritmo de la Poisson **sin truncar**,
+   el de las vigiladas, aunque se estime solo con los positivos. Es el resumen de la parte de **conteo**:
+   no le afectan los ceros, que son justo los que no sabemos repartir.
+2. **Los ceros observados, $p_0^{\text{obs}}$.** La proporción de pólizas del nivel sin ninguna alerta.
+3. **Los ceros que daría el conteo, $p_0^{\text{conteo}}$.** Si todas las pólizas de cada nivel estuvieran
+   vigiladas, cada una tendría cero alertas con probabilidad $e^{-\hat r\,t_i}$, según su exposición
+   $t_i$. Su media, $p_0^{\text{conteo}}=\overline{e^{-\hat r\,t_i}}$, es la proporción de ceros
+   **muestrales** esperada.
+4. **La proporción de ceros estructurales, $\hat\pi$.** Si una fracción $\pi$ del nivel está fuera del
+   perímetro, la proporción de ceros es la mezcla $p_0^{\text{obs}}=\pi+(1-\pi)\,p_0^{\text{conteo}}$.
+   Despejando,
+   $$\hat\pi=\frac{p_0^{\text{obs}}-p_0^{\text{conteo}}}{1-p_0^{\text{conteo}}}:$$
+   el **exceso** de ceros sobre los del conteo, reescalado para que sea la fracción de pólizas fuera del
+   perímetro. Es el resumen de la parte **estructural**.
+
+Añadimos la **tasa bruta** de alertas del nivel, $\sum y_i/\sum t_i$, para ver lo que diría la
+exploración habitual:
 
 ```{r}
 #| label: u24-zip-explora
 d_exp <- dplyr::mutate(cartera, potencia_cv_tercil = ggplot2::cut_number(potencia_cv, 3))
 explora <- function(var) {
-  d <- dplyr::mutate(d_exp, nivel = factor(.data[[var]]))
-  # ritmo de las vigiladas: Poisson truncada en 0 sobre las pólizas con alguna alerta, un ritmo por nivel
-  m_tr  <- glmmTMB::glmmTMB(n_fraude ~ 0 + nivel + offset(log(exposicion)),
+  d <- dplyr::mutate(d_exp, predictor_cat = factor(.data[[var]]))
+  # 1 · ritmo de las vigiladas: Poisson truncada en 0 sobre las pólizas con alguna alerta, un ritmo por nivel
+  m_tr  <- glmmTMB::glmmTMB(n_fraude ~ 0 + predictor_cat + offset(log(exposicion)),
                             family = glmmTMB::truncated_poisson(), data = subset(d, n_fraude > 0))
+  # fixef(m_tr)$cond: vector con nombres de los coeficientes de la fórmula (escala log), uno por nivel;
+  # exponenciados, el ritmo de cada nivel en alertas por unidad de exposición
   ritmo <- exp(glmmTMB::fixef(m_tr)$cond)
   d |>
-    dplyr::mutate(ritmo = ritmo[as.integer(nivel)]) |>
-    dplyr::group_by(nivel) |>
-    dplyr::summarise(ceros_obs    = mean(n_fraude == 0),
-                     ceros_conteo = mean(exp(-ritmo * exposicion)),   # ceros que daría ese ritmo
+    dplyr::mutate(ritmo = ritmo[as.integer(predictor_cat)]) |>
+    dplyr::group_by(predictor_cat) |>
+    dplyr::summarise(tasa_bruta   = sum(n_fraude) / sum(exposicion),
+                     ceros_obs    = mean(n_fraude == 0),                  # 2 · ceros observados
+                     ceros_conteo = mean(exp(-ritmo * exposicion)),       # 3 · ceros que daría el conteo
                      ritmo        = dplyr::first(ritmo), .groups = "drop") |>
-    dplyr::mutate(predictor = var, nivel = as.character(nivel),
-                  pi_est = (ceros_obs - ceros_conteo) / (1 - ceros_conteo))
+    dplyr::transmute(predictor = var, nivel = as.character(predictor_cat), tasa_bruta, ceros_obs,
+                     ceros_conteo, ritmo,
+                     pi_est = (ceros_obs - ceros_conteo) / (1 - ceros_conteo))   # 4 · ceros estructurales
 }
 explora_zip <- purrr::map_dfr(c("potencia_cv_tercil", "uso", "zona_circulacion", "tipo_vehiculo"),
                               explora)
-explora_zip
+# para mostrarla: predictor y nivel en una columna, y cifras redondeadas a 5 decimales
+explora_zip |>
+  dplyr::transmute(predictor_nivel = paste(predictor, nivel, sep = "-"),
+                   dplyr::across(c(tasa_bruta, ceros_obs, ceros_conteo, ritmo, pi_est), \(x) round(x, 5)))
 ```
+
+Un ejemplo para leer la tabla: en el tercil de **potencia baja**, las pólizas vigiladas tienen un ritmo
+de `r round(explora_zip$ritmo[1], 2)` alertas por unidad de exposición, con el que solo un
+`r round(100 * explora_zip$ceros_conteo[1])` % de ellas pasaría el periodo sin alertas. Pero sin alertas
+hay un `r round(100 * explora_zip$ceros_obs[1])` %. El exceso, reescalado, da
+$\hat\pi$ = `r round(explora_zip$pi_est[1], 2)`: se estima que esa fracción de las pólizas de potencia
+baja queda fuera del perímetro.
+
+La @fig-u24-zip-explora representa las dos columnas que resumen cada parte, `pi_est` y `ritmo`. Cada
+**columna** de paneles es un predictor, con sus niveles en el eje horizontal; la **fila superior** es la
+parte estructural ($\hat\pi$) y la **inferior**, la de conteo ($\hat r$). Cada fila tiene su propia
+escala vertical. Se lee así: si un predictor no influye en una parte, sus puntos en esa fila quedan
+**a la misma altura**; si influye, cambian de un nivel a otro.
 
 ```{r}
 #| label: fig-u24-zip-explora
 #| fig-cap: "Las dos partes del ZIP, separadas, para cada predictor candidato. Fila superior (parte estructural): proporción estimada de ceros estructurales, que cambia con la potencia y con el uso y es plana con la zona y el tipo de vehículo. Fila inferior (parte de conteo): ritmo de alertas de las pólizas vigiladas, que cambia con la potencia, la zona y el tipo de vehículo, y apenas con el uso."
 #| fig-width: 9
-#| fig-height: 4.6
+#| fig-height: 6
 explora_zip |>
   tidyr::pivot_longer(c(pi_est, ritmo), names_to = "parte", values_to = "valor") |>
   dplyr::mutate(parte = factor(parte, levels = c("pi_est", "ritmo"),
-                               labels = c("Estructural: ceros estructurales (pi)",
-                                          "Conteo: ritmo de las vigiladas"))) |>
+                               labels = c("Estructural:\nceros estructurales (pi)",
+                                          "Conteo:\nritmo de las vigiladas")),
+                # orden de la tabla (el natural de cada predictor), no el alfabético
+                nivel = forcats::fct_inorder(nivel)) |>
   ggplot(aes(nivel, valor, group = 1)) +
   geom_line(colour = "grey60") +
   geom_point(size = 2.5, colour = "steelblue") +
   facet_grid(parte ~ predictor, scales = "free") +
   labs(x = NULL, y = NULL) +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1),
+        strip.text.y = element_text(size = 9))   # títulos de fila en dos líneas, para que no se corten
 ```
 
-La @fig-u24-zip-explora (con las cifras en la tabla que la precede) separa limpiamente los papeles:
+Los papeles quedan separados:
 
-- **Parte estructural.** La proporción de ceros estructurales **baja al crecer la potencia** y es **menor
-  en el uso comercial**, mientras que es prácticamente **plana** con la zona y con el tipo de vehículo.
-  Los candidatos para el logit son, por tanto, `uso` y `potencia_cv`.
-- **Parte de conteo.** El ritmo de las vigiladas **sube con la potencia**, es mayor en zona **urbana** y en
-  **moto**, y apenas cambia con el **uso**. Los candidatos para el conteo son `potencia_cv`,
+- **Parte estructural** (fila superior). La proporción de ceros estructurales **baja al crecer la
+  potencia** y es **menor en el uso comercial**, y es prácticamente **plana** con la zona y con el tipo de
+  vehículo. Al logit van `uso` y `potencia_cv`.
+- **Parte de conteo** (fila inferior). El ritmo de las vigiladas **sube con la potencia**, es mayor en
+  zona **urbana** y en **moto**, y apenas cambia con el **uso**. Al conteo van `potencia_cv`,
   `zona_circulacion` y `tipo_vehiculo`.
 
-El `uso` es el caso instructivo. Sin separar las partes, las pólizas comerciales acumulan más alertas
-por póliza, y parecería un efecto sobre el ritmo; separadas, se ve que esa diferencia viene casi toda de
-que **están vigiladas más a menudo**. Aun así, lo dejamos también en el conteo para que sea el ajuste
-quien estime ese efecto con su incertidumbre, ajustado por los demás predictores.
+El `uso` muestra por qué había que separar. Su **tasa bruta** es claramente mayor en las comerciales
+(`r round(explora_zip$tasa_bruta[explora_zip$nivel == "comercial"], 2)` frente a
+`r round(explora_zip$tasa_bruta[explora_zip$nivel == "particular"], 2)` alertas por unidad de
+exposición), y parecería un efecto sobre el ritmo. Separadas las partes, el ritmo de las vigiladas es
+casi el mismo (`r round(explora_zip$ritmo[explora_zip$nivel == "comercial"], 2)` frente a
+`r round(explora_zip$ritmo[explora_zip$nivel == "particular"], 2)`): la diferencia viene de que las
+comerciales **están vigiladas más a menudo**. Aun así, dejamos el `uso` también en el conteo para que sea
+el ajuste quien estime ese efecto con su incertidumbre, ajustado por los demás predictores.
 
-Con esa lectura, la fórmula de `pscl::zeroinfl` tiene **dos lados**, separados por `|`:
+### Ajuste e interpretación
 
-- **A la izquierda**, la respuesta y los predictores de la parte de **conteo**, $\mathbf{x}_i$ en
-  $\log\mu_i=\mathbf{x}_i'\boldsymbol\beta$, con el *offset* de la exposición: lo que mueve el **ritmo** de
-  alertas de una póliza vigilada.
-- **A la derecha**, los predictores de la parte **estructural**, $\mathbf{z}_i$ en
+Ajustamos con `glmmTMB` [@brooks2017]. Lo usamos ya en la [Sección 4.2](#sec-u24-estructuras) para la
+Poisson truncada, y reúne en un mismo objeto todo lo que necesita la unidad: las dos partes del modelo,
+su inferencia, los residuos simulados de `DHARMa` y, en la [Unidad 2.5](#sec-u25-modelo), los efectos
+aleatorios. Cada parte tiene **su propia fórmula**:
+
+- **La fórmula principal** lleva la respuesta y los predictores de la parte de **conteo**, $\mathbf{x}_i$
+  en $\log\mu_i=\mathbf{x}_i'\boldsymbol\beta$, con el *offset* de la exposición: lo que mueve el
+  **ritmo** de alertas de una póliza vigilada.
+- **`ziformula`** lleva los predictores de la parte **estructural**, $\mathbf{z}_i$ en
   $\operatorname{logit}\pi_i=\mathbf{z}_i'\boldsymbol\gamma$: lo que hace más o menos probable que una
   póliza quede **fuera del perímetro**. No lleva *offset*: estar fuera del perímetro es una condición de
   la póliza, no algo que se acumule con el tiempo observado.
@@ -510,19 +554,63 @@ Con esa lectura, la fórmula de `pscl::zeroinfl` tiene **dos lados**, separados 
 Los dos conjuntos no tienen por qué coincidir, y elegirlos es una decisión de modelización con tres
 apoyos: la **historia** (qué puede plausiblemente dejar una póliza fuera del sistema), la **exploración**
 de la @fig-u24-zip-explora y, una vez ajustado, la **razón de verosimilitudes** al añadir o quitar
-predictores, como haremos enseguida con la edad. Aquí ponemos detrás de `|` el `uso` y la `potencia_cv`,
-los dos predictores que mueven los ceros estructurales. Dos casos especiales de la sintaxis: `| 1` deja
-$\pi$ constante (la misma probabilidad de cero estructural para todas las pólizas), y una fórmula sin
-`|` usa **los mismos** predictores en las dos partes:
+predictores, como haremos enseguida con la edad. En `ziformula` ponemos el `uso` y la `potencia_cv`, los
+dos predictores que mueven los ceros estructurales. Tres casos especiales de la sintaxis:
+`ziformula = ~ 1` deja $\pi$ constante (la misma probabilidad de cero estructural para todas las
+pólizas), `ziformula = ~ .` usa **los mismos** predictores que el conteo, y sin `ziformula` (por defecto,
+`~ 0`) no hay ceros estructurales y el modelo es una Poisson. La `family` fija la distribución $f$ del
+conteo: `poisson` para el ZIP.
 
 ```{r}
 #| label: u24-zip
-m_zip <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
+m_zip <- glmmTMB::glmmTMB(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
+  ziformula = ~ uso + potencia_cv,
+  family    = poisson, data = cartera)
 summary(m_zip)
 ```
+
+`summary()` da los coeficientes de las dos partes en la escala del enlace: el bloque *Conditional model*
+es el conteo y el bloque *Zero-inflation model*, la parte estructural. Para interpretarlos hay que
+exponenciarlos, y conviene hacerlo con sus intervalos de confianza. Lo hace
+`broom.mixed::tidy(m, exponentiate = TRUE, conf.int = TRUE)`, el equivalente para `glmmTMB` del
+`broom::tidy()` de la Unidad 2.1; su columna `component` dice a qué parte pertenece cada término (`cond`,
+el conteo; `zi`, los ceros). La función siguiente la ordena para leerla, y servirá también para el
+hurdle:
+
+```{r}
+#| label: u24-zip-or
+# efectos exponenciados con su IC de Wald al 95 %, sin los interceptos
+tabla_exp <- function(m, etiqueta_ceros) {
+  broom.mixed::tidy(m, exponentiate = TRUE, conf.int = TRUE) |>
+    dplyr::filter(term != "(Intercept)") |>
+    dplyr::transmute(parte      = ifelse(component == "cond", "conteo: IRR", etiqueta_ceros),
+                     termino    = term,
+                     estimacion = round(estimate, 3),
+                     ic_inf     = round(conf.low, 3),
+                     ic_sup     = round(conf.high, 3))
+}
+or_zip <- tabla_exp(m_zip, etiqueta_ceros = "ceros: OR de estar fuera del perímetro")
+or_zip
+```
+
+::: {.callout-note}
+## Intervalos de Wald y de verosimilitud perfil
+Los dos se construyen en la escala del enlace y se exponencian después, pero no del mismo modo:
+
+- **Wald.** Usa la aproximación normal del estimador: $\hat\beta\pm 1.96\,\widehat{\mathrm{EE}}(\hat\beta)$. Es
+  lo que dan por defecto `broom.mixed::tidy()` y `confint()` con un modelo de `glmmTMB`, y es también la
+  lógica de los intervalos para las **predicciones** de la [Unidad 2.1](#sec-u21-interpretacion)
+  ($\hat\eta\pm 1.96\,\widehat{\mathrm{EE}}(\hat\eta)$).
+- **Verosimilitud perfil.** Recoge los valores de $\beta$ que la razón de verosimilitudes no rechazaría.
+  No supone que la log-verosimilitud sea simétrica alrededor del máximo. Es lo que da `confint()` con un
+  `glm`, y por tanto lo que usaba `broom::tidy(..., conf.int = TRUE)` para las IRR de la Unidad 2.1. Con
+  `glmmTMB` se pide con `confint(m, method = "profile")`.
+
+Con muestras grandes como la nuestra apenas difieren (compruébalo comparando `confint(m_zip)` con
+`confint(m_zip, method = "profile")`). Se separan con muestras pequeñas o con estimaciones cerca del borde (probabilidades próximas a 0 o 1), y
+entonces el de perfil es más fiable.
+:::
 
 Se lee en **dos bloques**. En el de **conteo** (enlace log), $\exp(\beta)$ es una **razón de tasas**
 (IRR) entre las pólizas en riesgo: la **potencia** sube el ritmo ($\exp(0.0071)\approx 1.007$ por CV, es
@@ -530,30 +618,32 @@ decir $\times 1.4$ por cada 50 CV extra); las zonas menos urbanas lo bajan (rura
 urbana); y la **moto** lo eleva ($\times 1.26$). En el de **ceros** (enlace logit), $\exp(\gamma)$ es el
 **odds ratio de ser un cero estructural** (quedar fuera del perímetro): el uso **comercial** lo reduce a menos de la
 mitad ($\exp(-0.78)\approx 0.46$: mucho más a menudo vigilada) y la **potencia** también (por cada 50
-CV, $\times 0.59$). Dos preguntas —*quién está vigilado* y *a qué ritmo acumula alertas quien lo está*—
+CV, $\times 0.58$). Dos preguntas —*quién está vigilado* y *a qué ritmo acumula alertas quien lo está*—
 respondidas a la vez.
+
+Los intervalos añaden un matiz que confirma la exploración: el del `uso` en el **conteo** va de
+`r or_zip$ic_inf[or_zip$parte == "conteo: IRR" & or_zip$termino == "usocomercial"]` a
+`r or_zip$ic_sup[or_zip$parte == "conteo: IRR" & or_zip$termino == "usocomercial"]` y contiene el 1:
+una vez separados los ceros, no hay evidencia de que las comerciales acumulen alertas a más ritmo. Su
+efecto está en la parte de ceros, donde el intervalo queda lejos del 1.
 
 ¿Por qué la parte de conteo no lleva la edad ni la antigüedad del carnet? Porque no aportan: añadirlas
 apenas mueve la verosimilitud, como muestra la razón de verosimilitudes:
 
 ```{r}
 #| label: u24-zip-edad
-m_zip_edad <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + edad_conductor + antiguedad_carnet +
-             offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-lmtest::lrtest(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de conteo
+# update() cambia solo la fórmula principal (el conteo); ziformula se mantiene
+m_zip_edad <- update(m_zip, . ~ . + edad_conductor + antiguedad_carnet)
+anova(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de conteo
 ```
 
-¿Hace falta la NB en el conteo? Se ajusta el **ZINB** (`dist = "negbin"`) y se compara por AIC:
+¿Hace falta la NB en el conteo? Se ajusta el **ZINB** cambiando solo la familia del conteo
+(`nbinom2`, la NB de la [Unidad 2.3](#sec-u23-nb), con varianza $\mu+\mu^2/\theta$) y se compara por
+AIC:
 
 ```{r}
 #| label: u24-zinb
-m_zinb <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
+m_zinb <- update(m_zip, family = glmmTMB::nbinom2)
 AIC(m_zip, m_zinb)
 ```
 
@@ -564,35 +654,108 @@ previo del proceso.
 
 ::: {.callout-tip}
 ## 🔧 En R. Ajustar un ZIP / ZINB
+**1 · Explorar qué predictor va en cada parte.** Para cada predictor `x` (agrupado, si es continuo) se
+separan las dos partes nivel a nivel, apoyándose en los positivos, que seguro están en riesgo:
+
 ```r
-pscl::zeroinfl(y ~ x1 + x2 + offset(log(t)) | z1 + z2,   # conteo | ceros estructurales
-               dist = "poisson", data = ...)              # "negbin" -> ZINB
+explora <- function(d, x) {
+  d$predictor_cat <- factor(d[[x]])
+  # ritmo del conteo: Poisson truncada en 0 sobre los positivos, un ritmo por nivel
+  m_tr  <- glmmTMB::glmmTMB(y ~ 0 + predictor_cat + offset(log(t)),
+                            family = glmmTMB::truncated_poisson(), data = subset(d, y > 0))
+  ritmo <- exp(glmmTMB::fixef(m_tr)$cond)
+  d |>
+    dplyr::mutate(ritmo = ritmo[as.integer(predictor_cat)]) |>
+    dplyr::group_by(predictor_cat) |>
+    dplyr::summarise(p0_obs    = mean(y == 0),                 # ceros observados
+                     p0_conteo = mean(exp(-ritmo * t)),        # ceros que daría el conteo
+                     ritmo     = dplyr::first(ritmo)) |>
+    dplyr::mutate(pi_est = (p0_obs - p0_conteo) / (1 - p0_conteo))   # ceros estructurales
+}
 ```
 
-- La **fórmula de dos lados** separa por `|` la parte de **conteo** (izquierda, enlace log → IRR) de la
-  parte de **ceros estructurales** (derecha, enlace logit → OR de «fuera del perímetro»), cada una con sus
-  propios predictores. El *offset* va en el lado del conteo.
-- **`dist = "poisson"`** da el ZIP; **`"negbin"`**, el ZINB (positivos sobredispersos). Se estiman
-  **conjuntamente** por ML (por defecto con `optim`; EM opcional), porque los ceros están repartidos
-  entre ambos procesos.
-- **Predicción** — `predict(m, type = "response")` da la media marginal; `type = "prob"` la matriz de
-  $\hat P(Y=k)$ (la columna 1 son los ceros esperados); `type = "zero"` la probabilidad estructural y
-  `type = "count"` la media de la parte de conteo.
-- Alternativa con efectos aleatorios: `glmmTMB(y ~ ..., ziformula = ~ z1 + z2, family = ...)`.
+Un predictor cuyo `pi_est` cambia entre niveles va a la parte de **ceros**; uno cuyo `ritmo` cambia, a
+la de **conteo**. Un `pi_est` negativo (menos ceros de los que da el conteo) es deflación, que un ZI no
+puede reproducir.
+
+**2 · Ajustar.**
+
+```r
+m <- glmmTMB::glmmTMB(y ~ x1 + x2 + offset(log(t)),   # conteo (enlace log)
+                      ziformula = ~ z1 + z2,           # ceros estructurales (enlace logit)
+                      family = poisson, data = d)      # nbinom2 -> ZINB
+```
+
+- **Dos fórmulas**: la principal para el **conteo** (enlace log → IRR), con el *offset*, y `ziformula`
+  para los **ceros estructurales** (enlace logit → OR de «fuera del perímetro»), cada una con sus propios
+  predictores. `ziformula = ~ 1` deja $\pi$ constante; `~ .` repite los predictores del conteo.
+- **`family = poisson`** da el ZIP; **`nbinom2`**, el ZINB (positivos sobredispersos). Las dos partes se
+  estiman **conjuntamente** por máxima verosimilitud, porque los ceros están repartidos entre ambos
+  procesos.
+- **Predicción**: `predict(m, type = "response")` da la media marginal, $(1-\hat\pi)\hat\mu$;
+  `type = "zprob"`, la probabilidad de cero estructural $\hat\pi$; y `type = "conditional"`, la media
+  del conteo $\hat\mu$. Las probabilidades $\hat P(Y=k)$ se construyen con estas piezas, como hace
+  `prob_zip()` en la bondad de ajuste.
+- Con **efectos aleatorios** (pólizas agrupadas por agencia o región), véase la [Unidad 2.5](#sec-u25-modelo).
+
+**3 · Interpretar: OR e IRR con sus intervalos.**
+
+```r
+broom.mixed::tidy(m, exponentiate = TRUE, conf.int = TRUE)   # component cond: IRR; zi: OR de cero estructural
+exp(50 * glmmTMB::fixef(m)$cond["x1"])                       # efecto de un incremento de c = 50 unidades: IRR^c
+confint(m, method = "profile")                               # IC de perfil (escala del enlace), si se prefieren
+```
+
+Un IRR u OR cuyo intervalo contiene el 1 no se distingue de «sin efecto». Los interceptos exponenciados
+no son IRR ni OR (son la tasa o las *odds* de referencia).
+
+**4 · Contrastar predictores (modelos anidados)** con la razón de verosimilitudes:
+
+```r
+m_comp <- update(m_red, . ~ . + x3)                 # añade x3 al conteo
+m_comp <- update(m_red, ziformula = ~ z1 + z2 + z3)  # o a la parte de ceros
+anova(m_red, m_comp)
+```
+
+`anova()` calcula $2\,(\ell_{\text{comp}}-\ell_{\text{red}})$ y lo compara con una $\chi^2$ cuyos grados de
+libertad son los parámetros de diferencia entre los dos modelos.
 :::
 
 ### Bondad de ajuste y diagnóstico
 
-Tres comprobaciones de **bondad de ajuste**: que el modelo reproduce los **ceros**, que ajusta los
-**positivos** (¿sobredispersos?) y que la **forma** general encaja.
+¿Hay un **test de bondad de ajuste** para el ZIP? El clásico —comparar la deviance o el $\chi^2$ de
+Pearson con una $\chi^2_{n-p}$— **no es válido** aquí: como vimos en la
+[Unidad 2.1](#sec-u21-diagnostico), con conteos individuales de media baja esos estadísticos no siguen
+una $\chi^2$. El ajuste se evalúa, por eso, en dos pasos:
 
-**Ceros.** Comparamos los observados con los que predice el ZIP (sumando $\hat P(Y_i=0)$ sobre las
-pólizas):
+1. **Tres comprobaciones globales**, que se leen sin $p$-valor: que el modelo reproduce los **ceros**,
+   que ajusta los **positivos** (¿sobredispersos?) y que la **forma** de la distribución encaja.
+2. **Un test formal por simulación**, con los **residuos simulados** de `DHARMa`: su contraste de
+   uniformidad sí es un test de bondad de ajuste válido con medias bajas, y los residuos permiten,
+   además, mirar el ajuste predictor a predictor.
+
+Las tres comprobaciones globales necesitan las probabilidades $\hat P(Y_i=k)$ de cada póliza. `glmmTMB`
+no las da directamente, pero salen de la fórmula de la mezcla con las dos piezas que sí predice:
+$\hat\pi_i$ (`type = "zprob"`) y la media del conteo $\hat\mu_i$ (la exponencial del predictor lineal,
+`type = "link"`, que incluye el *offset*):
+
+$$\hat P(Y_i=0)=\hat\pi_i+(1-\hat\pi_i)\,e^{-\hat\mu_i},\qquad \hat P(Y_i=k)=(1-\hat\pi_i)\,\frac{e^{-\hat\mu_i}\hat\mu_i^{k}}{k!}\quad(k>0).$$
+
+**Ceros.** Comparamos los observados con los que predice el ZIP, sumando $\hat P(Y_i=0)$ sobre las
+pólizas:
 
 ```{r}
 #| label: u24-zip-diag
+# P(Y_i = k) del ZIP para cada póliza (filas) y cada k de K (columnas)
+prob_zip <- function(m, newdata = NULL, K = 0:8) {
+  pi_i <- predict(m, newdata, type = "zprob")                # probabilidad de cero estructural
+  mu_i <- exp(predict(m, newdata, type = "link"))            # media del conteo, con el offset
+  P <- (1 - pi_i) * outer(mu_i, K, \(mu, k) dpois(k, mu))    # (1 - pi) f(k)
+  P[, K == 0] <- P[, K == 0] + pi_i                          # el cero suma además pi
+  P
+}
 c(observados    = sum(cartera$n_fraude == 0),
-  esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
+  esperados_zip = round(sum(prob_zip(m_zip, K = 0))))
 ```
 
 Coinciden: el exceso está absorbido.
@@ -607,10 +770,10 @@ pólizas en riesgo es Poisson, **sin sobredispersión extra**.
 #| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el ZIP. A diferencia de la Poisson (que erraba el 0), el ZIP reproduce el pico de ceros y también los conteos positivos."
 #| fig-width: 6
 #| fig-height: 3.2
-esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
+P <- prob_zip(m_zip, K = 0:7); K <- 0:8
 tibble::tibble(k = K,
                Observado      = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `ZIP ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+               `ZIP ajustado` = c(colSums(P), nrow(P) - sum(P))) |>   # la última celda es «8 o más»
   tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
@@ -619,24 +782,12 @@ tibble::tibble(k = K,
 ```
 
 Estas tres comprobaciones son **globales**: miran el total de ceros, la dispersión de los positivos y
-la distribución en conjunto. Les faltan dos cosas: comprobar que el modelo acierta **en función de los
-predictores**, que es lo que valida el reparto de predictores entre las dos partes, y un **test de
-bondad de ajuste** con $p$-valor fiable. Como en la [Unidad 2.1](#sec-u21-diagnostico), con conteos de
-media baja la deviance y el $\chi^2$ de Pearson no siguen una $\chi^2$, así que ese test lo dan los
-**residuos simulados** de `DHARMa`.
+la distribución en conjunto. Falta el segundo paso: el test formal y el ajuste **en función de los
+predictores**, que es lo que valida el reparto de predictores entre las dos partes.
 
-**Residuos simulados.** `DHARMa` no admite modelos de `pscl`, de modo que ajustamos el **mismo ZIP** con
-`glmmTMB`, que sí permite simular (también el proceso de los ceros). Primero comprobamos que es el mismo
-modelo:
-
-```{r}
-#| label: u24-zip-tmb
-m_zip_tmb <- glmmTMB::glmmTMB(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-  ziformula = ~ uso + potencia_cv, family = poisson, data = cartera)
-cbind(pscl    = coef(m_zip),
-      glmmTMB = c(glmmTMB::fixef(m_zip_tmb)$cond, glmmTMB::fixef(m_zip_tmb)$zi))
-```
+**Residuos simulados.** `DHARMa` simula respuestas desde el modelo ajustado con `simulate()`, que en
+`glmmTMB` reproduce **los dos procesos**: decide primero si cada póliza es un cero estructural y, si no
+lo es, sortea su conteo. Basta pasarle `m_zip`:
 
 ```{r}
 #| label: fig-u24-zip-dharma
@@ -644,7 +795,7 @@ cbind(pscl    = coef(m_zip),
 #| fig-width: 9
 #| fig-height: 4.5
 set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
-res_zip <- DHARMa::simulateResiduals(m_zip_tmb, n = 1000)
+res_zip <- DHARMa::simulateResiduals(m_zip, n = 1000)
 plot(res_zip)
 ```
 
@@ -700,8 +851,8 @@ observado. Usamos las celdas 0 a 7 y «8 o más»:
 
 ```{r}
 #| label: u24-zip-chi2-boot
-frec_chi2 <- function(m, y, K = 8) {               # celdas 0, 1, ..., K-1 y "K o más"
-  P <- predict(m, type = "prob", at = 0:(K - 1))   # P(Y_i = k) de cada póliza
+frec_chi2 <- function(m, y, K = 8) {   # celdas 0, 1, ..., K-1 y "K o más"
+  P <- prob_zip(m, K = 0:(K - 1))      # P(Y_i = k) de cada póliza
   E <- c(colSums(P), length(y) - sum(P))
   O <- c(tabulate(y + 1, nbins = K), sum(y >= K))
   sum((O - E)^2 / E)
@@ -709,7 +860,7 @@ frec_chi2 <- function(m, y, K = 8) {               # celdas 0, 1, ..., K-1 y "K 
 X2_obs <- frec_chi2(m_zip, cartera$n_fraude)
 
 set.seed(2025)
-y_boot  <- simulate(m_zip_tmb, nsim = 200)         # 200 carteras simuladas desde el ZIP
+y_boot  <- simulate(m_zip, nsim = 200)   # 200 carteras simuladas desde el ZIP
 X2_boot <- vapply(y_boot, function(ys)
   frec_chi2(update(m_zip, data = transform(cartera, n_fraude = ys)), ys), numeric(1))
 
@@ -727,8 +878,8 @@ la correcta; aquí la conclusión no cambia, pero no hay garantía de que coinci
 Ceros reproducidos, positivos Poisson, forma ajustada y residuos sin patrón: el **ZIP ajusta bien**. La comparación con el
 hurdle y los demás modelos va en la [Sección 4.5](#sec-u24-elegir).
 
-¿Y hace falta el ZIP frente a la **Poisson** a secas? Ya lo sabemos por vías fiables: el score test y
-`DHARMa` ([Sección 4.1](#sec-u24-ceros)) detectaron el exceso, y el **AIC** lo ratifica al comparar
+¿Y hace falta el ZIP frente a la **Poisson** a secas? Ya lo sabemos por vías fiables: el contraste de
+`DHARMa` ([Sección 4.1](#sec-u24-ceros)) detectó el exceso incluso frente a la NB, y el **AIC** lo ratifica al comparar
 modelos ([Sección 4.5](#sec-u24-elegir)).
 
 ::: {.callout-warning}
@@ -736,122 +887,212 @@ modelos ([Sección 4.5](#sec-u24-elegir)).
 En casi cualquier tutorial de *zero-inflation* verás el **test de Vuong** (`pscl::vuong`) para decidir
 Poisson vs ZIP. **Se desaconseja**: Vuong exige modelos **no anidados**, y la Poisson es un caso
 particular del ZIP ($\pi=0$), así que sus supuestos fallan y su $p$-valor no es interpretable
-[@wilson2015]. Quédate con el **score test**, `DHARMa` y el **AIC**.
+[@wilson2015]. Quédate con `DHARMa` y el **AIC**.
+:::
+
+::: {.callout-tip}
+## 🔧 En R. Bondad de ajuste de un ZIP / ZINB
+No hay test clásico válido (deviance o $\chi^2$ de Pearson frente a una $\chi^2_{n-p}$) con conteos de
+media baja. El ajuste se evalúa en dos pasos.
+
+**1 · Comprobaciones globales** (sin $p$-valor), con el ZIP `m` y la función `prob_zip()` de esta
+sección, que construye $\hat P(Y_i=k)$ a partir de `predict(m, type = "zprob")` y
+`exp(predict(m, type = "link"))`:
+
+```r
+P <- prob_zip(m, K = 0:8)                   # matriz n x 9: P(Y_i = k) de cada observación
+c(obs = sum(d$y == 0), esp = sum(P[, 1]))   # ceros: observados frente a esperados
+AIC(m, update(m, family = glmmTMB::nbinom2))   # positivos: ¿mejora la NB (ZINB)?
+colSums(P)                                  # forma: frecuencias esperadas de cada k, para el rootograma
+```
+
+**2 · Residuos simulados y test formal**, directamente sobre el modelo ajustado:
+
+```r
+set.seed(1)
+res <- DHARMa::simulateResiduals(m, n = 1000)
+plot(res)                                   # QQ uniforme y residuos frente al predicho
+DHARMa::testUniformity(res)                 # test de bondad de ajuste (KS)
+DHARMa::testDispersion(res); DHARMa::testZeroInflation(res)
+DHARMa::plotResiduals(res, d$x1)            # frente a cada predictor (y a la exposición)
+```
+
+**Ampliación: $\chi^2$ de frecuencias calibrado por bootstrap.** Compara $O_k$ con
+$E_k=\sum_i\hat P(Y_i=k)$, agrupando la cola. Su $p$-valor se obtiene simulando con
+`simulate(m, nsim = B)`, reajustando con `update(m, data = ...)` y recalculando el estadístico; la
+$\chi^2$ con «celdas − 1» gl no es su distribución.
+
+No uses el test de Vuong para comparar con la Poisson (véase el aviso anterior).
 :::
 
 ## 4.4 Modelos hurdle {#sec-u24-hurdle}
 
-### El modelo: una barrera y un conteo truncado
+### El modelo: una barrera y un conteo truncado, y su estimación
 
 El *hurdle* [@mullahy1986] cuenta **otra historia**: un proceso **en dos etapas**. Primero se cruza (o
 no) una **barrera** —¿ocurre **algún** evento?—; y solo si se cruza, un conteo dice **cuántos**, pero
-ya **sin posibilidad de cero** (truncado en 0). Con $p_i=\Pr(Y_i>0)$ la probabilidad de cruzar y $f$ la
-distribución de conteo:
+ya **sin posibilidad de cero** (truncado en 0). Con $\pi_i=\Pr(Y_i=0)$ la probabilidad de **no**
+cruzarla y $f$ la distribución de conteo:
 
-$$P(Y_i=0)=1-p_i,\qquad P(Y_i=k>0)=p_i\,\frac{f(k)}{1-f(0)}.$$
+$$P(Y_i=0)=\pi_i,\qquad P(Y_i=k>0)=(1-\pi_i)\,\frac{f(k)}{1-f(0)}.$$
 
-La diferencia con el ZI es de raíz: aquí **todos** los ceros vienen de **un único** proceso (no cruzar
-la barrera); cruzada, el conteo es $\ge 1$. No hay «ceros muestrales» mezclados con los positivos.
+Usamos la misma letra que en el ZI porque en R las dos probabilidades se modelan igual, con
+`ziformula`; pero no significan lo mismo. En el ZI, $\pi_i$ es la probabilidad de un cero
+**estructural**, solo una parte de los ceros; en el hurdle, la probabilidad de **cualquier** cero.
 
-### Verosimilitud y estimación
+La diferencia es de raíz: en el hurdle, **cada tipo de valor sale de un único proceso**. **Todos los
+ceros** vienen de la barrera (no cruzarla), y **todos los positivos**, del conteo truncado en 0, que
+nunca produce un cero. En el ZI, en cambio, el conteo también genera ceros (los muestrales), que se
+suman a los estructurales: el cero tiene dos orígenes posibles, y por eso hay que repartirlo.
 
-Cada observación contribuye según sea cero o positiva:
+**Verosimilitud y estimación.** Cada observación contribuye según sea cero o positiva:
 
-$$\ell_i=\begin{cases}\log(1-p_i) & y_i=0,\\[2pt]\log p_i+\log f(y_i)-\log\!\bigl(1-f(0)\bigr) & y_i>0,\end{cases}$$
+$$\ell_i=\begin{cases}\log\pi_i & y_i=0,\\[2pt]\log(1-\pi_i)+\log f(y_i)-\log\!\bigl(1-f(0)\bigr) & y_i>0,\end{cases}$$
 
-con $\operatorname{logit}p_i=\mathbf{z}_i'\boldsymbol\gamma$ para la barrera y $f$ la distribución del
+con $\operatorname{logit}\pi_i=\mathbf{z}_i'\boldsymbol\gamma$ para la barrera y $f$ la distribución del
 conteo, de media $\mu_i=\exp(\mathbf{x}_i'\boldsymbol\beta)$ más el *offset*. En el **hurdle-Poisson**,
 $f(y)=e^{-\mu_i}\mu_i^{y}/y!$ y $1-f(0)=1-e^{-\mu_i}$; en el **hurdle-NB**, $f$ es la NB de la
 [Unidad 2.3](#sec-u23-nb) y $1-f(0)=1-\bigl(\theta/(\theta+\mu_i)\bigr)^{\theta}$.
 
-La diferencia con el ZI está en la estimación. Aquí cada cero se sabe de dónde viene —de no cruzar la
-barrera—, así que no hay pertenencia latente: $\ell=\sum_i\ell_i$ se **separa** en un sumando que solo
-depende de $\boldsymbol\gamma$ (los $\log p_i$ y $\log(1-p_i)$) y otro que solo depende de
-$\boldsymbol\beta$ (los positivos). Cada parte se estima **por su cuenta**, sin EM: un **GLM binomial**
-para la barrera (0 frente a $>0$) y un **conteo truncado en cero** para los positivos. En R,
-`pscl::hurdle`.
+La diferencia con el ZI está también en la estimación. Aquí cada cero se sabe de dónde viene —de no
+cruzar la barrera—, así que no hay pertenencia latente: $\ell=\sum_i\ell_i$ se **separa** en un sumando
+que solo depende de $\boldsymbol\gamma$ (los $\log\pi_i$ y $\log(1-\pi_i)$) y otro que solo depende de
+$\boldsymbol\beta$ (los positivos). Cada parte podría estimarse **por su cuenta**, sin EM: un **GLM
+binomial** para la barrera (0 frente a $>0$) y un **conteo truncado en cero** para los positivos.
+`glmmTMB` maximiza las dos a la vez, que da el mismo resultado.
 
-### Ajuste e interpretación
+### Exploración: qué predictor va en cada parte
 
-Como en el ZI, conviene ver primero **qué mueve cada parte**, y aquí es más sencillo, porque las dos
-partes se observan directamente. La **barrera** es la proporción de pólizas con alguna alerta,
-$1-p_0^{\text{obs}}$, sin nada que separar. El **conteo** es el ritmo de las pólizas con alguna alerta:
-el mismo que estimamos con la Poisson truncada en la exploración del ZI (fila inferior de la
-@fig-u24-zip-explora). Las dos cosas están ya en la tabla `explora_zip`:
+Como en el ZI, antes de ajustar decidimos **qué predictores lleva cada parte**. Aquí es más sencillo,
+porque en el hurdle las dos partes **se observan directamente**: cada cero es de la barrera y cada
+positivo, del conteo, así que no hay nada que separar.
+
+- **La barrera** se resume con la proporción de pólizas de cada nivel **sin ninguna alerta**,
+  $p_0^{\text{obs}}$: la estimación directa de $\pi$ en ese nivel.
+- **El conteo** se resume con el ritmo $\hat r$ de las pólizas con alguna alerta, estimado con la
+  Poisson truncada en 0. Es el mismo ritmo que calculamos en la exploración del ZI.
+
+Las dos columnas están ya en la tabla `explora_zip`:
 
 ```{r}
 #| label: u24-hurdle-explora
 explora_zip |>
-  dplyr::transmute(predictor, nivel, cruza_barrera = 1 - ceros_obs, ritmo)
+  dplyr::transmute(predictor_nivel = paste(predictor, nivel, sep = "-"),
+                   ceros_obs = round(ceros_obs, 5), ritmo = round(ritmo, 5))
 ```
 
-La proporción que cruza la barrera cambia con la potencia y con el uso, y es prácticamente plana con
-la zona y el tipo de vehículo; el ritmo, ya lo vimos, cambia con la potencia, la zona y el tipo. Es el
-mismo reparto que en el ZI, y la fórmula de dos lados se lee igual (conteo `|` barrera; los detalles de
-la sintaxis, en la [Sección 4.3](#sec-u24-zi)). Con una diferencia: el lado derecho ya no son los
-predictores de «estar fuera del perímetro», sino los de **tener alguna alerta**.
+La proporción de pólizas sin alertas **baja con la potencia** y es **menor en el uso comercial**, y
+apenas cambia con la zona y el tipo de vehículo; el ritmo, como vimos en el ZI, cambia con la potencia,
+la zona y el tipo. El reparto es el mismo: `uso` y `potencia_cv` a la barrera; `potencia_cv`,
+`zona_circulacion` y `tipo_vehiculo` al conteo (con `uso` también, como en el ZI, para que el ajuste
+estime su efecto).
+
+### Ajuste e interpretación
+
+En `glmmTMB`, un hurdle es un ZI con dos cambios: la `family` del conteo es **truncada en 0**
+(`truncated_poisson`), y entonces `ziformula` pasa a modelar la **barrera**, la probabilidad de **no
+tener ninguna alerta**. La fórmula principal sigue siendo la del conteo, con el *offset*:
 
 ```{r}
 #| label: u24-hurdle
-m_hp <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
+m_hp <- glmmTMB::glmmTMB(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
+  ziformula = ~ uso + potencia_cv,
+  family    = glmmTMB::truncated_poisson(), data = cartera)
 summary(m_hp)
+tabla_exp(m_hp, etiqueta_ceros = "barrera: OR de no tener ninguna alerta")   # efectos exponenciados e IC 95 %
 ```
 
-Ojo al **cambio de signo** respecto al ZI: aquí el bloque binario modela la probabilidad de **cruzar la
-barrera** (tener $\ge 1$ evento), no la de ser un cero estructural. Así, un coeficiente **positivo** en
-`uso` comercial significa que esas pólizas cruzan la barrera **con más frecuencia** (tienen alguna
-alerta más a menudo) —la misma realidad que en el ZI salía como «menos cero estructural», leída al
-revés—. El bloque de conteo se interpreta en IRR, sobre el conteo **truncado** (el ritmo entre quienes
-ya han cruzado).
+Se lee en **dos bloques** (la tabla da los efectos ya exponenciados, con su intervalo al 95 %):
 
-¿Hace falta la NB en el conteo truncado? Se ajusta el **hurdle-NB** y se compara por AIC:
+- **Barrera** (enlace logit). $\exp(\gamma)$ es el **odds ratio de no tener ninguna alerta**. El uso
+  **comercial** lo multiplica por `r round(exp(glmmTMB::fixef(m_hp)$zi[["usocomercial"]]), 2)`, y cada
+  50 CV más de potencia, por `r round(exp(50 * glmmTMB::fixef(m_hp)$zi[["potencia_cv"]]), 2)`. Los
+  signos son los del ZI, porque en los dos modelos `ziformula` describe una probabilidad de cero. Pero
+  la lectura cambia: el ZI dice que las comerciales quedan **fuera del perímetro** con menos frecuencia;
+  el hurdle solo dice que **se quedan sin alertas** con menos frecuencia, sin distinguir si es porque
+  están vigiladas más a menudo o porque, vigiladas, acumulan alertas más deprisa. Si se prefiere el OR
+  de **tener** alguna alerta, basta invertir: $1/\exp(\gamma)$.
+- **Conteo** (enlace log). $\exp(\beta)$ es una **razón de tasas** entre las pólizas que han cruzado la
+  barrera: cada 50 CV multiplican el ritmo por
+  `r round(exp(50 * glmmTMB::fixef(m_hp)$cond[["potencia_cv"]]), 2)`, la zona rural lo multiplica por
+  `r round(exp(glmmTMB::fixef(m_hp)$cond[["zona_circulacionrural"]]), 2)` frente a la urbana y la moto
+  por `r round(exp(glmmTMB::fixef(m_hp)$cond[["tipo_vehiculomoto"]]), 2)` frente al turismo. Son
+  prácticamente los mismos efectos que en el ZIP: las dos familias describen igual el ritmo de las
+  pólizas con alertas, y solo difieren en cómo explican los ceros.
+
+¿Hace falta la NB en el conteo truncado? Se ajusta el **hurdle-NB** cambiando la familia y se compara
+por AIC:
 
 ```{r}
 #| label: u24-hurdle-nb
-m_hnb <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
+m_hnb <- update(m_hp, family = glmmTMB::truncated_nbinom2)
 aic_h <- AIC(m_hp, m_hnb)
 aic_h
 ```
 
 El hurdle-NB no mejora el AIC (`r round(aic_h["m_hnb", "AIC"])` frente a
-`r round(aic_h["m_hp", "AIC"])`): la Poisson truncada basta, como anticipaba la pregunta 2 de la
+`r round(aic_h["m_hp", "AIC"])`): la Poisson truncada basta, como anticipaba la pregunta 1 de la
 [Sección 4.2](#sec-u24-estructuras).
 
 ::: {.callout-tip}
 ## 🔧 En R. Ajustar un hurdle
+**1 · Explorar qué predictor va en cada parte.** Las dos partes se observan directamente: por nivel de
+cada predictor, la proporción de ceros (barrera) y el ritmo de los positivos con una Poisson truncada
+en 0 (conteo), con la misma función `explora()` del ZI.
+
+**2 · Ajustar.**
+
 ```r
-pscl::hurdle(y ~ x1 + x2 + offset(log(t)) | z1 + z2,   # conteo truncado | barrera (0 vs >0)
-             dist = "poisson", data = ...)              # "negbin" para el conteo truncado
+m <- glmmTMB::glmmTMB(y ~ x1 + x2 + offset(log(t)),          # conteo truncado (enlace log)
+                      ziformula = ~ z1 + z2,                  # barrera: P(Y = 0) (enlace logit)
+                      family = glmmTMB::truncated_poisson(),  # truncated_nbinom2 -> hurdle-NB
+                      data = d)
 ```
 
-- Misma **fórmula de dos lados** que `zeroinfl`, pero el lado derecho es la **barrera** (un `glm`
-  binomial: ¿algún evento?) y el izquierdo un **conteo truncado en 0** (Poisson o NB). Las dos partes
-  **no comparten parámetros**, así que se estiman **por separado** (sin EM).
-- **Ojo al signo**: el bloque binario modela la probabilidad de **cruzar** la barrera (tener $\ge 1$), no
-  la de ser cero estructural —el signo sale al revés que en `zeroinfl`—.
-- **Predicción** — igual que en `zeroinfl` (`type = "response"` / `"prob"` / `"count"`). Los ceros ajustan
-  **exactos por construcción**: la parte binaria reproduce la proporción observada.
-- **Residuos simulados** — `DHARMa` no admite `pscl`: el mismo hurdle se ajusta con
-  `glmmTMB(..., ziformula = ~ z1 + z2, family = truncated_poisson)`, cuya parte `zi` modela
-  $\Pr(Y=0)$, con el signo opuesto al de `pscl`.
+- Las mismas **dos fórmulas** que en el ZI. Lo que convierte el modelo en un hurdle es la **familia
+  truncada**: con ella, `ziformula` modela **todos** los ceros (la barrera) y el conteo solo los
+  positivos.
+- **Signo**: `ziformula` modela la probabilidad de **no** cruzar la barrera. En textos que usan
+  `pscl::hurdle`, la barrera modela la de cruzarla, y los coeficientes salen con el signo cambiado.
+- **Predicción**: `type = "response"` da la media marginal, $(1-\hat\pi)\,\hat\mu/(1-e^{-\hat\mu})$;
+  `type = "zprob"`, la probabilidad de cero $\hat\pi$; y `type = "conditional"`, la media del conteo
+  **truncado**, $\hat\mu/(1-e^{-\hat\mu})$, no la $\hat\mu$ de la Poisson sin truncar (esa es
+  `exp(predict(m, type = "link"))`).
+
+**3 · Interpretar: OR e IRR con sus intervalos**, igual que en el ZI:
+
+```r
+broom.mixed::tidy(m, exponentiate = TRUE, conf.int = TRUE)   # cond: IRR; zi: OR de NO cruzar la barrera
+```
+
+Atención a la parte binaria: aquí el OR es el de **no tener ningún evento**, no el de ser un cero
+estructural, así que no se lee como el del ZI aunque tenga el mismo signo.
+
+**4 · Contrastar predictores**, con `anova(m_red, m_comp)`, como en el ZI.
 :::
 
 ### Bondad de ajuste y diagnóstico
 
-Las mismas comprobaciones que en el ZIP. **Ceros**: el hurdle los ajusta **exactamente por
-construcción** —la parte binaria reproduce la proporción observada—, así que «¿ajusta el 0?» es
-trivialmente sí:
+Las mismas comprobaciones que en el ZIP, con las probabilidades del hurdle:
+
+$$\hat P(Y_i=0)=\hat\pi_i,\qquad \hat P(Y_i=k)=(1-\hat\pi_i)\,\frac{e^{-\hat\mu_i}\hat\mu_i^{k}/k!}{1-e^{-\hat\mu_i}}\quad(k>0).$$
+
+**Ceros**: el hurdle los ajusta **exactamente por construcción** —la barrera reproduce la proporción
+observada—, así que «¿ajusta el 0?» es trivialmente sí:
 
 ```{r}
 #| label: u24-hurdle-diag
+# P(Y_i = k) del hurdle-Poisson para cada póliza (filas) y cada k de K (columnas)
+prob_hurdle <- function(m, newdata = NULL, K = 0:8) {
+  pi_i <- predict(m, newdata, type = "zprob")                # probabilidad de no cruzar la barrera
+  mu_i <- exp(predict(m, newdata, type = "link"))            # media de la Poisson SIN truncar
+  P <- (1 - pi_i) * outer(mu_i, K, \(mu, k) dpois(k, mu) / (1 - exp(-mu)))   # conteo truncado
+  P[, K == 0] <- pi_i                                        # el cero sale solo de la barrera
+  P
+}
 c(observados       = sum(cartera$n_fraude == 0),
-  esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
+  esperados_hurdle = round(sum(prob_hurdle(m_hp, K = 0))))   # coinciden por construcción
 ```
 
 **Positivos**: el hurdle-NB ya se ha comparado arriba por AIC. **Forma**: el rootograma debería ajustar
@@ -862,10 +1103,10 @@ también los positivos (@fig-u24-hurdle-root):
 #| fig-cap: "Frecuencias observadas de `n_fraude` frente a las esperadas por el hurdle-Poisson. El 0 coincide por construcción; los conteos positivos también se reproducen bien."
 #| fig-width: 6
 #| fig-height: 3.2
-esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
+P <- prob_hurdle(m_hp, K = 0:7); K <- 0:8
 tibble::tibble(k = K,
                Observado         = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `Hurdle ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+               `Hurdle ajustado` = c(colSums(P), nrow(P) - sum(P))) |>   # la última celda es «8 o más»
   tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
@@ -873,18 +1114,8 @@ tibble::tibble(k = K,
   labs(x = "nº de alertas", y = "nº de pólizas", fill = NULL)
 ```
 
-**Residuos simulados.** Como con el ZIP, ajustamos el mismo hurdle con `glmmTMB` y comprobamos que es
-el mismo modelo. Su parte `zi` modela la probabilidad de **cero**, así que sus coeficientes son los de
-la barrera de `pscl` con el signo cambiado:
-
-```{r}
-#| label: u24-hurdle-tmb
-m_hp_tmb <- glmmTMB::glmmTMB(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-  ziformula = ~ uso + potencia_cv, family = glmmTMB::truncated_poisson(), data = cartera)
-cbind(pscl    = coef(m_hp),
-      glmmTMB = c(glmmTMB::fixef(m_hp_tmb)$cond, -glmmTMB::fixef(m_hp_tmb)$zi))
-```
+**Residuos simulados.** Como en el ZIP, `DHARMa` simula directamente desde `m_hp`: primero la barrera
+y, para las pólizas que la cruzan, un conteo truncado en 0:
 
 ```{r}
 #| label: fig-u24-hurdle-dharma
@@ -892,7 +1123,7 @@ cbind(pscl    = coef(m_hp),
 #| fig-width: 9
 #| fig-height: 4.5
 set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
-res_hp <- DHARMa::simulateResiduals(m_hp_tmb, n = 1000)
+res_hp <- DHARMa::simulateResiduals(m_hp, n = 1000)
 plot(res_hp)
 ```
 
@@ -931,13 +1162,46 @@ cruzan la barrera menos de lo que el modelo predice. La razón está en la espec
 exposición entra en el conteo como *offset*, y basta: estar fuera del perímetro no depende del tiempo
 observado. En el hurdle, en cambio, la **barrera** —tener alguna alerta— sí depende de cuánto tiempo se
 ha observado la póliza, y en la fórmula no la hemos incluido. La corrección natural sería añadir
-`log(exposicion)` como predictor del lado derecho. Es una buena muestra de para qué sirven los residuos
+`log(exposicion)` como predictor en `ziformula`. Es una buena muestra de para qué sirven los residuos
 frente a cada predictor: el test global no lo detecta, y el gráfico sí.
 
 **Conclusión:** los ceros son exactos por construcción, los positivos se reproducen bien en el
 rootograma y el conteo truncado es Poisson; pero la barrera, tal como la hemos especificado, no recoge el
 efecto de la exposición. La comparación con el ZI —y con qué criterio elegir— va en la
 [Sección 4.5](#sec-u24-elegir).
+
+::: {.callout-tip}
+## 🔧 En R. Bondad de ajuste de un hurdle
+Los mismos dos pasos que en el ZIP, con una diferencia: el cero no necesita comprobarse (lo ajusta
+exacto por construcción).
+
+**1 · Comprobaciones globales** (sin $p$-valor), con el hurdle `m` y la función `prob_hurdle()` de esta
+sección:
+
+```r
+P <- prob_hurdle(m, K = 0:8)                # matriz n x 9: P(Y_i = k)
+c(obs = sum(d$y == 0), esp = sum(P[, 1]))   # ceros: coinciden por construcción
+AIC(m, update(m, family = glmmTMB::truncated_nbinom2))   # positivos: ¿mejora la NB truncada?
+colSums(P)                                  # forma: frecuencias esperadas de cada k, para el rootograma
+```
+
+**2 · Residuos simulados y test formal**, directamente sobre el modelo ajustado:
+
+```r
+set.seed(1)
+res <- DHARMa::simulateResiduals(m, n = 1000)
+plot(res)                                   # QQ uniforme y residuos frente al predicho
+DHARMa::testUniformity(res)                 # test de bondad de ajuste (KS)
+DHARMa::testDispersion(res)                 # (el de ceros sobra: los ajusta por construcción)
+DHARMa::plotResiduals(res, d$x1)            # frente a cada predictor...
+DHARMa::plotResiduals(res, d$t)             # ...y frente a la exposición: la barrera puede necesitarla
+tapply(residuals(res), ggplot2::cut_number(d$t, 4), median)   # ~ 0.5 en todos los cuartiles
+```
+
+Si los residuos se desvían frente a la exposición, añade `log(t)` como predictor de la barrera
+(`ziformula = ~ z1 + z2 + log(t)`): tener algún evento depende del tiempo observado. El $\chi^2$ de frecuencias con
+bootstrap del ZIP se aplica igual.
+:::
 
 
 ## 4.5 Elegir, comparar y conectar {#sec-u24-elegir}
@@ -971,7 +1235,7 @@ Tres lecturas:
 1. **Lo decisivo es tratar los ceros.** La Poisson y la NB quedan muy por detrás de los cuatro modelos
    con dos partes.
 2. **La NB no aporta dentro de cada familia.** ZINB y hurdle-NB tienen un parámetro más y un AIC algo
-   peor que sus versiones Poisson: el conteo es Poisson, como anticipó la pregunta 2 de la
+   peor que sus versiones Poisson: el conteo es Poisson, como anticipó la pregunta 1 de la
    [Sección 4.2](#sec-u24-estructuras).
 3. **El ZIP es el preferido**, con un peso de Akaike de `r round(comparacion$peso_AIC[comparacion$modelo == "ZIP"], 2)`.
    Su ventaja sobre el hurdle-Poisson viene en parte de la historia (los ceros son una mezcla) y en
@@ -985,7 +1249,8 @@ mejor en las predicciones.
 ### Predicción: la misma media, distinta distribución
 
 Todos los modelos predicen la **media** $E[Y\mid x]$, pero la componen distinto: el ZI como
-$(1-\pi)\mu$ y el hurdle como $p\,\mu/(1-e^{-\mu})$. Comparamos, para dos perfiles de póliza observados
+$(1-\pi)\mu$ y el hurdle como $(1-\pi)\,\mu/(1-e^{-\mu})$, con $\pi$ la probabilidad de cero estructural
+en el primero y de cualquier cero en el segundo. Comparamos, para dos perfiles de póliza observados
 un periodo completo (`exposicion = 1`), la media y la probabilidad de **cero** que da cada modelo, y la
 distribución completa de alertas (@fig-u24-pred-dist):
 
@@ -1001,8 +1266,8 @@ prob_modelo <- list(
   Poisson    = t(sapply(predict(m_fp,  perfiles_u24, type = "response"), \(m) dpois(K, m))),
   NB         = t(sapply(predict(m_fnb, perfiles_u24, type = "response"),
                         \(m) dnbinom(K, size = m_fnb$theta, mu = m))),
-  ZIP        = predict(m_zip, perfiles_u24, type = "prob", at = K),
-  `Hurdle-P` = predict(m_hp,  perfiles_u24, type = "prob", at = K))
+  ZIP        = prob_zip(m_zip, perfiles_u24, K = K),
+  `Hurdle-P` = prob_hurdle(m_hp, perfiles_u24, K = K))
 pred_u24 <- purrr::imap_dfr(prob_modelo, \(P, modelo)
   tibble::tibble(modelo = modelo, perfil = rep(perfiles_u24$perfil, times = length(K)),
                  k = rep(K, each = nrow(perfiles_u24)), prob = as.vector(P)))
@@ -1040,43 +1305,104 @@ ninguna alerta va de un `r round(100 * p0_pred("Poisson"))` % en la Poisson a un
 `r round(100 * p0_pred("ZIP"))` % en el ZIP.
 Para una aseguradora no es lo mismo: la media sirve para tarificar, pero la probabilidad de cero dice
 cuántas pólizas no darán trabajo al equipo antifraude. Además, el ZIP descompone esa predicción en sus
-dos piezas, que responden a las dos preguntas del negocio: `predict(m_zip, type = "zero")` da la
-probabilidad de estar fuera del perímetro, y `type = "count"`, el ritmo de alertas si está dentro.
-
-::: {.callout-tip}
-## 🔧 En R. Bondad de ajuste con exceso de ceros
-Vale todo lo del [compendio de la Unidad 2.3](#sec-u23-sintesis) —dispersión, AIC/BIC, rootograma,
-`DHARMa`—, con estos añadidos propios del exceso de ceros:
-
-- **Contrasta frente a la NB, no a la Poisson**: `DHARMa::testZeroInflation` sobre la NB; la NB ya
-  fabrica ceros, y el exceso genuino es el que sobra por encima de ella.
-- **Comprueba el 0** (observados frente a $\sum_i\hat P(Y_i{=}0)$): en el hurdle es exacto por
-  construcción; en el ZI hay que verificarlo.
-- **Residuos simulados** de los modelos de `pscl`, reajustándolos con `glmmTMB` (`ziformula`), y
-  **frente a cada predictor y a la exposición**, no solo en conjunto.
-- **Compara por AIC/BIC**, no por RMSE (todos predicen la misma media) ni por el test de Vuong.
-:::
+dos piezas, que responden a las dos preguntas del negocio: `predict(m_zip, type = "zprob")` da la
+probabilidad de estar fuera del perímetro, y `type = "conditional"`, el ritmo de alertas si está dentro.
 
 ### Validación contra el DGP
 
-Como los datos son simulados, comprobamos qué ha recuperado el análisis. El DGP generó los ceros por
-inflación estructural (`g_cero`) sobre un conteo Poisson:
+Como los datos son simulados, conocemos la «verdad»: `attr(cartera, "verdad")` guarda cómo se generó
+`n_fraude`. El generador es **exactamente un ZIP**:
+
+- **Parte estructural**: cada póliza queda fuera del perímetro con probabilidad $\pi_i$, con
+  $\operatorname{logit}\pi_i=\gamma_0+\gamma_{\text{uso}}\,\text{comercial}_i+\gamma_{\text{pot}}\,z^{\text{pot}}_i$,
+  donde $z^{\text{pot}}_i$ es la potencia **tipificada** (restada su media y dividida por su desviación
+  típica). Los tres valores están en `v$g_cero`.
+- **Conteo**: si está dentro, sus alertas siguen una Poisson de media
+  $t_i\exp(\mathbf{x}_i'\boldsymbol\beta)$, con `v$betas$ceros`. Ese vector incluye la edad, la
+  antigüedad del carnet y la del vehículo, pero con coeficiente 0: no influyen.
+
+Comparar estos valores con los coeficientes de `m_zip` no es inmediato, porque el DGP usa **otra
+escala** para dos predictores: la potencia tipificada en vez de en CV, y la zona **rural** como
+referencia en vez de la urbana. En lugar de convertir cada coeficiente a mano, reajustamos **el mismo
+ZIP** con la parametrización del DGP: la log-verosimilitud es idéntica (es el mismo modelo), y cada
+coeficiente estimado tiene así su pareja en el generador. Para cada uno comprobamos si su intervalo de
+confianza al 95 % **contiene** el valor verdadero:
 
 ```{r}
 #| label: u24-validacion
 v <- attr(cartera, "verdad")
-v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
-# el DGP usa la potencia tipificada: llevamos el coeficiente del ZIP (por CV) a esa escala
-c(usocomercial_ZIP          = coef(m_zip)[["zero_usocomercial"]],
-  potencia_tipificada_ZIP   = coef(m_zip)[["zero_potencia_cv"]] * sd(cartera$potencia_cv))
+b_conteo <- setNames(v$betas$ceros, v$nombres_beta)   # parte de conteo del DGP
+verdad_u24 <- tibble::tibble(
+  component = c(rep("cond", 7), rep("zi", 3)),
+  term = c("(Intercept)", "z_pot", "zona_circulacionurbana", "zona_circulacionmixta",
+           "usocomercial", "tipo_vehiculomoto", "tipo_vehiculofurgoneta",
+           "(Intercept)", "usocomercial", "z_pot"),
+  dgp  = unname(c(b_conteo[c("(int)", "z_pot", "urbana", "mixta", "comercial", "moto", "furgoneta")],
+                  v$g_cero[c("int", "b_uso", "b_pot")])))
+
+# el mismo ZIP en la escala del DGP: potencia tipificada y zona rural como referencia
+cartera_dgp <- dplyr::mutate(cartera, z_pot = as.numeric(scale(potencia_cv)),
+                             zona_circulacion = relevel(zona_circulacion, ref = "rural"))
+m_zip_dgp <- update(m_zip, . ~ . - potencia_cv + z_pot, ziformula = ~ uso + z_pot,
+                    data = cartera_dgp)
+c(logLik_zip = logLik(m_zip), logLik_zip_dgp = logLik(m_zip_dgp))   # mismo modelo
+
+validacion_u24 <- broom.mixed::tidy(m_zip_dgp, conf.int = TRUE) |>
+  dplyr::inner_join(verdad_u24, by = c("component", "term")) |>
+  dplyr::transmute(parte      = ifelse(component == "cond", "conteo (log)", "estructural (logit)"),
+                   termino    = term,
+                   dgp        = round(dgp, 3),
+                   estimacion = round(estimate, 3),
+                   ic_inf     = round(conf.low, 3),
+                   ic_sup     = round(conf.high, 3),
+                   contiene   = conf.low <= dgp & dgp <= conf.high)   # ¿el IC 95 % cubre la verdad?
+validacion_u24
+
+# proporción media de pólizas fuera del perímetro: la del DGP y la que estima el ZIP
+pi_dgp <- plogis(v$g_cero[["int"]] + v$g_cero[["b_uso"]] * (cartera$uso == "comercial") +
+                   v$g_cero[["b_pot"]] * cartera_dgp$z_pot)
+c(dgp = mean(pi_dgp), zip = mean(predict(m_zip, type = "zprob")))
 ```
 
-En la parte estructural, el ZIP estima `r round(coef(m_zip)[["zero_usocomercial"]], 2)` para el uso
-comercial y `r round(coef(m_zip)[["zero_potencia_cv"]] * sd(cartera$potencia_cv), 2)` para la potencia
-tipificada, con el mismo signo y una magnitud próxima a los del DGP. Y la comparación de modelos, hecha
-a ciegas, ha señalado el mecanismo correcto: el ZIP frente al ZINB (el conteo se generó Poisson) y frente
-al hurdle (los ceros se generaron por mezcla). Es el control de calidad que pediremos en el estudio de
-caso.
+```{r}
+#| label: u24-validacion-fila
+#| include: false
+val <- function(parte, termino)   # una fila de la tabla de validación, para citarla en el texto
+  validacion_u24[validacion_u24$parte == parte & validacion_u24$termino == termino, ]
+```
+
+Se lee en tres pasos.
+
+**1 · Los coeficientes.** Los `r sum(validacion_u24$contiene)` intervalos de la tabla, de
+`r nrow(validacion_u24)`, contienen el valor del DGP. En la parte **estructural**, el uso comercial
+(DGP `r val("estructural (logit)", "usocomercial")$dgp`, estimado
+`r val("estructural (logit)", "usocomercial")$estimacion`) y la potencia tipificada (DGP
+`r val("estructural (logit)", "z_pot")$dgp`, estimado `r val("estructural (logit)", "z_pot")$estimacion`)
+se recuperan con su signo y una magnitud muy próxima. Y en conjunto, el DGP deja fuera del perímetro a
+una proporción media de `r round(mean(pi_dgp), 3)` de las pólizas, y el ZIP estima
+`r round(mean(predict(m_zip, type = "zprob")), 3)`: la pregunta P8 —cuántas pólizas no vigila el
+sistema— queda bien respondida.
+
+**2 · Lo que no se detectó.** El caso instructivo es el **uso en el conteo**. El DGP sí le dio un
+efecto (`r val("conteo (log)", "usocomercial")$dgp`, una IRR de
+`r round(exp(val("conteo (log)", "usocomercial")$dgp), 2)`), pero el ZIP estima
+`r val("conteo (log)", "usocomercial")$estimacion`, con un intervalo de
+`r val("conteo (log)", "usocomercial")$ic_inf` a `r val("conteo (log)", "usocomercial")$ic_sup` que
+contiene **a la vez** el 0 y el valor verdadero. En la [Sección 4.3](#sec-u24-zi) concluimos que «no hay
+evidencia» de ese efecto, y era la conclusión correcta: **no** decía que el efecto fuera nulo, sino que
+estos datos no bastan para distinguir un efecto tan pequeño de cero. Por eso lo mantuvimos en el modelo
+con su intervalo, en lugar de quitarlo. Al revés, la edad y la antigüedad del carnet tienen efecto 0 en
+el DGP, y la razón de verosimilitudes no encontró motivo para incluirlas.
+
+**3 · El mecanismo.** La comparación de modelos, hecha a ciegas, eligió el mecanismo con el que se
+generaron los datos: el ZIP frente al ZINB, porque el conteo se generó Poisson, y frente al hurdle,
+porque los ceros se generaron por mezcla. El DGP explica también lo que vimos en los residuos del hurdle
+frente a la exposición. En el generador, los ceros muestrales de una póliza vigilada aparecen con
+probabilidad $e^{-\mu_i}$, que **crece al bajar la exposición** (porque $\mu_i$ la incluye). El hurdle
+tiene que meter esos ceros en su barrera, y sin la exposición en `ziformula` no puede.
+
+Es el control de calidad que pediremos en el estudio de caso: no basta con que el modelo ajuste bien;
+hay que comprobar **qué** ha recuperado y **qué no**, y por qué.
 
 ### Una estrategia general
 
@@ -1085,13 +1411,12 @@ remite a la sección donde se desarrolla.
 
 ::: {.callout-tip}
 ## Receta para el exceso de ceros
-1. **¿Sobran ceros frente a la NB?** `DHARMa::testZeroInflation` sobre la NB y ceros observados frente a
-   esperados por grupos ([§4.1](#sec-u24-ceros), pregunta 1 de la [§4.2](#sec-u24-estructuras)). Si no
-   sobran, basta la Poisson o la NB.
+1. **¿Sobran ceros frente a la NB?** `DHARMa::testZeroInflation` sobre la NB ([§4.1](#sec-u24-ceros)).
+   Si no sobran, basta la Poisson o la NB.
 2. **¿Qué distribución tiene el conteo?** Índice de dispersión de una Poisson truncada en 0 ajustada a
-   los positivos: si ronda 1, versión Poisson; si no, NB (pregunta 2).
+   los positivos: si ronda 1, versión Poisson; si no, NB (pregunta 1 de la [§4.2](#sec-u24-estructuras)).
 3. **¿Mezcla o barrera?** La historia del problema y si algún grupo tiene menos ceros de los que da el
-   conteo (pregunta 3): mezcla → ZI; barrera o deflación → hurdle.
+   conteo (pregunta 2): mezcla → ZI; barrera o deflación → hurdle.
 4. **¿Qué predictor va en cada parte?** Explora las dos partes por separado: ceros estructurales y
    ritmo de las vigiladas en el ZI ([§4.3](#sec-u24-zi)); proporción que cruza y ritmo en el hurdle
    ([§4.4](#sec-u24-hurdle)). La exposición, como *offset* en el conteo; en la barrera del hurdle, como
