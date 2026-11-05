@@ -38,9 +38,9 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
   forcats = "1.0.1", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
-  marginaleffects = "0.32.0", performance = "0.17.0", pscl = "1.5.9",
-  sessioninfo = "1.2.4", survival = "3.8.6", tibble = "3.3.1",
-  tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
+  marginaleffects = "0.32.0", performance = "0.17.0", sessioninfo = "1.2.4",
+  survival = "3.8.6", tibble = "3.3.1", tidyverse = "2.0.0", vcd = "1.4.13",
+  vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -61,7 +61,6 @@ rm(.falta, .instalada, .otra)
 library(broom)
 library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
-library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
@@ -129,7 +128,7 @@ c(sigma_region = sd_reg, sigma_agencia = sd_ag)
 # -----------------------------------------------------------------------------
 # [u25-irr]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.3 Interpretación
+#     > 5.2 El modelo mixto de Poisson
 #       > Efectos fijos: IRR condicionales
 # -----------------------------------------------------------------------------
 ef <- summary(m_glmm)$coefficients
@@ -142,18 +141,46 @@ data.frame(
   dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 # -----------------------------------------------------------------------------
+# [u25-varcorr]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Componentes de varianza e ICC
+# -----------------------------------------------------------------------------
+print(VarCorr(m_glmm), comp = c("Variance", "Std.Dev."))
+Sigma_u <- diag(c(sd_reg^2, sd_ag^2))          # supuesto: niveles independientes
+dimnames(Sigma_u) <- list(c("region", "agencia"), c("region", "agencia"))
+round(Sigma_u, 4)
+# covarianza entre los predictores de dos pólizas, según el nivel que compartan
+round(c(misma_agencia = sd_reg^2 + sd_ag^2, misma_region_otra_agencia = sd_reg^2,
+        distinta_region = 0), 4)
+
+# -----------------------------------------------------------------------------
 # [u25-icc]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.3 Interpretación
+#     > 5.2 El modelo mixto de Poisson
 #       > Componentes de varianza e ICC
 # -----------------------------------------------------------------------------
 performance::icc(m_glmm, by_group = TRUE)
 
 # -----------------------------------------------------------------------------
+# [u25-test-varianza]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Componentes de varianza e ICC
+# -----------------------------------------------------------------------------
+m_sin_reg <- update(m_glmm, . ~ . - (1 | region/agencia) + (1 | agencia))   # solo agencia
+m_sin_ag  <- update(m_glmm, . ~ . - (1 | region/agencia) + (1 | region))    # solo región
+LR <- c(region  = 2 * (as.numeric(logLik(m_glmm)) - as.numeric(logLik(m_sin_reg))),
+        agencia = 2 * (as.numeric(logLik(m_glmm)) - as.numeric(logLik(m_sin_ag))))
+data.frame(LR          = round(LR, 2),
+           p_ingenuo   = signif(pchisq(LR, df = 1, lower.tail = FALSE), 3),
+           p_corregido = signif(0.5 * pchisq(LR, df = 1, lower.tail = FALSE), 3))   # mezcla 50:50
+
+# -----------------------------------------------------------------------------
 # [fig-u25-blups]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.3 Interpretación
-#       > BLUP: qué agencias se desvían
+#     > 5.2 El modelo mixto de Poisson
+#       > Efectos aleatorios predichos (BLUP): el factor de cada agencia
 # -----------------------------------------------------------------------------
 re  <- ranef(m_glmm, condVar = TRUE)$`agencia:region`
 re_df <- tibble::tibble(
@@ -168,9 +195,19 @@ ggplot(re_df, aes(b, agencia)) +
   labs(x = "desviación del log-ritmo (BLUP)", y = "agencia")
 
 # -----------------------------------------------------------------------------
+# [u25-blups-resumen]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Efectos aleatorios predichos (BLUP): el factor de cada agencia
+# -----------------------------------------------------------------------------
+# agencias cuyo intervalo excluye el 0, y el rango de sus factores multiplicativos
+c(agencias = nrow(re_df), excluyen_cero = sum(abs(re_df$b) > 1.96 * re_df$se),
+  factor_min = round(exp(min(re_df$b)), 2), factor_max = round(exp(max(re_df$b)), 2))
+
+# -----------------------------------------------------------------------------
 # [u25-pred]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.3 Interpretación
+#     > 5.2 El modelo mixto de Poisson
 #       > Predicción: condicional frente a marginal
 # -----------------------------------------------------------------------------
 nd <- cartera |>
@@ -185,16 +222,16 @@ c(
 # -----------------------------------------------------------------------------
 # [u25-drop1]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.4 Inferencia y selección
-#       > Los efectos fijos: contraste y selección
+#     > 5.2 El modelo mixto de Poisson
+#       > Selección de variables
 # -----------------------------------------------------------------------------
 drop1(m_glmm, test = "Chisq")
 
 # -----------------------------------------------------------------------------
 # [u25-aic]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.4 Inferencia y selección
-#       > La estructura aleatoria: ¿hace falta el agrupamiento?
+#     > 5.2 El modelo mixto de Poisson
+#       > Agrupamiento versus sobredispersión
 # -----------------------------------------------------------------------------
 m_nb <- glm.nb(
   n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -207,24 +244,65 @@ performance::compare_performance(
 )
 
 # -----------------------------------------------------------------------------
+# [u25-disp-glmm]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Agrupamiento versus sobredispersión
+# -----------------------------------------------------------------------------
+disp_pois <- performance::check_overdispersion(m_pois)
+disp_glmm <- performance::check_overdispersion(m_glmm)
+round(c(ratio_poisson = disp_pois$dispersion_ratio, p_poisson = disp_pois$p_value,
+        ratio_glmm    = disp_glmm$dispersion_ratio, p_glmm    = disp_glmm$p_value), 3)
+
+# -----------------------------------------------------------------------------
+# [u25-deviance]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Bondad de ajuste y diagnóstico
+# -----------------------------------------------------------------------------
+c(deviance = round(deviance(m_glmm), 1), gl_residuales = df.residual(m_glmm),
+  media_ajustada = round(mean(fitted(m_glmm)), 3),
+  pct_ceros = round(100 * mean(cartera$n_gestiones == 0), 1))
+
+# -----------------------------------------------------------------------------
 # [fig-u25-dharma]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.5 Bondad de ajuste y diagnóstico
+#     > 5.2 El modelo mixto de Poisson
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 res_glmm <- simulateResiduals(m_glmm)
 plot(res_glmm)
 
 # -----------------------------------------------------------------------------
+# [u25-dharma-tests]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.2 El modelo mixto de Poisson
+#       > Bondad de ajuste y diagnóstico
+# -----------------------------------------------------------------------------
+# p-valores de los contrastes de DHARMa sobre el GLMM
+round(c(uniformidad = testUniformity(res_glmm, plot = FALSE)$p.value,
+        dispersion  = testDispersion(res_glmm, plot = FALSE)$p.value,
+        atipicos    = testOutliers(res_glmm, plot = FALSE)$p.value,
+        ceros       = testZeroInflation(res_glmm, plot = FALSE)$p.value,
+        cuantiles   = testQuantiles(res_glmm, plot = FALSE)$p.value), 3)
+
+# -----------------------------------------------------------------------------
 # [u25-r2]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.5 Bondad de ajuste y diagnóstico
+#     > 5.2 El modelo mixto de Poisson
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 performance::r2(m_glmm)
+v <- insight::get_variance(m_glmm)   # sigma2_f, sigma2 de los efectos aleatorios y sigma2_epsilon
+round(c(var_fija = v$var.fixed, var_aleatoria = v$var.random, var_distribucion = v$var.distribution,
+        R2_marginal    = v$var.fixed / (v$var.fixed + v$var.random + v$var.distribution),
+        R2_condicional = (v$var.fixed + v$var.random) / (v$var.fixed + v$var.random + v$var.distribution)),
+      3)
 
 # -----------------------------------------------------------------------------
 # [u25-olre-disp]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#     > 5.3 El efecto aleatorio a nivel de observación (OLRE)
 #       > Por qué modelizar n_danos como OLRE
 # -----------------------------------------------------------------------------
 m_pois_danos <- glm(
@@ -237,7 +315,7 @@ performance::check_overdispersion(m_pois_danos)
 # -----------------------------------------------------------------------------
 # [u25-olre]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#     > 5.3 El efecto aleatorio a nivel de observación (OLRE)
 #       > El modelo y su ajuste
 # -----------------------------------------------------------------------------
 cartera$id_obs <- factor(seq_len(nrow(cartera)))   # un nivel aleatorio por observación
@@ -252,7 +330,7 @@ c(sigma_obs = sd_olre)
 # -----------------------------------------------------------------------------
 # [fig-u25-olre-diag]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#     > 5.3 El efecto aleatorio a nivel de observación (OLRE)
 #       > Inferencia, bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 res_olre <- simulateResiduals(m_olre)
@@ -261,21 +339,26 @@ plot(res_olre)
 # -----------------------------------------------------------------------------
 # [u25-olre-comp]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#     > 5.3 El efecto aleatorio a nivel de observación (OLRE)
 #       > Comparación con la binomial negativa
 # -----------------------------------------------------------------------------
 m_nb2 <- glm.nb(
   n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
     offset(log(exposicion)), data = cartera
 )
-performance::compare_performance(
-  Poisson = m_pois_danos, NB2 = m_nb2, OLRE = m_olre, metrics = c("AIC", "BIC", "RMSE")
-)
+comparacion_olre <- performance::compare_performance(
+  m_pois_danos, m_nb2, m_olre, metrics = c("AIC", "BIC", "RMSE")
+) |>
+  as.data.frame() |>
+  dplyr::transmute(modelo = dplyr::recode(Name, m_pois_danos = "Poisson", m_nb2 = "NB2", m_olre = "OLRE"),
+                   AIC, AIC_wt, BIC, BIC_wt, RMSE)
+# sin notación científica: el peso de la Poisson es del orden de 1e-295 y se muestra como 0
+comparacion_olre |> dplyr::mutate(dplyr::across(where(is.numeric), \(v) round(v, 4))) |> format(scientific = FALSE)
 
 # -----------------------------------------------------------------------------
 # [u25-olre-rmse]
 #   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.6 Cierre: el efecto aleatorio a nivel de observación (OLRE)
+#     > 5.3 El efecto aleatorio a nivel de observación (OLRE)
 #       > Comparación con la binomial negativa
 # -----------------------------------------------------------------------------
 pred_marg <- predict(m_olre, type = "response", re.form = NA)     # población, sin el BLUP

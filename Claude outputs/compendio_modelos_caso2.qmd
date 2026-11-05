@@ -1,0 +1,1022 @@
+---
+title: "Caso 2 · Compendio de modelos en R"
+subtitle: "Ajuste con efectos fijos y mixtos, y su regularización, para cada modelo del caso"
+lang: es
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: false
+    code-copy: true
+execute:
+  eval: false     # el código está completo y se ejecuta en orden; cambia a true para ver las salidas
+---
+
+<!-- Compendio de consulta. Los bloques de código no se ejecutan al renderizar (eval: false),
+     pero están completos y se ejecutan en orden sobre la cartera de teoría.
+     Verificado en esta preparación:
+       - Todos los bloques, salvo los de glmmLasso, mpath y priors, ejecutados en orden con
+         R 4.3.3, glmmTMB 1.1.8, glmnet 4.1-8, lme4 y survival sobre cartera_auto_20252026.rds:
+         sin errores. Avisos esperables: "NA/NaN function evaluation" en glmmTMB (convergencia 0,
+         hessiana definida), "Rescale variables?" en glmer y glmer.nb, convergencia singular en
+         la pendiente aleatoria de z_edad; glmer del OLRE no converge del todo (max|grad| alto),
+         pero su desviación típica coincide con la de glmmTMB.
+       - Bloques «Con las otras funciones del caso» (glm, glmer, glm.nb, glmer.nb, pscl, loglm,
+         broom, broom.mixed, AER, performance, cox.zph): ejecutados sin errores. Verificado que la
+         barrera de pscl::hurdle tiene los coeficientes con el signo cambiado respecto a glmmTMB.
+       - glmmTMB 1.1.8 sobre la cartera de teoría: poisson con offset, nbinom2 (sigma = theta de
+         MASS::glm.nb, 0.8628 en ambos), nbinom1, ziformula con y sin efectos aleatorios,
+         truncated_nbinom2 + ziformula, binomial(link = "cloglog"), (1 | region/agencia),
+         (1 | a) + (1 | b), diag(1 + x | a) y (1 + x || a), dispformula; deviance() de un glmmTMB
+         Poisson = deviance frente al saturado; drop1() funciona; familias quasi -> error.
+       - priors NO existe en glmmTMB 1.1.8; sí en la viñeta actual del paquete [VERIFICAR versión].
+       - glmnet: familias integradas, objetos de familia, penalty.factor y type.measure según su
+         documentación oficial (versión 5.0).
+       - glmmLasso y mpath: solo su documentación; no se han podido ejecutar. -->
+
+# Cómo leer este compendio
+
+Para cada modelo del Caso 2 se recorren cuatro tareas: **ajustar con efectos fijos**, **regularizar
+con efectos fijos**, **ajustar con efectos aleatorios** (modelo mixto) y **regularizar el modelo mixto**.
+Cuando la regularización es la misma en los dos casos, aparece una sola vez. En cada tarea se da
+primero la función principal, con `glmmTMB` como opción por defecto siempre que es posible, y después
+las alternativas.
+
+Las llamadas usan una notación común:
+
+| Objeto | Qué es |
+|:--|:--|
+| `y` | respuesta de conteo (en las unidades, `n_asistencia`, `n_danos`, `n_fraude`, `n_gestiones`) |
+| `x`, `x1`, `x2` | predictores del conteo (o de la tasa) |
+| `z` | predictores de la parte de ceros |
+| `exposicion` | tiempo observado de la póliza; entra como `offset(log(exposicion))` |
+| `agencia`, `region` | factores de agrupación (agencias anidadas en regiones) |
+| `id_obs` | identificador de cada fila, para el efecto aleatorio por observación (OLRE) |
+| `cartera` | datos con una fila por póliza |
+| `tabla` | tabla de contingencia en formato largo, con la frecuencia en `Freq` |
+| `pp` | datos persona-periodo (una fila por póliza y tramo), con `y` (evento en el tramo), `tramo` y `en_riesgo` (tiempo en riesgo en el tramo) |
+| `X`, `X_pp` | matrices de diseño para `glmnet`: `model.matrix(~ x1 + x2, datos)[, -1]` |
+
+Debajo de cada tabla, el apartado **En la práctica** explica cada tarea y da el código completo para
+hacerla sobre la cartera de teoría del Caso 2. Cierra cada modelo el apartado **Con las otras funciones del caso**, con
+la misma tarea escrita con las funciones que usan las unidades (`glm`, `glmer`, `glm.nb`, `glmer.nb`,
+`pscl`, `MASS::loglm`, `survival`) y las herramientas que las acompañan (`broom`, `broom.mixed`,
+`performance`, `AER`).
+
+Todo lo que se dice de `glmnet` vale para *ridge* (`alpha = 0`), *lasso* (`alpha = 1`) y *elastic-net*
+(`0 < alpha < 1`), y $\lambda$ se elige siempre con `cv.glmnet` (`lambda.min` o `lambda.1se`).
+
+## Visión de conjunto
+
+| Modelo | Fijos | Regularización (fijos) | Mixto | Regularización (mixto) |
+|:--|:--|:--|:--|:--|
+| [Poisson para tasas](#poisson) | `glmmTMB` | `glmnet` | `glmmTMB` | `glmmLasso` (*lasso*) · `glmmTMB` + `priors` (*ridge*) |
+| [Log-lineal para tablas](#loglineal) | `glmmTMB` | `glmnet` | no se usa en el caso | — |
+| [Logística](#logistica) | `glmmTMB` | `glmnet` | `glmmTMB` | `glmmLasso` · `glmmTMB` + `priors` |
+| [Quasi-Poisson](#quasi) | `glm` (no en `glmmTMB`) | `glmnet` (Poisson) | no hay versión mixta *quasi* | — |
+| [Binomial negativa](#nb) | `glmmTMB` | `glmnet` (NB2, $\theta$ fijo) · `mpath` · `priors` | `glmmTMB` | solo *ridge* (`priors`) |
+| [Ceros inflados (ZIP/ZINB)](#zi) | `glmmTMB` | `mpath::zipath` · `priors` | `glmmTMB` | solo *ridge* (`priors`) |
+| [*Hurdle*](#hurdle) | `glmmTMB` | por partes: `glmnet` + `priors` | `glmmTMB` | por partes |
+| [Riesgos a trozos](#trozos) | `glmmTMB` | `glmnet` | `glmmTMB` (fragilidad) | `glmmLasso` · `glmmTMB` + `priors` |
+| [Tiempo discreto (`cloglog`)](#cloglog) | `glmmTMB` | `glmnet` | `glmmTMB` | `glmmTMB` + `priors` |
+| [Cox y Kaplan–Meier](#cox) | `survival` | `glmnet` (Cox) | `survival` (`frailty()`) | sin herramienta verificada |
+
+: Qué función resuelve cada tarea. Los enlaces llevan a la sección de cada modelo. {#tbl-vision}
+
+::: {.callout-warning}
+## Antes de usar `priors` en `glmmTMB`
+El argumento `priors` (prior normal centrada en cero sobre los efectos fijos = penalización *ridge*,
+con estimación MAP) **no existe en `glmmTMB` 1.1.8**; aparece en la viñeta actual del paquete.
+Comprueba tu versión con `packageVersion("glmmTMB")` antes de usarlo [VERIFICAR]. `glmmTMB` **no tiene
+*lasso***: solo encoge, no pone coeficientes a cero.
+:::
+
+## Preparación: paquetes y datos
+
+Los bloques de código de este compendio se ejecutan en orden, de arriba abajo, y usan la cartera de
+teoría del Caso 2, que se descarga del repositorio del curso. Al renderizar no se ejecutan
+(`eval: false` en la cabecera): para ver las salidas, cambia esa opción a `true` o ejecuta los
+bloques en la consola. Los que dependen de paquetes que no están en la pila de la guía
+(`glmmLasso`, `mpath`) o de una versión reciente de `glmmTMB` (`priors`) llevan un aviso.
+
+```{r}
+#| label: comp-setup
+library(glmmTMB)
+library(glmnet)
+library(lme4)        # glmer() y glmer.nb(), como alternativa a glmmTMB
+library(survival)    # Surv(), survfit(), coxph(), frailty()
+
+SEMILLA <- 20252026L
+
+# gzcon() descomprime al vuelo el .rds que llega por http
+url_cartera <- "https://raw.githubusercontent.com/asunmayoral/GLM/master/caso2/datos/cartera_auto_20252026.rds"
+cartera <- readRDS(gzcon(url(url_cartera, open = "rb")))
+
+# identificador de cada póliza como factor, para el efecto aleatorio por observación (OLRE)
+cartera$id_obs <- factor(cartera$id_poliza)
+
+# los diecisiete predictores candidatos, como matriz de diseño para glmnet (sin intercepto)
+candidatos <- c("edad_conductor", "antiguedad_carnet", "potencia_cv", "antiguedad_vehiculo",
+                "zona_circulacion", "uso", "tipo_vehiculo", "sexo", "estado_civil",
+                "color_vehiculo", "tiene_garaje", "forma_pago", "financiado", "km_declarados",
+                "valor_vehiculo", "n_conductores", "antiguedad_cliente")
+X <- model.matrix(reformulate(candidatos), data = cartera)[, -1]
+
+# una sola partición en 10 bloques, para que todas las validaciones cruzadas sean comparables
+set.seed(SEMILLA)
+bloque <- sample(rep(1:10, length.out = nrow(cartera)))
+
+# prior para el ridge de glmmTMB (argumento priors; ver el aviso del principio) [VERIFICAR]:
+# normal(0, 1) sobre los efectos fijos y una prior muy ancha sobre el intercepto, para no encogerlo
+prior_ridge <- data.frame(prior = c("normal(0,100)", "normal(0,1)"),
+                          class = c("fixef", "fixef"),
+                          coef  = c("(Intercept)", ""))
+```
+
+En el proceso que generó la cartera, solo `n_gestiones` depende de la agencia. En los demás modelos
+mixtos de este compendio, el efecto aleatorio por agencia enseña la sintaxis, y es de esperar que su
+varianza estimada sea pequeña.
+
+# Poisson para tasas (Unidad 2.1) {#poisson}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y ~ x + offset(log(exposicion)), family = poisson, data = cartera)` | `glm(y ~ x + offset(log(exposicion)), family = poisson, data = cartera)` | Mismos coeficientes y errores estándar. IRR = `exp(fixef(m)$cond)` |
+| Regularización (fijos) | `cv.glmnet(X, cartera$y, family = "poisson", offset = log(cartera$exposicion), alpha = 1)` | — | El *offset* va en su argumento, no en `X`; `glmnet` estandariza por defecto |
+| Ajuste (mixto) | `glmmTMB(y ~ x + offset(log(exposicion)) + (1 \| region/agencia), family = poisson, data = cartera)` | `lme4::glmer(...)` con la misma fórmula | Otras estructuras en la tabla siguiente |
+| Regularización (mixto) | *Lasso*: `glmmLasso(fix = y ~ x, rnd = list(agencia = ~1), family = poisson(link = "log"), lambda = l, data = cartera)` | *Ridge*: el mixto de `glmmTMB` con `priors = data.frame(prior = "normal(0,1)", class = "fixef")` | `glmmLasso`: un solo factor de agrupación documentado; *offset* no documentado [VERIFICAR]; $\lambda$ por rejilla comparando `$bic` |
+
+: Poisson para tasas. {#tbl-poisson}
+
+## En la práctica
+
+**Efectos fijos.** El modelo de la Unidad 2.1 modela la tasa de asistencias por unidad de exposición. La
+llamada de `glmmTMB` es la de `glm()` con otra función: la familia, la fórmula y el *offset* no cambian.
+Los coeficientes están en la escala del logaritmo de la tasa, y al exponenciarlos se leen como razones
+de tasas (IRR).
+
+```{r}
+#| label: comp-pois-fijo
+m_pois <- glmmTMB(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                    tipo_vehiculo + offset(log(exposicion)),
+                  family = poisson, data = cartera)
+summary(m_pois)
+exp(fixef(m_pois)$cond)                 # IRR
+exp(confint(m_pois))                    # IRR con su intervalo (Wald)
+
+# la misma estimación con glm()
+m_pois_glm <- glm(n_asistencia ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                    tipo_vehiculo + offset(log(exposicion)),
+                  family = poisson, data = cartera)
+```
+
+**Regularización.** `glmnet` ajusta el modelo con los diecisiete candidatos a la vez y encoge sus
+coeficientes; `cv.glmnet` elige $\lambda$ por validación cruzada con la *deviance* de Poisson. El
+*offset* va en su argumento, no dentro de la matriz `X`. Con `alpha = 1` es el *lasso*: los
+coeficientes que valen cero son las variables descartadas.
+
+```{r}
+#| label: comp-pois-reg
+cv_pois <- cv.glmnet(X, cartera$n_asistencia, family = "poisson",
+                     offset = log(cartera$exposicion), alpha = 1, foldid = bloque)
+plot(cv_pois)                           # deviance de validación según log(lambda)
+coef(cv_pois, s = "lambda.min")         # 0 = variable descartada
+coef(cv_pois, s = "lambda.1se")         # el modelo más corto a un error estándar del mínimo
+```
+
+**Modelo mixto.** Para el efecto de la agencia usamos `n_gestiones`, la respuesta que en la Unidad 2.5
+depende de la agencia que lleva la póliza (en `n_asistencia` ese efecto no existe). El término
+`(1 | region/agencia)` da un intercepto aleatorio a cada región y otro a cada agencia dentro de su región.
+`VarCorr()` devuelve las desviaciones típicas de esos efectos, y `predict(..., re.form = NA)` predice para
+una agencia cualquiera, sin su efecto propio.
+
+Durante la optimización puede aparecer el aviso `NA/NaN function evaluation`: si al final
+`m$fit$convergence` vale 0 y `m$sdr$pdHess` es `TRUE`, el ajuste ha convergido.
+
+```{r}
+#| label: comp-pois-mixto
+m_pois_mix <- glmmTMB(n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                        tipo_vehiculo + offset(log(exposicion)) + (1 | region/agencia),
+                      family = poisson, data = cartera)
+VarCorr(m_pois_mix)                                   # componentes de varianza
+c(convergencia = m_pois_mix$fit$convergence, hessiana_definida = m_pois_mix$sdr$pdHess)
+head(predict(m_pois_mix, type = "response"))          # condicional: con el efecto de su agencia
+head(predict(m_pois_mix, type = "response", re.form = NA))  # marginal: agencia cualquiera
+
+# el mismo modelo con lme4; con los predictores sin tipificar avisa
+# "Model is nearly unidentifiable ... Rescale variables?": el propio aviso sugiere reescalar
+m_pois_glmer <- glmer(n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                        tipo_vehiculo + offset(log(exposicion)) + (1 | region/agencia),
+                      family = poisson, data = cartera)
+```
+
+El efecto aleatorio por observación (OLRE) es un modelo mixto con un grupo por póliza. Recoge la
+heterogeneidad entre pólizas que los predictores no explican y es una alternativa a la binomial negativa
+para `n_danos` (Unidad 2.5):
+
+```{r}
+#| label: comp-olre
+m_olre <- glmmTMB(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                    tipo_vehiculo + offset(log(exposicion)) + (1 | id_obs),
+                  family = poisson, data = cartera)
+VarCorr(m_olre)
+```
+
+**Regularización del modelo mixto.** `glmnet` no admite efectos aleatorios. Hay dos vías: el *lasso* de
+`glmmLasso`, que penaliza los efectos fijos con $L_1$ y estima a la vez los aleatorios, y el *ridge* de
+`glmmTMB`, que pone una prior normal centrada en cero sobre los efectos fijos (estimación MAP). Ninguna de
+las dos elige $\lambda$ sola: en `glmmLasso` se recorre una rejilla y se compara su `$bic`; en
+`glmmTMB` la desviación típica de la prior hace el papel de $\lambda$.
+
+```{r}
+#| label: comp-pois-mixto-lasso
+# Lasso con glmmLasso: no está en la pila de la guía y no se ha probado en esta preparación.
+# Su documentación no menciona offset [VERIFICAR]: sin él, el modelo es de recuentos, no de tasas.
+# Su ayuda solo describe un factor de agrupación: aquí, la agencia.
+library(glmmLasso)
+rejilla <- c(100, 50, 20, 10, 5)
+ajustes_lasso <- lapply(rejilla, \(l) glmmLasso(
+  fix = n_gestiones ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo,
+  rnd = list(agencia = ~1), family = poisson(link = "log"), lambda = l, data = cartera))
+m_lasso_mix <- ajustes_lasso[[which.min(sapply(ajustes_lasso, \(m) m$bic))]]
+m_lasso_mix$coefficients                # efectos fijos (los descartados valen 0)
+m_lasso_mix$StdDev                      # desviación típica del efecto aleatorio
+```
+
+```{r}
+#| label: comp-pois-mixto-ridge
+# Ridge con glmmTMB: requiere una versión con el argumento priors (no está en la 1.1.8) [VERIFICAR]
+m_ridge_mix <- update(m_pois_mix, priors = prior_ridge)
+fixef(m_ridge_mix)
+```
+
+## Estructuras de efectos aleatorios
+
+Las estructuras disponibles para el modelo mixto, con su sintaxis:
+
+| Estructura | `glmmTMB` (y `glmer`) | `glmmLasso` | Para qué |
+|:--|:--|:--|:--|
+| Intercepto aleatorio | `(1 \| agencia)` | `rnd = list(agencia = ~1)` | Cada agencia, su propio nivel de tasa |
+| Anidado | `(1 \| region/agencia)` | No documentado | Agencias dentro de regiones (Unidad 2.5) |
+| Cruzados | `(1 \| agencia) + (1 \| zona)` | No documentado | Dos agrupaciones que no se anidan |
+| Pendiente aleatoria correlada | `(1 + x \| agencia)` | `rnd = list(agencia = ~1 + x)` | El efecto de `x` cambia de agencia a agencia |
+| Pendiente sin correlación | `diag(1 + x \| agencia)` o `(1 + x \|\| agencia)` | No documentado | Intercepto y pendiente independientes |
+| Por observación (OLRE) | `(1 \| id_obs)` | No documentado | Heterogeneidad póliza a póliza: alternativa a la binomial negativa (Unidad 2.5) |
+| Otras covarianzas | `ar1()`, `cs()`, `toep()`, `rr()`… (solo `glmmTMB`) | — | Ver la viñeta de estructuras de covarianza de `glmmTMB` |
+
+: Estructuras de efectos aleatorios. {#tbl-estructuras}
+
+Las mismas estructuras, escritas sobre `n_gestiones`. La pendiente de `edad_conductor` se tipifica
+antes, para que intercepto y pendiente estén en escalas comparables y el optimizador no tenga
+problemas:
+
+```{r}
+#| label: comp-estructuras
+cartera$z_edad <- as.numeric(scale(cartera$edad_conductor))
+f0 <- n_gestiones ~ z_edad + offset(log(exposicion))
+
+m_int   <- glmmTMB(update(f0, . ~ . + (1 | agencia)),             family = poisson, data = cartera)
+m_anid  <- glmmTMB(update(f0, . ~ . + (1 | region/agencia)),      family = poisson, data = cartera)
+m_cruz  <- glmmTMB(update(f0, . ~ . + (1 | agencia) + (1 | uso)), family = poisson, data = cartera)
+m_pend  <- glmmTMB(update(f0, . ~ . + (1 + z_edad | agencia)),    family = poisson, data = cartera)
+m_diag  <- glmmTMB(update(f0, . ~ . + diag(1 + z_edad | agencia)), family = poisson, data = cartera)
+
+# ¿qué estructura apoyan los datos? Comparación por AIC
+AIC(m_int, m_anid, m_cruz, m_pend, m_diag)
+```
+
+En `n_gestiones` la pendiente aleatoria de la edad no tiene apoyo en los datos, y `m_pend` puede dar un
+aviso de convergencia singular: la sintaxis es correcta, pero los datos no sostienen esa estructura. Es
+la señal para quedarse con una más simple.
+
+## Con las otras funciones del caso
+
+Las mismas estimaciones con `glm()` y `glmer()`, como aparecen en las unidades 2.1 y 2.5. Con un `glm`,
+`broom::tidy(..., exponentiate = TRUE, conf.int = TRUE)` da los IRR con su intervalo; con un `glmer`
+(o un `glmmTMB`), `broom.mixed::tidy()` hace lo mismo.
+
+```{r}
+#| label: comp-pois-alt
+# Poisson con efectos fijos (Unidad 2.1)
+broom::tidy(m_pois_glm, exponentiate = TRUE, conf.int = TRUE)
+drop1(m_pois_glm, test = "LRT")                       # aporte de cada predictor
+
+# GLMM anidado (Unidad 2.5): m_pois_glmer, ajustado más arriba
+VarCorr(m_pois_glmer)
+isSingular(m_pois_glmer)                              # ¿alguna varianza estimada en el borde (0)?
+broom.mixed::tidy(m_pois_glmer, effects = "fixed", exponentiate = TRUE, conf.int = TRUE)
+
+# OLRE con glmer (Unidad 2.5). Con los predictores sin tipificar avisa de que no converge del
+# todo; la desviación típica del efecto coincide con la de glmmTMB (m_olre), que converge sin avisos
+m_olre_glmer <- glmer(n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso +
+                        tipo_vehiculo + offset(log(exposicion)) + (1 | id_obs),
+                      family = poisson, data = cartera)
+VarCorr(m_olre_glmer)
+
+# estructuras de efectos aleatorios con glmer
+g_int  <- glmer(update(f0, . ~ . + (1 | agencia)),             family = poisson, data = cartera)
+g_anid <- glmer(update(f0, . ~ . + (1 | region/agencia)),      family = poisson, data = cartera)
+g_cruz <- glmer(update(f0, . ~ . + (1 | agencia) + (1 | uso)), family = poisson, data = cartera)
+g_pend <- glmer(update(f0, . ~ . + (1 + z_edad | agencia)),    family = poisson, data = cartera)
+g_diag <- glmer(update(f0, . ~ . + (1 + z_edad || agencia)),   family = poisson, data = cartera)
+AIC(g_int, g_anid, g_cruz, g_pend, g_diag)
+```
+
+`glmer` no admite `diag()`, pero `(1 + z_edad || agencia)` da la misma estructura (intercepto y
+pendiente sin correlación). Las estructuras `ar1()`, `cs()`, `toep()` o `rr()` solo existen en `glmmTMB`.
+
+# Log-lineal para tablas de contingencia (Unidad 2.2) {#loglineal}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(Freq ~ A * B, family = poisson, data = tabla)`; jerarquía con `(A + B + C)^2`, etc. | `glm(Freq ~ A * B, family = poisson, data = tabla)`; `MASS::loglm(~ A * B, tabla)` | `deviance()` da la *deviance* frente al saturado; `anova(m1, m2)` hace el LRT; `drop1(m, test = "Chisq")` funciona. En la tabla de `anova()` de un `glmmTMB`, la columna «deviance» es $-2\ell$ |
+| — tabla cuadrada | Simetría `Freq ~ par`; cuasi-simetría `Freq ~ prev + act + par`; asociación uniforme `Freq ~ prev + act + I(i * j)` (+ `diagonal` para la inercia) | Las mismas fórmulas con `glm` | Homogeneidad marginal = LRT entre simetría y cuasi-simetría |
+| Regularización (fijos) | `cv.glmnet(model.matrix(~ (A + B + C)^3, tabla)[, -1], tabla$Freq, family = "poisson", penalty.factor = pf)` | — | `pf = 0` en los efectos principales y `1` en las interacciones: solo se encogen las asociaciones. El *lasso* no respeta la jerarquía (puede retener una interacción sin los términos que contiene). Útil con tablas escasas |
+| Ajuste (mixto) | No se usa en el caso | — | En una tabla, cada fila es una celda: no hay agrupación natural |
+| Regularización (mixto) | — | — | — |
+
+: Log-lineal. {#tbl-loglineal}
+
+## En la práctica
+
+**Efectos fijos.** En un log-lineal la fila es una celda de la tabla y la respuesta es su frecuencia.
+Construimos la tabla de tres vías de la Unidad 2.2 (zona × tipo de vehículo × tener alguna asistencia) y
+comparamos dos modelos anidados: la independencia condicional de zona y tipo dada la asistencia, y la
+asociación homogénea. `anova()` hace el LRT; `deviance()` y `df.residual()` dan el ajuste frente al
+saturado.
+
+```{r}
+#| label: comp-loglin-fijo
+cart_tab <- transform(cartera, asistencia = factor(ifelse(n_asistencia > 0, "con", "sin"),
+                                                   levels = c("sin", "con")))
+tabla <- as.data.frame(xtabs(~ zona_circulacion + tipo_vehiculo + asistencia, data = cart_tab))
+
+m_ci  <- glmmTMB(Freq ~ zona_circulacion * asistencia + tipo_vehiculo * asistencia,
+                 family = poisson, data = tabla)
+m_hom <- glmmTMB(Freq ~ (zona_circulacion + tipo_vehiculo + asistencia)^2,
+                 family = poisson, data = tabla)
+anova(m_ci, m_hom)                                    # LRT entre los dos modelos
+c(deviance = deviance(m_hom), gl = df.residual(m_hom)) # ajuste frente al saturado
+drop1(m_hom, test = "Chisq")                          # aporte de cada interacción
+```
+
+Para la tabla cuadrada del bonus-malus se pasa a formato largo con los índices de fila (`i`) y columna
+(`j`), el par no ordenado de celdas espejo (`par`) y el indicador de la diagonal. Cada modelo es una
+fórmula sobre esas columnas:
+
+```{r}
+#| label: comp-loglin-cuadrada
+cuad <- as.data.frame(xtabs(~ bonus_malus_prev + bonus_malus_act, data = cartera))
+names(cuad)[1:2] <- c("prev", "act")
+cuad <- transform(cuad, i = as.integer(prev), j = as.integer(act))
+cuad <- transform(cuad, par      = factor(paste(pmin(i, j), pmax(i, j), sep = "-")),
+                        diagonal = factor(ifelse(i == j, "queda", "mueve")))
+
+m_sim  <- glmmTMB(Freq ~ par,                              family = poisson, data = cuad)
+m_qs   <- glmmTMB(Freq ~ prev + act + par,                 family = poisson, data = cuad)
+m_unif <- glmmTMB(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
+anova(m_sim, m_qs)          # homogeneidad marginal
+```
+
+**Regularización.** La matriz de diseño contiene todas las interacciones hasta el orden tres. Con
+`penalty.factor` igual a 0 en los efectos principales, solo se encogen las asociaciones, que es lo que
+interesa seleccionar. Con tan pocas celdas, se usan pocos bloques de validación.
+
+```{r}
+#| label: comp-loglin-reg
+X_tab <- model.matrix(~ (zona_circulacion + tipo_vehiculo + asistencia)^3, data = tabla)[, -1]
+pf    <- ifelse(grepl(":", colnames(X_tab)), 1, 0)   # 0 = sin penalizar (efectos principales)
+set.seed(SEMILLA)
+cv_tab <- cv.glmnet(X_tab, tabla$Freq, family = "poisson", penalty.factor = pf, nfolds = 5)
+coef(cv_tab, s = "lambda.1se")
+```
+
+## Con las otras funciones del caso
+
+Con `glm()`, como en la Unidad 2.2. Ahí el LRT se pide con `test = "LRT"` y el ajuste frente al
+saturado es directamente `deviance()` con `df.residual()`; `MASS::loglm()` ajusta los mismos modelos con
+una fórmula sin respuesta.
+
+```{r}
+#| label: comp-loglin-alt
+g_ci  <- glm(Freq ~ zona_circulacion * asistencia + tipo_vehiculo * asistencia,
+             family = poisson, data = tabla)
+g_hom <- glm(Freq ~ (zona_circulacion + tipo_vehiculo + asistencia)^2,
+             family = poisson, data = tabla)
+anova(g_ci, g_hom, test = "LRT")
+c(deviance = deviance(g_hom), gl = df.residual(g_hom),
+  p = pchisq(deviance(g_hom), df.residual(g_hom), lower.tail = FALSE))
+rstandard(g_hom, type = "pearson")                    # residuos ajustados por celda
+
+# la misma asociación homogénea con MASS::loglm, sobre la tabla de contingencia
+MASS::loglm(~ (zona_circulacion + tipo_vehiculo + asistencia)^2,
+            data = xtabs(Freq ~ zona_circulacion + tipo_vehiculo + asistencia, data = tabla))
+
+# tablas cuadradas
+g_sim  <- glm(Freq ~ par,                              family = poisson, data = cuad)
+g_qs   <- glm(Freq ~ prev + act + par,                 family = poisson, data = cuad)
+g_unif <- glm(Freq ~ prev + act + I(i * j) + diagonal, family = poisson, data = cuad)
+anova(g_sim, g_qs, test = "LRT")                      # homogeneidad marginal
+```
+
+# Logística (puente con el log-lineal, Unidad 2.2) {#logistica}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y01 ~ x, family = binomial, data = cartera)` | `glm(y01 ~ x, family = binomial, data = cartera)` | `exp(coef)` = *odds ratio*; coincide con el del log-lineal saturado |
+| Regularización (fijos) | `cv.glmnet(X, cartera$y01, family = "binomial", type.measure = "auc")` | `type.measure = "deviance"`, `"class"` o `"mse"` (índice de Brier) | Con `"auc"`, $\lambda$ maximiza el AUC fuera de muestra |
+| Ajuste (mixto) | `glmmTMB(y01 ~ x + (1 \| agencia), family = binomial, data = cartera)` | `lme4::glmer(...)` | Mismas estructuras que en la @tbl-estructuras |
+| Regularización (mixto) | *Lasso*: `glmmLasso(fix = y01 ~ x, rnd = list(agencia = ~1), family = binomial(link = "logit"), lambda = l, data = cartera)` | *Ridge*: `glmmTMB` con `priors` | Mismas limitaciones de `glmmLasso` que en la @tbl-poisson |
+
+: Logística. {#tbl-logistica}
+
+## En la práctica
+
+**Efectos fijos.** La logística sobre el indicador de alguna asistencia reproduce los *odds ratios* del
+log-lineal saturado de la tabla zona × asistencia (Unidad 2.2):
+
+```{r}
+#| label: comp-logit-fijo
+m_logit <- glmmTMB(asistencia ~ zona_circulacion, family = binomial, data = cart_tab)
+exp(fixef(m_logit)$cond)                 # odds ratios
+```
+
+**Regularización.** Con `type.measure = "auc"`, `cv.glmnet` elige $\lambda$ por el AUC fuera de muestra:
+
+```{r}
+#| label: comp-logit-reg
+cv_logit <- cv.glmnet(X, cart_tab$asistencia, family = "binomial",
+                      type.measure = "auc", foldid = bloque)
+coef(cv_logit, s = "lambda.min")
+```
+
+**Modelo mixto y su regularización.** Intercepto aleatorio por agencia; para regularizar, las mismas dos
+vías que en la Poisson:
+
+```{r}
+#| label: comp-logit-mixto
+m_logit_mix <- glmmTMB(asistencia ~ zona_circulacion + (1 | agencia),
+                       family = binomial, data = cart_tab)
+VarCorr(m_logit_mix)
+
+# lasso con efectos aleatorios (glmmLasso; no probado en esta preparación)
+m_logit_lasso <- glmmLasso(fix = asistencia ~ zona_circulacion + tipo_vehiculo + uso,
+                           rnd = list(agencia = ~1), family = binomial(link = "logit"),
+                           lambda = 10, data = cart_tab)
+```
+
+## Con las otras funciones del caso
+
+```{r}
+#| label: comp-logit-alt
+g_logit <- glm(asistencia ~ zona_circulacion, family = binomial, data = cart_tab)
+broom::tidy(g_logit, exponentiate = TRUE, conf.int = TRUE)          # odds ratios
+
+g_logit_mix <- glmer(asistencia ~ zona_circulacion + (1 | agencia),
+                     family = binomial, data = cart_tab)
+broom.mixed::tidy(g_logit_mix, effects = "fixed", exponentiate = TRUE, conf.int = TRUE)
+```
+
+# Quasi-Poisson (Unidad 2.3) {#quasi}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glm(y ~ x + offset(log(exposicion)), family = quasipoisson, data = cartera)` | **No disponible en `glmmTMB`** (`"quasi" families cannot be used in glmmTMB`) | Lo más parecido en `glmmTMB` es `nbinom1` (varianza lineal en $\mu$), pero es una verosimilitud completa, no una cuasi-verosimilitud |
+| Regularización (fijos) | `cv.glmnet(X, cartera$y, family = "poisson", offset = log(cartera$exposicion))` | `family = quasipoisson()` como objeto de familia | Las estimaciones son las de la Poisson: la regularización no cambia. Lo que no sirve son sus errores estándar (y `glmnet` no los da) |
+| Ajuste (mixto) | No hay versión mixta *quasi* en la pila del curso | Para sobredispersión con agrupación: OLRE o binomial negativa mixta | — |
+| Regularización (mixto) | — | — | — |
+
+: Quasi-Poisson. {#tbl-quasi}
+
+## En la práctica
+
+La quasi-Poisson solo se ajusta con `glm()`. Sus coeficientes son los de la Poisson; lo que cambia es la
+dispersión $\hat\phi$, que multiplica los errores estándar por $\sqrt{\hat\phi}$ (Unidad 2.3). Por eso su
+regularización es la de la Poisson: el *lasso* elige las mismas variables.
+
+```{r}
+#| label: comp-quasi
+f_danos <- n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+  offset(log(exposicion))
+m_quasi <- glm(f_danos, family = quasipoisson, data = cartera)
+summary(m_quasi)$dispersion             # phi estimado
+
+cv_quasi <- cv.glmnet(X, cartera$n_danos, family = "poisson",
+                      offset = log(cartera$exposicion), foldid = bloque)
+coef(cv_quasi, s = "lambda.min")
+```
+
+## Con las otras funciones del caso
+
+La quasi-Poisson solo existe en `glm()`, que es la función principal. Lo que se puede añadir es cómo
+llegar a su dispersión desde la Poisson, con las herramientas de diagnóstico de la Unidad 2.3:
+
+```{r}
+#| label: comp-quasi-alt
+g_pois_danos <- glm(f_danos, family = poisson, data = cartera)
+sum(residuals(g_pois_danos, type = "pearson")^2) / df.residual(g_pois_danos)  # = phi de la quasi
+performance::check_overdispersion(g_pois_danos)
+AER::dispersiontest(g_pois_danos)                     # contraste de Cameron y Trivedi
+broom::tidy(m_quasi, exponentiate = TRUE, conf.int = TRUE)
+```
+
+# Binomial negativa NB2 y NB1 (Unidad 2.3) {#nb}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | NB2: `glmmTMB(y ~ x + offset(log(exposicion)), family = nbinom2, data = cartera)`; NB1: `family = nbinom1` | NB2: `MASS::glm.nb(y ~ x + offset(log(exposicion)), data = cartera)` | NB2: $\mathrm{Var} = \mu + \mu^2/\theta$, y `sigma(m)` es la $\theta$ de `glm.nb`. NB1: $\mathrm{Var} = \mu(1+\alpha)$, y `sigma(m)` es $\alpha$ |
+| Regularización (fijos) | NB2: `cv.glmnet(X, cartera$y, family = MASS::negative.binomial(theta = th), offset = log(cartera$exposicion))`, con `th <- MASS::glm.nb(...)$theta` | NB2 con $\theta$ estimado: `mpath::glmregNB()` | $\theta$ fijo de antemano en `glmnet`. NB1: no hay objeto de familia para `glmnet` (solo *ridge*, fila siguiente) |
+| Ajuste (mixto) | `glmmTMB(y ~ x + offset(log(exposicion)) + (1 \| agencia), family = nbinom2, data = cartera)` | `lme4::glmer.nb(...)` (solo NB2) | Mismas estructuras que en la @tbl-estructuras |
+| Regularización *ridge* (fijos y mixto) | `glmmTMB(...)` con `family = nbinom2` o `nbinom1` y `priors` sobre `class = "fixef"` | — | Única vía para la NB1 y para la NB mixta: `glmmLasso` no documenta la binomial negativa |
+
+: Binomial negativa. {#tbl-nb}
+
+## En la práctica
+
+**Efectos fijos.** Las dos parametrizaciones de la binomial negativa difieren en cómo crece la varianza
+con la media (Unidad 2.3). `sigma()` devuelve su parámetro de dispersión: $\theta$ en la NB2 y $\alpha$
+en la NB1.
+
+```{r}
+#| label: comp-nb-fijo
+m_nb2 <- glmmTMB(f_danos, family = nbinom2, data = cartera)   # Var = mu + mu^2 / theta
+m_nb1 <- glmmTMB(f_danos, family = nbinom1, data = cartera)   # Var = mu (1 + alpha)
+c(theta_NB2 = sigma(m_nb2), alpha_NB1 = sigma(m_nb1))
+AIC(m_nb2, m_nb1)
+
+m_nb2_mass <- MASS::glm.nb(f_danos, data = cartera)          # la NB2 con MASS: misma theta
+```
+
+**Regularización.** `glmnet` regulariza la NB2 como objeto de familia, con $\theta$ fijado de antemano;
+lo natural es tomar la que estima `glm.nb` sin penalizar. `mpath::glmregNB()` estima $\theta$ a la vez
+que penaliza.
+
+```{r}
+#| label: comp-nb-reg
+th <- m_nb2_mass$theta
+cv_nb <- cv.glmnet(X, cartera$n_danos, family = MASS::negative.binomial(theta = th),
+                   offset = log(cartera$exposicion), foldid = bloque)
+coef(cv_nb, s = "lambda.min")
+
+# NB2 penalizada con theta estimado (mpath; no probado en esta preparación;
+# el uso del offset en la fórmula está sin verificar [VERIFICAR])
+m_nb_mpath <- mpath::glmregNB(f_danos, data = cartera)
+```
+
+**Modelo mixto.** La misma NB con un intercepto aleatorio por agencia. `glmer.nb` hace la NB2 mixta, pero
+con estos predictores sin tipificar da avisos de convergencia, mientras que `glmmTMB` converge sin
+ellos.
+
+```{r}
+#| label: comp-nb-mixto
+m_nb_mix <- glmmTMB(update(f_danos, . ~ . + (1 | agencia)), family = nbinom2, data = cartera)
+VarCorr(m_nb_mix)
+m_nb_glmer <- glmer.nb(update(f_danos, . ~ . + (1 | agencia)), data = cartera)
+```
+
+**Regularización *ridge* (fijos y mixto).** Es la misma llamada con o sin efecto aleatorio, y la única vía
+para la NB1:
+
+```{r}
+#| label: comp-nb-ridge
+m_nb1_ridge    <- update(m_nb1,    priors = prior_ridge)   # requiere priors [VERIFICAR]
+m_nb_mix_ridge <- update(m_nb_mix, priors = prior_ridge)
+```
+
+## Con las otras funciones del caso
+
+`MASS::glm.nb()` es la alternativa para la NB2 con efectos fijos (`m_nb2_mass`, más arriba) y
+`lme4::glmer.nb()`, para la NB2 mixta (`m_nb_glmer`). La NB1 solo está en `glmmTMB`.
+
+```{r}
+#| label: comp-nb-alt
+summary(m_nb2_mass)
+c(theta_glm.nb = m_nb2_mass$theta, theta_glmmTMB = sigma(m_nb2))     # la misma theta
+broom::tidy(m_nb2_mass, exponentiate = TRUE, conf.int = TRUE)
+
+getME(m_nb_glmer, "glmer.nb.theta")                   # theta de la NB2 mixta
+VarCorr(m_nb_glmer)
+```
+
+# Ceros inflados: ZIP y ZINB (Unidad 2.4) {#zi}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y ~ x + offset(log(exposicion)), ziformula = ~ z, family = poisson, data = cartera)`; ZINB con `family = nbinom2` | `pscl::zeroinfl(y ~ x + offset(log(exposicion)) \| z, dist = "poisson", data = cartera)` | `ziformula` modela la probabilidad del cero estructural (enlace logit) |
+| Regularización (fijos) | `mpath::zipath(y ~ x + offset(log(exposicion)) \| z, family = "poisson", data = cartera)` (o `family = "negbin"`) | — | *Lasso* o *elastic-net* en las dos partes, cada una con su $\lambda$ (`lambda.count`, `lambda.zero`) |
+| Ajuste (mixto) | `glmmTMB(y ~ x + offset(log(exposicion)) + (1 \| agencia), ziformula = ~ z + (1 \| agencia), family = poisson, data = cartera)` | — | El efecto aleatorio puede ir en el conteo, en los ceros o en ambos |
+| Regularización *ridge* (fijos y mixto) | `glmmTMB(...)` con `priors` sobre `class = "fixef"` y `class = "fixef_zi"` | — | Sin *lasso* para el modelo mixto con ceros inflados |
+
+: Ceros inflados. {#tbl-zi}
+
+## En la práctica
+
+**Efectos fijos.** `n_fraude` mezcla pólizas que nunca levantan revisión con las que todavía no lo han
+hecho (Unidad 2.4). La fórmula principal modela el conteo y `ziformula`, la probabilidad del cero
+estructural:
+
+```{r}
+#| label: comp-zi-fijo
+f_fraude <- n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion))
+m_zip  <- glmmTMB(f_fraude, ziformula = ~ uso + potencia_cv, family = poisson, data = cartera)
+m_zinb <- update(m_zip, family = nbinom2)
+fixef(m_zip)                            # $cond: conteo (log); $zi: ceros estructurales (logit)
+AIC(m_zip, m_zinb)
+
+# alternativa: pscl
+m_zip_pscl <- pscl::zeroinfl(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                               offset(log(exposicion)) | uso + potencia_cv,
+                             dist = "poisson", data = cartera)
+```
+
+**Regularización.** `mpath::zipath` penaliza las dos partes, cada una con su $\lambda$. En la fórmula, lo
+que va antes de `|` es el conteo y lo que va después, los ceros.
+
+```{r}
+#| label: comp-zi-reg
+# mpath: no está en la pila de la guía; no probado en esta preparación
+m_zip_pen <- mpath::zipath(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                             offset(log(exposicion)) | uso + potencia_cv + zona_circulacion,
+                           family = "poisson", data = cartera)
+```
+
+**Modelo mixto.** El efecto aleatorio puede ir en el conteo, en los ceros o en los dos. En `n_fraude` la
+agencia no interviene en el proceso que generó los datos: el ejemplo enseña la sintaxis, con el efecto en
+la parte de ceros. Ponerlo también en el conteo es añadir `+ (1 | agencia)` a la fórmula principal.
+
+```{r}
+#| label: comp-zi-mixto
+m_zip_mix <- glmmTMB(f_fraude, ziformula = ~ uso + potencia_cv + (1 | agencia),
+                     family = poisson, data = cartera)
+VarCorr(m_zip_mix)
+```
+
+**Regularización *ridge* (fijos y mixto).** Una prior por cada parte del modelo:
+
+```{r}
+#| label: comp-zi-ridge
+prior_ridge_zi <- data.frame(prior = "normal(0,1)", class = c("fixef", "fixef_zi"), coef = "")
+m_zip_ridge     <- update(m_zip,     priors = prior_ridge_zi)   # requiere priors [VERIFICAR]
+m_zip_mix_ridge <- update(m_zip_mix, priors = prior_ridge_zi)
+```
+
+## Con las otras funciones del caso
+
+Con `pscl`, el conteo y los ceros se separan con `|` en una sola fórmula; la ZINB se pide con
+`dist = "negbin"`. `pscl` no tiene efectos aleatorios: el modelo mixto con ceros inflados solo se
+ajusta con `glmmTMB`.
+
+```{r}
+#| label: comp-zi-alt
+summary(m_zip_pscl)
+m_zinb_pscl <- pscl::zeroinfl(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                                offset(log(exposicion)) | uso + potencia_cv,
+                              dist = "negbin", data = cartera)
+AIC(m_zip_pscl, m_zinb_pscl)
+# probabilidades predichas de cada conteo, para comparar ceros observados y esperados
+colSums(predict(m_zip_pscl, type = "prob"))[1:3]
+```
+
+# Modelos *hurdle* (Unidad 2.4) {#hurdle}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y ~ x + offset(log(exposicion)), ziformula = ~ z, family = truncated_poisson, data = cartera)`; NB con `family = truncated_nbinom2` | `pscl::hurdle(y ~ x + offset(log(exposicion)) \| z, dist = "poisson", data = cartera)` | Aquí `ziformula` es la barrera: modela la probabilidad de $Y = 0$ |
+| Regularización (fijos) | Barrera: `cv.glmnet(Z, as.numeric(cartera$y > 0), family = "binomial")`. Parte truncada: *ridge* con `glmmTMB(..., family = truncated_poisson)` y `priors` | — | La verosimilitud se separa en dos partes que se regularizan por separado. Sin herramienta verificada para *lasso* en la parte truncada |
+| Ajuste (mixto) | `glmmTMB(y ~ x + offset(log(exposicion)) + (1 \| agencia), ziformula = ~ z + (1 \| agencia), family = truncated_poisson, data = cartera)` | — | Efecto aleatorio en la barrera, en la parte truncada o en ambas |
+| Regularización (mixto) | Barrera: `glmmLasso(..., family = binomial(link = "logit"))`. Parte truncada: *ridge* con `priors` | *Ridge* en las dos partes: `priors` con `class = "fixef"` y `"fixef_zi"` | Mismas limitaciones de `glmmLasso` que en la @tbl-poisson |
+
+: *Hurdle*. {#tbl-hurdle}
+
+## En la práctica
+
+**Efectos fijos.** En el *hurdle*, una barrera decide si hay alguna revisión y una Poisson truncada en
+cero cuenta cuántas, cuando las hay. En `glmmTMB` la barrera va en `ziformula` y la familia es la
+truncada:
+
+```{r}
+#| label: comp-hurdle-fijo
+m_hp  <- glmmTMB(f_fraude, ziformula = ~ uso + potencia_cv, family = truncated_poisson, data = cartera)
+m_hnb <- update(m_hp, family = truncated_nbinom2)
+fixef(m_hp)                             # $zi: probabilidad de Y = 0 (logit)
+
+m_hp_pscl <- pscl::hurdle(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                            offset(log(exposicion)) | uso + potencia_cv,
+                          dist = "poisson", data = cartera)
+```
+
+**Regularización.** La verosimilitud del *hurdle* se separa en sus dos partes, que pueden regularizarse
+por separado. La barrera es una logística sobre «alguna revisión», y se penaliza con `glmnet`:
+
+```{r}
+#| label: comp-hurdle-reg
+Z <- model.matrix(~ uso + potencia_cv + zona_circulacion + tipo_vehiculo + edad_conductor,
+                  data = cartera)[, -1]
+cv_barrera <- cv.glmnet(Z, as.numeric(cartera$n_fraude > 0), family = "binomial", foldid = bloque)
+coef(cv_barrera, s = "lambda.min")
+
+# parte truncada: solo ridge
+m_hp_ridge <- update(m_hp, priors = prior_ridge)   # requiere priors [VERIFICAR]
+```
+
+**Modelo mixto y su regularización.** Como en los ceros inflados, el efecto aleatorio puede ir en la
+barrera, en el conteo truncado o en los dos:
+
+```{r}
+#| label: comp-hurdle-mixto
+m_hp_mix <- glmmTMB(f_fraude, ziformula = ~ uso + potencia_cv + (1 | agencia),
+                    family = truncated_poisson, data = cartera)
+VarCorr(m_hp_mix)
+
+m_hp_mix_ridge <- update(m_hp_mix, priors = prior_ridge_zi)   # requiere priors [VERIFICAR]
+```
+
+## Con las otras funciones del caso
+
+```{r}
+#| label: comp-hurdle-alt
+summary(m_hp_pscl)
+m_hnb_pscl <- pscl::hurdle(n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo +
+                             offset(log(exposicion)) | uso + potencia_cv,
+                           dist = "negbin", data = cartera)
+AIC(m_hp_pscl, m_hnb_pscl)
+```
+
+Un matiz de signo al comparar con `glmmTMB`: `pscl::hurdle` modela en la barrera la probabilidad de
+**superarla** ($Y > 0$), y `glmmTMB` la de $Y = 0$, así que los coeficientes de la barrera salen con el
+signo cambiado. Como en los ceros inflados, el *hurdle* mixto solo se ajusta con `glmmTMB`.
+
+# Riesgos a trozos y fragilidad (Unidad 2.6) {#trozos}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y ~ tramo + x + offset(log(en_riesgo)), family = poisson, data = pp)` | `glm(...)` con la misma fórmula | `exp(coef)` = *hazard ratio*. Con tramos de igual longitud sobra el *offset*. `pp` sale de `survSplit()` o de la función de expansión del curso |
+| Regularización (fijos) | `cv.glmnet(X_pp, pp$y, family = "poisson", offset = log(pp$en_riesgo), penalty.factor = pf)` | — | `pf = 0` en las columnas de `tramo`: así no se encoge el *hazard* base |
+| Ajuste (mixto) = fragilidad | `glmmTMB(y ~ tramo + x + offset(log(en_riesgo)) + (1 \| agencia), family = poisson, data = pp)` | `lme4::glmer(...)` | La varianza del efecto aleatorio es la de una fragilidad lognormal |
+| Regularización (mixto) | *Lasso*: `glmmLasso(fix = y ~ tramo + x, rnd = list(agencia = ~1), family = poisson(link = "log"), lambda = l, data = pp)` | *Ridge*: `glmmTMB` con `priors` | En `glmmLasso`, `tramo` también se penaliza (el *hazard* base se encoge) |
+
+: Riesgos a trozos. {#tbl-trozos}
+
+## En la práctica
+
+**Datos persona-periodo.** En la cartera de teoría, `tiempo_primer_sin` es el tramo en que se observa el
+primer siniestro, o el último tramo seguido si no lo hubo. Cada póliza se despliega en una fila por tramo
+en riesgo, y `y` vale 1 solo en el tramo del siniestro. Los tramos son de igual longitud, así que no hace
+falta *offset* (Unidad 2.6).
+
+```{r}
+#| label: comp-pp
+K  <- attr(cartera, "verdad")$K          # número de tramos del periodo
+nt <- cartera$tiempo_primer_sin
+pp <- cartera[rep(seq_len(nrow(cartera)), nt), ]
+pp$tramo <- factor(sequence(nt), levels = seq_len(K))
+pp$y     <- as.integer(sequence(nt) == rep(nt, nt) & rep(cartera$evento, nt) == 1)
+c(filas = nrow(pp), eventos = sum(pp$y), eventos_en_cartera = sum(cartera$evento))
+```
+
+Con tiempo continuo, `survSplit()` corta en tramos y el tiempo en riesgo entra como *offset*:
+`survSplit(Surv(t, evento) ~ ., data = datos, cut = cortes, episode = "tramo")`, y en el modelo,
+`+ offset(log(en_riesgo))`.
+
+**Efectos fijos.** Los coeficientes de `tramo` dibujan el *hazard* base y los de las covariables se leen,
+exponenciados, como *hazard ratios*:
+
+```{r}
+#| label: comp-trozos-fijo
+f_pw <- y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion
+m_pw <- glmmTMB(f_pw, family = poisson, data = pp)
+exp(fixef(m_pw)$cond)                   # tramo: hazard base relativo; resto: HR
+```
+
+**Regularización.** Con `penalty.factor` igual a 0 en las columnas de `tramo`, el *hazard* base no se
+encoge y solo compiten las covariables:
+
+```{r}
+#| label: comp-trozos-reg
+X_pp  <- model.matrix(~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo +
+                        zona_circulacion, data = pp)[, -1]
+pf_pp <- ifelse(grepl("^tramo", colnames(X_pp)), 0, 1)
+set.seed(SEMILLA)
+cv_pw <- cv.glmnet(X_pp, pp$y, family = "poisson", penalty.factor = pf_pp)
+coef(cv_pw, s = "lambda.min")
+```
+
+En `pp` cada póliza ocupa varias filas, y el reparto aleatorio de `cv.glmnet` puede separarlas en
+bloques distintos. Para que una póliza caiga entera en un bloque, se asigna el bloque por póliza:
+`foldid = bloque[match(pp$id_poliza, cartera$id_poliza)]`.
+
+**Modelo mixto: fragilidad.** Un intercepto aleatorio por agencia en el modelo a trozos es una
+fragilidad lognormal compartida por las pólizas de cada agencia:
+
+```{r}
+#| label: comp-trozos-mixto
+m_frag <- glmmTMB(update(f_pw, . ~ . + (1 | agencia)), family = poisson, data = pp)
+VarCorr(m_frag)
+```
+
+**Regularización del modelo mixto.**
+
+```{r}
+#| label: comp-trozos-mixto-reg
+# lasso (glmmLasso; no probado). Ojo: tramo también se penaliza
+m_frag_lasso <- glmmLasso(fix = y ~ tramo + edad_conductor + antiguedad_carnet + sexo +
+                            tipo_vehiculo + zona_circulacion,
+                          rnd = list(agencia = ~1), family = poisson(link = "log"),
+                          lambda = 10, data = pp)
+
+# ridge (glmmTMB con priors) [VERIFICAR]
+m_frag_ridge <- update(m_frag, priors = prior_ridge)
+```
+
+## Con las otras funciones del caso
+
+Con `glm()` y `glmer()`, como en la Unidad 2.6:
+
+```{r}
+#| label: comp-trozos-alt
+g_pw <- glm(f_pw, family = poisson, data = pp)
+broom::tidy(g_pw, exponentiate = TRUE, conf.int = TRUE)       # tramo: hazard base; resto: HR
+
+g_frag <- glmer(update(f_pw, . ~ . + (1 | agencia)), family = poisson, data = pp)
+VarCorr(g_frag)
+```
+
+# Tiempo discreto con enlace `cloglog` (Unidad 2.6) {#cloglog}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `glmmTMB(y ~ tramo + x, family = binomial(link = "cloglog"), data = pp)` | `glm(...)` con la misma fórmula | Mismo *hazard ratio* que el Poisson cuando los tramos son cortos |
+| Regularización (fijos) | `cv.glmnet(X_pp, pp$y, family = binomial(link = "cloglog"), penalty.factor = pf)` | — | Objeto de familia: más lento que las familias integradas |
+| Ajuste (mixto) | `glmmTMB(y ~ tramo + x + (1 \| agencia), family = binomial(link = "cloglog"), data = pp)` | `lme4::glmer(...)` | — |
+| Regularización (mixto) | *Ridge*: `glmmTMB` con `priors` | *Lasso*: `glmmLasso` con `family = binomial(link = "cloglog")` [VERIFICAR] | La documentación de `glmmLasso` admite familias de `glm()`, pero no muestra el enlace `cloglog` |
+
+: Tiempo discreto. {#tbl-cloglog}
+
+## En la práctica
+
+El modelo de tiempo discreto usa los mismos datos `pp` con otra familia: binomial con enlace `cloglog`.
+Con tramos cortos, sus *hazard ratios* coinciden con los del modelo a trozos.
+
+```{r}
+#| label: comp-cloglog
+m_cll <- glmmTMB(f_pw, family = binomial(link = "cloglog"), data = pp)
+exp(fixef(m_cll)$cond)
+
+# regularización: objeto de familia en glmnet (más lento que las familias integradas)
+set.seed(SEMILLA)
+cv_cll <- cv.glmnet(X_pp, pp$y, family = binomial(link = "cloglog"),
+                    penalty.factor = pf_pp, nfolds = 5)
+coef(cv_cll, s = "lambda.min")
+
+# modelo mixto
+m_cll_mix <- glmmTMB(update(f_pw, . ~ . + (1 | agencia)),
+                     family = binomial(link = "cloglog"), data = pp)
+VarCorr(m_cll_mix)
+
+# regularización del modelo mixto: ridge con priors [VERIFICAR]
+m_cll_mix_ridge <- update(m_cll_mix, priors = prior_ridge)
+```
+
+## Con las otras funciones del caso
+
+```{r}
+#| label: comp-cloglog-alt
+g_cll <- glm(f_pw, family = binomial(link = "cloglog"), data = pp)
+broom::tidy(g_cll, exponentiate = TRUE, conf.int = TRUE)
+
+g_cll_mix <- glmer(update(f_pw, . ~ . + (1 | agencia)),
+                   family = binomial(link = "cloglog"), data = pp)
+VarCorr(g_cll_mix)
+```
+
+# Cox y Kaplan–Meier (Unidad 2.6) {#cox}
+
+| Tarea | Función principal | Alternativas | Notas |
+|:--|:--|:--|:--|
+| Ajuste (fijos) | `survival::coxph(Surv(tiempo, evento) ~ x, data = cartera, ties = "breslow")`; curva con `survival::survfit(Surv(tiempo, evento) ~ g, data = cartera)` | — | No son GLM: no se ajustan con `glmmTMB`. Kaplan–Meier no tiene coeficientes |
+| Regularización (fijos) | `cv.glmnet(X, survival::Surv(cartera$tiempo, cartera$evento), family = "cox")` | `type.measure = "C"` (índice C de Harrell) | — |
+| Ajuste (mixto) | `survival::coxph(Surv(tiempo, evento) ~ x + frailty(agencia), data = cartera)` | — | Fragilidad gamma por defecto |
+| Regularización (mixto) | Sin herramienta verificada | — | — |
+
+: Cox y Kaplan–Meier. {#tbl-cox}
+
+## En la práctica
+
+Kaplan–Meier y Cox trabajan sobre la cartera original, una fila por póliza, con el tiempo y el
+indicador de evento en `Surv()`:
+
+```{r}
+#| label: comp-cox
+km <- survfit(Surv(tiempo_primer_sin, evento) ~ zona_circulacion, data = cartera)
+plot(km, col = 1:3, xlab = "tramo", ylab = "S(t)")
+
+m_cox <- coxph(Surv(tiempo_primer_sin, evento) ~ edad_conductor + antiguedad_carnet + sexo +
+                 tipo_vehiculo + zona_circulacion, data = cartera, ties = "breslow")
+exp(coef(m_cox))                         # hazard ratios
+
+# regularización: la respuesta de glmnet es el objeto Surv
+X_cox <- model.matrix(~ edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo +
+                        zona_circulacion, data = cartera)[, -1]
+set.seed(SEMILLA)
+cv_cox <- cv.glmnet(X_cox, Surv(cartera$tiempo_primer_sin, cartera$evento),
+                    family = "cox", type.measure = "C")
+coef(cv_cox, s = "lambda.min")
+
+# modelo mixto: fragilidad gamma por agencia
+m_cox_frag <- coxph(Surv(tiempo_primer_sin, evento) ~ edad_conductor + antiguedad_carnet + sexo +
+                      tipo_vehiculo + zona_circulacion + frailty(agencia),
+                    data = cartera, ties = "breslow")
+m_cox_frag
+```
+
+## Con las otras funciones del caso
+
+Kaplan–Meier y Cox ya se ajustan con `survival`, la función principal. Lo que se puede añadir es la
+comprobación de riesgos proporcionales de la Unidad 2.6 y la curva de supervivencia en formato de tabla:
+
+```{r}
+#| label: comp-cox-alt
+cox.zph(m_cox)                                        # residuos de Schoenfeld: proporcionalidad
+summary(km, times = 1:K)                              # S(t) por tramo y zona
+broom::tidy(m_cox, exponentiate = TRUE, conf.int = TRUE)
+```
+
+# Herramientas comunes sobre un `glmmTMB`
+
+| Para | Función |
+|:--|:--|
+| Resumen y coeficientes | `summary(m)`, `fixef(m)` |
+| Intervalos | `confint(m)` (Wald por defecto); exponenciar para IRR, OR o HR |
+| Dispersión y varianzas | `sigma(m)`, `VarCorr(m)`, `ranef(m)` |
+| Comparar modelos | `AIC(m)`, `BIC(m)`, `anova(m1, m2)` (LRT), `drop1(m, test = "Chisq")` |
+| Predecir | `predict(m, newdata, type = "response")`; marginal (sin efectos aleatorios) con `re.form = NA` |
+| Diagnosticar | `DHARMa::simulateResiduals(m)` |
+
+: Funciones de uso común con un objeto `glmmTMB`. {#tbl-herramientas}
+
+Aplicadas a uno de los modelos anteriores:
+
+```{r}
+#| label: comp-herramientas
+summary(m_pois_mix)
+fixef(m_pois_mix)
+exp(confint(m_pois_mix))
+VarCorr(m_pois_mix)
+lapply(ranef(m_pois_mix)$cond, head)   # un elemento por nivel de agrupación
+AIC(m_pois_mix); BIC(m_pois_mix)
+drop1(m_pois_mix, test = "Chisq")
+res <- DHARMa::simulateResiduals(m_pois_mix)
+plot(res)
+```
+
+# Lo que no se unifica
+
+- **Quasi-Poisson**: se queda en `glm`; `glmmTMB` no admite familias *quasi*.
+- ***Lasso***: `glmmTMB` solo regulariza con *ridge* (`priors`). Para seleccionar variables hace falta
+  `glmnet` (sin efectos aleatorios), `glmmLasso` (con efectos aleatorios, con limitaciones) o
+  `mpath::zipath` (ceros inflados).
+- **Cox y Kaplan–Meier**: se quedan en `survival`.
+- Ni `glmmLasso` ni `mpath` están en la pila de software de la guía, y no se han probado en la
+  preparación de este compendio: conviene comprobarlos antes de usarlos.
+
+# Para ampliar
+
+**Paquetes (páginas de CRAN, con manuales y viñetas)**
+
+- `glmmTMB`: <https://cran.r-project.org/package=glmmTMB> · viñeta de *priors*:
+  <https://cran.r-universe.dev/glmmTMB/doc/priors.html> · cómo citarlo:
+  <https://www.stats.bris.ac.uk/R/web/packages/glmmTMB/citation.html>
+- `glmnet`: <https://cran.r-project.org/package=glmnet> · introducción (función objetivo por familia):
+  <https://glmnet.stanford.edu/articles/glmnet.html> · el argumento `family`:
+  <https://trevorhastie.r-universe.dev/glmnet/doc/glmnetFamily.html>
+- `lme4`: <https://cran.r-project.org/package=lme4>
+- `MASS`: <https://cran.r-project.org/package=MASS>
+- `pscl`: <https://cran.r-project.org/package=pscl>
+- `survival`: <https://cran.r-project.org/package=survival>
+- `glmmLasso`: <https://cran.r-project.org/package=glmmLasso> · ayuda:
+  <https://search.r-project.org/CRAN/refmans/glmmLasso/html/glmmLasso.html>
+- `mpath`: <https://cran.r-project.org/package=mpath> · ayuda de `zipath()`:
+  <https://r-packages.io/packages/mpath/zipath>
+
+**Referencias**
+
+- Bates, D., Mächler, M., Bolker, B., & Walker, S. (2015). Fitting linear mixed-effects models using
+  lme4. *Journal of Statistical Software, 67*(1), 1–48. <https://doi.org/10.18637/jss.v067.i01>
+- Bengio, Y., & Grandvalet, Y. (2004). No unbiased estimator of the variance of K-fold
+  cross-validation. *Journal of Machine Learning Research, 5*, 1089–1105.
+  <https://www.jmlr.org/papers/v5/grandvalet04a.html>
+- Brooks, M. E., Kristensen, K., van Benthem, K. J., Magnusson, A., Berg, C. W., Nielsen, A., Skaug,
+  H. J., Mächler, M., & Bolker, B. M. (2017). glmmTMB balances speed and flexibility among packages for
+  zero-inflated generalized linear mixed modeling. *The R Journal, 9*(2), 378–400.
+  <https://doi.org/10.32614/RJ-2017-066>
+- Friedman, J. H., Hastie, T., & Tibshirani, R. (2010). Regularization paths for generalized linear
+  models via coordinate descent. *Journal of Statistical Software, 33*(1), 1–22.
+  <https://doi.org/10.18637/jss.v033.i01>
+- Groll, A., & Tutz, G. (2014). Variable selection for generalized linear mixed models by
+  L1-penalized estimation. *Statistics and Computing, 24*(2), 137–154.
+- Tay, J. K., Narasimhan, B., & Hastie, T. (2023). Elastic net regularization paths for all
+  generalized linear models. *Journal of Statistical Software, 106*(1), 1–31.
+  <https://doi.org/10.18637/jss.v106.i01>
+- Wang, Z., Ma, S., Wang, C.-Y., Zappitelli, M., Devarajan, P., & Parikh, C. R. (2014). EM for
+  regularized zero-inflated regression models with applications to postoperative morbidity after
+  cardiac surgery in children. *Statistics in Medicine, 33*(29), 5192–5208.
