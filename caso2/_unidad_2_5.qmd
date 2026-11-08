@@ -1124,13 +1124,10 @@ c(LR = LR_olre, p_corregido = 0.5 * pchisq(LR_olre, 1, lower.tail = FALSE))
 ```
 
 Con $\mathrm{LR}=$ `r round(LR_olre, 1)`, la sobredispersión es indudable. Falta comprobar que el OLRE la
-ha absorbido, con los residuos simulados de `DHARMa`. Aquí hay que simular con cuidado. `DHARMa` simula
-condicionando a los efectos aleatorios estimados, lo que en el GLMM es razonable: cada efecto de agencia
-lo comparten unas `r round(nrow(cartera) / nrow(re_df))` pólizas. En el OLRE, en cambio, cada $\hat v_i$ se estima con una sola
-observación, la propia $y_i$. Simular «con su $\hat v_i$» es simular alrededor de un valor que ya
-incorpora $y_i$, así que cada observación caería en el centro de sus simulaciones y los residuos se
-apiñarían en torno a 0.5, aunque el modelo fuera correcto. La comparación adecuada es **incondicional**:
-en cada réplica, cada póliza recibe un impulso nuevo, $v_i\sim N(0,\hat\sigma^2_{\text{obs}})$, y se
+ha absorbido, con los residuos simulados de `DHARMa`. Pero aquí **no** sirve `simulateResiduals()`, que
+usamos en la [§5.5](#sec-u25-diagnostico): simularía con los impulsos predichos $\hat v_i$, y en el OLRE eso
+falsea el diagnóstico. El recuadro que sigue a los resultados explica por qué y lo comprueba. Simulamos de
+forma **incondicional**: en cada réplica, cada póliza recibe un impulso nuevo, $v_i\sim N(0,\hat\sigma^2_{\text{obs}})$, y se
 simula $y_i\sim\operatorname{Poisson}\big(\hat\lambda_i e^{v_i}\big)$, con
 $\hat\lambda_i=e_i\exp(\mathbf x_i^{\top}\hat{\boldsymbol\beta})$. Simulamos así a mano y entregamos las
 réplicas a `DHARMa` con `createDHARMa()` (@fig-u25-olre-diag):
@@ -1168,6 +1165,75 @@ Con la simulación incondicional, ningún contraste rechaza al 5 %: uniformidad 
 cuantiles del panel derecho no se apartan de la horizontal: el OLRE ha absorbido la sobredispersión de
 `n_danos` que la Poisson dejaba fuera, y reproduce también su proporción de ceros. El de dispersión es el
 que más se acerca al umbral, sin llegar a él.
+
+::: {.callout-important}
+## Por qué el OLRE exige otra simulación (y el GLMM de la §5.5 no)
+**Qué es un residuo simulado.** Para cada observación, `DHARMa` simula muchas respuestas del modelo y
+anota en qué posición cae la observada entre ellas: el residuo $r_i\in(0,1)$ es la proporción de
+simulaciones por debajo de $y_i$, con los empates repartidos al azar. Si el modelo es correcto **y las
+simulaciones no dependen de $y_i$**, $r_i$ se distribuye como una uniforme en $(0,1)$.
+
+**Simular condicionando es fijar los efectos predichos.** `simulateResiduals()` simula, desde su versión
+0.5.0, con los efectos aleatorios predichos: $y_i^{*}\sim\operatorname{Poisson}\big(\hat\lambda_i e^{\hat u}\big)$.
+Pero $\hat u$ se predijo con los datos, $y_i$ incluida. Que el residuo valga depende de **cuánto pesa
+$y_i$ en su propio efecto predicho**:
+
+- **En el GLMM** de `n_gestiones`, el $\hat u^{\text{ag}}_j$ de una agencia se predice con todas sus
+  pólizas, unas `r round(nrow(cartera) / nrow(re_df))`. Como vimos en el
+  [encogimiento](#sec-u25-blup), la información de la agencia es $I_j=\sum_i\hat\mu_{ij}$, y una póliza
+  aporta la fracción $\hat\mu_{ij}/I_j$: en la mediana, un
+  `r round(100 * median(fitted(m_glmm) / ave(fitted(m_glmm), cartera$agencia, cartera$region, FUN = sum)), 1)` %.
+  $\hat u^{\text{ag}}_j$ apenas depende de $y_i$, así que simular con él es casi como simular sin haber
+  visto $y_i$, y el diagnóstico de la [§5.5](#sec-u25-diagnostico) es válido.
+- **En el OLRE**, $\hat v_i$ se predice con **una sola** observación, la propia $y_i$: toda su información
+  sale de ella. Una póliza con muchos partes recibe un $\hat v_i$ alto, y una sin ninguno, uno negativo. Al
+  simular con ese $\hat v_i$, las réplicas se desplazan hacia la $y_i$ observada, que acaba cerca del centro
+  de sus simulaciones: los residuos se apiñan en torno a 0.5 aunque el modelo sea correcto, y los
+  contrastes lo leen como un defecto.
+
+La simulación incondicional lo evita: el impulso de cada réplica es nuevo e independiente de $y_i$.
+
+Lo comprobamos en tres pasos. Primero, el impulso predicho medio según el número de partes de la póliza.
+Después, el residuo calculado a mano con la definición anterior, simulando en el GLMM con sus $\hat u$ y en
+el OLRE con y sin sus $\hat v_i$. Por último, un índice de dispersión análogo al de `DHARMa`: la varianza de $y_i$
+alrededor de la media simulada, dividida por la de las propias réplicas; vale 1 si el modelo es correcto.
+Como referencia, en una uniforme la mitad de los residuos cae entre 0.25 y 0.75, y su desviación típica es
+$1/\sqrt{12}\approx0.289$:
+
+```{r}
+#| label: u25-olre-condicional
+v_hat <- ranef(m_olre)$cond$id_obs[, 1]                       # impulso predicho de cada póliza
+round(tapply(v_hat, pmin(cartera$n_danos, 3), mean), 2)       # por partes observados (3 = «3 o más»)
+
+residuo <- \(y, sim) {                 # posición de y entre sus réplicas, con los empates al azar
+  bajo <- rowMeans(sim < y); hasta <- rowMeans(sim <= y)
+  bajo + runif(length(y)) * (hasta - bajo)
+}
+resumen <- \(y, sim) {
+  r <- residuo(y, sim); media <- rowMeans(sim)
+  c(entre_025_075 = mean(r > 0.25 & r < 0.75), desv_tipica = sd(r),
+    dispersion    = var(y - media) / mean(apply(sim, 2, \(s) var(s - media))))
+}
+sim_glmm_cond <- replicate(250, rpois(n_pol, fitted(m_glmm)))            # GLMM, con sus u predichos
+sim_olre_cond <- replicate(250, rpois(n_pol, lam_olre * exp(v_hat)))     # OLRE, con sus v predichos
+comp_sim <- rbind(
+  glmm_condicional   = resumen(cartera$n_gestiones, sim_glmm_cond),
+  olre_condicional   = resumen(cartera$n_danos, sim_olre_cond),
+  olre_incondicional = resumen(cartera$n_danos, sim_olre))
+round(comp_sim, 3)
+```
+
+El impulso predicho crece con los partes observados: es, en buena parte, la propia $y_i$ reescrita. En el
+GLMM, la simulación condicional deja los residuos como una uniforme (fracción central
+`r round(comp_sim["glmm_condicional", "entre_025_075"], 2)`, desviación típica
+`r round(comp_sim["glmm_condicional", "desv_tipica"], 3)`, dispersión
+`r round(comp_sim["glmm_condicional", "dispersion"], 2)`). En el OLRE, la misma simulación los apiña en el
+centro (fracción `r round(comp_sim["olre_condicional", "entre_025_075"], 2)`, desviación típica
+`r round(comp_sim["olre_condicional", "desv_tipica"], 3)`) y simula una **infradispersión** que no existe:
+dispersión `r sprintf("%.2f", comp_sim["olre_condicional", "dispersion"])`. La simulación incondicional devuelve
+una dispersión de `r round(comp_sim["olre_incondicional", "dispersion"], 2)`, compatible con 1, como
+confirmó el contraste de la @fig-u25-olre-diag.
+:::
 
 
 

@@ -36,12 +36,12 @@ leer_datos_glm <- function(ruta) {
 # mitad de un ajuste; si tu versión difiere, avisa y sigue.
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
-  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
-  ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
-  lmtest = "0.9.40", marginaleffects = "0.32.0", performance = "0.17.0",
-  pscl = "1.5.9", purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13",
-  vcdExtra = "0.9.6")
+  DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
+  broom.mixed = "0.2.9.7", dplyr = "1.2.1", forcats = "1.0.1",
+  ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
+  marginaleffects = "0.32.0", performance = "0.17.0", purrr = "1.2.2",
+  sessioninfo = "1.2.4", survival = "3.8.6", tibble = "3.3.1",
+  tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -62,9 +62,7 @@ rm(.falta, .instalada, .otra)
 library(broom)
 library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
-library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
-library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
@@ -77,6 +75,8 @@ theme_set(theme_minimal(base_size = 12))
 
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
+source(url_glm("caso2/R/dgp_panel.R"))   # funciones del proceso generador
+panel <- leer_datos_glm("caso2/datos/panel_partes_20252032.rds")   # panel póliza-año de partes (Unidad 2.6)
 glimpse(cartera)
 head(cartera)
 
@@ -139,57 +139,27 @@ set.seed(2024)   # el p-valor sale de simular: fijamos la semilla para que se re
 sim_fnb <- DHARMa::simulateResiduals(m_fnb, n = 1000)
 zt_fnb  <- DHARMa::testZeroInflation(sim_fnb, plot = FALSE)   # ¿aún sobran ceros tras la NB?
 zt_fnb
-# cuántas de las 1000 simulaciones igualan o superan los ceros observados
-sum(colSums(sim_fnb$simulatedResponse == 0) >= sum(cartera$n_fraude == 0))
+n0_obs <- sum(cartera$n_fraude == 0)
+n0_sim <- colSums(sim_fnb$simulatedResponse == 0)   # ceros de cada una de las 1000 simulaciones
+c(observados = n0_obs, media_sim = mean(n0_sim), dt_sim = sd(n0_sim),
+  sims_que_alcanzan = sum(n0_sim >= n0_obs))
 
 # -----------------------------------------------------------------------------
-# [u24-scoretest]
+# [fig-u24-nb-zerodist]
 #   4 · Demasiados ceros
 #     > 4.1 Qué es, de dónde viene y cómo se identifica
 #       > Cómo se identifica
 # -----------------------------------------------------------------------------
-vcdExtra::zero.test(cartera$n_fraude)   # score test de Van den Broek
-
-# el mismo estadístico, calculado a mano con la fórmula
-y_f <- cartera$n_fraude; n_f <- length(y_f); n0_f <- sum(y_f == 0)
-lam_f <- mean(y_f); p0_f <- exp(-lam_f)            # tasa común y P(Y = 0) de la Poisson
-(n0_f - n_f * p0_f)^2 / (n_f * p0_f * (1 - p0_f) - n_f * lam_f * p0_f^2)
-
-# -----------------------------------------------------------------------------
-# [u24-ceros-grupos-tabla]
-#   4 · Demasiados ceros
-#     > 4.2 Estructuras para los ceros
-#       > Pregunta 1 · ¿Sobran ceros incluso frente a la NB?
-# -----------------------------------------------------------------------------
-ceros_grupo <- tibble::tibble(
-  grupo     = dplyr::ntile(fitted(m_fp), 12),          # 12 grupos de riesgo esperado parecido
-  media     = fitted(m_fp),
-  Observado = cartera$n_fraude == 0,
-  Poisson   = dpois(0, fitted(m_fp)),                  # P(Y = 0) de cada póliza según cada modelo
-  NB        = dnbinom(0, size = m_fnb$theta, mu = fitted(m_fnb))) |>
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(dplyr::across(c(media, Observado, Poisson, NB), mean))
-ceros_grupo
-
-# -----------------------------------------------------------------------------
-# [fig-u24-ceros-grupos]
-#   4 · Demasiados ceros
-#     > 4.2 Estructuras para los ceros
-#       > Pregunta 1 · ¿Sobran ceros incluso frente a la NB?
-# -----------------------------------------------------------------------------
-ceros_grupo |>
-  tidyr::pivot_longer(c(Observado, Poisson, NB), names_to = "fuente", values_to = "p0") |>
-  ggplot(aes(media, p0, colour = fuente)) +
-  geom_line(linewidth = 0.7) +
-  geom_point(size = 2) +
-  scale_colour_manual(values = c("Observado" = "grey20", "Poisson" = "darkorange", "NB" = "steelblue")) +
-  labs(x = "nº esperado de alertas en el grupo (Poisson)", y = "proporción de ceros", colour = NULL)
+ggplot(tibble::tibble(n0 = n0_sim), aes(n0)) +
+  geom_histogram(bins = 30, fill = "steelblue", colour = "white") +
+  geom_vline(xintercept = n0_obs, linetype = "dashed", linewidth = 0.8) +
+  labs(x = "nº de pólizas con cero alertas (simulaciones bajo la NB)", y = "nº de simulaciones")
 
 # -----------------------------------------------------------------------------
 # [u24-positivos]
 #   4 · Demasiados ceros
 #     > 4.2 Estructuras para los ceros
-#       > Pregunta 2 · ¿Poisson o NB para el conteo? Los positivos
+#       > Pregunta 1 · ¿Poisson o NB para el conteo?
 # -----------------------------------------------------------------------------
 # solo las pólizas con alguna alerta: ¿su conteo es Poisson (truncada en 0) o va más disperso?
 pos   <- subset(cartera, n_fraude > 0)
@@ -203,48 +173,73 @@ disp_pos <- sum((pos$n_fraude - m_tr)^2 / v_tr) / df.residual(m_ztp)
 disp_pos
 
 # -----------------------------------------------------------------------------
+# [u24-deflacion]
+#   4 · Demasiados ceros
+#     > 4.2 Estructuras para los ceros
+#       > Pregunta 2 · ¿Mezcla o barrera?
+# -----------------------------------------------------------------------------
+ceros_grupo <- tibble::tibble(
+  grupo      = dplyr::ntile(fitted(m_fp), 12),   # 12 grupos de riesgo esperado parecido
+  observados = cartera$n_fraude == 0,
+  esperados  = dpois(0, fitted(m_fp))) |>        # P(Y = 0) de cada póliza según la Poisson
+  dplyr::group_by(grupo) |>
+  dplyr::summarise(dplyr::across(c(observados, esperados), mean)) |>
+  dplyr::mutate(diferencia = observados - esperados)
+ceros_grupo
+
+# -----------------------------------------------------------------------------
 # [u24-zip-explora]
 #   4 · Demasiados ceros
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
-#       > Ajuste e interpretación
+#       > Exploración: qué predictor va en cada parte
 # -----------------------------------------------------------------------------
 d_exp <- dplyr::mutate(cartera, potencia_cv_tercil = ggplot2::cut_number(potencia_cv, 3))
 explora <- function(var) {
-  d <- dplyr::mutate(d_exp, nivel = factor(.data[[var]]))
-  # ritmo de las vigiladas: Poisson truncada en 0 sobre las pólizas con alguna alerta, un ritmo por nivel
-  m_tr  <- glmmTMB::glmmTMB(n_fraude ~ 0 + nivel + offset(log(exposicion)),
+  d <- dplyr::mutate(d_exp, predictor_cat = factor(.data[[var]]))
+  # 1 · ritmo de las vigiladas: Poisson truncada en 0 sobre las pólizas con alguna alerta, un ritmo por nivel
+  m_tr  <- glmmTMB::glmmTMB(n_fraude ~ 0 + predictor_cat + offset(log(exposicion)),
                             family = glmmTMB::truncated_poisson(), data = subset(d, n_fraude > 0))
+  # fixef(m_tr)$cond: vector con nombres de los coeficientes de la fórmula (escala log), uno por nivel;
+  # exponenciados, el ritmo de cada nivel en alertas por unidad de exposición
   ritmo <- exp(glmmTMB::fixef(m_tr)$cond)
   d |>
-    dplyr::mutate(ritmo = ritmo[as.integer(nivel)]) |>
-    dplyr::group_by(nivel) |>
-    dplyr::summarise(ceros_obs    = mean(n_fraude == 0),
-                     ceros_conteo = mean(exp(-ritmo * exposicion)),   # ceros que daría ese ritmo
+    dplyr::mutate(ritmo = ritmo[as.integer(predictor_cat)]) |>
+    dplyr::group_by(predictor_cat) |>
+    dplyr::summarise(tasa_bruta   = sum(n_fraude) / sum(exposicion),
+                     ceros_obs    = mean(n_fraude == 0),                  # 2 · ceros observados
+                     ceros_conteo = mean(exp(-ritmo * exposicion)),       # 3 · ceros que daría el conteo
                      ritmo        = dplyr::first(ritmo), .groups = "drop") |>
-    dplyr::mutate(predictor = var, nivel = as.character(nivel),
-                  pi_est = (ceros_obs - ceros_conteo) / (1 - ceros_conteo))
+    dplyr::transmute(predictor = var, nivel = as.character(predictor_cat), tasa_bruta, ceros_obs,
+                     ceros_conteo, ritmo,
+                     pi_est = (ceros_obs - ceros_conteo) / (1 - ceros_conteo))   # 4 · ceros estructurales
 }
 explora_zip <- purrr::map_dfr(c("potencia_cv_tercil", "uso", "zona_circulacion", "tipo_vehiculo"),
                               explora)
-explora_zip
+# para mostrarla: predictor y nivel en una columna, y cifras redondeadas a 5 decimales
+explora_zip |>
+  dplyr::transmute(predictor_nivel = paste(predictor, nivel, sep = "-"),
+                   dplyr::across(c(tasa_bruta, ceros_obs, ceros_conteo, ritmo, pi_est), \(x) round(x, 5)))
 
 # -----------------------------------------------------------------------------
 # [fig-u24-zip-explora]
 #   4 · Demasiados ceros
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
-#       > Ajuste e interpretación
+#       > Exploración: qué predictor va en cada parte
 # -----------------------------------------------------------------------------
 explora_zip |>
   tidyr::pivot_longer(c(pi_est, ritmo), names_to = "parte", values_to = "valor") |>
   dplyr::mutate(parte = factor(parte, levels = c("pi_est", "ritmo"),
-                               labels = c("Estructural: ceros estructurales (pi)",
-                                          "Conteo: ritmo de las vigiladas"))) |>
+                               labels = c("Estructural:\nceros estructurales (pi)",
+                                          "Conteo:\nritmo de las vigiladas")),
+                # orden de la tabla (el natural de cada predictor), no el alfabético
+                nivel = forcats::fct_inorder(nivel)) |>
   ggplot(aes(nivel, valor, group = 1)) +
   geom_line(colour = "grey60") +
   geom_point(size = 2.5, colour = "steelblue") +
   facet_grid(parte ~ predictor, scales = "free") +
   labs(x = NULL, y = NULL) +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1),
+        strip.text.y = element_text(size = 9))   # títulos de fila en dos líneas, para que no se corten
 
 # -----------------------------------------------------------------------------
 # [u24-zip]
@@ -252,11 +247,30 @@ explora_zip |>
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_zip <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
+m_zip <- glmmTMB::glmmTMB(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
+  ziformula = ~ uso + potencia_cv,
+  family    = poisson, data = cartera)
 summary(m_zip)
+
+# -----------------------------------------------------------------------------
+# [u24-zip-or]
+#   4 · Demasiados ceros
+#     > 4.3 Modelos zero-inflated (ZIP / ZINB)
+#       > Ajuste e interpretación
+# -----------------------------------------------------------------------------
+# efectos exponenciados con su IC de Wald al 95 %, sin los interceptos
+tabla_exp <- function(m, etiqueta_ceros) {
+  broom.mixed::tidy(m, exponentiate = TRUE, conf.int = TRUE) |>
+    dplyr::filter(term != "(Intercept)") |>
+    dplyr::transmute(parte      = ifelse(component == "cond", "conteo: IRR", etiqueta_ceros),
+                     termino    = term,
+                     estimacion = round(estimate, 3),
+                     ic_inf     = round(conf.low, 3),
+                     ic_sup     = round(conf.high, 3))
+}
+or_zip <- tabla_exp(m_zip, etiqueta_ceros = "ceros: OR de estar fuera del perímetro")
+or_zip
 
 # -----------------------------------------------------------------------------
 # [u24-zip-edad]
@@ -264,12 +278,9 @@ summary(m_zip)
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_zip_edad <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + edad_conductor + antiguedad_carnet +
-             offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
-lmtest::lrtest(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de conteo
+# update() cambia solo la fórmula principal (el conteo); ziformula se mantiene
+m_zip_edad <- update(m_zip, . ~ . + edad_conductor + antiguedad_carnet)
+anova(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de conteo
 
 # -----------------------------------------------------------------------------
 # [u24-zinb]
@@ -277,10 +288,7 @@ lmtest::lrtest(m_zip, m_zip_edad)   # H0: edad y carnet no aportan a la parte de
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_zinb <- pscl::zeroinfl(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
+m_zinb <- update(m_zip, family = glmmTMB::nbinom2)
 AIC(m_zip, m_zinb)
 
 # -----------------------------------------------------------------------------
@@ -289,8 +297,16 @@ AIC(m_zip, m_zinb)
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
+# P(Y_i = k) del ZIP para cada póliza (filas) y cada k de K (columnas)
+prob_zip <- function(m, newdata = NULL, K = 0:8) {
+  pi_i <- predict(m, newdata, type = "zprob")                # probabilidad de cero estructural
+  mu_i <- exp(predict(m, newdata, type = "link"))            # media del conteo, con el offset
+  P <- (1 - pi_i) * outer(mu_i, K, \(mu, k) dpois(k, mu))    # (1 - pi) f(k)
+  P[, K == 0] <- P[, K == 0] + pi_i                          # el cero suma además pi
+  P
+}
 c(observados    = sum(cartera$n_fraude == 0),
-  esperados_zip = round(sum(predict(m_zip, type = "prob")[, 1])))
+  esperados_zip = round(sum(prob_zip(m_zip, K = 0))))
 
 # -----------------------------------------------------------------------------
 # [fig-u24-zip-root]
@@ -298,27 +314,15 @@ c(observados    = sum(cartera$n_fraude == 0),
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-esp <- colSums(predict(m_zip, type = "prob")); K <- 0:8
+P <- prob_zip(m_zip, K = 0:7); K <- 0:8
 tibble::tibble(k = K,
                Observado      = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `ZIP ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+               `ZIP ajustado` = c(colSums(P), nrow(P) - sum(P))) |>   # la última celda es «8 o más»
   tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("Observado" = "steelblue", "ZIP ajustado" = "darkorange")) +
   labs(x = "nº de alertas", y = "nº de pólizas", fill = NULL)
-
-# -----------------------------------------------------------------------------
-# [u24-zip-tmb]
-#   4 · Demasiados ceros
-#     > 4.3 Modelos zero-inflated (ZIP / ZINB)
-#       > Bondad de ajuste y diagnóstico
-# -----------------------------------------------------------------------------
-m_zip_tmb <- glmmTMB::glmmTMB(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-  ziformula = ~ uso + potencia_cv, family = poisson, data = cartera)
-cbind(pscl    = coef(m_zip),
-      glmmTMB = c(glmmTMB::fixef(m_zip_tmb)$cond, glmmTMB::fixef(m_zip_tmb)$zi))
 
 # -----------------------------------------------------------------------------
 # [fig-u24-zip-dharma]
@@ -327,7 +331,7 @@ cbind(pscl    = coef(m_zip),
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
-res_zip <- DHARMa::simulateResiduals(m_zip_tmb, n = 1000)
+res_zip <- DHARMa::simulateResiduals(m_zip, n = 1000)
 plot(res_zip)
 
 # -----------------------------------------------------------------------------
@@ -360,8 +364,8 @@ DHARMa::plotResiduals(res_zip, cartera$potencia_cv, xlab = "potencia (CV)")
 #     > 4.3 Modelos zero-inflated (ZIP / ZINB)
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-frec_chi2 <- function(m, y, K = 8) {               # celdas 0, 1, ..., K-1 y "K o más"
-  P <- predict(m, type = "prob", at = 0:(K - 1))   # P(Y_i = k) de cada póliza
+frec_chi2 <- function(m, y, K = 8) {   # celdas 0, 1, ..., K-1 y "K o más"
+  P <- prob_zip(m, K = 0:(K - 1))      # P(Y_i = k) de cada póliza
   E <- c(colSums(P), length(y) - sum(P))
   O <- c(tabulate(y + 1, nbins = K), sum(y >= K))
   sum((O - E)^2 / E)
@@ -369,7 +373,7 @@ frec_chi2 <- function(m, y, K = 8) {               # celdas 0, 1, ..., K-1 y "K 
 X2_obs <- frec_chi2(m_zip, cartera$n_fraude)
 
 set.seed(2025)
-y_boot  <- simulate(m_zip_tmb, nsim = 200)         # 200 carteras simuladas desde el ZIP
+y_boot  <- simulate(m_zip, nsim = 200)   # 200 carteras simuladas desde el ZIP
 X2_boot <- vapply(y_boot, function(ys)
   frec_chi2(update(m_zip, data = transform(cartera, n_fraude = ys)), ys), numeric(1))
 
@@ -379,29 +383,30 @@ c(X2 = X2_obs,
 
 # -----------------------------------------------------------------------------
 # [u24-hurdle-explora]
-#   4 · Demasiados ceros > 4.4 Modelos hurdle > Ajuste e interpretación
+#   4 · Demasiados ceros
+#     > 4.4 Modelos hurdle
+#       > Exploración: qué predictor va en cada parte
 # -----------------------------------------------------------------------------
 explora_zip |>
-  dplyr::transmute(predictor, nivel, cruza_barrera = 1 - ceros_obs, ritmo)
+  dplyr::transmute(predictor_nivel = paste(predictor, nivel, sep = "-"),
+                   ceros_obs = round(ceros_obs, 5), ritmo = round(ritmo, 5))
 
 # -----------------------------------------------------------------------------
 # [u24-hurdle]
 #   4 · Demasiados ceros > 4.4 Modelos hurdle > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_hp <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "poisson", data = cartera)
+m_hp <- glmmTMB::glmmTMB(
+  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
+  ziformula = ~ uso + potencia_cv,
+  family    = glmmTMB::truncated_poisson(), data = cartera)
 summary(m_hp)
+tabla_exp(m_hp, etiqueta_ceros = "barrera: OR de no tener ninguna alerta")   # efectos exponenciados e IC 95 %
 
 # -----------------------------------------------------------------------------
 # [u24-hurdle-nb]
 #   4 · Demasiados ceros > 4.4 Modelos hurdle > Ajuste e interpretación
 # -----------------------------------------------------------------------------
-m_hnb <- pscl::hurdle(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)) |
-             uso + potencia_cv,
-  dist = "negbin", data = cartera)
+m_hnb <- update(m_hp, family = glmmTMB::truncated_nbinom2)
 aic_h <- AIC(m_hp, m_hnb)
 aic_h
 
@@ -411,8 +416,16 @@ aic_h
 #     > 4.4 Modelos hurdle
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
+# P(Y_i = k) del hurdle-Poisson para cada póliza (filas) y cada k de K (columnas)
+prob_hurdle <- function(m, newdata = NULL, K = 0:8) {
+  pi_i <- predict(m, newdata, type = "zprob")                # probabilidad de no cruzar la barrera
+  mu_i <- exp(predict(m, newdata, type = "link"))            # media de la Poisson SIN truncar
+  P <- (1 - pi_i) * outer(mu_i, K, \(mu, k) dpois(k, mu) / (1 - exp(-mu)))   # conteo truncado
+  P[, K == 0] <- pi_i                                        # el cero sale solo de la barrera
+  P
+}
 c(observados       = sum(cartera$n_fraude == 0),
-  esperados_hurdle = round(sum(predict(m_hp, type = "prob")[, 1])))   # coinciden por construcción
+  esperados_hurdle = round(sum(prob_hurdle(m_hp, K = 0))))   # coinciden por construcción
 
 # -----------------------------------------------------------------------------
 # [fig-u24-hurdle-root]
@@ -420,27 +433,15 @@ c(observados       = sum(cartera$n_fraude == 0),
 #     > 4.4 Modelos hurdle
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-esp <- colSums(predict(m_hp, type = "prob")); K <- 0:8
+P <- prob_hurdle(m_hp, K = 0:7); K <- 0:8
 tibble::tibble(k = K,
                Observado         = as.numeric(table(factor(pmin(cartera$n_fraude, 8), levels = K))),
-               `Hurdle ajustado` = c(esp[1:8], sum(esp[-(1:8)]))) |>
+               `Hurdle ajustado` = c(colSums(P), nrow(P) - sum(P))) |>   # la última celda es «8 o más»
   tidyr::pivot_longer(-k, names_to = "fuente", values_to = "frec") |>
   ggplot(aes(k, frec, fill = fuente)) +
   geom_col(position = "dodge") +
   scale_fill_manual(values = c("Observado" = "steelblue", "Hurdle ajustado" = "darkorange")) +
   labs(x = "nº de alertas", y = "nº de pólizas", fill = NULL)
-
-# -----------------------------------------------------------------------------
-# [u24-hurdle-tmb]
-#   4 · Demasiados ceros
-#     > 4.4 Modelos hurdle
-#       > Bondad de ajuste y diagnóstico
-# -----------------------------------------------------------------------------
-m_hp_tmb <- glmmTMB::glmmTMB(
-  n_fraude ~ potencia_cv + zona_circulacion + uso + tipo_vehiculo + offset(log(exposicion)),
-  ziformula = ~ uso + potencia_cv, family = glmmTMB::truncated_poisson(), data = cartera)
-cbind(pscl    = coef(m_hp),
-      glmmTMB = c(glmmTMB::fixef(m_hp_tmb)$cond, -glmmTMB::fixef(m_hp_tmb)$zi))
 
 # -----------------------------------------------------------------------------
 # [fig-u24-hurdle-dharma]
@@ -449,7 +450,7 @@ cbind(pscl    = coef(m_hp),
 #       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
 set.seed(2025)   # la simulación es aleatoria: fijamos la semilla para que el diagnóstico se reproduzca
-res_hp <- DHARMa::simulateResiduals(m_hp_tmb, n = 1000)
+res_hp <- DHARMa::simulateResiduals(m_hp, n = 1000)
 plot(res_hp)
 
 # -----------------------------------------------------------------------------
@@ -515,14 +516,19 @@ prob_modelo <- list(
   Poisson    = t(sapply(predict(m_fp,  perfiles_u24, type = "response"), \(m) dpois(K, m))),
   NB         = t(sapply(predict(m_fnb, perfiles_u24, type = "response"),
                         \(m) dnbinom(K, size = m_fnb$theta, mu = m))),
-  ZIP        = predict(m_zip, perfiles_u24, type = "prob", at = K),
-  `Hurdle-P` = predict(m_hp,  perfiles_u24, type = "prob", at = K))
+  ZIP        = prob_zip(m_zip, perfiles_u24, K = K),
+  `Hurdle-P` = prob_hurdle(m_hp, perfiles_u24, K = K))
 pred_u24 <- purrr::imap_dfr(prob_modelo, \(P, modelo)
   tibble::tibble(modelo = modelo, perfil = rep(perfiles_u24$perfil, times = length(K)),
                  k = rep(K, each = nrow(perfiles_u24)), prob = as.vector(P)))
+# la media, con predict(): sumar k * P(Y = k) hasta k = 10 la infraestimaría (cola de la NB)
+medias_pred <- sapply(list(Poisson = m_fp, NB = m_fnb, ZIP = m_zip, `Hurdle-P` = m_hp),
+                      \(m) predict(m, perfiles_u24, type = "response"))
 resumen_pred <- pred_u24 |>
-  dplyr::group_by(perfil, modelo) |>
-  dplyr::summarise(media = sum(k * prob), P_cero = prob[k == 0], .groups = "drop")
+  dplyr::filter(k == 0) |>
+  dplyr::transmute(perfil, modelo, P_cero = prob) |>
+  dplyr::mutate(media = medias_pred[cbind(match(perfil, perfiles_u24$perfil),
+                                          match(modelo, colnames(medias_pred)))])
 resumen_pred
 p0_pred <- function(m, p = perfiles_u24$perfil[1])   # P(Y = 0) de un perfil según un modelo
   resumen_pred$P_cero[resumen_pred$modelo == m & resumen_pred$perfil == p]
@@ -548,10 +554,46 @@ pred_u24 |>
 #       > Validación contra el DGP
 # -----------------------------------------------------------------------------
 v <- attr(cartera, "verdad")
-v$g_cero   # DGP de la parte estructural: intercepto, efecto de uso y de potencia
-# el DGP usa la potencia tipificada: llevamos el coeficiente del ZIP (por CV) a esa escala
-c(usocomercial_ZIP          = coef(m_zip)[["zero_usocomercial"]],
-  potencia_tipificada_ZIP   = coef(m_zip)[["zero_potencia_cv"]] * sd(cartera$potencia_cv))
+b_conteo <- setNames(v$betas$ceros, v$nombres_beta)   # parte de conteo del DGP
+verdad_u24 <- tibble::tibble(
+  component = c(rep("cond", 7), rep("zi", 3)),
+  term = c("(Intercept)", "z_pot", "zona_circulacionurbana", "zona_circulacionmixta",
+           "usocomercial", "tipo_vehiculomoto", "tipo_vehiculofurgoneta",
+           "(Intercept)", "usocomercial", "z_pot"),
+  dgp  = unname(c(b_conteo[c("(int)", "z_pot", "urbana", "mixta", "comercial", "moto", "furgoneta")],
+                  v$g_cero[c("int", "b_uso", "b_pot")])))
+
+# el mismo ZIP en la escala del DGP: potencia tipificada y zona rural como referencia
+cartera_dgp <- dplyr::mutate(cartera, z_pot = as.numeric(scale(potencia_cv)),
+                             zona_circulacion = relevel(zona_circulacion, ref = "rural"))
+m_zip_dgp <- update(m_zip, . ~ . - potencia_cv + z_pot, ziformula = ~ uso + z_pot,
+                    data = cartera_dgp)
+c(logLik_zip = logLik(m_zip), logLik_zip_dgp = logLik(m_zip_dgp))   # mismo modelo
+
+validacion_u24 <- broom.mixed::tidy(m_zip_dgp, conf.int = TRUE) |>
+  dplyr::inner_join(verdad_u24, by = c("component", "term")) |>
+  dplyr::transmute(parte      = ifelse(component == "cond", "conteo (log)", "estructural (logit)"),
+                   termino    = term,
+                   dgp        = round(dgp, 3),
+                   estimacion = round(estimate, 3),
+                   ic_inf     = round(conf.low, 3),
+                   ic_sup     = round(conf.high, 3),
+                   contiene   = conf.low <= dgp & dgp <= conf.high)   # ¿el IC 95 % cubre la verdad?
+validacion_u24
+
+# proporción media de pólizas fuera del perímetro: la del DGP y la que estima el ZIP
+pi_dgp <- plogis(v$g_cero[["int"]] + v$g_cero[["b_uso"]] * (cartera$uso == "comercial") +
+                   v$g_cero[["b_pot"]] * cartera_dgp$z_pot)
+c(dgp = mean(pi_dgp), zip = mean(predict(m_zip, type = "zprob")))
+
+# -----------------------------------------------------------------------------
+# [u24-validacion-fila]
+#   4 · Demasiados ceros
+#     > 4.5 Elegir, comparar y conectar
+#       > Validación contra el DGP
+# -----------------------------------------------------------------------------
+val <- function(parte, termino)   # una fila de la tabla de validación, para citarla en el texto
+  validacion_u24[validacion_u24$parte == parte & validacion_u24$termino == termino, ]
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

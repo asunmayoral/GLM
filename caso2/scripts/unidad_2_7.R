@@ -37,9 +37,9 @@ leer_datos_glm <- function(ruta) {
 PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09-07"
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", glmmTMB = "1.1.14",
-  glmnet = "5.0", lme4 = "2.0.1", marginaleffects = "0.32.0",
-  performance = "0.17.0", pscl = "1.5.9", sessioninfo = "1.2.4",
-  survival = "3.8.6", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
+  glmnet = "5.0", marginaleffects = "0.32.0", performance = "0.17.0",
+  sessioninfo = "1.2.4", survival = "3.8.6", tidyverse = "2.0.0",
+  vcd = "1.4.13", vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -60,9 +60,7 @@ rm(.falta, .instalada, .otra)
 library(broom)
 library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
-library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
-library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
@@ -75,6 +73,8 @@ theme_set(theme_minimal(base_size = 12))
 
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
+source(url_glm("caso2/R/dgp_panel.R"))   # funciones del proceso generador
+panel <- leer_datos_glm("caso2/datos/panel_partes_20252032.rds")   # panel póliza-año de partes (Unidad 2.6)
 glimpse(cartera)
 head(cartera)
 
