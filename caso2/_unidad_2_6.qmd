@@ -1,0 +1,1218 @@
+<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-.
+DATOS: `panel` (póliza-año de partes), generado por R/dgp_panel.R con cargar_panel_partes(cartera) en el
+maestro. Proceso INDEPENDIENTE de la cartera: solo lee exposicion y covariables; no altera nada de 2.1–2.5.
+Semilla 20252032. attr(panel, "partes"): una fila por parte con su instante t (años desde el alta).
+attr(panel, "verdad"): h0 (tasa base por año), beta, sigma_frag = 0.6, T_max = 10. La verdad SOLO en §6.7.
+ENCUADRE: la respuesta es un CONTEO por año-póliza con exposición (expo_anual) -> se modela una TASA (partes
+por año-póliza), nunca una probabilidad. El cliente sigue en riesgo tras un parte (eventos recurrentes).
+No es el persona-periodo cloglog del Caso 1 (allí 0/1, probabilidad por periodo, se sale tras el evento).
+Sin Kaplan–Meier ni Cox: lo no paramétrico es Nelson–Aalen de la tasa acumulada (§6.6); Cox va a U3.6/U3.7.
+§6.6 HECHO: Nelson–Aalen como referencia sin modelo para calibrar (no en la exploración, decisión de la
+autora 08-nov). Las tasas anuales NO sirven de referencia: el glm con un factor por año las reproduce
+(circular). Calibración con m_pw (GLM, tasa media de la cartera). Cifras: NA 0.79 a 5 años y 1.43 al
+final; modelo 0.79 y 1.42. Proporcionalidad (LRT trozo:x sobre m_pw_fin): ningún p < 0.17 (mín. uso 0.174;
+edad 0.919, carnet 0.935, potencia 0.722, zona 0.236, vehículo 0.489).
+§6.6 DHARMa: createDHARMa con simulate(m_pw_fin) INCONDICIONAL (glmmTMB 1.1.8 simula fragilidad nueva:
+cor por póliza total obs/sim medio 0.33 frente a 0.88 con la media condicional); NO simulateResiduals
+(condiciona a los BLUP desde DHARMa 0.5). Réplica manual SIN DHARMa (no instalable aquí), 250 sims:
+por fila unif 0.91, disp 0.98 (p 0.46), ceros p 0.69; por póliza unif 0.95, disp 0.94 (p 0.29), ceros
+p 0.58. CONFIRMADO con DHARMa en el render de la autora (08-nov, borrador_u26): por fila unif 0.664,
+disp 0.986 (p 0.576), ceros p 0.528; por póliza unif 0.450, disp 0.954 (p 0.392), ceros p 0.576.
+§6.5 SELECCIÓN (decisión de la autora, 08-nov, con bolker2009): drop1 sobre el MIXTO, no sobre el GLM
+(pseudorreplicación). Solo sobra sexo (p 0.70). GLM frente a mixto: uso 0.0056 -> 0.035; vehículo 0.0014 ->
+0.019. Modelo final m_pw_fin = m_pw_mix sin sexo; sigma 0.632. Regularización: NO en esta unidad (probado:
+lasso con bloques por póliza y trozo sin penalizar retiene todo con lambda.min y quita zona/uso/vehículo
+con lambda.1se); solo remisión al resumen #sec-u2r-mixreg.
+Simplificación del DGP: la antigüedad no depende del riesgo (sin abandono selectivo); se discute como
+limitación en §6.5 [feldblum1996; cohen2005]. Covariables constantes en el tiempo (las de la cartera hoy).
+TÉRMINOS: tasa (partes/año-póliza) · trozo (intervalo de antigüedad con tasa constante) · exposición
+(expo_anual) · fragilidad (efecto de póliza). «Riesgos a trozos» solo como nombre del modelo.
+FUENTES: lawless1998 (núcleo), cook2007 (cap. 3), lawless1995 (Nelson–Aalen/función media), holford1980,
+laird1981, vaupel1979, lawless1987 (Poisson mixta), brooks2017 (glmmTMB).
+CIFRAS VERIFICADAS (réplica R 4.3, 08-nov; comprobar contra el render): panel 21331 filas, 3071 pólizas,
+2975 partes; antigüedad 3 a 9.99 años; 3030 filas con expo_anual < 1; 255 filas con 2 o más partes; máximo
+4 partes en un año. Póliza ejemplo 94: antigüedad 5.39, partes 0,1,2,1,0,0, último año 0.39. -->
+
+# 6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad {#sec-u26}
+
+Hasta ahora cada póliza aportaba **un** conteo —sus partes durante todo el tiempo contratado— y la
+exposición servía para convertirlo en una tasa. Esa tasa era **una sola** para todo el historial del
+cliente: dábamos por hecho que el ritmo al que un cliente da partes es el mismo el primer año que el
+décimo. En esta unidad abrimos ese historial **año a año** y nos preguntamos si el ritmo **cambia con la
+antigüedad**. El modelo que lo responde supone que la tasa es constante dentro de cada tramo de
+antigüedad —un **trozo**— y puede cambiar de un trozo a otro: es el modelo de **riesgos a trozos**, y no
+es más que la Poisson con *offset* que ya conocemos, aplicada a una tabla con una fila por cliente y año.
+
+El recorrido es el siguiente: el problema y los datos (§6.1) → el modelo de riesgos a trozos (§6.2) → la
+exploración que decide los trozos y comprueba la estructura del modelo (§6.3) → su ajuste, interpretación
+y predicción (§6.4) → por qué los años de un mismo cliente no son independientes y qué hacer al respecto
+(§6.5) → el diagnóstico (§6.6) → la validación contra el DGP (§6.7).
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general (**RA6**): modelizar una **tasa que cambia con el tiempo** como un GLM de Poisson con
+*offset* sobre datos **póliza-año**. En concreto:
+
+- elegir los **trozos** con un criterio explícito y leer el **riesgo base** y las **razones de tasas**;
+- **predecir** la tasa y los partes esperados de perfiles prototipo a lo largo de la antigüedad;
+- reconocer la **póliza como agrupación** mediante un efecto aleatorio —la **fragilidad**—, seleccionar
+  variables sobre ese modelo y distinguir los tipos de predicción (espiral de los mixtos de la
+  [Unidad 2.5](#sec-u25));
+- **diagnosticar** el modelo: proporcionalidad, calibración frente a la tasa acumulada de Nelson–Aalen
+  (espiral de la censura de la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15)) y residuos simulados (RA7).
+
+Fuentes: @holford1980 y @laird1981 para el modelo log-lineal de tasas a trozos; @lawless1998 para su
+aplicación a conteos agrupados por intervalos, el diseño de esta unidad; el capítulo 3 de @cook2007 como
+referencia general de los modelos de Poisson para eventos recurrentes; @lawless1995 para la tasa
+acumulada sin modelo; @vaupel1979 y @lawless1987 para la heterogeneidad entre clientes; @bolker2009 para
+la selección de variables en modelos mixtos; @feldblum1996, @cohen2005 y @liu2004 para la salida de
+clientes como limitación; @agresti2013 para el método delta; @brooks2017 para `glmmTMB`.
+:::
+
+## 6.1 El problema y los datos {#sec-u26-datos}
+
+### La pregunta
+
+¿Da un cliente partes al mismo ritmo durante toda su relación con la aseguradora, o ese ritmo cambia a
+medida que acumula años con nosotros? No es una curiosidad académica. En la práctica actuarial se sostiene
+que la frecuencia de siniestros tiende a bajar con la duración de la póliza, por varias razones a la vez:
+el conductor se familiariza con su vehículo, gana experiencia y, además, los malos riesgos tienden a
+marcharse [@feldblum1996; @cohen2005]. Si eso ocurre en nuestra cartera, una tarifa que trate igual al
+cliente recién llegado que al veterano estará cobrando de menos a unos y de más a otros.
+
+La pregunta tiene, por tanto, dos partes: **cómo evoluciona la tasa de partes con la antigüedad** y
+**cuánto pesan, además, las características del cliente y del vehículo**. Para responderlas necesitamos
+saber no solo *cuántos* partes dio cada cliente, sino *en qué año* de su relación con nosotros los dio.
+
+### Del historial de cada cliente a un panel póliza-año
+
+Partimos de la cartera de las unidades anteriores. Allí `exposicion` medía el tiempo contratado de cada
+cliente como fracción de la antigüedad del cliente más veterano. Ahora le ponemos escala: si ese cliente
+más veterano lleva **10 años** con nosotros, la **antigüedad** de cada cliente, en años, es
+$10 \times$ `exposicion`. En nuestra cartera va de `r min(panel$antiguedad)` a
+`r round(max(panel$antiguedad), 2)` años.
+
+Para cada cliente disponemos del **histórico de partes de siniestro**, anotado año a año desde que
+contrató. Es un registro distinto de los conteos que modelamos en las unidades 2.1 a 2.5: aquellos eran
+totales sin fecha; este dice *cuándo* ocurrió cada parte. Lo organizamos como un **panel póliza-año**: una
+fila por cliente y por cada año de antigüedad que ha cumplido —o que está cumpliendo— con nosotros. Un
+cliente con cinco años y medio de antigüedad aporta seis filas: cinco años completos y un sexto en curso.
+
+El panel tiene `r nrow(panel)` filas, que corresponden a las `r dplyr::n_distinct(panel$id_poliza)` pólizas
+de la cartera, y registra en total `r sum(panel$n_partes_anual)` partes. Así es su estructura:
+
+```{r}
+#| label: u26-panel
+dplyr::glimpse(panel)
+```
+
+Veamos las filas de un cliente concreto (@tbl-u26-panel).
+
+```{r}
+#| label: tbl-u26-panel
+#| tbl-cap: "Las filas de la póliza 94 en el panel póliza-año. Cada fila es un año de antigüedad del cliente con la aseguradora: `anio` indica cuál, `expo_anual` qué parte de ese año ha estado asegurado y `n_partes_anual` cuántos partes dio en él. La antigüedad total del cliente se repite en todas sus filas. El último año está en curso, por eso su exposición es menor que 1."
+# póliza elegida porque recorre años con 0, 1 y 2 partes y termina con un año incompleto
+panel |>
+  dplyr::filter(id_poliza == 94) |>
+  dplyr::select(id_poliza, antiguedad, anio, expo_anual, n_partes_anual)
+```
+
+```{r}
+#| label: u26-ej
+#| include: false
+ej <- dplyr::filter(panel, id_poliza == 94)
+```
+
+Esta póliza lleva `r ej$antiguedad[1]` años con nosotros, así que aporta `r nrow(ej)` filas. Dio partes en
+varios años —`r sum(ej$n_partes_anual)` en total, `r max(ej$n_partes_anual)` de ellos en un mismo año— y
+su último año solo está cubierto en una fracción de `r ej$expo_anual[nrow(ej)]`: es el año que está
+cumpliendo ahora.
+
+### Las variables
+
+| Papel | Variables |
+|---|---|
+| Agrupación | `id_poliza`: identifica al cliente; todas sus filas comparten su valor |
+| Eje temporal | `anio`: año de antigüedad al que corresponde la fila (1 = el primer año tras contratar) |
+| Exposición | `expo_anual`: fracción de ese año durante la que el cliente estuvo asegurado (1 si el año está completo) |
+| Respuesta | `n_partes_anual`: número de partes de siniestro del cliente en ese año |
+| Descriptiva | `antiguedad`: antigüedad total del cliente, en años; se repite en todas sus filas |
+| Predictores | `edad_conductor`, `antiguedad_carnet`, `potencia_cv`, `zona_circulacion`, `uso`, `tipo_vehiculo`, `sexo`: los de la cartera ([presentación del caso](#sec-datos-cartera)) |
+
+Los predictores se toman tal como constan hoy en la cartera y se repiten en todas las filas del cliente:
+son **constantes en el tiempo**. Es una simplificación —la edad, por ejemplo, avanza un año por fila—
+que nos permite centrarnos en lo nuevo de esta unidad, el eje temporal.
+
+### Por qué no basta con contar: exposición y tasa
+
+Dos rasgos de la respuesta obligan a pensar en términos de **tasa** y no de recuento bruto.
+
+El primero es que **no todos los años duran lo mismo**. El último año de cada cliente está, en general,
+incompleto: `r sum(panel$expo_anual < 1)` de las `r nrow(panel)` filas tienen `expo_anual` menor que 1.
+Un cliente que solo ha estado asegurado medio año ha tenido la mitad de tiempo para dar partes, y sería
+injusto comparar sus partes con los de un año completo. La solución es la de la
+[Unidad 2.1](#sec-u21): medir **partes por año de exposición** —una tasa— y dejar que la exposición entre
+en el modelo como *offset*.
+
+El segundo es que la respuesta es un **conteo**, no un sí/no. Un cliente puede dar más de un parte en el
+mismo año y, tras un parte, sigue asegurado y en riesgo de dar el siguiente (@tbl-u26-npartes).
+
+```{r}
+#| label: tbl-u26-npartes
+#| tbl-cap: "Distribución de `n_partes_anual` en las filas del panel. La gran mayoría de los años-póliza transcurre sin partes, pero hay años con dos o más: la respuesta es un conteo, no un indicador de si hubo o no parte."
+dplyr::count(panel, n_partes_anual)
+```
+
+En `r sum(panel$n_partes_anual >= 2)` años-póliza se registran dos o más partes, con un máximo de
+`r max(panel$n_partes_anual)`. Por eso la cantidad que nos interesa tiene unidades de **partes por
+año-póliza**: un número que no está acotado por 1 y que solo se convierte en un número esperado de partes
+al multiplicarlo por el tiempo expuesto.
+
+::: {.callout-important}
+## No es el modelo del Caso 1
+En la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15) también teníamos una fila por sujeto y periodo. Pero allí la respuesta era
+**binaria** —¿ocurrió el evento en este periodo?—, el sujeto **abandonaba** el conjunto de riesgo en cuanto
+ocurría, y lo que modelábamos era una **probabilidad** por periodo, acotada entre 0 y 1 y ligada a la
+longitud del periodo.
+
+Aquí la respuesta es un **conteo**, el cliente **sigue en riesgo** después de cada parte y lo que modelamos
+es una **tasa**: partes por unidad de tiempo expuesto. Por eso la familia es Poisson, el enlace es log y
+la exposición entra como *offset*. Si una fila dura medio año, el número esperado de partes es la mitad;
+una probabilidad no se comporta así.
+:::
+
+Con los datos ya presentados, la pregunta de la unidad se puede formular con precisión: **¿cómo cambia la
+tasa de partes con la antigüedad?** En la §6.2 formulamos el modelo que la responde, y en la §6.3 miramos
+los datos para concretarlo.
+
+## 6.2 El modelo de riesgos a trozos {#sec-u26-modelo}
+
+### La tasa como función de la antigüedad
+
+En la [Unidad 2.1](#sec-u21) la tasa de un cliente era un número fijo, $\lambda$, y sus partes esperados
+en un tiempo $t$ eran $\lambda\,t$. Ahora admitimos que la tasa **cambia con la antigüedad**: la escribimos
+$\lambda(t)$, partes por año en el momento en que el cliente cumple $t$ años con nosotros. Tres ideas
+bastan para todo lo que sigue.
+
+1. **Los partes esperados se acumulan.** Hasta la antigüedad $t$, un cliente acumula en promedio
+   $$\Lambda(t)=\int_0^t \lambda(s)\,\mathrm{d}s$$
+   partes: el área bajo la curva de la tasa. A $\Lambda(t)$ la llamaremos **tasa acumulada**.
+2. **La tasa es la pendiente de la tasa acumulada.** Donde $\Lambda(t)$ sube deprisa, la tasa es alta;
+   donde se aplana, es baja. Volveremos sobre esta idea en la [§6.6](#sec-u26-diagnostico), para comprobar
+   el modelo frente a una estimación de $\Lambda(t)$ que no depende de él.
+3. **Si la tasa es constante en un tramo, todo se simplifica.** Si $\lambda(t)=\lambda_k$ durante el año
+   $k$, los partes esperados en ese año son $\lambda_k \times$ `expo_anual`: tasa por exposición, exactamente
+   la Poisson con *offset* que ya conocemos. Es la idea del modelo que formulamos a continuación.
+
+### El modelo
+
+El modelo se apoya en el panel póliza-año de la [§6.1](#sec-u26-datos). Cada fila aporta los partes del
+cliente $i$ en el año $k$, $d_{ik}$ (`n_partes_anual`), su exposición en ese año, $e_{ik}$ (`expo_anual`),
+el trozo de antigüedad al que pertenece ese año y las características del cliente, $\mathbf{x}_i$. En
+adelante, $d$ designará siempre un número de partes y $e$ (o $E$, si es un total), una exposición. El modelo es una Poisson cuya media es la tasa por la
+exposición:
+$$d_{ik}\sim\text{Poisson}(\mu_{ik}),\qquad \mu_{ik}=e_{ik}\,\lambda_{ik},\qquad
+\log\lambda_{ik}=\alpha_k+\mathbf{x}_i^\top\boldsymbol\beta,$$
+donde $\alpha_k$ toma el mismo valor en todos los años de un mismo trozo. Tomando logaritmos en la media,
+$$\log\mu_{ik}=\log e_{ik}+\alpha_k+\mathbf{x}_i^\top\boldsymbol\beta .$$
+Es la Poisson con *offset* de la [Unidad 2.1](#sec-u21) con un único añadido: un término $\alpha_k$ para
+cada trozo de antigüedad. Cada pieza tiene una lectura directa:
+
+- **El *offset*** $\log e_{ik}$ entra con coeficiente 1 y convierte el conteo en tasa: un año cubierto a
+  medias aporta la mitad de partes esperados.
+- **Los $\alpha_k$** describen cómo cambia la tasa con la antigüedad. Tomando el primer trozo como
+  referencia, $e^{\alpha_k-\alpha_1}$ es la **razón de tasas** del trozo $k$ frente al primero *a igualdad
+  de cliente*.
+- **Los $\boldsymbol\beta$** son, como en la Unidad 2.1, logaritmos de razones de tasas: $e^{\beta_j}$
+  multiplica la tasa cuando la variable $j$ aumenta una unidad, en **todos** los trozos por igual.
+
+En escala original, $\lambda_{ik}=e^{\alpha_k}\times e^{\mathbf{x}_i^\top\boldsymbol\beta}$: una tasa
+base que depende del trozo, multiplicada por un factor propio del cliente. Este es el modelo de **riesgos
+a trozos** [@holford1980; @laird1981], y aplicado a conteos de eventos por intervalo de tiempo es el que
+proponen @lawless1998.
+
+Antes de ajustarlo, el modelo pide dos cosas a los datos. La primera, **decidir los trozos**: dónde cortar
+la antigüedad para que la tasa sea razonablemente constante dentro de cada tramo. La segunda, **comprobar
+que su estructura es razonable**: que cada característica del cliente multiplica la tasa por un factor
+parecido en todos los trozos. Las dos se resuelven en la exploración de la [§6.3](#sec-u26-exploracion).
+
+## 6.3 Exploración: qué trozos y qué estructura {#sec-u26-exploracion}
+
+### La tasa año a año: ¿cuántos trozos?
+
+El modelo supone que la tasa es constante dentro de cada trozo de antigüedad y que puede cambiar de un
+trozo a otro. Lo primero, por tanto, es decidir **qué trozos** usar. Dos cosas lo determinan: dónde cambia la tasa y cuánta información hay para estimarla en cada tramo.
+El punto de partida natural es el año de antigüedad.
+
+Con la notación de la [§6.2](#sec-u26-modelo), la tasa empírica del año $k$ es el
+total de partes dividido entre la exposición total (@tbl-u26-tasa):
+$$\hat\lambda_k=\frac{\sum_i d_{ik}}{\sum_i e_{ik}}=\frac{d_k}{E_k}.$$
+
+```{r}
+#| label: tbl-u26-tasa
+#| tbl-cap: "Tasa empírica de partes por año de antigüedad. `filas`: clientes que aportan ese año; `exposicion`: años-póliza observados; `partes`: total de partes; `tasa`: partes por año-póliza; `media_fila`: media de partes por fila, sin tener en cuenta la exposición. Las dos últimas coinciden en los años que todos los clientes completan y se separan cuando aparecen años incompletos."
+tasa_anio <- panel |>
+  dplyr::group_by(anio) |>
+  dplyr::summarise(filas      = dplyr::n(),
+                   exposicion = round(sum(expo_anual), 1),
+                   partes     = sum(n_partes_anual),
+                   tasa       = round(partes / exposicion, 3),
+                   media_fila = round(mean(n_partes_anual), 3))
+tasa_anio
+```
+
+La tabla dice dos cosas. La primera confirma lo visto en la [§6.1](#sec-u26-datos): hay que dividir
+entre la exposición, no entre el número de filas. En los tres primeros años, que todos los clientes
+completan, la tasa y la media por fila coinciden. Después, la media por fila trata los años incompletos
+como si fueran completos y sin partes, y se queda corta: en el año 10, `r tasa_anio$media_fila[10]` frente
+a una tasa de `r tasa_anio$tasa[10]`.
+
+La segunda es la forma. La tasa baja en los primeros años, pero al final la serie se vuelve irregular y el
+año 10 incluso repunta. ¿Es un cambio real o es ruido? Depende de cuánta información sostiene cada año. El
+error estándar del logaritmo de la tasa es, aproximadamente, $1/\sqrt{d_k}$ (el recuadro siguiente lo
+justifica): cuantos menos partes, más incierta es la tasa. Con esa aproximación dibujamos cada tasa con su
+intervalo al 95 % (@fig-u26-tasa).
+
+::: {.callout-note collapse="true"}
+## Detalle técnico: el error estándar de la tasa, por el método delta
+**El método.** Si un estimador $\hat\theta$ es aproximadamente normal y $g$ es una función derivable,
+$\operatorname{Var}\{g(\hat\theta)\}\approx g'(\theta)^2\,\operatorname{Var}(\hat\theta)$
+(sección 16.1 de @agresti2013).
+
+**Aplicado a la tasa de un año.** Con $d_k$ partes y una exposición total $E_k$ fija,
+$\hat\lambda_k=d_k/E_k$. Si $d_k\sim\text{Poisson}(\lambda_k E_k)$, entonces
+$\operatorname{Var}(\hat\lambda_k)=\lambda_k E_k/E_k^2=\lambda_k/E_k$. Tomando $g=\log$, con
+$g'(\lambda_k)=1/\lambda_k$:
+$$\operatorname{Var}(\log\hat\lambda_k)\approx\frac{1}{\lambda_k^2}\cdot\frac{\lambda_k}{E_k}=\frac{1}{\lambda_k E_k}\approx\frac{1}{d_k}.$$
+Por tanto $\operatorname{ee}(\log\hat\lambda_k)\approx 1/\sqrt{d_k}$, y el intervalo al 95 % es
+$\hat\lambda_k\,e^{\pm 1.96/\sqrt{d_k}}$, que nunca baja de cero. La precisión depende solo del número de
+partes, no del de clientes.
+
+**Supuesto.** Que los partes sigan una Poisson. Si unos clientes son sistemáticamente más propensos que
+otros, la varianza real es mayor y el intervalo resulta algo optimista.
+:::
+
+```{r}
+#| label: fig-u26-tasa
+#| fig-cap: "Tasa empírica de partes por año de antigüedad, con su intervalo al 95 % aproximado: exp(log tasa ± 1.96/√partes). El color indica la exposición del año, en años-póliza: cuanto más claro, menos clientes han llegado a esa antigüedad. Al caer la exposición caen también los partes que sostienen la estimación, y el intervalo se ensancha. El aparente repunte del año 10, el de menor exposición, cabe holgadamente dentro de su intervalo."
+#| fig-width: 6.5
+#| fig-height: 4
+tasa_anio |>
+  dplyr::mutate(inf = tasa * exp(-1.96 / sqrt(partes)),
+                sup = tasa * exp( 1.96 / sqrt(partes))) |>
+  ggplot(aes(anio, tasa, colour = exposicion)) +
+  geom_pointrange(aes(ymin = inf, ymax = sup), linewidth = 0.8) +
+  scale_colour_gradient(low = "#9ecae1", high = "#08306b") +
+  scale_x_continuous(breaks = 1:10) +
+  labs(x = "año de antigüedad", y = "partes por año-póliza", colour = "exposición\n(años-póliza)")
+```
+
+La exposición cae de `r round(tasa_anio$exposicion[1])` años-póliza en los primeros años a
+`r round(tasa_anio$exposicion[10])` en el décimo, y con ella los partes: de `r tasa_anio$partes[1]` a
+`r tasa_anio$partes[10]`. Por eso los intervalos se ensanchan, y el del año 10 es tan ancho que no permite
+distinguir un repunte de una tasa estable. Dar a cada año su propia tasa sería, en los últimos años,
+modelar ruido.
+
+La decisión es, por tanto, **agrupar años contiguos** hasta que cada trozo tenga información suficiente.
+Como criterio práctico pedimos unos 200 partes por trozo, que dejan un error de alrededor del 7 % en la
+tasa ($1/\sqrt{200}\approx 0.07$). Los seis primeros años lo cumplen por separado; los años 7 a 10 se
+agrupan en un único trozo:
+
+```{r}
+#| label: u26-trozos
+panel <- panel |>
+  dplyr::mutate(trozo = cut(anio, breaks = c(0:6, 10), labels = c(1:6, "7-10")))
+
+tasa_trozo <- panel |>
+  dplyr::group_by(trozo) |>
+  dplyr::summarise(partes = sum(n_partes_anual),
+                   tasa   = round(partes / sum(expo_anual), 3))
+tasa_trozo
+```
+
+El trozo `7-10` reúne `r tasa_trozo$partes[7]` partes, con una tasa de `r tasa_trozo$tasa[7]`, por
+debajo de la del primer año (`r tasa_trozo$tasa[1]`). Estos son los siete trozos con los que trabajará el
+modelo.
+
+::: {.callout-tip}
+## Los trozos los decide el analista
+No hay una partición correcta: es un compromiso entre **detalle** y **estabilidad**. Más trozos
+describen con más precisión cómo cambia la tasa, pero cada uno descansa sobre menos partes y su tasa es
+más ruidosa; menos trozos dan tasas más estables a cambio de una forma más gruesa. El criterio de unos 200
+partes por trozo es una elección razonable, no una regla.
+
+Una opción más suave es exigir unos 500 partes por trozo. Con ese criterio, los tres primeros años siguen
+por separado y el resto se agrupa en dos trozos más anchos:
+
+```{r}
+#| label: u26-trozos-alt
+panel |>
+  dplyr::mutate(trozo_alt = cut(anio, breaks = c(0, 1, 2, 3, 5, 10),
+                                labels = c("1", "2", "3", "4-5", "6-10"))) |>
+  dplyr::group_by(trozo_alt) |>
+  dplyr::summarise(partes = sum(n_partes_anual),
+                   tasa   = round(partes / sum(expo_anual), 3))
+```
+
+Con cinco trozos, los dos tramos anchos dan tasas estables y decrecientes, y desaparecen las
+irregularidades del final; a cambio, se pierde el detalle de cómo evoluciona la tasa entre los años 4 y 10. Cualquiera de las dos particiones es defendible; lo
+importante es fijarla con un criterio explícito **antes** de ajustar el modelo, y no elegir después la que
+dé el resultado más vistoso.
+:::
+
+### La tasa según las características del cliente
+
+Lo segundo es comprobar la estructura del modelo: ¿difiere la tasa entre clientes y, sobre todo, **se
+combina esa diferencia con la antigüedad como supone el modelo**? Para verlo calculamos la tasa por trozo **dentro de cada nivel** de cada predictor.
+Las continuas se agrupan en terciles —bajo, medio y alto—, calculados sobre los **clientes** y no sobre las
+filas, para que los clientes más antiguos no pesen más. Con terciles, y no con grupos más finos, cada
+combinación de trozo y nivel conserva partes suficientes.
+
+```{r}
+#| label: u26-tasa-xt
+tercil <- function(x) factor(dplyr::ntile(x, 3), labels = c("bajo", "medio", "alto"))
+clientes_t <- panel |>
+  dplyr::distinct(id_poliza, edad_conductor, antiguedad_carnet, potencia_cv) |>
+  dplyr::transmute(id_poliza, edad = tercil(edad_conductor), carnet = tercil(antiguedad_carnet),
+                   potencia = tercil(potencia_cv))
+panel_t <- dplyr::left_join(panel, clientes_t, by = "id_poliza")
+
+predictores <- c(edad = "edad", carnet = "carnet", potencia = "potencia", zona = "zona_circulacion",
+                 uso = "uso", vehiculo = "tipo_vehiculo", sexo = "sexo")
+tasa_xt <- purrr::imap_dfr(predictores, \(v, nombre) panel_t |>
+  dplyr::group_by(trozo, nivel = as.character(.data[[v]])) |>
+  dplyr::summarise(partes = sum(n_partes_anual), tasa = partes / sum(expo_anual), .groups = "drop") |>
+  dplyr::mutate(predictor = nombre)) |>
+  # orden natural en la leyenda: bajo, medio, alto (los factores conservan el suyo)
+  dplyr::mutate(nivel = forcats::fct_relevel(nivel, intersect(c("bajo", "medio", "alto"), unique(nivel))))
+```
+
+La @fig-u26-tasa-x dibuja esas tasas con el eje vertical en **escala logarítmica**. La escala no es un
+capricho: si un predictor **multiplica** la tasa por el mismo factor en todos los trozos, en escala
+logarítmica sus líneas quedan a una distancia vertical constante, es decir, **paralelas**.
+
+```{r}
+#| label: fig-u26-tasa-x
+#| fig-cap: "Tasa empírica de partes (partes por año-póliza) por trozo de antigüedad, con una línea por nivel de cada predictor (las continuas, en terciles de clientes). El eje vertical está en escala logarítmica: líneas paralelas indican que el predictor multiplica la tasa por el mismo factor en todos los trozos. En edad, años de carnet y potencia los niveles conservan su orden en todos los trozos; en zona, uso, tipo de vehículo y sexo las diferencias son pequeñas y las líneas se cruzan. En todos los grupos la tasa tiende a bajar con la antigüedad."
+#| fig-width: 10
+#| fig-height: 6.5
+patchwork::wrap_plots(purrr::map(names(predictores), \(p)
+  ggplot(dplyr::filter(tasa_xt, predictor == p), aes(trozo, tasa, colour = nivel, group = nivel)) +
+    geom_line() +
+    geom_point(size = 1.5) +
+    scale_y_log10() +
+    labs(title = p, x = "trozo", y = NULL, colour = NULL) +
+    theme(legend.position = "bottom", plot.title = element_text(size = 10))),
+  ncol = 4)
+```
+
+La figura deja tres lecturas.
+
+- **En todas las curvas, la tasa del primer trozo es mayor que la del último.** La caída con la antigüedad
+  no es solo de la cartera en conjunto: aparece en cada grupo de clientes.
+- **Edad, años de carnet y potencia desplazan la curva entera.** Los clientes jóvenes, con pocos años de
+  carnet o con vehículos potentes tienen más tasa, y la mantienen por encima en todos los trozos. Edad y
+  carnet, eso sí, van muy ligadas —su correlación entre clientes es
+  `r round(with(dplyr::distinct(panel, id_poliza, edad_conductor, antiguedad_carnet), cor(edad_conductor, antiguedad_carnet)), 2)`—,
+  así que el descriptivo no permite saber cuánto aporta cada una.
+- **Zona, uso, tipo de vehículo y sexo separan poco**, y sus curvas se cruzan de un trozo a otro: con
+  diferencias tan pequeñas, el ruido domina.
+
+Aunque algunas curvas se crucen, el patrón dominante es compatible con la estructura del modelo: cada
+característica del cliente **multiplica la tasa por un factor común**, el mismo en todos los trozos, y la
+antigüedad hace bajar la tasa por igual a todos los clientes. En la [§6.6](#sec-u26-diagnostico) lo
+contrastaremos formalmente.
+
+Con esto la exploración ha cumplido su función: trabajaremos con siete trozos y la estructura del modelo
+es razonable. Lo que el descriptivo no puede hacer es medirlo todo a la vez: cuánto baja la tasa de un
+trozo a otro *a igualdad de cliente*, y cuánto aporta cada predictor *a igualdad de los demás*. Eso lo
+hace el ajuste.
+
+::: {.callout-tip}
+## 🔧 En R. Tasas empíricas con exposición
+Con unos datos `d` en formato sujeto-periodo —un conteo `y`, su exposición `expo`, el periodo `k` (aquí,
+el año de antigüedad) y un predictor categórico `g`—:
+
+```r
+# tasa empírica de cada periodo: total de eventos entre exposición total, con su IC 95 % aproximado
+tasa_k <- d |>
+  dplyr::group_by(k) |>
+  dplyr::summarise(eventos = sum(y), exposicion = sum(expo), tasa = eventos / exposicion,
+                   inf = tasa * exp(-1.96 / sqrt(eventos)),
+                   sup = tasa * exp( 1.96 / sqrt(eventos)))
+
+# agrupar periodos contiguos en trozos, con un criterio de eventos por trozo fijado de antemano
+d$trozo <- cut(d$k, breaks = c(0:6, 10), labels = c(1:6, "7-10"))
+
+# tasa por trozo dentro de cada nivel del predictor (para dibujarla en escala logarítmica)
+tasa_trozo_g <- d |>
+  dplyr::group_by(trozo, g) |>
+  dplyr::summarise(eventos = sum(y), tasa = eventos / sum(expo), .groups = "drop")
+```
+
+Nunca promedies el conteo por fila cuando la exposición varía: la tasa es *suma de eventos / suma de
+exposición*.
+:::
+
+## 6.4 Ajuste, interpretación y predicción {#sec-u26-ajuste}
+
+### Ajuste
+
+Ajustamos el modelo de la [§6.2](#sec-u26-modelo) con los siete trozos decididos en la
+[§6.3](#sec-u26-exploracion). Las tres variables continuas las medimos en **decenas** —10 años de edad, 10 años de carnet, 10 CV de
+potencia—, para que sus razones de tasas no queden en cifras pegadas a 1 por medir cambios demasiado
+pequeños. Los factores toman como referencia su primer nivel: zona urbana, uso particular, turismo y
+sexo H.
+
+```{r}
+#| label: u26-pw
+panel <- panel |>
+  dplyr::mutate(edad_10 = edad_conductor / 10, carnet_10 = antiguedad_carnet / 10,
+                potencia_10 = potencia_cv / 10)
+
+m_pw <- glm(n_partes_anual ~ trozo + edad_10 + carnet_10 + potencia_10 + zona_circulacion + uso +
+              tipo_vehiculo + sexo + offset(log(expo_anual)),
+            family = poisson, data = panel)
+```
+
+La @tbl-u26-pw muestra las razones de tasas con sus intervalos al 95 %.
+
+```{r}
+#| label: tbl-u26-pw
+#| tbl-cap: "Razones de tasas del modelo de riesgos a trozos, con intervalo de confianza al 95 %. Las filas `trozo` comparan cada trozo con el primero, a igualdad de cliente; las demás comparan cada nivel con su referencia (zona urbana, uso particular, turismo, sexo H) o miden el efecto de 10 unidades de la variable continua, a igualdad del resto. La fila `(Intercept)` es la tasa del cliente de referencia en el primer trozo con las continuas en 0, sin interpretación práctica."
+tab_pw <- broom::tidy(m_pw, exponentiate = TRUE, conf.int = TRUE) |>
+  dplyr::transmute(termino = term, razon = round(estimate, 3), inf = round(conf.low, 3),
+                   sup = round(conf.high, 3), p = signif(p.value, 2))
+tab_pw
+```
+
+```{r}
+#| label: u26-pw-aux
+#| include: false
+rt <- function(t, col = "razon") tab_pw[[col]][tab_pw$termino == t]   # cifra de la tabla, para el texto
+pct <- function(t) round(100 * abs(1 - rt(t)))                          # cambio porcentual
+```
+
+### Interpretación
+
+**La antigüedad.** A igualdad de cliente, la tasa del trozo `7-10` es `r rt("trozo7-10")` veces la del
+primero (intervalo de `r rt("trozo7-10", "inf")` a `r rt("trozo7-10", "sup")`): un cliente da en esos años
+un `r pct("trozo7-10")` % menos partes que en su primer año. La caída no es inmediata: los trozos 2 y 3
+no se distinguen del primero —sus intervalos incluyen el 1—, y la tasa empieza a bajar con claridad a
+partir del cuarto año.
+
+**Las características del cliente**, cada una a igualdad de las demás:
+
+- **Edad y años de carnet** reducen la tasa: un `r pct("edad_10")` % menos por cada 10 años de edad y un
+  `r pct("carnet_10")` % menos por cada 10 años de carnet. El modelo separa lo que el descriptivo no podía:
+  las dos protegen, cada una por su lado.
+- **La potencia** la aumenta: un `r pct("potencia_10")` % más por cada 10 CV.
+- **La zona** importa: frente a la urbana, la tasa es un `r pct("zona_circulacionmixta")` % menor en zona
+  mixta y un `r pct("zona_circulacionrural")` % menor en rural.
+- **El uso comercial** la aumenta un `r pct("usocomercial")` % y **la moto**, un
+  `r pct("tipo_vehiculomoto")` % frente al turismo.
+- **La furgoneta y el sexo** no muestran efecto: sus intervalos incluyen el 1.
+
+Qué variables conservar lo decidiremos en la [§6.5](#sec-u26-poliza), cuando el modelo tenga en cuenta que
+cada cliente aporta varias filas.
+
+### Predicción
+
+Con el modelo podemos calcular la tasa de cualquier cliente en cada trozo y seguir cómo evoluciona con
+la antigüedad. Para comparar, fijamos tres **perfiles prototipo**, todos con uso particular, turismo y
+sexo H:
+
+- **Joven y urbano**, de riesgo alto: 25 años, 5 de carnet, un coche de 160 CV y circulación urbana.
+- **Mediano**: el cliente central de la cartera, con la edad, los años de carnet y la potencia en sus
+  medianas y circulación urbana, la zona más frecuente.
+- **Veterano y rural**, de riesgo bajo: 60 años, 35 de carnet, un coche de 90 CV y circulación rural.
+
+Para obtener la tasa fijamos la exposición en un año completo.
+
+```{r}
+#| label: tbl-u26-perfiles
+#| tbl-cap: "Tasa de partes (partes por año) predicha por el modelo para los tres perfiles prototipo en cada trozo de antigüedad. Las tres bajan con la antigüedad en la misma proporción, y el cociente entre dos perfiles es el mismo en todos los trozos."
+medianas <- panel |>                                  # medianas por cliente, no por fila
+  dplyr::distinct(id_poliza, edad_conductor, antiguedad_carnet, potencia_cv) |>
+  dplyr::summarise(dplyr::across(-id_poliza, median))
+
+perfiles <- tibble::tibble(
+  perfil      = c("joven_urbano", "mediano", "veterano_rural"),
+  edad_10     = c(2.5, medianas$edad_conductor / 10, 6),
+  carnet_10   = c(0.5, medianas$antiguedad_carnet / 10, 3.5),
+  potencia_10 = c(16, medianas$potencia_cv / 10, 9),
+  zona_circulacion = c("urbana", "urbana", "rural"), uso = "particular", tipo_vehiculo = "turismo",
+  sexo = "H", expo_anual = 1)                       # un año completo: la predicción es la tasa
+
+pred <- tidyr::crossing(perfiles, trozo = factor(levels(panel$trozo), levels = levels(panel$trozo)))
+pred$tasa <- predict(m_pw, newdata = pred, type = "response")
+
+pred_tabla <- pred |>
+  dplyr::select(trozo, perfil, tasa) |>
+  tidyr::pivot_wider(names_from = perfil, values_from = tasa) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+pred_tabla
+```
+
+```{r}
+#| label: u26-perfiles-aux
+#| include: false
+anchos <- c(rep(1, 6), 4)                             # años que abarca cada trozo
+partes_esp <- pred |>
+  dplyr::group_by(perfil) |>
+  dplyr::summarise(cinco = sum(tasa[1:5]),           # los trozos 1 a 5 son de un año cada uno
+                   diez  = sum(tasa * anchos))       # todo el seguimiento: tasa por años del trozo
+pe <- function(p, col) round(partes_esp[[col]][partes_esp$perfil == p], 2)
+tasa_p <- function(p, k) pred$tasa[pred$perfil == p & pred$trozo == k]
+```
+
+El cliente mediano tiene `r medianas$edad_conductor` años, `r medianas$antiguedad_carnet` de carnet y un
+coche de `r medianas$potencia_cv` CV. La @tbl-u26-perfiles se lee en dos direcciones.
+
+- **A lo largo de la antigüedad**, los tres perfiles siguen la misma evolución: en el trozo `7-10` su tasa
+  es `r rt("trozo7-10")` veces la del primer año. El joven y urbano pasa de
+  `r round(tasa_p("joven_urbano", "1"), 3)` a `r round(tasa_p("joven_urbano", "7-10"), 3)` partes por año;
+  el mediano, de `r round(tasa_p("mediano", "1"), 3)` a `r round(tasa_p("mediano", "7-10"), 3)`; el
+  veterano y rural, de `r round(tasa_p("veterano_rural", "1"), 3)` a
+  `r round(tasa_p("veterano_rural", "7-10"), 3)`.
+- **Entre perfiles**, las distancias se mantienen en todos los trozos: el joven y urbano tiene una tasa
+  `r round(tasa_p("joven_urbano", "1") / tasa_p("mediano", "1"), 1)` veces la del mediano, y este,
+  `r round(tasa_p("mediano", "1") / tasa_p("veterano_rural", "1"), 1)` veces la del veterano y rural.
+  Es la consecuencia directa de que el modelo multiplique la tasa base por un factor propio de cada
+  cliente.
+
+Sumando la tasa de cada trozo por los años que abarca obtenemos los partes esperados. En sus cinco
+primeros años, el joven y urbano espera `r pe("joven_urbano", "cinco")` partes, el mediano
+`r pe("mediano", "cinco")` y el veterano y rural `r pe("veterano_rural", "cinco")`; en diez años,
+`r pe("joven_urbano", "diez")`, `r pe("mediano", "diez")` y `r pe("veterano_rural", "diez")`.
+
+La @fig-u26-perfiles dibuja esas tasas sobre la antigüedad, con su intervalo al 95 %. Se ve literalmente la
+tasa *a trozos*: constante dentro de cada trozo y con un salto al pasar al siguiente.
+
+```{r}
+#| label: fig-u26-perfiles
+#| fig-cap: "Tasa de partes predicha por el modelo para los tres perfiles prototipo a lo largo de la antigüedad. Cada segmento es la tasa de un trozo, constante dentro de él (el último trozo abarca de los 6 a los 10 años); la banda sombreada es su intervalo de confianza al 95 %. El eje vertical está en escala logarítmica: los tres perfiles bajan igual con la antigüedad y quedan a la misma distancia en todos los trozos, porque el modelo multiplica la tasa base por un factor propio de cada cliente."
+#| fig-width: 7
+#| fig-height: 4
+ic <- predict(m_pw, newdata = pred, type = "link", se.fit = TRUE)   # IC en escala log
+limites <- c(0:6, 10)                                               # bordes de los trozos, en años
+
+pred |>
+  dplyr::mutate(inf = exp(ic$fit - 1.96 * ic$se.fit), sup = exp(ic$fit + 1.96 * ic$se.fit),
+                desde = limites[as.integer(trozo)], hasta = limites[as.integer(trozo) + 1]) |>
+  ggplot() +
+  geom_rect(aes(xmin = desde, xmax = hasta, ymin = inf, ymax = sup, fill = perfil), alpha = 0.25) +
+  geom_segment(aes(x = desde, xend = hasta, y = tasa, yend = tasa, colour = perfil), linewidth = 1) +
+  scale_y_log10() +
+  scale_x_continuous(breaks = limites) +
+  scale_colour_discrete(labels = c("joven, urbano", "mediano", "veterano, rural"),
+                        aesthetics = c("colour", "fill")) +
+  labs(x = "antigüedad (años)", y = "partes por año (escala log)", colour = NULL, fill = NULL)
+```
+
+::: {.callout-tip}
+## 🔧 En R. El modelo de riesgos a trozos
+Con unos datos `d` en formato sujeto-periodo —conteo `y`, exposición `expo`, factor `trozo` y
+predictores `x1`, `x2`—:
+
+```r
+m <- glm(y ~ trozo + x1 + x2 + offset(log(expo)), family = poisson, data = d)
+
+# razones de tasas con su intervalo al 95 %
+broom::tidy(m, exponentiate = TRUE, conf.int = TRUE)
+
+# tasa predicha de un perfil en cada trozo: exposición fija en una unidad de tiempo
+nd <- tidyr::crossing(x1 = 30, x2 = "a", trozo = levels(d$trozo), expo = 1)
+nd$tasa <- predict(m, newdata = nd, type = "response")
+
+# intervalo al 95 % de cada tasa: se calcula en escala log y se exponencia
+p <- predict(m, newdata = nd, type = "link", se.fit = TRUE)
+nd$inf <- exp(p$fit - 1.96 * p$se.fit)
+nd$sup <- exp(p$fit + 1.96 * p$se.fit)
+```
+
+El intervalo se construye en la escala del predictor lineal, $\log\hat\lambda\pm 1.96\,\text{ee}$, donde
+la aproximación normal funciona mejor, y se lleva a la escala de la tasa con la exponencial: por eso nunca
+baja de cero y no es simétrico alrededor de la tasa estimada.
+
+Para que una razón de tasas de una variable continua sea legible, mide la variable en unidades con
+sentido (decenas de años, de CV…). Las predicciones con `expo = 1` son tasas; con otra exposición, son
+eventos esperados en ese tiempo.
+:::
+
+## 6.5 Los años de un mismo cliente no son independientes {#sec-u26-poliza}
+
+El modelo de la §6.4 trata cada fila del panel como una observación independiente, una vez tenidas en cuenta
+las características del cliente. Pero cada cliente aporta varias filas, una por año, y es razonable pensar
+que dos clientes con la misma edad, el mismo coche y la misma zona no tienen el mismo riesgo: cuentan
+hábitos, recorridos o prudencia que no medimos. A esa propensión propia de cada cliente, que no explican
+las variables disponibles, se la llama **fragilidad** [@vaupel1979]. Si existe, los años de un mismo
+cliente se parecen entre sí: quien da partes un año tiende a darlos también en otros. Las filas ya no son
+independientes, y la **póliza** pasa a ser una variable de agrupación, como lo era la agencia en la
+[Unidad 2.5](#sec-u25).
+
+### Un efecto aleatorio por póliza
+
+La solución es la de la [Unidad 2.5](#sec-u25): añadir al modelo un **intercepto aleatorio** por póliza,
+$$\log\lambda_{ik}=\alpha_k+\mathbf{x}_i^\top\boldsymbol\beta+u_i,\qquad u_i\sim N(0,\sigma^2).$$
+El término $u_i$ es la fragilidad del cliente en escala logarítmica: $e^{u_i}$ multiplica su tasa en todos
+sus años. Lo ajustamos con `glmmTMB` [@brooks2017], sobre el mismo panel y con las mismas variables:
+
+```{r}
+#| label: u26-mix
+m_pw_mix <- glmmTMB::glmmTMB(
+  n_partes_anual ~ trozo + edad_10 + carnet_10 + potencia_10 + zona_circulacion + uso +
+    tipo_vehiculo + sexo + offset(log(expo_anual)) + (1 | id_poliza),
+  family = poisson, data = panel)
+
+sigma_pol <- sqrt(glmmTMB::VarCorr(m_pw_mix)$cond$id_poliza[1])
+lrt_pol   <- 2 * (as.numeric(logLik(m_pw_mix)) - as.numeric(logLik(m_pw)))   # mixto frente a GLM
+round(c(sigma = sigma_pol, exp_sigma = exp(sigma_pol), razon_verosimilitudes = lrt_pol), 3)
+```
+
+La desviación típica de la fragilidad es $\hat\sigma=$ `r round(sigma_pol, 2)`. Se lee en escala
+multiplicativa: un cliente una desviación típica por encima de lo normal tiene una tasa
+`r round(exp(sigma_pol), 2)` veces la de un cliente idéntico en sus características. Es una diferencia
+grande: mayor, por ejemplo, que la que separa la zona urbana de la rural, cuya razón de tasas equivale a
+multiplicar por `r round(1 / rt("zona_circulacionrural"), 2)`. El contraste de razón de verosimilitudes
+frente al modelo sin efecto de póliza vale `r round(lrt_pol)`, tan grande que no deja dudas: la fragilidad
+existe.
+
+### Qué cambia y qué no
+
+```{r}
+#| label: tbl-u26-mix
+#| tbl-cap: "Razones de tasas y errores estándar (en escala logarítmica) del modelo sin efecto de póliza (§6.4) y con él. Las razones de tasas apenas cambian. Los errores estándar de los trozos son los mismos; los de las características del cliente crecen."
+tab_mix <- tibble::tibble(
+  termino  = names(coef(m_pw))[-1],
+  razon    = round(exp(coef(m_pw))[-1], 3),
+  ee       = round(sqrt(diag(vcov(m_pw)))[-1], 3),
+  razon_mix = round(exp(glmmTMB::fixef(m_pw_mix)$cond)[-1], 3),
+  ee_mix   = round(sqrt(diag(vcov(m_pw_mix)$cond))[-1], 3))
+tab_mix
+```
+
+La @tbl-u26-mix resume el efecto de reconocer la agrupación.
+
+- **Las razones de tasas apenas cambian.** Con enlace log, un intercepto aleatorio desplaza el nivel
+  general de la tasa, pero no altera los efectos multiplicativos de las demás variables. Las conclusiones
+  de la §6.4 se mantienen.
+- **Los errores estándar de los trozos no cambian.** Comparar dos trozos es comparar años de los mismos
+  clientes, y en esa comparación la fragilidad de cada cliente se cancela.
+- **Los errores estándar de las características del cliente crecen.** La edad, la zona o el tipo de
+  vehículo se comparan *entre* clientes, y ahí la fragilidad añade variabilidad que el modelo sin efecto
+  de póliza ignoraba. Sus intervalos eran demasiado estrechos: el modelo mixto los corrige.
+
+### ¿Qué variables se quedan?
+
+Con los errores estándar ya corregidos, podemos decidir qué variables conservar. Para cada una comparamos
+el modelo mixto con el mismo modelo sin ella, mediante un contraste de razón de verosimilitudes. Al lado
+mostramos el mismo contraste hecho con el modelo sin efecto de póliza de la §6.4, para ver qué habríamos
+concluido ignorando la agrupación.
+
+```{r}
+#| label: tbl-u26-seleccion
+#| tbl-cap: "Contraste de razón de verosimilitudes al eliminar cada variable. `gl`: parámetros que se eliminan; `p_glm`: valor p con el modelo sin efecto de póliza (§6.4); `chi2_mixto` y `p_mixto`: estadístico y valor p con el modelo mixto, que es el que tiene en cuenta que cada cliente aporta varias filas."
+seleccion <- dplyr::full_join(
+  tibble::as_tibble(drop1(m_pw, test = "Chisq"), rownames = "variable") |>
+    dplyr::select(variable, gl = Df, p_glm = `Pr(>Chi)`),
+  tibble::as_tibble(drop1(m_pw_mix, test = "Chisq"), rownames = "variable") |>
+    dplyr::select(variable, chi2_mixto = LRT, p_mixto = `Pr(>Chi)`),
+  by = "variable") |>
+  dplyr::filter(variable != "<none>") |>
+  dplyr::mutate(chi2_mixto = round(chi2_mixto, 2), dplyr::across(c(p_glm, p_mixto), \(x) signif(x, 2)))
+seleccion
+```
+
+```{r}
+#| label: u26-seleccion-aux
+#| include: false
+pv <- function(v, col) seleccion[[col]][seleccion$variable == v]   # valor p de la tabla, para el texto
+```
+
+La @tbl-u26-seleccion lleva a una decisión clara: todas las variables son necesarias salvo el **sexo**
+(p = `r pv("sexo", "p_mixto")`). El tipo de vehículo se queda como conjunto, porque la moto sí se distingue
+del turismo aunque la furgoneta no lo haga.
+
+La comparación con el modelo sin efecto de póliza muestra cuánto exageraba la evidencia: el uso pasa de
+p = `r pv("uso", "p_glm")` a `r pv("uso", "p_mixto")`, y el tipo de vehículo, de `r pv("tipo_vehiculo", "p_glm")`
+a `r pv("tipo_vehiculo", "p_mixto")`. Siguen siendo significativos, pero con mucha menos holgura. Si la
+selección se hubiera hecho sobre el modelo sin efecto de póliza, la conclusión habría sido la misma esta
+vez, pero con una seguridad que los datos no justifican.
+
+El modelo final es, por tanto, el mixto sin el sexo:
+
+```{r}
+#| label: u26-final
+m_pw_fin <- update(m_pw_mix, . ~ . - sexo)
+```
+
+::: {.callout-note}
+## Recomendaciones: seleccionar variables con datos agrupados
+- **Primero la estructura, después la selección.** Los efectos aleatorios que impone el diseño —aquí, la
+  póliza, porque cada cliente aporta varios años— se incluyen desde el principio y se conservan; la
+  selección se hace sobre los efectos fijos de ese modelo [@bolker2009].
+- **No seleccionar sobre el modelo que ignora la agrupación.** Tratar como independientes las filas de un
+  mismo cliente es pseudorreplicación: los errores estándar salen demasiado pequeños y los contrastes,
+  demasiado optimistas [@bolker2009].
+- **La razón de verosimilitudes para efectos fijos**, con dos condiciones: que el modelo se estime por
+  máxima verosimilitud (lo que hace `glmmTMB` por defecto) y que haya muchas observaciones y muchos
+  niveles del efecto aleatorio [@bolker2009]. Aquí hay `r nrow(panel)` filas y
+  `r dplyr::n_distinct(panel$id_poliza)` pólizas, así que el contraste es fiable.
+- **Con muchos candidatos**, la vía es la regularización en dos pasos del
+  [resumen de modelos](#sec-u2r-mixreg): seleccionar con `cv.glmnet` sobre el modelo de efectos fijos,
+  formando los bloques de validación por cliente, y ajustar después el mixto con las variables retenidas.
+  El trozo, que describe la tasa base, no debe penalizarse.
+:::
+
+### Predicción: qué cliente
+
+Con el efecto de póliza, la tasa de un perfil deja de ser un único número: depende de **qué cliente** se
+suponga. Son los mismos cuatro tipos de predicción de la [Unidad 2.5](#sec-u25-prediccion), con el
+cliente en el papel de la agencia (allí se deducen las fórmulas):
+
+| Predicción | Tasa | Error que incorpora |
+|:--|:--|:--|
+| **Cliente observado** | $e^{\hat\eta+\hat u_i}$ | el de $\hat{\boldsymbol\beta}$ y $\hat u_i$, conjuntamente |
+| **Cliente típico** ($u=0$; la mediana) | $e^{\hat\eta}$ | el de $\hat{\boldsymbol\beta}$ |
+| **Cliente nuevo, en media** | $e^{\hat\eta}\,e^{\sigma^2/2}$ | el de $\hat{\boldsymbol\beta}$ ($\sigma$ tratada como conocida) |
+| **Cliente nuevo, intervalo de predicción** | $e^{\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2}}$ | el de $\hat{\boldsymbol\beta}$ y la variación entre clientes |
+
+Aquí $\hat\eta=\hat\alpha_k+\mathbf{x}^\top\hat{\boldsymbol\beta}$ es el predictor lineal del perfil en el
+trozo $k$. Lo aplicamos a los tres perfiles prototipo de la [§6.4](#sec-u26-ajuste), con el modelo final:
+
+```{r}
+#| label: u26-pred-mix
+s2_pol <- glmmTMB::VarCorr(m_pw_fin)$cond$id_poliza[1]          # varianza de la fragilidad
+nd_mix <- dplyr::mutate(pred, id_poliza = NA)                     # perfiles y trozos de la §6.4
+p_tip  <- predict(m_pw_fin, newdata = nd_mix, type = "link", se.fit = TRUE, re.form = NA)
+pred_mix <- nd_mix |>
+  dplyr::transmute(perfil, trozo,
+                   efectos_fijos = tasa,                                   # modelo de la §6.4
+                   tipico        = exp(p_tip$fit),
+                   tipico_inf    = exp(p_tip$fit - 1.96 * p_tip$se.fit),
+                   tipico_sup    = exp(p_tip$fit + 1.96 * p_tip$se.fit),
+                   nuevo_media   = exp(p_tip$fit + s2_pol / 2),
+                   nuevo_inf     = exp(p_tip$fit - 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)),
+                   nuevo_sup     = exp(p_tip$fit + 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)))
+```
+
+```{r}
+#| label: fig-u26-pred-mix
+#| fig-cap: "Tasa predicha para los tres perfiles prototipo de la §6.4 a lo largo de la antigüedad, según el tipo de predicción (escala logarítmica). Línea negra discontinua: modelo de efectos fijos de la §6.4. Línea de color con banda oscura: cliente típico (u = 0) con su intervalo de confianza. Línea de puntos: cliente nuevo en media. Banda clara: intervalo de predicción para la tasa de un cliente nuevo. La predicción de efectos fijos coincide con la del cliente nuevo en media; la del cliente típico queda por debajo; y la tasa de un cliente concreto puede estar muy lejos de ambas."
+#| fig-width: 10
+#| fig-height: 4
+pred_mix |>
+  dplyr::mutate(desde = limites[as.integer(trozo)], hasta = limites[as.integer(trozo) + 1],
+                perfil = factor(perfil, c("joven_urbano", "mediano", "veterano_rural"),
+                                c("joven, urbano", "mediano", "veterano, rural"))) |>
+  ggplot() +
+  geom_rect(aes(xmin = desde, xmax = hasta, ymin = nuevo_inf, ymax = nuevo_sup, fill = perfil), alpha = 0.12) +
+  geom_rect(aes(xmin = desde, xmax = hasta, ymin = tipico_inf, ymax = tipico_sup, fill = perfil), alpha = 0.35) +
+  geom_segment(aes(x = desde, xend = hasta, y = tipico, yend = tipico, colour = perfil), linewidth = 1) +
+  geom_segment(aes(x = desde, xend = hasta, y = nuevo_media, yend = nuevo_media, colour = perfil),
+               linetype = 3, linewidth = 1) +
+  geom_segment(aes(x = desde, xend = hasta, y = efectos_fijos, yend = efectos_fijos), linetype = 2) +
+  facet_wrap(~ perfil) +
+  scale_y_log10() +
+  scale_x_continuous(breaks = limites) +
+  labs(x = "antigüedad (años)", y = "partes por año (escala log)") +
+  theme(legend.position = "none")
+```
+
+```{r}
+#| label: u26-pred-mix-aux
+#| include: false
+pm <- function(per, k, col) round(pred_mix[[col]][pred_mix$perfil == per & pred_mix$trozo == k], 3)
+```
+
+La @fig-u26-pred-mix enseña tres cosas, con el conductor joven y urbano en su primer año como ejemplo.
+
+- **La predicción de efectos fijos de la §6.4 es la del cliente nuevo en media**: `r pm("joven_urbano", "1", "efectos_fijos")`
+  frente a `r pm("joven_urbano", "1", "nuevo_media")`. El modelo sin efecto de póliza estima, sin
+  decirlo, la tasa **media** de los clientes con ese perfil.
+- **El cliente típico tiene una tasa menor**, `r pm("joven_urbano", "1", "tipico")`: la media queda por
+  encima de la mediana en un factor $e^{\hat\sigma^2/2}=$ `r round(exp(s2_pol / 2), 2)`, porque los
+  clientes más propensos suben la media más de lo que los menos propensos la bajan.
+- **La tasa de un cliente nuevo concreto es muy incierta**: puede caer entre
+  `r pm("joven_urbano", "1", "nuevo_inf")` y `r pm("joven_urbano", "1", "nuevo_sup")`. Saber su edad, su
+  coche y su zona no basta para conocer su riesgo; lo que falta lo pone su propio historial.
+
+Eso último es lo que aprovecha la predicción del **cliente observado**. Volvamos a la póliza 94 de la
+@tbl-u26-panel, que dio partes en tres de sus años:
+
+```{r}
+#| label: tbl-u26-pred-94
+#| tbl-cap: "Tasa predicha para la póliza 94 en cada trozo: con su efecto de póliza estimado (cliente observado, con su intervalo de confianza) y para un cliente típico con sus mismas características. Su historial de partes la sitúa claramente por encima de lo que predicen sus características."
+nd_94 <- panel |>
+  dplyr::filter(id_poliza == 94) |>
+  dplyr::distinct(id_poliza, .keep_all = TRUE) |>
+  dplyr::select(-trozo, -expo_anual) |>
+  tidyr::crossing(trozo = factor(levels(panel$trozo), levels = levels(panel$trozo))) |>
+  dplyr::mutate(expo_anual = 1)
+p_obs_94 <- predict(m_pw_fin, newdata = nd_94, type = "link", se.fit = TRUE)               # con su u_i
+p_tip_94 <- predict(m_pw_fin, newdata = nd_94, type = "link", se.fit = TRUE, re.form = NA)  # u = 0
+pred_94 <- tibble::tibble(trozo     = nd_94$trozo,
+                          observado = exp(p_obs_94$fit),
+                          inf       = exp(p_obs_94$fit - 1.96 * p_obs_94$se.fit),
+                          sup       = exp(p_obs_94$fit + 1.96 * p_obs_94$se.fit),
+                          tipico    = exp(p_tip_94$fit)) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+u_94 <- glmmTMB::ranef(m_pw_fin)$cond$id_poliza["94", 1]          # su fragilidad estimada (escala log)
+pred_94
+```
+
+El efecto estimado de la póliza 94 es $\hat u=$ `r round(u_94, 2)`: su tasa es `r round(exp(u_94), 2)`
+veces la de un cliente típico con sus mismas características. En el primer trozo, el modelo le asigna
+`r pred_94$observado[1]` partes por año, frente a `r pred_94$tipico[1]` para el cliente típico. Es la base
+estadística de la tarificación por experiencia: el historial de cada cliente corrige lo que predicen sus
+características. La corrección no es completa, porque el efecto estimado se encoge hacia 0 —como los BLUP
+de la Unidad 2.5—, tanto más cuantos menos años lleve el cliente en la cartera.
+
+::: {.callout-warning}
+## Una limitación: los clientes que se van
+En esta cartera la antigüedad de cada cliente depende solo de cuándo contrató. En una cartera real no es
+así: los clientes con más partes tienden a marcharse antes, por voluntad propia o porque la aseguradora no
+les renueva [@feldblum1996; @cohen2005]. Entonces los años altos de antigüedad quedan poblados por los
+clientes de menos riesgo, y la caída de la tasa con la antigüedad mezcla dos cosas: que cada cliente
+mejora y que los peores se van. Un efecto aleatorio por póliza no separa esas dos explicaciones; hacerlo
+exige modelizar también la salida de la cartera.
+
+La idea, en pocas palabras, es un **modelo conjunto**: junto a la tasa de partes se modeliza el riesgo de
+que cada cliente se dé de baja, y una **misma fragilidad** entra en los dos. El cliente frágil da más partes
+y, a la vez, tiende a irse antes. Al estimar los dos procesos juntos, la salida de los clientes deja de
+sesgar la evolución de la tasa con la antigüedad [@liu2004]. Los modelos para el tiempo hasta un evento,
+como la baja, los trabajaremos en el Caso 3.
+:::
+
+::: {.callout-tip}
+## 🔧 En R. Riesgos a trozos con efecto de sujeto
+Con unos datos `d` en formato sujeto-periodo —conteo `y`, exposición `expo`, factor `trozo`, predictor
+`x` e identificador `id`—:
+
+```r
+m     <- glm(y ~ trozo + x + offset(log(expo)), family = poisson, data = d)           # sin efecto de sujeto
+m_mix <- glmmTMB::glmmTMB(y ~ trozo + x + offset(log(expo)) + (1 | id), family = poisson, data = d)   # con él
+sqrt(glmmTMB::VarCorr(m_mix)$cond$id[1])                        # desviación típica de la fragilidad
+2 * (as.numeric(logLik(m_mix)) - as.numeric(logLik(m)))         # razón de verosimilitudes
+
+# selección: razón de verosimilitudes al eliminar cada variable, sobre el modelo mixto
+drop1(m_mix, test = "Chisq")
+m_fin <- update(m_mix, . ~ . - x)                                # si x sobra
+
+# predicción para unas covariables nd (con expo = 1 e id): en escala log, y se exponencian los extremos
+s2    <- glmmTMB::VarCorr(m_fin)$cond$id[1]
+p_obs <- predict(m_fin, nd, type = "link", se.fit = TRUE)                 # cliente observado (su u_i)
+p_tip <- predict(m_fin, nd, type = "link", se.fit = TRUE, re.form = NA)   # cliente típico (u = 0)
+exp(p_tip$fit + s2 / 2)                                                   # cliente nuevo, en media
+exp(p_tip$fit + c(-1.96, 1.96) * sqrt(p_tip$se.fit^2 + s2))              # cliente nuevo, predicción
+```
+:::
+
+## 6.6 Diagnóstico {#sec-u26-diagnostico}
+
+El modelo descansa en dos supuestos que conviene comprobar: que cada predictor **multiplica la tasa por
+igual en todos los trozos**, y que una tasa **constante dentro de cada trozo** basta para reproducir cómo
+se acumulan los partes a lo largo de la antigüedad.
+
+### ¿Actúan los predictores por igual en todos los trozos?
+
+Es el supuesto que la exploración de la [§6.3](#sec-u26-exploracion) daba por razonable. Para contrastarlo
+formalmente, dejamos que el efecto de un predictor sea **distinto en cada trozo** —añadiendo la interacción
+`trozo:predictor`— y comprobamos si esa libertad mejora el modelo con un contraste de razón de
+verosimilitudes. Lo hacemos sobre el modelo final de la [§6.5](#sec-u26-poliza), con efecto de póliza y
+sin el sexo, porque el modelo sin efecto de póliza subestima los errores y daría contrastes demasiado
+optimistas. Probamos todos sus predictores.
+
+```{r}
+#| label: tbl-u26-prop
+#| tbl-cap: "Contraste de la proporcionalidad: para cada predictor, razón de verosimilitudes entre el modelo final (con efecto de póliza, sin sexo) y el mismo modelo con la interacción entre el trozo y ese predictor. `gl`: parámetros añadidos por la interacción; `chi2`: estadístico; `p`: valor p. Un valor p alto indica que dejar variar el efecto entre trozos no mejora el ajuste."
+predictores_prop <- c("edad_10", "carnet_10", "potencia_10", "zona_circulacion", "uso", "tipo_vehiculo")
+prop <- purrr::map_dfr(predictores_prop, \(v) {
+  m_int <- update(m_pw_fin, as.formula(paste(". ~ . + trozo:", v)))
+  a <- anova(m_pw_fin, m_int)
+  tibble::tibble(predictor = v, gl = a$`Chi Df`[2], chi2 = round(a$Chisq[2], 2),
+                 p = round(a$`Pr(>Chisq)`[2], 3))
+})
+prop
+```
+
+Ninguna interacción mejora el modelo: el valor p más bajo de la @tbl-u26-prop es `r min(prop$p)`. Los datos
+no dan razones para pensar que el efecto de algún predictor cambie con la antigüedad, que es lo que ya
+sugerían las curvas paralelas de la exploración. Conviene leerlo con la cautela de siempre: no rechazar el
+supuesto no lo demuestra, solo indica que estos datos no lo contradicen.
+
+### ¿Reproduce el modelo la evolución de los partes?
+
+El segundo supuesto se comprueba frente a una referencia que no dependa del modelo. Las tasas anuales de la
+§6.3 no sirven: el modelo con un parámetro por año las reproduce exactamente, así que compararlas con él
+sería circular. La referencia adecuada es la **tasa acumulada**, $\Lambda(t)$, estimada sin suponer ninguna
+forma para la tasa.
+
+Para estimarla usamos el instante exacto de cada parte, que el panel lleva adjunto: una tabla con una fila
+por parte, con la póliza (`id_poliza`), el año (`anio`) y el instante en años desde el alta (`t`). No todos
+los clientes han llegado a todas las antigüedades —uno con 4 años en la cartera no ha podido dar partes en
+su sexto año—, así que cada parte se divide entre los clientes que **seguían en la cartera** en ese
+momento: es la misma censura que en la [Unidad 1.5](../caso1/caso1_binaria.qmd#sec-u15). Es el estimador de **Nelson–Aalen** de la
+tasa acumulada [@lawless1995]:
+$$\widehat\Lambda(t)=\sum_{t_j\le t}\frac{d_j}{n(t_j)},$$
+donde $t_j$ recorre los instantes en que hubo algún parte hasta $t$, $d_j$ es el número de partes en ese
+instante y $n(t_j)$ el número de clientes cuya antigüedad alcanza $t_j$. Cada sumando es la tasa de ese
+instante y la suma los va acumulando.
+
+```{r}
+#| label: u26-na
+partes   <- attr(panel, "partes")
+clientes <- dplyr::distinct(panel, id_poliza, antiguedad)   # una fila por cliente
+na <- partes |>
+  dplyr::count(t, name = "d") |>                                        # partes en cada instante
+  dplyr::mutate(
+    en_obs = vapply(t, \(s) sum(clientes$antiguedad >= s), numeric(1)),  # clientes que seguían en la cartera
+    nelson = cumsum(d / en_obs))
+na_en <- function(s) max(c(0, na$nelson[na$t <= s]))   # tasa acumulada empírica en la antigüedad s
+```
+
+Del lado del modelo, la tasa acumulada de un cliente es la suma de la tasa de cada trozo por el tiempo
+pasado en él, $\Lambda(t)=\sum_k\lambda_k\Delta_k(t)$: una línea quebrada, recta dentro de cada trozo. Para
+compararla con Nelson–Aalen, que describe la cartera en conjunto, promediamos sobre todos los clientes la
+tasa que el modelo de la §6.4 predice para cada uno en cada trozo.
+
+```{r}
+#| label: u26-acum-modelo
+nd <- tidyr::crossing(
+  dplyr::distinct(panel, id_poliza, .keep_all = TRUE) |> dplyr::select(-trozo, -expo_anual),
+  trozo = factor(levels(panel$trozo), levels = levels(panel$trozo)))
+nd$expo_anual <- 1
+nd$tasa <- predict(m_pw, newdata = nd, type = "response")
+tasa_cartera <- dplyr::group_by(nd, trozo) |> dplyr::summarise(tasa = mean(tasa))
+
+# tasa acumulada del modelo en la antigüedad s: tasa de cada trozo por el tiempo pasado en él hasta s
+acum_modelo <- function(s) sum(tasa_cartera$tasa * pmax(0, pmin(s, limites[-1]) - limites[-length(limites)]))
+```
+
+```{r}
+#| label: fig-u26-calibracion
+#| fig-cap: "Tasa acumulada de partes por cliente a lo largo de la antigüedad: estimación de Nelson–Aalen, sin modelo (escalera), y la que implica el modelo de riesgos a trozos (línea discontinua, recta dentro de cada trozo). Si la tasa constante por trozos es adecuada, las dos deben coincidir."
+#| fig-width: 6.5
+#| fig-height: 4
+rejilla <- tibble::tibble(t = seq(0, 10, by = 0.05))
+rejilla$modelo <- vapply(rejilla$t, acum_modelo, numeric(1))
+
+ggplot() +
+  geom_step(data = na, aes(t, nelson, colour = "Nelson–Aalen"), linewidth = 0.7) +
+  geom_line(data = rejilla, aes(t, modelo, colour = "modelo de riesgos a trozos"),
+            linetype = 2, linewidth = 0.8) +
+  scale_x_continuous(breaks = limites) +
+  scale_colour_manual(values = c("Nelson–Aalen" = "steelblue", "modelo de riesgos a trozos" = "black")) +
+  labs(x = "antigüedad (años)", y = "partes acumulados por cliente", colour = NULL)
+```
+
+Las dos curvas de la @fig-u26-calibracion prácticamente se superponen. A los cinco años, Nelson–Aalen
+estima `r round(na_en(5), 2)` partes acumulados por cliente y el modelo, `r round(acum_modelo(5), 2)`; al
+final del seguimiento, `r round(na_en(10), 2)` frente a `r round(acum_modelo(10), 2)`. La pequeña
+diferencia del final cae en el trozo `7-10`, el más ancho y el de menos clientes. Una tasa constante por
+trozos reproduce bien cómo se acumulan los partes a lo largo de la antigüedad.
+
+### ¿Se ajustan los partes a una Poisson?
+
+Queda la comprobación global: si, dado el modelo, los partes observados se comportan como los que el
+propio modelo genera. Usamos los **residuos simulados** de `DHARMa`, como en la
+[Unidad 2.5](#sec-u25): se simulan muchos paneles desde el modelo final y se mira dónde cae cada valor
+observado entre sus simulaciones. Si el modelo es adecuado, esos residuos se reparten de forma uniforme
+entre 0 y 1. Tres contrastes resumen la comparación: la **uniformidad**, la **dispersión** —si los datos
+varían más o menos de lo que admite la Poisson— y el **exceso de ceros**.
+
+Las simulaciones son **incondicionales**: en cada una, cada cliente recibe una fragilidad nueva, como lo
+haría un cliente nuevo con sus mismas características. Es la manera de comprobar también que la
+fragilidad está bien descrita, y además permite repetir el diagnóstico **por póliza**, sumando los
+residuos de todos los años de cada cliente: el nivel donde la heterogeneidad entre clientes se dejaría
+notar.
+
+```{r}
+#| label: tbl-u26-dharma
+#| tbl-cap: "Contrastes de los residuos simulados (DHARMa) del modelo final, por fila y por póliza (sumando los años de cada cliente). `uniformidad`, `p_dispersion` y `p_ceros` son valores p; `dispersion` es el cociente entre la variabilidad observada y la simulada (1 si coinciden). Valores p altos y un cociente cercano a 1 indican que los partes se comportan como una Poisson con la tasa y la fragilidad que estima el modelo."
+set.seed(SEMILLA_CURSO)                                    # simulaciones reproducibles
+sim_fin <- as.matrix(simulate(m_pw_fin, nsim = 250))       # fragilidad nueva en cada simulación
+res_fin <- DHARMa::createDHARMa(simulatedResponse = sim_fin,
+                                observedResponse  = panel$n_partes_anual,
+                                fittedPredictedResponse = rowMeans(sim_fin),
+                                integerResponse   = TRUE)
+res_fin_pol <- DHARMa::recalculateResiduals(res_fin, group = panel$id_poliza)
+
+contrastes <- function(r) {
+  disp <- DHARMa::testDispersion(r, plot = FALSE)
+  c(uniformidad  = DHARMa::testUniformity(r, plot = FALSE)$p.value,
+    dispersion   = unname(disp$statistic),
+    p_dispersion = disp$p.value,
+    p_ceros      = DHARMa::testZeroInflation(r, plot = FALSE)$p.value)
+}
+dharma <- tibble::tibble(nivel = c("por fila", "por póliza"),
+                         dplyr::bind_rows(contrastes(res_fin), contrastes(res_fin_pol))) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+dharma
+```
+
+El modelo final supera los contrastes en los dos niveles (@tbl-u26-dharma). La dispersión observada es
+`r dharma$dispersion[1]` veces la simulada por fila y `r dharma$dispersion[2]` por póliza, con valores p de
+`r dharma$p_dispersion[1]` y `r dharma$p_dispersion[2]`: los partes no varían más de lo que admite una
+Poisson **una vez incluida la fragilidad**. No hace falta, por tanto, pasar a una binomial negativa: la
+variabilidad extra entre clientes que en la [Unidad 2.3](#sec-u23) se habría atribuido a la
+sobredispersión ya la recoge el efecto de póliza. Tampoco hay más ceros de los esperados, ni por fila ni
+por cliente.
+
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico del modelo de riesgos a trozos
+Con el modelo mixto `m_mix` (conteo `y`, exposición `expo`, factor `trozo`, predictor `x`, sujeto `id`):
+
+```r
+# proporcionalidad: ¿mejora el modelo si el efecto de x cambia con el trozo?
+m_int <- update(m_mix, . ~ . + trozo:x)
+anova(m_mix, m_int)                                   # p alto: no hay evidencia en contra
+```
+
+**Residuos simulados (DHARMa) y sobredispersión**, en cuatro pasos:
+
+```r
+# 1. simular respuestas desde el modelo; simulate() de glmmTMB da una fragilidad nueva en cada réplica
+set.seed(1)
+sim <- as.matrix(simulate(m_mix, nsim = 250))
+
+# 2. residuos escalados: dónde cae cada observación entre sus 250 simulaciones (uniforme si el modelo es bueno)
+res <- DHARMa::createDHARMa(simulatedResponse = sim, observedResponse = d$y,
+                            fittedPredictedResponse = rowMeans(sim), integerResponse = TRUE)
+plot(res)                                    # QQ frente a la uniforme y residuos frente al predicho
+
+# 3. sobredispersión: variabilidad observada / simulada; ~1 y p alto, la Poisson basta
+DHARMa::testDispersion(res)
+DHARMa::testUniformity(res); DHARMa::testZeroInflation(res)
+
+# 4. los mismos contrastes sumando los residuos de cada sujeto
+res_id <- DHARMa::recalculateResiduals(res, group = d$id)
+DHARMa::testDispersion(res_id)
+```
+
+En un modelo **sin** efectos aleatorios basta `res <- DHARMa::simulateResiduals(m)` en lugar de los pasos 1
+y 2. Con efectos aleatorios, `simulateResiduals()` simula condicionando a los efectos estimados de cada
+sujeto (por defecto desde `DHARMa` 0.5.0); para comprobar también la fragilidad, y para sumar por sujeto,
+hay que simular de forma incondicional, como aquí. Si `testDispersion` diera un cociente claramente mayor
+que 1, quedaría variabilidad sin explicar y habría que pasar a una binomial negativa
+([Unidad 2.3](#sec-u23)).
+
+**Tasa acumulada de Nelson–Aalen**, a partir de una tabla `ev` con el instante `t` de cada evento y una
+tabla `suj` con el tiempo de observación `fin` de cada sujeto:
+
+```r
+ev |> dplyr::count(t, name = "d") |>                       # eventos por instante, ordenados por t
+  dplyr::mutate(en_obs = vapply(t, \(s) sum(suj$fin >= s), numeric(1)),
+                acumulada = cumsum(d / en_obs))
+```
+
+**Tasa acumulada del modelo**, con `tasa` la tasa de cada trozo y `limites` sus bordes:
+
+```r
+acum <- function(s) sum(tasa * pmax(0, pmin(s, limites[-1]) - limites[-length(limites)]))
+```
+:::
+
+## 6.7 Validación contra el DGP {#sec-u26-dgp}
+
+El panel es simulado, así que conocemos la verdad y podemos comprobar qué ha recuperado el modelo final
+de la [§6.5](#sec-u26-poliza). El generador guarda en `attr(panel, "verdad")` la tasa base de cada año de
+antigüedad (`h0`), los coeficientes de las características del cliente (`beta`) y la desviación típica de
+la fragilidad (`sigma_frag`). Para compararlos con las estimaciones hay que ponerlos en la misma escala:
+
+- **Riesgo base.** El modelo estima una tasa por trozo; en el trozo `7-10`, que agrupa cuatro años, la
+  verdad es la media de sus tasas anuales ponderada por la exposición de cada año. Comparamos razones
+  frente al primer trozo.
+- **Continuas.** El generador expresa sus efectos por desviación típica de la variable; el modelo, por
+  decenas. Un efecto $\beta$ por desviación típica equivale a $10\beta/\text{sd}$ por decena.
+- **Zona.** El generador toma como referencia la zona rural, y el modelo, la urbana, así que hay que
+  restar.
+
+```{r}
+#| label: u26-verdad
+verdad <- attr(panel, "verdad")
+b_fin  <- glmmTMB::fixef(m_pw_fin)$cond
+ee_fin <- sqrt(diag(vcov(m_pw_fin)$cond))
+```
+
+### El riesgo base
+
+```{r}
+#| label: tbl-u26-dgp-trozos
+#| tbl-cap: "Razón de tasas de cada trozo frente al primero: verdad del generador y estimación del modelo final, con su intervalo al 95 %. En el trozo 7-10, la verdad es la media de las tasas de sus cuatro años ponderada por la exposición."
+expo_anio <- tapply(panel$expo_anual, panel$anio, sum)
+h0_trozo  <- c(verdad$h0[1:6], sum(verdad$h0[7:10] * expo_anio[7:10]) / sum(expo_anio[7:10]))
+tz <- grep("^trozo", names(b_fin))
+val_trozo <- tibble::tibble(
+  trozo    = levels(panel$trozo)[-1],
+  verdad   = h0_trozo[-1] / h0_trozo[1],
+  estimado = exp(b_fin[tz]),
+  inf      = exp(b_fin[tz] - 1.96 * ee_fin[tz]),
+  sup      = exp(b_fin[tz] + 1.96 * ee_fin[tz])) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+val_trozo
+```
+
+Todas las razones verdaderas caen dentro de su intervalo (@tbl-u26-dgp-trozos). La tasa real baja con la
+antigüedad hasta quedar, en el trozo `7-10`, en `r val_trozo$verdad[6]` veces la del primer año; el modelo
+estima `r val_trozo$estimado[6]`. El matiz está al principio: en los trozos 2 y 3 la tasa real ya es algo
+menor que en el primero (`r val_trozo$verdad[1]` y `r val_trozo$verdad[2]`), pero el modelo no llegaba a
+distinguirlos ([§6.4](#sec-u26-ajuste)). No es un error, sino falta de potencia: una caída de esa magnitud
+necesita más partes de los que tiene cada trozo para separarse del ruido.
+
+### Los efectos de las características del cliente
+
+```{r}
+#| label: tbl-u26-dgp-beta
+#| tbl-cap: "Coeficientes del modelo final (escala logarítmica) frente a los del generador, puestos en la misma escala: continuas por decena y zona frente a la urbana. `ee`: error estándar; `distancia`: diferencia entre estimado y verdadero, en errores estándar."
+sd_cli <- c(edad_10     = sd(cartera$edad_conductor),       # la cartera tiene una fila por cliente
+            carnet_10   = sd(cartera$antiguedad_carnet),
+            potencia_10 = sd(cartera$potencia_cv))
+b_dgp <- verdad$beta
+verdad_beta <- c(
+  edad_10                = b_dgp[["z_edad"]]   * 10 / sd_cli[["edad_10"]],
+  carnet_10              = b_dgp[["z_carnet"]] * 10 / sd_cli[["carnet_10"]],
+  potencia_10            = b_dgp[["z_pot"]]    * 10 / sd_cli[["potencia_10"]],
+  zona_circulacionmixta  = b_dgp[["mixta"]] - b_dgp[["urbana"]],   # el generador mide frente a rural
+  zona_circulacionrural  = -b_dgp[["urbana"]],
+  usocomercial           = b_dgp[["comercial"]],
+  tipo_vehiculomoto      = b_dgp[["moto"]],
+  tipo_vehiculofurgoneta = b_dgp[["furgoneta"]])
+val_beta <- tibble::tibble(
+  termino   = names(verdad_beta),
+  verdad    = verdad_beta,
+  estimado  = b_fin[names(verdad_beta)],
+  ee        = ee_fin[names(verdad_beta)],
+  distancia = (estimado - verdad) / ee) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+val_beta
+```
+
+Todos los coeficientes quedan a menos de dos errores estándar de su valor real
+(@tbl-u26-dgp-beta). La mayor distancia es la de la zona rural, a
+`r round(abs(val_beta$distancia[val_beta$termino == "zona_circulacionrural"]), 2)` errores estándar: el modelo la estima en `r val_beta$estimado[val_beta$termino == "zona_circulacionrural"]`
+cuando la verdad es `r val_beta$verdad[val_beta$termino == "zona_circulacionrural"]`. Es el ruido de esta
+muestra concreta, la misma que ya separaba algo más de la cuenta la zona urbana de la rural en la
+exploración. La furgoneta, cuyo efecto real es pequeño, no se distinguía del turismo; con los partes
+disponibles no hay potencia para detectarlo. Y el **sexo**, que el generador no usa, salió del modelo en la
+selección de la [§6.5](#sec-u26-poliza): la decisión fue la correcta.
+
+### La fragilidad
+
+```{r}
+#| label: u26-dgp-sigma
+ic_sigma <- confint(m_pw_fin, parm = "theta_")      # intervalo de la desviación típica de la fragilidad
+round(c(verdad = verdad$sigma_frag, ic_sigma[1, c("Estimate", "2.5 %", "97.5 %")]), 3)
+```
+
+La desviación típica de la fragilidad se estima en `r round(ic_sigma[1, "Estimate"], 3)`, con un
+intervalo de `r round(ic_sigma[1, "2.5 %"], 3)` a `r round(ic_sigma[1, "97.5 %"], 3)` que contiene el valor
+real, `r verdad$sigma_frag`. El modelo mide bien cuánto difieren los clientes entre sí.
+
+En conjunto, el modelo de riesgos a trozos con efecto de póliza recupera lo que el generador puso: una tasa
+que baja con la antigüedad, los efectos de las características del cliente y la heterogeneidad entre
+clientes. Conviene recordar por qué funciona tan bien: en este generador la antigüedad no depende del
+riesgo de cada cliente. En una cartera real, donde los malos riesgos se marchan antes, la caída de la tasa
+con la antigüedad no se podría atribuir sin más a la mejora de los clientes (véase el recuadro sobre los
+clientes que se van, en la [§6.5](#sec-u26-poliza)).

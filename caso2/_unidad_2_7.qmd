@@ -2,18 +2,23 @@
      En producción desde 2026-11-07; la versión anterior queda en _unidad_2_7_old.qmd (no incluida).
      PENDIENTE: renumerar las «Tareas del estudiante» de las unidades 2.1–2.6, que siguen con la
      numeración P1–P17 de la versión antigua. No tocarlas hasta que la autora lo indique.
+     P5 (riesgos a trozos) va AL FINAL y sigue la Unidad 2.6 tal como quedó el 08-nov: panel
+     póliza-año, trozos fijados ANTES de ajustar con un criterio explícito (no comparaciones
+     múltiples a posteriori), efecto aleatorio por póliza, tipos de predicción (cliente observado =
+     tarificación por experiencia), proporcionalidad y Nelson–Aalen. Sin Kaplan–Meier ni tiempo
+     hasta el primer parte.
      ORDEN: los datos de la empresa → el encargo → tu trabajo (pistas) → el formato.
      Cinco preguntas, UNA POR DECISIÓN del comité, en LENGUAJE DE NEGOCIO; su traducción estadística,
      la variable respuesta y la unidad van en el callout de pistas. No reintroducir jerga en las
      preguntas ni preguntar dos veces lo mismo para encajar un modelo (la escalera Poisson → NB →
      ceros es una sola pregunta, P2).
-     Una sola magnitud: los PARTES DE SINIESTRO (tuvo_siniestro, n_siniestros, n_partes_anual,
-     t_primer_sin) y su resumen comercial, el bonus-malus (P5).
+     Una sola magnitud: los PARTES DE SINIESTRO (tuvo_siniestro, n_siniestros, n_partes_anual)
+     y su resumen comercial, el bonus-malus (P4).
      El tiempo se mide en AÑOS: offset(log(antiguedad)), no exposicion (décadas).
      En este encargo NO hay validación contra el DGP, ni checklist, ni alusión a las rúbricas
      (se están rehaciendo).
      No hay cifras: cada equipo obtiene las suyas. Las respuestas esperadas están en GLM_PROFESOR.
-     Aprobados por la autora (2026-11-07): los cinco clientes tipo y el supuesto de P5 (los
+     Aprobados por la autora (2026-11-07): los cinco clientes tipo y el supuesto de P4 (los
      clientes nuevos, un 10 % de la cartera actual, entran en el nivel 3). -->
 
 # 7 · Estudio de caso, exposición y evaluación {#sec-u27}
@@ -56,7 +61,7 @@ de póliza**, no en bruto. La @tbl-u27-variables agrupa las variables según su 
 | Predictores de riesgo | `edad_conductor` (y en tramos, `edad_tramo`: 18-25 / 25-35 / 35-65 / 65+); `antiguedad_carnet`; `potencia_cv`; `cilindrada`; `antiguedad_vehiculo`; `valor_vehiculo`; `densidad` (hab/km² del domicilio); `zona_circulacion` (urbana/mixta/rural); `km_anuales`; `uso` (particular/comercial); `tipo_vehiculo` (turismo/moto/furgoneta); `combustible` (gasolina/diésel) |
 | Factor **prohibido** | `sexo`: está en los datos, pero **no puede usarse** como factor de tarificación (primas unisex, *Test-Achats*, TJUE C-236/09). Exclúyelo de los modelos de tarificación y de la selección de P2 |
 | Variables adicionales (ruido / selección) | `color_vehiculo`, `estado_civil`, `forma_pago`, `financiado`, `n_conductores`, `nivel_estudios`, `medio_contacto` |
-| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**. Es la respuesta de P5, como tabla cuadrada. **No puede usarse como predictor** de los siniestros: se calcula a partir de ellos (**fuga de información**) |
+| Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: clase de **bonificación-penalización** (1 = mejor tarifa … 5 = peor) el año **anterior** y el **actual**. Es la respuesta de P4, como tabla cuadrada. **No puede usarse como predictor** de los siniestros: se calcula a partir de ellos (**fuga de información**) |
 | Tiempo-a-evento | `t_primer_sin` (tiempo hasta el **primer siniestro**; o el fin de la observación si no lo hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
 
 : Las variables de la cartera, según su papel. {#tbl-u27-variables}
@@ -135,21 +140,21 @@ clase de modelos.
 >    agencia en la que debamos **intervenir**? Y vamos a **abrir una agencia**: ¿qué siniestralidad
 >    tenemos que prever para sus clientes?
 >
-> **Dirección de clientes.** *«Queremos decidir qué ofrecer a cada cliente según el tiempo que lleva
-> con nosotros.»*
->
-> 4. ¿Un cliente da más partes a medida que lleva más años con nosotros, menos, o igual? ¿Deberíamos
->    tenerlo en cuenta en el **precio de la renovación**? Además, estamos pensando en premiar a los
->    clientes nuevos que pasen sus **tres primeros años sin ningún parte**: ¿qué probabilidad tiene de
->    conseguirlo cada uno de los clientes tipo? ¿Y qué parte de los clientes nuevos se lo llevaría?
->
 > **Dirección financiera.** *«Cada nivel de bonus-malus paga una prima distinta, y para presupuestar
 > el año próximo necesitamos saber cuántos clientes tendremos en cada uno.»*
 >
-> 5. Si nuestros clientes se mueven entre niveles como lo hicieron el año pasado, ¿cómo quedarán
+> 4. Si nuestros clientes se mueven entre niveles como lo hicieron el año pasado, ¿cómo quedarán
 >    repartidos el año que viene? ¿La cartera está **mejorando o empeorando**? Contamos además con
 >    **crecer un 10 %**, y los clientes nuevos entran en el **nivel 3**, el de entrada. Necesitamos
 >    cuántos clientes habrá en cada nivel, y con qué margen podemos contar para presupuestar.
+>
+> **Dirección de clientes.** *«Queremos decidir qué ofrecer a cada cliente según el tiempo que lleva
+> con nosotros.»*
+>
+> 5. ¿Un cliente da más partes a medida que lleva más años con nosotros, menos, o igual? ¿Deberíamos
+>    tenerlo en cuenta en el **precio de la renovación**? ¿Cuántos partes esperamos de cada cliente
+>    tipo en cada etapa de su vida con nosotros? Y de un cliente que ya conocemos, ¿esperamos lo
+>    mismo que de uno nuevo con su misma ficha, o debe pesar su **historial**?
 
 Las fichas de los clientes tipo (@tbl-u27-perfil) son las mismas para todos los equipos, para que
 las respuestas sean comparables. Traen **todas** las variables permitidas, porque no sabemos de
@@ -170,17 +175,17 @@ antemano cuáles conservará tu modelo. Un año de póliza es `antiguedad = 1`.
 | `combustible` | gasolina | diesel | gasolina | diesel | gasolina |
 | `antiguedad` (años) | 1 | 1 | 1 | 1 | 1 |
 
-: Fichas de los cinco clientes tipo de la pregunta 2 (y de la 4). Cubren perfiles que interesan al comité: un conductor joven de ciudad, una familia en zona rural, una moto urbana, una furgoneta de uso comercial con mucho kilometraje y un conductor mayor que apenas circula. Los campos que no aparecen en la tabla son iguales en los cinco: `color_vehiculo` = gris, `estado_civil` = casado, `forma_pago` = anual, `financiado` = 0, `n_conductores` = 1, `nivel_estudios` = medio, `medio_contacto` = presencial. Si tu modelo agrupa o transforma alguna variable (tramos de edad, logaritmo de los km), aplica a estas fichas la misma transformación. {#tbl-u27-perfil}
+: Fichas de los cinco clientes tipo de las preguntas 2 y 5. Cubren perfiles que interesan al comité: un conductor joven de ciudad, una familia en zona rural, una moto urbana, una furgoneta de uso comercial con mucho kilometraje y un conductor mayor que apenas circula. Los campos que no aparecen en la tabla son iguales en los cinco: `color_vehiculo` = gris, `estado_civil` = casado, `forma_pago` = anual, `financiado` = 0, `n_conductores` = 1, `nivel_estudios` = medio, `medio_contacto` = presencial. Si tu modelo agrupa o transforma alguna variable (tramos de edad, logaritmo de los km), aplica a estas fichas la misma transformación. {#tbl-u27-perfil}
 
 ### Tu trabajo
 
 Entregas un **informe ejecutivo reproducible** dirigido al comité. No respondas las preguntas una a
 una, como ejercicios sueltos: léelas todas antes de empezar y plantea **un objetivo común**, explicar
-y predecir **cuántos partes da cada cliente**. P2, P3 y P4 se responden con **un solo modelo de
+y predecir **cuántos partes da cada cliente**. P2, P3 y P5 se responden con **un solo modelo de
 siniestralidad** que vas afinando: empiezas por la Poisson y añades lo que tus datos pidan —más
 variabilidad, ceros, agencia, el efecto de la antigüedad—. Lo que descubras al responder una
 pregunta puede obligarte a cambiar el modelo con el que respondiste otra; si ocurre, rehaz esa
-respuesta, de modo que todas salgan del **mismo modelo final**. P1 y P5 se responden con tablas, y
+respuesta, de modo que todas salgan del **mismo modelo final**. P1 y P4 se responden con tablas, y
 sus conclusiones no deben contradecir las del modelo.
 
 Que un paso **no merezca la pena** es una respuesta tan válida como la contraria; lo que importa es
@@ -241,23 +246,7 @@ una.
   una **agencia concreta**, para una **región concreta** y para una **agencia genérica**, como la que
   se va a abrir, distinguiendo la agencia típica de la media de todas.
 
-- **P4 · Dirección de clientes.**
-  - *Variable respuesta:* `n_partes_anual` del panel, con `offset(log(expo_anual))`; para el premio,
-    `t_primer_sin` con `evento`.
-  - *Se trabaja en:* [Unidad 2.6](#sec-u26) (riesgos a trozos, supervivencia).
-
-  El *offset* de P2 supone que el ritmo de partes es constante; P4 lo pone a prueba con un factor de
-  **tramo de antigüedad** sobre el panel. Como cada póliza aporta varias filas, añade un **efecto
-  aleatorio por póliza**, `(1 | id_poliza)`: con partes repetidos, esa fragilidad sí se puede estimar
-  ([Sección 6.5](#sec-u26-frailty)), y es la misma heterogeneidad que la binomial negativa recogía en
-  P2. Contrasta las tasas de los tramos entre sí con **comparaciones múltiples** (por ejemplo, con
-  `emmeans` y un ajuste de los $p$-valores): primero, para agrupar los tramos que no difieren y
-  simplificar el modelo; después, para derivar un **factor de renovación** por tramo, con su
-  intervalo, que sirva para predecir. El premio a tres años es un **tiempo hasta el primer parte**,
-  con censura: la parte de los clientes nuevos que se lo llevaría se lee en la curva de
-  **Kaplan–Meier**.
-
-- **P5 · Dirección financiera.**
+- **P4 · Dirección financiera.**
   - *Variables:* `bonus_malus_prev` y `bonus_malus_act`, como tabla cuadrada.
   - *Se trabaja en:* [Unidad 2.2](#sec-u22-cuadradas) (tablas de cambio).
 
@@ -268,6 +257,23 @@ una.
   después de aplicar las transiciones. Da dos intervalos —el de **confianza** del número esperado en
   cada nivel y el de **predicción** del número que habrá realmente, que es el que sirve para
   presupuestar— y di de qué supuestos dependen.
+
+- **P5 · Dirección de clientes.**
+  - *Variable respuesta:* `n_partes_anual`, de `panel.csv`, con `offset(log(expo_anual))`. El panel
+    no trae las características del cliente: únelas desde `cartera.csv` por `id_poliza`.
+  - *Se trabaja en:* [Unidad 2.6](#sec-u26) (riesgos a trozos).
+
+  El *offset* de P2 supone que un cliente da partes al mismo ritmo toda su vida con la aseguradora;
+  aquí lo pones a prueba, con el modelo que ya afinaste llevado al panel año a año. Empieza por la
+  **tasa empírica de cada año**, con su intervalo, y fija los **trozos** de antigüedad con un criterio
+  explícito —por ejemplo, un mínimo de partes por trozo— **antes** de ajustar. Las **razones de
+  tasas** de cada trozo frente al primero, con su intervalo, son el factor de renovación que pide el
+  comité. Como cada cliente aporta varias filas, añade un **efecto aleatorio por póliza** y decide
+  sobre ese modelo qué variables se quedan. Para los clientes tipo, distingue el **cliente típico** del
+  **cliente nuevo** (en media y con su intervalo); para el cliente que ya conocéis, la predicción del
+  **cliente observado**, en la que su historial corrige lo que predice su ficha. Comprueba que cada
+  característica actúa igual en todos los trozos y que el modelo reproduce la **tasa acumulada de
+  Nelson–Aalen**, que se calcula con los instantes de los partes de `siniestros.csv`.
 :::
 
 ::: {.callout-note}

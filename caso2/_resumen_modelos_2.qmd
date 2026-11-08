@@ -1,19 +1,33 @@
 <!-- Partial · Resumen de sintaxis del Caso 2. Incluir con {{< include _resumen_modelos_2.qmd >}}
-     tras _unidad_2_5.qmd. Sin YAML. Sin chunks ejecutables: los bloques son ```r (no se evalúan).
+     tras _unidad_2_5.qmd. Sin YAML. Sin chunks ejecutables: los bloques de código R van sin llaves (no se evalúan).
 CIFRAS: ninguna. Es una chuleta de sintaxis; no hay salidas que citar.
 VERIFICADO (R 4.3.3, glmmTMB 1.1.8, glmnet 4.1-8, MASS, sobre datos simulados con la notación
 genérica d, y, x, f1, f2, A, B, exposicion, obs): todos los bloques corren sin errores, salvo los
-marcados [VERIFICAR] (priors de glmmTMB, ausente en 1.1.8; glmmLasso y mpath, no instalables aquí).
+que dependen de paquetes no instalables aquí, ejecutados por la autora (abajo).
+mpath::zipath: ejecutado por la autora sobre n_fraude de la 2.4 (ZIP de m_zip). RESPETA el offset, en la
+fórmula o con offset = (intercepto del conteo 1.441; pscl con offset 1.447, sin offset 1.022).
+family = "negbin" corre. BIC sobre el camino eligió el lambda más pequeño: no descartó ninguna
+variable (todas eran predictores reales), así que su capacidad de selección no queda probada.
+glmmLasso 1.6.4: ejecutado por la autora sobre n_gestiones de la 2.5. offset() en la fórmula no da
+error pero se IGNORA (coeficientes y sd de agencia = glmmTMB sin offset: -1.503 vs -1.528; 0.665 vs
+0.666). rnd = list(region = ~1, agencia = ~1) corre; etiquetas de agencia únicas (30 = 30 pares).
+BIC mínimo en lambda = 10 retuvo dos variables de ruido (antiguedad_carnet, km_declarados).
+priors: ejecutado por la autora con glmmTMB 1.1.14 sobre el GLMM de la 2.5 (encoge los fijos;
+varianzas de región y agencia casi intactas).
 Comprobado: quasipoisson da los mismos coeficientes que poisson; dplyr::count() omite las celdas
 vacías salvo con .drop = FALSE, xtabs() las conserva; cv.glmnet admite offset con
 MASS::negative.binomial(); predict(cv, newoffset = ) funciona.
+Añadido 08-nov (verificado en R 4.3 con datos simulados, notación genérica): drop1() sobre glmmTMB;
+foldid con los grupos repartidos en 10 bloques (cada grupo entero en uno); penalty.factor = 0 deja sin
+penalizar las columnas de un término. Inestabilidad del lasso con pocos candidatos observada en datos
+de la autora (lambda.min lo retiene todo; lambda.1se descarta efectos significativos en el mixto).
 ENCUADRE: tablas sin regularización ni efectos aleatorios. Mixto + regularización: vía recomendada
 en dos pasos (selección con glmnet sobre el modelo fijo, después el mixto); ridge con priors como
-alternativa en un paso. glmmLasso no admite offset (documentación del paquete, 1.6.x).
+alternativa en un paso. glmmLasso ignora el offset en silencio (comprobado, 1.6.4).
 NOMENCLATURA: f1 y f2 son factores; en las tablas de cambio, la misma clasificación en dos
 momentos (mismos niveles). B anidado en A. FAM = el argumento que cambia entre modelos. -->
 
-# Resumen · Cómo se escribe cada modelo del Caso 2 {#sec-u2r}
+# 📋 Resumen · Cómo se escribe cada modelo del Caso 2 {#sec-u2r}
 
 Esta chuleta reúne la sintaxis de los modelos de las unidades 2.1 a 2.5 con una notación genérica.
 No repite la teoría: cada bloque remite a la unidad donde se explica. Cuando varios modelos comparten
@@ -179,8 +193,19 @@ predict(cv, newx = X0, newoffset = log(e0), s = "lambda.1se", type = "response")
 - *Hurdle*: su verosimilitud se separa en dos partes. La barrera es una logística, que se regulariza con
   `cv.glmnet(X, as.integer(d$y > 0), family = "binomial", alpha = a)`; la parte truncada no tiene
   familia en `glmnet` y se regulariza con *ridge* (bloque siguiente).
-- NB1, ZIP y ZINB: no tienen familia en `glmnet`; se regularizan con *ridge*. El *lasso* para los
-  inflados existe en `mpath::zipath()`, fuera de la pila del curso [VERIFICAR: no probado].
+- NB1: no tiene familia en `glmnet`; se regulariza con *ridge* (bloque siguiente).
+- ZIP y ZINB: no tienen familia en `glmnet`. El *lasso* (o *elastic-net*) de las dos partes está en
+  `mpath::zipath()`, fuera de la pila del curso, con la fórmula de `pscl` (conteo `|` ceros); también
+  pueden regularizarse con *ridge* (bloque siguiente).
+
+```r
+p <- mpath::zipath(y ~ x + f1 + f2 + offset(log(exposicion)) | x + f1,
+                   family = FAM, data = d)        # FAM = "poisson" (ZIP) | "negbin" (ZINB)
+coef(p, which = which.min(p$bic))                 # $count y $zero; 0 = descartada
+```
+
+  Cada parte tiene su propio camino de $\lambda$ (`p$lambda.count`, `p$lambda.zero`), y el *offset*
+  se respeta, tanto en la fórmula como con el argumento `offset =`.
 
 ***Ridge* con `glmmTMB`** (argumento `priors`, desde la versión 1.1.9; compruébalo con
 `packageVersion("glmmTMB")`). Una prior normal centrada en cero sobre los efectos fijos equivale a una
@@ -190,7 +215,7 @@ penalización *ridge*. Vale para cualquier modelo ajustado con `glmmTMB`:
 d$x <- as.numeric(scale(d$x))     # glmmTMB no estandariza: sin esto, la penalización depende de las unidades
 pr  <- data.frame(prior = c("normal(0,10)", "normal(0,1)"),   # intercepto casi libre; resto, encogido
                   class = "fixef", coef = c("(Intercept)", ""))
-m_r <- update(m, priors = pr)     # [VERIFICAR: no probado; requiere glmmTMB >= 1.1.9]
+m_r <- update(m, priors = pr)
 ```
 
 - En ZIP, ZINB y *hurdle*, se añaden filas con `class = "fixef_zi"` para penalizar también la parte de
@@ -200,15 +225,29 @@ m_r <- update(m, priors = pr)     # [VERIFICAR: no probado; requiere glmmTMB >= 
 
 ## Con efectos aleatorios y regularización {#sec-u2r-mixreg}
 
-`glmnet` no admite efectos aleatorios. Hay tres vías:
+**Con pocos candidatos, sin regularizar.** Se seleccionan los efectos fijos por razón de verosimilitudes
+**sobre el modelo mixto**, nunca sobre el que ignora la agrupación: tratar como independientes las filas de
+un mismo grupo es pseudorreplicación y da contrastes demasiado optimistas. El contraste es fiable si el
+modelo se estima por máxima verosimilitud (`glmmTMB` lo hace por defecto) y hay muchas observaciones y
+muchos niveles del efecto aleatorio [@bolker2009].
+
+```r
+drop1(m_mix, test = "Chisq")           # razón de verosimilitudes al quitar cada efecto fijo
+m_fin <- update(m_mix, . ~ . - f2)     # si f2 sobra
+```
+
+**Con muchos candidatos**, la selección se regulariza, pero `glmnet` no admite efectos aleatorios. Hay
+tres vías:
 
 1. **En dos pasos (recomendada).** Se seleccionan las variables con `cv.glmnet` sobre el modelo de
    efectos fijos (sección anterior) y después se ajusta el mixto con las retenidas. Funciona con todas las
    familias, usa solo paquetes de la pila y mantiene el *offset*.
 
    ```r
-   # bloques de validación por grupo: las filas de un mismo A no se reparten entre bloques
-   cv <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion), foldid = as.integer(d$A))
+   # bloques de validación por grupo: cada A, entero, a uno de 10 bloques al azar
+   bloque_A <- sample(rep(1:10, length.out = nlevels(d$A)))
+   cv <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion),
+                   foldid = bloque_A[as.integer(d$A)])
    b  <- coef(cv, s = "lambda.1se")[-1, 1]
    names(b)[b != 0]        # columnas retenidas: un factor entra si sobrevive alguna de sus indicadoras
    m  <- glmmTMB(y ~ x + f1 + offset(log(exposicion)) + (1 | A/B), family = FAM, data = d)
@@ -217,18 +256,36 @@ m_r <- update(m, priors = pr)     # [VERIFICAR: no probado; requiere glmmTMB >= 
    En el último paso, la fórmula lleva solo lo retenido (aquí, por ejemplo, `x` y `f1`). La selección
    ignora el agrupamiento salvo por los bloques; por eso se forman por grupo.
 
+   - **Bloques.** Las filas de un mismo grupo deben ir al mismo bloque: si no, el modelo «conoce» al
+     grupo que tiene que predecir y la validación resulta optimista. Repartir los grupos en 10 bloques
+     sirve tanto con pocos grupos como con miles; un bloque por grupo (`foldid = as.integer(d$A)`) solo
+     es práctico con pocos.
+   - **Términos que no se seleccionan.** El *lasso* encoge y puede anular cualquier columna de `X`. Un
+     término que debe quedarse siempre en el modelo (aquí, por ejemplo, `f1`) se exime con
+     `penalty.factor`, que vale 0 en sus columnas:
+     `cv.glmnet(..., penalty.factor = ifelse(grepl("^f1", colnames(X)), 0, 1))`.
+   - **Con pocos candidatos, casi todos con efecto**, la selección del *lasso* es inestable: depende del
+     criterio para elegir $\lambda$ (`lambda.min` puede retenerlo todo y `lambda.1se`, descartar efectos
+     reales). Ahí es mejor la razón de verosimilitudes sobre el mixto (arriba).
+
 2. ***Ridge* en un paso.** El mismo `update(m, priors = pr)` de la sección anterior, aplicado al modelo
    mixto, sea cual sea su familia (Poisson, NB, ZIP, ZINB, *hurdle*). Penaliza solo los efectos fijos; las
-   varianzas de `A` y `B` se estiman como siempre [VERIFICAR: no probado].
+   varianzas de `A` y `B` se estiman como siempre.
 3. ***Lasso* en un paso** con `glmmLasso`, fuera de la pila del curso:
 
    ```r
-   glmmLasso(fix = y ~ x + f1 + f2, rnd = list(A = ~1), family = poisson(link = "log"),
-             lambda = l, data = d)       # [VERIFICAR: no probado]
+   rejilla <- c(500, 200, 100, 50, 20, 10, 1)
+   ajustes <- lapply(rejilla, \(l) glmmLasso(fix = y ~ x + f1 + f2, rnd = list(A = ~1, B = ~1),
+                                             family = poisson(link = "log"), lambda = l, data = d))
+   m <- ajustes[[which.min(sapply(ajustes, \(a) a$bic))]]   # lambda por BIC
+   m$coefficients; m$StdDev                                  # fijos (0 = descartado) y sd de cada nivel
    ```
 
-   Tiene tres limitaciones según su documentación: no admite *offset* (modela recuentos, no tasas), sus
-   ejemplos usan un solo factor de agrupación y $\lambda$ se elige recorriendo una rejilla y comparando
-   el `$bic` de cada ajuste.
+   - **No admite *offset*, y no avisa:** `offset(log(exposicion))` en `fix` no da error, pero el ajuste
+     sale igual que sin él. Modela recuentos, no tasas.
+   - Dos niveles con `rnd = list(A = ~1, B = ~1)`. Equivale a `(1 | A/B)` solo si las etiquetas de `B`
+     no se repiten entre niveles de `A` (como en el apartado de efectos aleatorios).
+   - Conviene tipificar antes las continuas, como hacen los ejemplos de su ayuda. $\lambda$ se elige por rejilla
+     y BIC, y en el ejemplo de `n_gestiones` ese criterio retuvo dos variables de ruido.
 
 La quasi-Poisson no tiene versión mixta, así que tampoco la tiene regularizada.

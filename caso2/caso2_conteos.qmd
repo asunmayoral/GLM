@@ -67,7 +67,7 @@ Al completar el Caso 2, el estudiante será capaz de:
 - **RA3 · Sobredispersión.** Diagnosticar la sobredispersión (índice de dispersión, relación media–varianza, contraste de Cameron–Trivedi) y tratarla con **quasi-Poisson** y **binomial negativa** (NB1/NB2), sabiendo cuál elegir.
 - **RA4 · Exceso de ceros.** Detectar el exceso de ceros y modelarlo con modelos **inflados de ceros** (ZIP/ZINB) y de **barrera** (*hurdle*), distinguiendo el mecanismo de mezcla del de barrera.
 - **RA5 · Conteos agrupados (mixtos).** Ajustar e interpretar **GLMM de Poisson** con estructura anidada: componentes de varianza, ICC, BLUP y la distinción entre media **condicional** y **marginal**.
-- **RA6 · Supervivencia como tasa.** Reformular el tiempo a evento como un GLM de Poisson —**riesgos a trozos** sobre datos persona-periodo—, leer los *hazard ratios* y la supervivencia, y conectarlo con Cox, Kaplan–Meier y la **fragilidad**.
+- **RA6 · Tasas que cambian con el tiempo.** Modelizar una tasa que varía con la antigüedad como un GLM de Poisson con *offset* sobre datos sujeto-periodo —**riesgos a trozos**—: elegir los trozos con criterio explícito, interpretar el riesgo base y las razones de tasas, predecir para perfiles y clientes concretos, tratar el sujeto como agrupación mediante un efecto aleatorio (**fragilidad**), seleccionar variables sobre el modelo mixto y diagnosticar el ajuste (proporcionalidad, calibración frente a la tasa acumulada de **Nelson–Aalen** con censura, residuos simulados).
 - **RA7 · Bondad de ajuste y diagnóstico.** Evaluar el ajuste de un modelo de conteo con el índice de dispersión, los **residuos simulados** (DHARMa), el rootograma y la calibración, conociendo las restricciones del contraste de *deviance*.
 - **RA8 · Selección, validación y regularización.** Comparar y seleccionar modelos (*deviance*, AIC/BIC, razón de verosimilitudes), validarlos (**validación cruzada**) y **regularizarlos** (ridge, lasso y elastic-net con `glmnet`).
 - **RA9 · Estudio de caso reproducible.** Desarrollar, presentar y defender un **estudio de caso reproducible** que integre las lentes del conteo.
@@ -78,7 +78,7 @@ Al completar el Caso 2, el estudiante será capaz de:
 En el Caso 1 preguntábamos *«¿ocurre el evento? ¿y cuándo?»*. Ahora el evento es **repetible**:
 preguntamos *«¿cuántas veces y a qué ritmo?»*. Entramos en la familia **Poisson** (enlace log),
 tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **exceso de ceros**, los
-**conteos agrupados** (mixtos) y el nexo de la supervivencia como **tasa** (riesgos a trozos).
+**conteos agrupados** (mixtos) y las **tasas que cambian con el tiempo** (riesgos a trozos).
 
 | Unidad | Contenido | Objetivo y datos |
 |:--:|:----------------------------------------------------------------|:------------------|
@@ -87,7 +87,7 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 | **2.3** | *«¿Y si la varianza supera a la media?»* — Sobredispersión: causas, diagnóstico, estructuras de la varianza, quasi-Poisson y binomial negativa (con OLRE y conexiones). | **RA3** (y RA7 en el diagnóstico)<br>**Datos:** `cartera` |
 | **2.4** | *«¿Y si sobran ceros?»* — Exceso de ceros: *hurdle* y *zero-inflated* (ZIP/ZINB). | **RA4** (y RA7)<br>**Datos:** `cartera` |
 | **2.5** | *«¿Y si las pólizas se agrupan por agencia?»* — Conteos agrupados: GLMM de Poisson. | **RA5** (espiral de mixtos; y RA7)<br>**Datos:** `cartera` (por `agencia`/`region`) |
-| **2.6** | *«¿Del conteo al reloj?»* — Del conteo al reloj: riesgos a trozos ≡ Poisson con *offset*; fragilidad. | **RA6** (espiral de supervivencia; y RA7)<br>**Datos:** `cartera` (persona-periodo) |
+| **2.6** | *«¿Cambia el ritmo de partes con la antigüedad?»* — Riesgos a trozos: la tasa como función de la antigüedad y el modelo (Poisson con *offset* y un nivel por trozo) · *Exploración* (tasas anuales y elección de los trozos; estructura multiplicativa) · *Ajuste, interpretación y predicción* (razones de tasas, perfiles prototipo) · *Fragilidad del cliente* (efecto aleatorio por póliza, selección de variables, tipos de predicción) · *Diagnóstico* (proporcionalidad, calibración con Nelson–Aalen, residuos simulados) · *Validación*. | **RA6** (espirales de mixtos y de supervivencia; y RA7, RA8)<br>**Datos:** `panel` (póliza-año de partes) |
 | **2.7** | *«¿Sabes ya modelizar conteos?»* — Estudio de caso, exposiciones y evaluación. | **RA9** (integra RA1–RA8)<br>**Datos:** cartera de auto de cada equipo |
 
 **Caja de herramientas de R por unidad.** Las funciones y paquetes que vertebran cada sesión, **enlazados a la sección donde se explican** (el uso comentado vive en el callout «🔧 En R» de cada sección y en los scripts de `caso2/scripts/`):
@@ -99,7 +99,7 @@ tratamos las **tasas** con *offset*, y de ahí a la **sobredispersión**, el **e
 | **2.3** | detección: [`AER::dispersiontest` · `DHARMa::testDispersion` · `countreg::rootogram`](#sec-u23-diagnostico) · quasi-Poisson: [`glm(family = quasipoisson)`](#sec-u23-quasi) · binomial negativa: [`MASS::glm.nb` · `glmmTMB` (NB1 y NB2) · `sigma`](#sec-u23-nb) · bondad de ajuste: [índice de dispersión · AIC/BIC · rootograma](#sec-u23-sintesis) |
 | **2.4** | detección: [`DHARMa::testZeroInflation` frente a la NB](#sec-u24-ceros) · estructuras: [Poisson truncada en los positivos (`glmmTMB`) · deflación de ceros por grupos](#sec-u24-estructuras) · ZIP/ZINB: [`glmmTMB(ziformula = , family = poisson / nbinom2)` · `broom.mixed::tidy`](#sec-u24-zi) · hurdle: [`glmmTMB(ziformula = , family = truncated_poisson)`](#sec-u24-hurdle) · comparación: [AIC · ceros predichos frente a observados](#sec-u24-elegir) |
 | **2.5** | GLMM Poisson: [`glmmTMB` · anidamiento `(1 \| a/b)`](#sec-u25-modelo) · [exploración y cribado de predictores](#sec-u25-eda) · [pendientes por región](#sec-u25-inferencia) · [componentes de varianza y partición](#sec-u25-varianza) · [BLUP](#sec-u25-blup) · [predicción con intervalos](#sec-u25-prediccion) · bondad de ajuste: [`DHARMa` · dispersión residual · $R^2$ de Nakagawa · ICC](#sec-u25-diagnostico) · OLRE: [`(1 \| id_obs)` · `performance::compare_performance`](#sec-u25-olre) |
-| **2.6** | riesgos a trozos: [`glm(poisson, offset)` · `survival::Surv` · `survfit` · `broom::tidy`](#sec-u26-piecewise) · Cox como contraste: [`coxph` · `cox.zph` (Schoenfeld)](#sec-u26-clasicos) |
+| **2.6** | exploración: [tasas empíricas con exposición · intervalo por el método delta · `cut` para los trozos](#sec-u26-exploracion) · riesgos a trozos: [`glm(poisson, offset = log(expo))` · `broom::tidy(exponentiate = TRUE)` · `predict(se.fit = TRUE)`](#sec-u26-ajuste) · fragilidad: [`glmmTMB` con `(1 \| id)` · `drop1` · predicción observada, típica, media y de un cliente nuevo](#sec-u26-poliza) · diagnóstico: [`anova` con `trozo:x` · Nelson–Aalen · `DHARMa::createDHARMa` · `recalculateResiduals` · `testDispersion`](#sec-u26-diagnostico) |
 | **2.7** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 :::
 
@@ -126,7 +126,7 @@ y 1.00). Como el número de incidencias depende del tiempo expuesto, la exposici
 | Predictores del riesgo | `edad_conductor`, `antiguedad_carnet`, `potencia_cv`, `antiguedad_vehiculo`, `zona_circulacion`, `uso`, `tipo_vehiculo` |
 | Predictores adicionales (selección) | `sexo`, `estado_civil`, `color_vehiculo`, `tiene_garaje`, `forma_pago`, `financiado`, `km_declarados`, `valor_vehiculo`, `n_conductores`, `antiguedad_cliente` |
 | Cambio (dos momentos) | `bonus_malus_prev` y `bonus_malus_act`: nivel de **bonificación-penalización** de la póliza (1 = mejor tarifa … 5 = peor) el **año anterior** y el **actual**; comparándolos se ve cómo evoluciona el riesgo (tabla cuadrada) |
-| Tiempo-a-evento | `tiempo_primer_sin` (tramo del periodo en que se observa el **primer siniestro** de la póliza; o el último tramo seguido si no hubo → censura), `evento` (1 = siniestro observado, 0 = censura) |
+| Panel póliza-año (Unidad 2.6) | `panel`, una tabla aparte generada por `R/dgp_panel.R` a partir de la cartera: una fila por póliza y **año de antigüedad**, con `anio`, `expo_anual` (fracción del año asegurada) y `n_partes_anual` (partes de siniestro del año), más la `antiguedad` del cliente en años ($10\times$ `exposicion`) y sus covariables. Lleva adjunto el instante de cada parte (`attr(panel, "partes")`). La cartera conserva `tiempo_primer_sin` y `evento`, de una versión anterior de la unidad, que no se usan |
 
 Las **cuatro respuestas** comparten predictores pero están diseñadas para ilustrar cada fenómeno del
 caso: `n_asistencia` es una Poisson bien portada; `n_danos`, sobredispersa; `n_fraude`, con exceso de

@@ -27,7 +27,7 @@
 #                      excluir = setdiff(todos, "_unidad_1_5.R"))
 #
 #  QUÉ HACE, por caso:
-#    · localiza el documento maestro (el .qmd que no empieza por `_unidad_`);
+#    · localiza el documento maestro (`casoN/casoN_*.qmd`);
 #    · toma como PREÁMBULO todos los chunks del maestro anteriores al primer
 #      `{{< include ... >}}` —es decir, setup de librerías y carga de datos—,
 #      traduciendo el acceso local a datos (`source("R/x.R")`, `cargar_*()`) a
@@ -207,9 +207,13 @@ generar_scripts <- function(casos = NULL,
     `1` = c(patron = "cargar_cohorte\\(\\)",
             ruta   = "caso1/datos/cohorte_20252026.rds",
             nota   = "cohorte simulada del curso"),
-    `2` = c(patron = "cargar_cartera\\(\"auto\"\\)",
-            ruta   = "caso2/datos/cartera_auto_20252026.rds",
-            nota   = "cartera de auto del curso"),
+    `2` = list(
+      c(patron = "cargar_cartera\\(\"auto\"\\)",
+        ruta   = "caso2/datos/cartera_auto_20252026.rds",
+        nota   = "cartera de auto del curso"),
+      c(patron = "cargar_panel_partes\\(cartera\\)",
+        ruta   = "caso2/datos/panel_partes_20252032.rds",
+        nota   = "panel póliza-año de partes (Unidad 2.6)")),
     `3` = c(patron = "cargar_averias\\(\\)",
             ruta   = "caso3/datos/banco_averias_20252026.rds",
             nota   = "banco de averías del curso"))
@@ -218,10 +222,12 @@ generar_scripts <- function(casos = NULL,
     lineas <- sub('source\\("R/([^"]+)"\\)\\s*(#.*)?$',
                   sprintf('source(url_glm("caso%s/R/\\1"))   # funciones del proceso generador', cs),
                   lineas)
+    # Un caso puede cargar varios bancos: una entrada por cada uno.
     d <- datos_caso[[as.character(cs)]]
-    if (!is.null(d))
-      lineas <- sub(paste0(d[["patron"]], "\\s*(#.*)?$"),
-                    sprintf('leer_datos_glm("%s")   # %s', d[["ruta"]], d[["nota"]]),
+    if (!is.list(d)) d <- list(d)
+    for (di in d)
+      lineas <- sub(paste0(di[["patron"]], "\\s*(#.*)?$"),
+                    sprintf('leer_datos_glm("%s")   # %s', di[["ruta"]], di[["nota"]]),
                     lineas)
     lineas
   }
@@ -300,8 +306,9 @@ generar_scripts <- function(casos = NULL,
     dir.create(dir_scripts, showWarnings = FALSE)
 
     # ---- 2 · Maestro y preámbulo -------------------------------------------
-    qmds    <- Sys.glob(file.path(dir_caso, "*.qmd"))
-    maestro <- qmds[!grepl("^_unidad_", basename(qmds))]
+    # El maestro sigue la convención casoN/casoN_*.qmd; así no cuentan los
+    # parciales auxiliares (_resumen_*) ni copias de trabajo (*_old.qmd).
+    maestro <- Sys.glob(file.path(dir_caso, paste0("caso", cs, "_*.qmd")))
     if (length(maestro) != 1L) {
       warning("Caso ", cs, ": esperaba 1 documento maestro y encuentro ",
               length(maestro), ". Lo salto."); next
