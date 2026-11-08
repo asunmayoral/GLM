@@ -1129,16 +1129,16 @@ Esa fragilidad puede ser **compartida** por un grupo: un mismo $Z_j$ para todas 
 claro es una **aseguradora** que segmenta por precio y capta perfiles de bajo riesgo: acaba con una cartera
 poco siniestra, y ese nivel común —que no explican las covariables individuales— es su fragilidad. Nuestro
 banco no tiene aseguradoras, pero sí **agencias**, así que podemos preguntarle a los datos si esconden esa
-heterogeneidad, con el mismo `glmer` de la [Unidad 2.5](#sec-u25):
+heterogeneidad, con el mismo `glmmTMB` de la [Unidad 2.5](#sec-u25):
 
 ```{r}
 #| label: u26-frailty
-m_frag <- glmer(
+m_frag <- glmmTMB(
   y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion +
     (1 | agencia),
   family = poisson, data = pp
 )
-sd_frag <- as.data.frame(VarCorr(m_frag))$sdcor[1]
+sd_frag <- attr(VarCorr(m_frag)$cond$agencia, "stddev")[[1]]
 c(sigma_agencia = sd_frag)
 ```
 

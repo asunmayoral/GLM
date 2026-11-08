@@ -38,9 +38,10 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
   forcats = "1.0.1", ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
-  lme4 = "2.0.1", marginaleffects = "0.32.0", performance = "0.17.0",
-  purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  tibble = "3.3.1", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
+  insight = "1.5.1", lme4 = "2.0.1", marginaleffects = "0.32.0",
+  performance = "0.17.0", purrr = "1.2.2", sessioninfo = "1.2.4",
+  survival = "3.8.6", tibble = "3.3.1", tidyverse = "2.0.0", vcd = "1.4.13",
+  vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -379,7 +380,7 @@ round(cbind(LR = LR_pend,
 m_nb <- glm.nb(n_gestiones ~ potencia_c + uso + offset(log(exposicion)), data = cartera)
 performance::compare_performance(
   Poisson = m_pois, NB = m_nb, GLMM = m_glmm,
-  metrics = c("AIC", "BIC", "RMSE")
+  metrics = c("AIC", "BIC")
 )
 
 # -----------------------------------------------------------------------------
@@ -450,7 +451,7 @@ validacion |> dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 # [u25-olre-disp]
 #   5 · Efectos Aleatorios y Modelos Mixtos
 #     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
-#       > Por qué modelizar n_danos como OLRE
+#       > El OLRE en la cartera
 # -----------------------------------------------------------------------------
 m_pois_danos <- glm(
   n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
@@ -463,7 +464,7 @@ performance::check_overdispersion(m_pois_danos)
 # [u25-olre]
 #   5 · Efectos Aleatorios y Modelos Mixtos
 #     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
-#       > El modelo y su ajuste
+#       > El OLRE en la cartera
 # -----------------------------------------------------------------------------
 cartera$id_obs <- factor(seq_len(nrow(cartera)))   # un nivel aleatorio por observación
 m_olre <- glmmTMB(
@@ -471,52 +472,63 @@ m_olre <- glmmTMB(
     offset(log(exposicion)) + (1 | id_obs),
   family = poisson, data = cartera
 )
+c(convergencia = m_olre$fit$convergence == 0, hessiano_def_pos = m_olre$sdr$pdHess)
 sd_olre <- attr(VarCorr(m_olre)$cond$id_obs, "stddev")[[1]]
-c(sigma_obs = sd_olre)
+ic_olre <- confint(m_olre, parm = "theta_")         # IC de Wald en escala log, devuelto a sigma
+ic_olre
+
+# -----------------------------------------------------------------------------
+# [u25-olre-test]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
+#       > El OLRE en la cartera
+# -----------------------------------------------------------------------------
+LR_olre <- 2 * (as.numeric(logLik(m_olre)) - as.numeric(logLik(m_pois_danos)))
+c(LR = LR_olre, p_corregido = 0.5 * pchisq(LR_olre, 1, lower.tail = FALSE))
 
 # -----------------------------------------------------------------------------
 # [fig-u25-olre-diag]
 #   5 · Efectos Aleatorios y Modelos Mixtos
 #     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
-#       > Inferencia, bondad de ajuste y diagnóstico
+#       > El OLRE en la cartera
 # -----------------------------------------------------------------------------
-res_olre <- simulateResiduals(m_olre)
+set.seed(2025)                                                   # simulaciones reproducibles
+n_pol    <- nrow(cartera)
+lam_olre <- predict(m_olre, re.form = NA, type = "response")     # tasa sin el impulso de la póliza
+sim_olre <- replicate(250, rpois(n_pol, lam_olre * exp(rnorm(n_pol, 0, sd_olre))))
+res_olre <- DHARMa::createDHARMa(
+  simulatedResponse       = sim_olre,
+  observedResponse        = cartera$n_danos,
+  fittedPredictedResponse = lam_olre * exp(sd_olre^2 / 2),      # la media de la Poisson-lognormal
+  integerResponse         = TRUE)
 plot(res_olre)
+
+# -----------------------------------------------------------------------------
+# [u25-olre-dharma-tests]
+#   5 · Efectos Aleatorios y Modelos Mixtos
+#     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
+#       > El OLRE en la cartera
+# -----------------------------------------------------------------------------
+# p-valores de los contrastes de DHARMa sobre el OLRE, con la simulación incondicional
+tests_olre <- round(c(uniformidad = testUniformity(res_olre, plot = FALSE)$p.value,
+                      dispersion  = testDispersion(res_olre, plot = FALSE)$p.value,
+                      atipicos    = testOutliers(res_olre, plot = FALSE)$p.value,
+                      ceros       = testZeroInflation(res_olre, plot = FALSE)$p.value), 3)
+tests_olre
 
 # -----------------------------------------------------------------------------
 # [u25-olre-comp]
 #   5 · Efectos Aleatorios y Modelos Mixtos
 #     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
-#       > Comparación con la binomial negativa
+#       > El OLRE en la cartera
 # -----------------------------------------------------------------------------
 m_nb2 <- glm.nb(
   n_danos ~ edad_conductor + potencia_cv + zona_circulacion + uso + tipo_vehiculo +
     offset(log(exposicion)), data = cartera
 )
-comparacion_olre <- performance::compare_performance(
-  m_pois_danos, m_nb2, m_olre, metrics = c("AIC", "BIC", "RMSE")
-) |>
-  as.data.frame() |>
-  dplyr::transmute(modelo = dplyr::recode(Name, m_pois_danos = "Poisson", m_nb2 = "NB2", m_olre = "OLRE"),
-                   AIC, AIC_wt, BIC, BIC_wt, RMSE)
-# sin notación científica: el peso de la Poisson es del orden de 1e-295 y se muestra como 0
-comparacion_olre |> dplyr::mutate(dplyr::across(where(is.numeric), \(v) round(v, 4))) |> format(scientific = FALSE)
-
-# -----------------------------------------------------------------------------
-# [u25-olre-rmse]
-#   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.7 El efecto aleatorio a nivel de observación (OLRE)
-#       > Comparación con la binomial negativa
-# -----------------------------------------------------------------------------
-pred_tipica <- predict(m_olre, type = "response", re.form = NA)   # observación típica, u = 0
-pred_pob    <- pred_tipica * exp(sd_olre^2 / 2)                    # media poblacional, E[exp(v)]
-rmse <- \(p) sqrt(mean((cartera$n_danos - p)^2))
-round(c(rmse_tipica       = rmse(pred_tipica),
-        rmse_poblacional  = rmse(pred_pob),
-        rmse_nb2          = rmse(fitted(m_nb2)),
-        media_tipica      = mean(pred_tipica),
-        media_poblacional = mean(pred_pob),
-        media_observada   = mean(cartera$n_danos)), 3)
+comparacion_olre <- sapply(list(Poisson = m_pois_danos, NB2 = m_nb2, OLRE = m_olre),
+  \(m) c(parametros = attr(logLik(m), "df"), AIC = AIC(m), BIC = BIC(m)))
+round(comparacion_olre, 1)
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

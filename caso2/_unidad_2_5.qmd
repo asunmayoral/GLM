@@ -15,7 +15,7 @@ sd_reg 0.538 [0.284, 1.018], sd_ag 0.368 [0.250, 0.542], corr. estimaciones -0.0
 región 0.162, agencia 0.076, Poisson 0.741. LRT región 15.47, agencia 51.37. Póliza 1: observada 0.184
 [0.115, 0.297], típica 0.364 [0.230, 0.576], media nueva 0.450, predicción [0.094, 1.414].
 DGP: potencia 0.160/DT (verdad 0.15), comercial 0.324 (verdad 0.25); efectos pequeños reales no detectados.
-OLRE: sigma_obs 0.94 [0.89, 1.00], LR vs Poisson 1357.5; AIC Poisson 10765.9, NB2 9417.7, OLRE 9410.4. Sin RMSE. -->
+OLRE: sigma_obs 0.94 [0.89, 1.00], LR vs Poisson 1357.5; AIC Poisson 10765.9, NB2 9417.7, OLRE 9410.4. Sin RMSE. DHARMa del OLRE con simulación INCONDICIONAL (createDHARMa; condicionar a v_i apiña los residuos en 0.5): uniformidad 0.370, dispersión 0.096, atípicos 0.154, ceros 0.224 (render 08-nov). -->
 
 # 5 · Efectos Aleatorios y Modelos Mixtos {#sec-u25}
 
@@ -30,8 +30,10 @@ desvían? ¿qué esperar de una agencia nueva?*
 
 Esta unidad es una **espiral**: reactiva los mixtos del Caso 1, ahora sobre la familia Poisson. Como es
 **un** modelo (el GLMM de Poisson con intercepto aleatorio) y no una familia de alternativas, seguimos
-el recorrido completo de la Unidad 2.1: contexto → modelización y estimación → interpretación →
-inferencia y selección → bondad de ajuste y diagnóstico.
+el recorrido completo de la Unidad 2.1: el agrupamiento en los datos (§5.1) → el modelo y su ajuste
+(§5.2) → interpretación y predicción (§5.3) → selección de variables y de distribución (§5.4) → bondad de
+ajuste y diagnóstico (§5.5) → validación contra el DGP (§5.6). Cierra con el OLRE (§5.7), que usa un
+efecto aleatorio para modelar la sobredispersión.
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -48,7 +50,7 @@ aleatorios; @nakagawa2013 y @nakagawa2017 para el $R^2$ y el ICC; @faraway2016 p
 
 La respuesta `n_gestiones` cuenta las gestiones de siniestro de cada póliza, tramitadas a través de su
 **agencia**; y las 30 agencias se reparten en **6 regiones**. En el margen `n_gestiones` parecía casi
-bien portada (var/media ≈ 1.2), pero esconde esa jerarquía: su ritmo varía **entre regiones** y, dentro
+bien portada (var/media = `r round(var(cartera$n_gestiones) / mean(cartera$n_gestiones), 2)`), pero esconde esa jerarquía: su ritmo varía **entre regiones** y, dentro
 de cada región, **entre agencias**. Lo vemos representando la tasa de gestiones de cada agencia,
 agrupada por su región (@fig-u25-anidamiento):
 
@@ -300,10 +302,20 @@ summary(m_glmm)
 ```
 
 ::: {.callout-tip}
-## 🔧 En R. Ajustar un GLMM de Poisson (anidamiento)
+## 🔧 En R. Explorar, cribar y ajustar un GLMM de Poisson (anidamiento)
 ```r
-glmmTMB(y ~ efectos_fijos + offset(log(t)) + (1 | region/agencia),
-        family = poisson, data = ...)
+# Exploración: tasa ponderada por exposición de cada nivel (o cuartil) de un predictor
+d |> dplyr::group_by(nivel = x) |> dplyr::summarise(tasa = sum(y) / sum(t))
+
+# Cribado: cada candidato, uno a uno, sobre el mixto NULO, con un LRT
+m_nulo <- glmmTMB(y ~ offset(log(t)) + (1 | region/agencia), family = poisson, data = d)
+m_x    <- update(m_nulo, . ~ . + x)
+LR     <- 2 * as.numeric(logLik(m_x) - logLik(m_nulo))
+pchisq(LR, df = attr(logLik(m_x), "df") - attr(logLik(m_nulo), "df"), lower.tail = FALSE)
+
+# Ajuste, con la continua centrada (intercepto interpretable y optimizador estable)
+d$x_c <- d$x - mean(d$x)
+m <- glmmTMB(y ~ x_c + f + offset(log(t)) + (1 | region/agencia), family = poisson, data = d)
 ```
 
 - **Estructura aleatoria** — `(1 | grupo)` añade un intercepto aleatorio por grupo; `(1 | region/agencia)`,
@@ -503,7 +515,8 @@ data.frame(LR          = round(LR, 2),
 
 Los dos niveles son necesarios: quitar la región empeora la verosimilitud en
 $\mathrm{LR}=$ `r round(LR[["region"]], 2)` y quitar la agencia, en `r round(LR[["agencia"]], 2)`, con
-$p$-valores corregidos muy por debajo de 0.001. Con 6 regiones, la aproximación asintótica es frágil, y
+$p$-valores corregidos de `r signif(0.5 * pchisq(LR[["region"]], 1, lower.tail = FALSE), 2)` y
+`r signif(0.5 * pchisq(LR[["agencia"]], 1, lower.tail = FALSE), 2)`. Con 6 regiones, la aproximación asintótica es frágil, y
 conviene leer el contraste junto al intervalo de $\sigma_{\text{reg}}$.
 
 ### Efectos aleatorios predichos (BLUP): el factor de cada agencia {#sec-u25-blup}
@@ -682,6 +695,46 @@ confianza, porque lo domina la variación entre agencias y no la incertidumbre d
 Estos intervalos son para la **tasa esperada**; el número de gestiones que de hecho se registre añade,
 además, la variabilidad de la Poisson.
 
+::: {.callout-tip}
+## 🔧 En R. Interpretar y predecir con un GLMM de Poisson
+```r
+# IRR condicionales, con su IC de Wald construido en la escala log
+b <- summary(m)$coefficients$cond
+exp(cbind(IRR      = b[, "Estimate"],
+          inferior = b[, "Estimate"] - 1.96 * b[, "Std. Error"],
+          superior = b[, "Estimate"] + 1.96 * b[, "Std. Error"]))
+
+# Componentes de varianza: sigma de cada nivel y su IC (Wald en log sigma, devuelto a sigma)
+VarCorr(m)
+confint(m, parm = "theta_")
+# H0: sigma^2 = 0 está en el borde: p = la mitad del de una chi2_1
+m_sin_ag <- update(m, . ~ . - (1 | region/agencia) + (1 | region))
+LR <- 2 * (as.numeric(logLik(m)) - as.numeric(logLik(m_sin_ag)))
+0.5 * pchisq(LR, 1, lower.tail = FALSE)
+
+# Partición de la varianza, R2 de Nakagawa e ICC por nivel
+insight::get_variance(m)
+performance::r2(m)
+performance::icc(m, by_group = TRUE)
+
+# BLUP y su error (gráfico de oruga)
+re <- ranef(m, condVar = TRUE)$cond$`agencia:region`
+se <- sqrt(as.numeric(attr(re, "condVar")))
+
+# Predicción para las covariables de nd: en escala log, y se exponencian los extremos
+p_obs <- predict(m, nd, type = "link", se.fit = TRUE)                 # su agencia
+p_tip <- predict(m, nd, type = "link", se.fit = TRUE, re.form = NA)   # agencia típica (u = 0)
+s2_u  <- sum(sapply(VarCorr(m)$cond, \(v) attr(v, "stddev")^2))       # sigma2_reg + sigma2_ag
+exp(p_tip$fit) * exp(s2_u / 2)                                        # media de una agencia nueva
+exp(p_tip$fit + c(-1.96, 1.96) * sqrt(p_tip$se.fit^2 + s2_u))         # intervalo de predicción
+```
+
+- El IRR condicional coincide con el poblacional solo con enlace log y sin pendientes aleatorias.
+- Las fracciones de la partición dependen de la aproximación de $\sigma^2_\varepsilon$; las razones entre
+  los componentes aleatorios y fijos, no.
+- Los BLUP se encogen hacia 0 tanto más cuantas menos gestiones espera el modelo en la agencia.
+:::
+
 ## 5.4 Selección de variables y distribución {#sec-u25-seleccion}
 
 ### Selección de variables {#sec-u25-inferencia}
@@ -786,6 +839,32 @@ veía en el margen era agrupamiento. Si quedara, el paso siguiente sería un GLM
 negativa (`glmmTMB(..., family = nbinom2)`), que combina las dos fuentes. En `n_danos` ocurre lo
 contrario, sobredispersión sin grupos que la expliquen, y es el caso del OLRE de la [§5.7](#sec-u25-olre).
 
+::: {.callout-tip}
+## 🔧 En R. Seleccionar efectos fijos, pendientes aleatorias y distribución
+```r
+drop1(m, test = "Chisq")                         # LRT de quitar cada término fijo
+
+# Añadir un candidato (continuo estandarizado) y contrastarlo con un LRT
+m_x <- update(m, . ~ . + scale(x))
+LR  <- 2 * as.numeric(logLik(m_x) - logLik(m))
+pchisq(LR, df = attr(logLik(m_x), "df") - attr(logLik(m), "df"), lower.tail = FALSE)
+
+# Pendiente aleatoria por región, con x centrada; H0 en el borde: p/2
+m_pend <- update(m, . ~ . + (0 + x_c | region))
+LR     <- max(2 * as.numeric(logLik(m_pend) - logLik(m)), 0)   # un LR < 0 es error numérico
+0.5 * pchisq(LR, 1, lower.tail = FALSE)
+
+# ¿Agrupamiento o sobredispersión?
+m_nb <- MASS::glm.nb(y ~ x_c + f + offset(log(t)), data = d)
+performance::compare_performance(Poisson = m_pois, NB = m_nb, GLMM = m, metrics = c("AIC", "BIC"))
+performance::check_overdispersion(m)             # la dispersión que queda tras el agrupamiento
+```
+
+- Los avisos `NA/NaN function evaluation` de `nlminb` son inocuos si `m$fit$convergence == 0` y
+  `m$sdr$pdHess`; centrar o estandarizar las continuas los evita.
+- Si quedara sobredispersión tras el agrupamiento: el mismo modelo con `family = nbinom2`.
+:::
+
 ## 5.5 Bondad de ajuste y diagnóstico {#sec-u25-diagnostico}
 
 **Bondad de ajuste con la deviance: no.** Como en las unidades anteriores, contrastar la deviance
@@ -847,6 +926,14 @@ ambos es lo que aporta el agrupamiento.
 
 ::: {.callout-tip}
 ## 🔧 En R. Bondad de ajuste en modelos mixtos
+```r
+res <- DHARMa::simulateResiduals(m)   # desde la 0.5.0, condicionando a los efectos aleatorios
+plot(res)
+testUniformity(res); testDispersion(res); testOutliers(res)
+testZeroInflation(res); testQuantiles(res)
+performance::check_singularity(m)     # alguna varianza colapsada a 0
+```
+
 Al recorrido de conteo (índice de dispersión, criterios de información y residuos simulados; véase el
 compendio de la [Unidad 2.3](#sec-u23-sintesis)) los mixtos añaden: **residuos DHARMa** interpretados
 sobre la estructura aleatoria, **dispersión residual** (`testDispersion`), **$R^2$ de Nakagawa**
@@ -885,14 +972,14 @@ validacion |> dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
 
 Los efectos de la potencia y del uso recuperan su valor, y también $\sigma_{\text{reg}}$, aunque con un
 intervalo muy ancho: solo hay 6 regiones. $\sigma_{\text{ag}}$, en cambio, sale por debajo de su valor y fuera de su
-intervalo (`r round(sd_ag, 2)` frente a `r format(verdad$sigma_a, nsmall = 2)`). No es un sesgo del método. El 0.60 es la desviación
+intervalo (`r round(sd_ag, 2)` frente a `r format(verdad$sigma_a, nsmall = 2)`). No es un sesgo del método. El `r format(verdad$sigma_a, nsmall = 2)` es la desviación
 típica de la distribución de la que se **sortearon** las agencias, no la de las 30 que salieron; y con solo
 5 agencias por región, parte de su dispersión cae, por azar, **entre** regiones (las medias regionales de
 los efectos de agencia no son cero), y el modelo se la atribuye a la región. Con pocos grupos, las
 varianzas y su reparto entre niveles se estiman con mucha incertidumbre.
 
 El DGP incluye, además, efectos pequeños de la edad, la zona, el tipo y la antigüedad del vehículo (como
-mucho 0.20 en escala log) que el cribado no detectó: con `r sum(cartera$n_gestiones)` gestiones en 30
+mucho `r sprintf("%.2f", max(abs(b_verdad[c("z_edad", "urbana", "mixta", "moto", "furgoneta", "z_antv")])))` en escala log) que el cribado no detectó: con `r sum(cartera$n_gestiones)` gestiones en 30
 agencias no hay potencia estadística para distinguirlos del ruido. Descartar un predictor significa que los
 datos no muestran su efecto, no que no exista. Los que no tienen efecto, los años de carnet y los
 predictores adicionales, quedaron fuera, y el DGP usa los mismos coeficientes en todas las regiones: **no
@@ -913,11 +1000,40 @@ Al integrar $v_i$, la respuesta marginal es una **Poisson-lognormal**: su varian
 que el OLRE **modela la sobredispersión** como un efecto aleatorio, en paralelo a lo que la binomial
 negativa hace con una mezcla Poisson-Gamma.
 
+:::{.callout-note}
+**Media y varianza.** Llamemos $\lambda_i=e_i\exp(\mathbf{x}_i^{\top}\boldsymbol\beta)$ a la tasa sin el
+impulso, de modo que $Y_i\mid v_i\sim\operatorname{Poisson}(\lambda_i e^{v_i})$. Las dos cantidades se
+obtienen condicionando en $v_i$ y promediando, con los momentos de la lognormal,
+$E[e^{v_i}]=e^{\sigma^2_{\text{obs}}/2}$ y $\operatorname{Var}(e^{v_i})=e^{\sigma^2_{\text{obs}}}\big(e^{\sigma^2_{\text{obs}}}-1\big)$.
+La **media** es
+
+$$
+m_i=E[Y_i]=E\big[E(Y_i\mid v_i)\big]=\lambda_i\,E\big[e^{v_i}\big]=\lambda_i\,e^{\sigma^2_{\text{obs}}/2},
+$$
+
+por encima de $\lambda_i$, como ocurría con la [predicción poblacional](#sec-u25-prediccion) del GLMM. La
+**varianza**, por la ley de la varianza total, suma la variación de la Poisson alrededor de su media y la
+variación de esa media entre pólizas:
+
+$$
+\operatorname{Var}(Y_i)=\underbrace{E\big[\operatorname{Var}(Y_i\mid v_i)\big]}_{\lambda_i E[e^{v_i}]\;=\;m_i}
++\underbrace{\operatorname{Var}\big(E(Y_i\mid v_i)\big)}_{\lambda_i^2\operatorname{Var}(e^{v_i})\;=\;m_i^2\,(e^{\sigma^2_{\text{obs}}}-1)}
+=m_i+\big(e^{\sigma^2_{\text{obs}}}-1\big)\,m_i^2 .
+$$
+
+Como $e^{\sigma^2_{\text{obs}}}-1>0$ siempre que $\sigma^2_{\text{obs}}>0$, la varianza **supera a la
+media**, y la diferencia crece con el cuadrado de la media. Es la misma forma cuadrática que la de la
+binomial negativa NB2, $m_i+m_i^2/\theta$, con $e^{\sigma^2_{\text{obs}}}-1$ en el papel de $1/\theta$. Si
+$\sigma^2_{\text{obs}}=0$, se recupera la Poisson: $\operatorname{Var}(Y_i)=m_i$.
+:::
+
+
 ### El OLRE en la cartera {#sec-u25-olre-cartera}
 
-`n_danos` fue la respuesta **sobredispersa** del caso: en la [Unidad 2.3](#sec-u23-nb) su cociente
-varianza/media superaba con holgura el 1 y la NB la ajustó mucho mejor que la Poisson. Lo confirmamos
-sobre el ajuste Poisson:
+La variable `n_danos` fue la respuesta **sobredispersa** del Caso 2: en la [Unidad 2.3](#sec-u23-nb) su cociente
+varianza/media superaba con holgura el 1 y la NB la ajustó mucho mejor que la Poisson. Partimos de los mismos
+predictores que allí: la edad del conductor, la potencia, la zona de circulación, el uso y el tipo de
+vehículo. Lo confirmamos sobre su ajuste Poisson:
 
 ```{r}
 #| label: u25-olre-disp
@@ -929,18 +1045,41 @@ m_pois_danos <- glm(
 performance::check_overdispersion(m_pois_danos)
 ```
 
-¿De dónde viene esa sobredispersión? De **heterogeneidad no observada entre pólizas**: dos conductores con
+¿De dónde puede venir esa sobredispersión? Puede venir de una mezcla de poblaciones, pero también de **heterogeneidad no observada entre pólizas**: dos conductores con
 las mismas covariables no comparten el mismo riesgo real —hábitos, entorno, azar—, y esas diferencias que
 no medimos hacen que unos acumulen más partes de los que «les tocaría» por su $\mathbf{x}$. Modelizar ese
 exceso como un impulso aleatorio por póliza, $v_i$, es **exactamente** un OLRE: cada póliza lleva su
 propio multiplicador $\exp(v_i)$ sobre la tasa.
 
-Conviene puntualizar una diferencia con el modelo anidado. Allí cada agencia agrupaba **muchas** pólizas,
+Basta exponenciar el predictor lineal para verlo. La tasa de la póliza $i$, la media por unidad de
+exposición, es
+
+$$
+\frac{\mu_i}{e_i}=\exp\!\big(\mathbf{x}_i^{\top}\boldsymbol\beta+v_i\big)
+=\underbrace{\exp\!\big(\mathbf{x}_i^{\top}\boldsymbol\beta\big)}_{\text{tasa según sus covariables}}
+\times\underbrace{e^{v_i}}_{\text{multiplicador propio}} .
+$$
+
+El impulso $v_i$, que se suma en la escala log, actúa en la escala de la tasa como un **factor**: si
+$v_i>0$, la póliza tramita por encima de lo que predicen sus covariables, en un factor $e^{v_i}>1$; si
+$v_i<0$, por debajo. Dos pólizas con las mismas covariables, $\mathbf{x}_i=\mathbf{x}_{i'}$, solo se
+diferencian en ese multiplicador:
+
+$$
+\frac{\mu_i/e_i}{\mu_{i'}/e_{i'}}=e^{\,v_i-v_{i'}} .
+$$
+
+Como $v_i\sim N(0,\sigma^2_{\text{obs}})$, el multiplicador $e^{v_i}$ es lognormal: su mediana es 1, la
+póliza típica, y su dispersión la fija $\sigma_{\text{obs}}$. El 95 % de las pólizas tiene un multiplicador
+entre $e^{-1.96\,\sigma_{\text{obs}}}$ y $e^{1.96\,\sigma_{\text{obs}}}$.
+
+Conviene puntualizar una diferencia con el modelo anidado sobre `n_gestiones`. Allí cada agencia agrupaba **muchas** pólizas,
 y el efecto aleatorio capturaba lo que comparten. Aquí, en cambio, la cartera tiene **una sola fila por
 póliza**: el efecto por observación coincide con uno por sujeto, de modo que cada «grupo» es de **tamaño
-1**. Por eso el OLRE no modela dependencia entre observaciones —no la hay— sino la heterogeneidad
-sobrante, es decir, la sobredispersión. Es la misma razón por la que sus herramientas de grupo (ICC,
-BLUP, condicional frente a marginal) aquí no aplican: no hay grupos que comparar.
+1**. Por eso el OLRE no modela dependencia entre observaciones —no la hay— sino la **heterogeneidad
+sobrante**, es decir, la **sobredispersión**. Es la misma razón por la que sus herramientas de grupo (ICC,
+BLUP, condicional frente a marginal) aquí no aplican: no hay grupos que comparar. El OLRE
+luce ante sobredispersión **de observación**, no de grupo.
 
 Y aquí está la conexión con la [Unidad 2.3](#sec-u23-nb): **el OLRE y la binomial negativa son el mismo
 tipo de modelo** —una Poisson con un multiplicador aleatorio por observación— y solo se diferencian en la
@@ -949,11 +1088,8 @@ Ambas añaden **un único** parámetro de dispersión y capturan la varianza ext
 alternativa sensata —y de igual coste— a la NB, y especialmente natural en esta unidad, donde ya
 trabajamos en el marco de los mixtos.
 
-En cambio, no lo aplicamos a `n_gestiones` porque su variación extra es el **agrupamiento** región/agencia
-que ya modelamos; un OLRE encima no tendría nada que absorber y su varianza saldría $\approx 0$. El OLRE
-luce ante sobredispersión **de observación**, no de grupo.
 
-Añadimos a la Poisson de `n_danos` un intercepto aleatorio por póliza, un nivel por observación:
+Añadimos a la Poisson de `n_danos` un intercepto aleatorio por póliza, un nivel por observación, y obtenemos la estimación de la desviación estándar con su intervalo de confianza:
 
 ```{r}
 #| label: u25-olre
@@ -968,6 +1104,8 @@ sd_olre <- attr(VarCorr(m_olre)$cond$id_obs, "stddev")[[1]]
 ic_olre <- confint(m_olre, parm = "theta_")         # IC de Wald en escala log, devuelto a sigma
 ic_olre
 ```
+Con la estimación, el 95 % de las pólizas tiene un multiplicador entre
+`r round(exp(-1.96 * sd_olre), 2)` y `r round(exp(1.96 * sd_olre), 2)`.
 
 El componente estimado es $\hat\sigma_{\text{obs}}=$ `r round(sd_olre, 2)` (escala log), con un intervalo
 al 95 % de `r sprintf("%.2f", ic_olre[1, "2.5 %"])` a `r sprintf("%.2f", ic_olre[1, "97.5 %"])`: estrecho, porque se
@@ -976,8 +1114,8 @@ póliza se aparta de su valor esperado por un factor del orden de $e^{\sigma_{\t
 se siguen leyendo como IRR, ahora **netos** de esa variabilidad individual.
 
 **¿Es $\sigma_{\text{obs}}$ distinta de cero?** Es el mismo contraste de frontera de los
-[componentes de varianza](#sec-u25-varianza): comparamos el OLRE con la Poisson, que es el caso
-$\sigma_{\text{obs}}=0$, y el $p$ es la mitad del de una $\chi^2_1$:
+[componentes de varianza](#sec-u25-varianza), $\sigma_{\text{obs}}=0$. Comparamos pues el OLRE con la Poisson, y calculamos el $p$-valor con la mitad del de una $\chi^2_1$:
+$$p = \frac{1}{2} \Pr(\chi^2_1 >LR), \qquad LR = 2(l_{\text{OLRE}}-l_{\text{Poisson}}) $$
 
 ```{r}
 #| label: u25-olre-test
@@ -985,21 +1123,63 @@ LR_olre <- 2 * (as.numeric(logLik(m_olre)) - as.numeric(logLik(m_pois_danos)))
 c(LR = LR_olre, p_corregido = 0.5 * pchisq(LR_olre, 1, lower.tail = FALSE))
 ```
 
-Con $\mathrm{LR}=$ `r round(LR_olre, 1)`, la sobredispersión es indudable. Falta comprobar que el OLRE la ha
-absorbido: si es así, los residuos simulados de `DHARMa` quedan bien portados y el test de dispersión, no
-significativo (@fig-u25-olre-diag):
+Con $\mathrm{LR}=$ `r round(LR_olre, 1)`, la sobredispersión es indudable. Falta comprobar que el OLRE la
+ha absorbido, con los residuos simulados de `DHARMa`. Aquí hay que simular con cuidado. `DHARMa` simula
+condicionando a los efectos aleatorios estimados, lo que en el GLMM es razonable: cada efecto de agencia
+lo comparten unas `r round(nrow(cartera) / nrow(re_df))` pólizas. En el OLRE, en cambio, cada $\hat v_i$ se estima con una sola
+observación, la propia $y_i$. Simular «con su $\hat v_i$» es simular alrededor de un valor que ya
+incorpora $y_i$, así que cada observación caería en el centro de sus simulaciones y los residuos se
+apiñarían en torno a 0.5, aunque el modelo fuera correcto. La comparación adecuada es **incondicional**:
+en cada réplica, cada póliza recibe un impulso nuevo, $v_i\sim N(0,\hat\sigma^2_{\text{obs}})$, y se
+simula $y_i\sim\operatorname{Poisson}\big(\hat\lambda_i e^{v_i}\big)$, con
+$\hat\lambda_i=e_i\exp(\mathbf x_i^{\top}\hat{\boldsymbol\beta})$. Simulamos así a mano y entregamos las
+réplicas a `DHARMa` con `createDHARMa()` (@fig-u25-olre-diag):
 
 ```{r}
 #| label: fig-u25-olre-diag
-#| fig-cap: "Residuos simulados (DHARMa) del OLRE sobre `n_danos`. Frente a la Poisson —sobredispersa—, el QQ y la prueba de dispersión deben indicar que la varianza extra ya está recogida."
+#| fig-cap: "Residuos simulados (DHARMa) del OLRE sobre `n_danos`, con simulación incondicional: en cada réplica, cada póliza recibe un impulso nuevo $v_i\\sim N(0,\\hat\\sigma^2_{\\text{obs}})$. Simular condicionando a los $\\hat v_i$, cada uno estimado con una sola observación, apiñaría los residuos en torno a 0.5 aunque el modelo fuera correcto. QQ frente a la uniforme (izquierda), con los contrastes de uniformidad, dispersión y atípicos, y residuos contra el predicho (derecha)."
 #| fig-width: 7
-#| fig-height: 3.4
-res_olre <- simulateResiduals(m_olre)
+#| fig-height: 5
+set.seed(2025)                                                   # simulaciones reproducibles
+n_pol    <- nrow(cartera)
+lam_olre <- predict(m_olre, re.form = NA, type = "response")     # tasa sin el impulso de la póliza
+sim_olre <- replicate(250, rpois(n_pol, lam_olre * exp(rnorm(n_pol, 0, sd_olre))))
+res_olre <- DHARMa::createDHARMa(
+  simulatedResponse       = sim_olre,
+  observedResponse        = cartera$n_danos,
+  fittedPredictedResponse = lam_olre * exp(sd_olre^2 / 2),      # la media de la Poisson-lognormal
+  integerResponse         = TRUE)
 plot(res_olre)
 ```
 
+```{r}
+#| label: u25-olre-dharma-tests
+# p-valores de los contrastes de DHARMa sobre el OLRE, con la simulación incondicional
+tests_olre <- round(c(uniformidad = testUniformity(res_olre, plot = FALSE)$p.value,
+                      dispersion  = testDispersion(res_olre, plot = FALSE)$p.value,
+                      atipicos    = testOutliers(res_olre, plot = FALSE)$p.value,
+                      ceros       = testZeroInflation(res_olre, plot = FALSE)$p.value), 3)
+tests_olre
+```
+
+Con la simulación incondicional, ningún contraste rechaza al 5 %: uniformidad $p=$
+`r tests_olre[["uniformidad"]]`, dispersión `r tests_olre[["dispersion"]]`, atípicos
+`r tests_olre[["atipicos"]]` y ceros `r tests_olre[["ceros"]]`. El QQ sigue la diagonal y las líneas de
+cuantiles del panel derecho no se apartan de la horizontal: el OLRE ha absorbido la sobredispersión de
+`n_danos` que la Poisson dejaba fuera, y reproduce también su proporción de ceros. El de dispersión es el
+que más se acerca al umbral, sin llegar a él.
+
+
+
 **Comparación con la binomial negativa.** Ponemos lado a lado la Poisson, la NB2 y el OLRE con el AIC y el
 BIC:
+
+:::{.callout-tip}
+Las dos correcciones están anidadas en la Poisson, como casos de frontera: la NB2 cuando
+$\theta\to\infty$, contrastado ya en la [Unidad 2.3](#sec-u23-nb-diagnostico), y el
+OLRE cuando $\sigma_{\text{obs}}=0$, contrastado más arriba. Entre sí, en cambio, no lo están (sus mezclas
+son una Gamma y una lognormal), así que solo las compara el AIC.
+:::
 
 ```{r}
 #| label: u25-olre-comp
@@ -1034,11 +1214,20 @@ LR <- 2 * (as.numeric(logLik(m_olre)) - as.numeric(logLik(m_pois)))
 0.5 * pchisq(LR, 1, lower.tail = FALSE)                  # H0: sigma_obs = 0 (p de frontera)
 sapply(list(Poisson = m_pois, NB2 = m_nb, OLRE = m_olre),
        \(m) c(AIC = AIC(m), BIC = BIC(m)))               # comparación de los tres modelos
+
+# DHARMa con simulación INCONDICIONAL: un impulso nuevo por fila en cada réplica
+s   <- attr(VarCorr(m_olre)$cond$id_obs, "stddev")[[1]]
+lam <- predict(m_olre, re.form = NA, type = "response")
+sim <- replicate(250, rpois(nrow(d), lam * exp(rnorm(nrow(d), 0, s))))
+res <- DHARMa::createDHARMa(simulatedResponse = sim, observedResponse = d$y,
+         fittedPredictedResponse = lam * exp(s^2 / 2), integerResponse = TRUE)
+plot(res); testDispersion(res); testZeroInflation(res)
 ```
 
 - **OLRE** = intercepto aleatorio **por fila**: convierte la Poisson en una **Poisson-lognormal** que
   absorbe la sobredispersión, en paralelo a la NB (Poisson-Gamma).
-- **Diagnóstico**: `DHARMa::simulateResiduals(m_olre)` y `testDispersion()`, como en el GLMM.
+- **Diagnóstico**: no con `simulateResiduals(m_olre)`, que condiciona a cada $\hat v_i$, estimado con la
+  propia $y_i$, y apiña los residuos en 0.5; se simula de forma incondicional, como arriba.
 :::
 
 ::: {.callout-tip}

@@ -1,0 +1,234 @@
+<!-- Partial · Resumen de sintaxis del Caso 2. Incluir con {{< include _resumen_modelos_2.qmd >}}
+     tras _unidad_2_5.qmd. Sin YAML. Sin chunks ejecutables: los bloques son ```r (no se evalúan).
+CIFRAS: ninguna. Es una chuleta de sintaxis; no hay salidas que citar.
+VERIFICADO (R 4.3.3, glmmTMB 1.1.8, glmnet 4.1-8, MASS, sobre datos simulados con la notación
+genérica d, y, x, f1, f2, A, B, exposicion, obs): todos los bloques corren sin errores, salvo los
+marcados [VERIFICAR] (priors de glmmTMB, ausente en 1.1.8; glmmLasso y mpath, no instalables aquí).
+Comprobado: quasipoisson da los mismos coeficientes que poisson; dplyr::count() omite las celdas
+vacías salvo con .drop = FALSE, xtabs() las conserva; cv.glmnet admite offset con
+MASS::negative.binomial(); predict(cv, newoffset = ) funciona.
+ENCUADRE: tablas sin regularización ni efectos aleatorios. Mixto + regularización: vía recomendada
+en dos pasos (selección con glmnet sobre el modelo fijo, después el mixto); ridge con priors como
+alternativa en un paso. glmmLasso no admite offset (documentación del paquete, 1.6.x).
+NOMENCLATURA: f1 y f2 son factores; en las tablas de cambio, la misma clasificación en dos
+momentos (mismos niveles). B anidado en A. FAM = el argumento que cambia entre modelos. -->
+
+# Resumen · Cómo se escribe cada modelo del Caso 2 {#sec-u2r}
+
+Esta chuleta reúne la sintaxis de los modelos de las unidades 2.1 a 2.5 con una notación genérica.
+No repite la teoría: cada bloque remite a la unidad donde se explica. Cuando varios modelos comparten
+la llamada y solo cambia un argumento, se escribe una vez y se indica qué valor toma ese argumento en
+cada modelo (lo llamamos `FAM`).
+
+## Notación {#sec-u2r-notacion}
+
+- `d`: los datos, una fila por unidad observada (en el caso, la póliza).
+- `y`: la respuesta, un **conteo** (número de eventos: entero, 0, 1, 2, …).
+- `x`: una covariable continua; `f1`, `f2`: dos factores (categóricos).
+- `exposicion`: el tiempo durante el que se observa cada unidad. Entra como `offset(log(exposicion))`,
+  de modo que se modela la **tasa** $\mu/\text{exposición}$ y no el recuento bruto
+  ([§ Modelización](#sec-u21-modelizacion)).
+- `A`, `B`: factores de agrupación, con `B` **anidado** en `A` (en el caso, agencia dentro de región).
+- `obs`: un identificador por fila, `d$obs <- factor(seq_len(nrow(d)))`, para el efecto aleatorio por
+  observación (OLRE).
+
+## Tablas de contingencia y de cambio {#sec-u2r-tablas}
+
+En un log-lineal el dato es la **celda**: la respuesta es su frecuencia, `Freq`, y las predictoras son
+los factores que la definen ([Unidad 2.2](#sec-u22-dosvias)).
+
+**Calcular las frecuencias.**
+
+```r
+tab     <- xtabs(~ f1 + f2, data = d)   # tabla de contingencia (matriz de recuentos)
+addmargins(tab)                         # con totales de fila y columna
+prop.table(tab, 1)                      # proporciones por fila (2 = por columna)
+Freq_df <- as.data.frame(tab)           # formato largo: columnas f1, f2, Freq (una fila por celda)
+```
+
+`dplyr::count(d, f1, f2, name = "Freq")` da el mismo formato largo, pero **omite las celdas vacías**
+salvo que se añada `.drop = FALSE`; `xtabs()` las conserva con `Freq = 0`, y el modelo las necesita.
+
+**Tablas de contingencia.** Todos los modelos son `glm(Freq ~ ..., family = poisson, data = Freq_df)`
+y solo cambia el lado derecho:
+
+- Independencia: `Freq ~ f1 + f2`. Saturado (asociación libre): `Freq ~ f1 * f2`.
+- Con un tercer factor `f3` (tabla `as.data.frame(xtabs(~ f1 + f2 + f3, data = d))`): independencia
+  mutua `f1 + f2 + f3`; conjunta `f1 * f2 + f3`; condicional `f1 * f3 + f2 * f3`; asociación homogénea
+  `(f1 + f2 + f3)^2`; saturado `f1 * f2 * f3` ([§ Tres vías](#sec-u22-tresvias)).
+
+```r
+m0 <- glm(Freq ~ f1 + f2, family = poisson, data = Freq_df)
+m1 <- glm(Freq ~ f1 * f2, family = poisson, data = Freq_df)
+anova(m0, m1, test = "LRT")                                    # contraste entre modelos anidados
+pchisq(deviance(m0), df.residual(m0), lower.tail = FALSE)      # ajuste frente al saturado
+rstandard(m0, type = "pearson")                                # residuos ajustados por celda
+MASS::loglm(~ f1 + f2, data = tab)                             # el mismo modelo, sobre la matriz
+```
+
+**Tablas de cambio (cuadradas).** Aquí `f1` y `f2` son la **misma clasificación en dos momentos**
+(antes y después, con los mismos niveles ordenados). Se añaden a la tabla larga las columnas
+auxiliares de la [§ Tablas de cambio](#sec-u22-cuadradas):
+
+```r
+cuad <- as.data.frame(xtabs(~ f1 + f2, data = d))
+cuad <- transform(cuad, i = as.integer(f1), j = as.integer(f2))          # niveles como números
+cuad <- transform(cuad,
+  par      = factor(paste(pmin(i, j), pmax(i, j), sep = "-")),           # pareja sin orden
+  diagonal = factor(ifelse(i == j, "queda", "mueve")),                   # celda de la diagonal
+  sube1    = as.integer(j == i + 1))                                     # sube exactamente un nivel
+```
+
+De nuevo `glm(Freq ~ ..., family = poisson, data = cuad)`, con este lado derecho:
+
+- Simetría: `par`. Cuasi-simetría: `f1 + f2 + par`.
+- Homogeneidad marginal: no es un modelo, es el contraste `anova(m_sim, m_qs, test = "LRT")` entre los
+  dos anteriores.
+- Independencia: `f1 + f2`. Asociación uniforme: `f1 + f2 + I(i * j)`.
+- Inercia: `f1 + f2 + I(i * j) + diagonal`. Inercia y paso hacia arriba: `f1 + f2 + diagonal + sube1`.
+
+Las tablas no se regularizan ni llevan efectos aleatorios: cada fila es una celda, sin agrupación
+natural, y con pocas celdas el *lasso* puede retener una interacción sin los términos que contiene,
+rompiendo la jerarquía que da sentido al modelo.
+
+## Modelos para el conteo: efectos fijos {#sec-u2r-fijos}
+
+Una sola fórmula sirve para todos los modelos de conteo:
+
+```r
+fo <- y ~ x + f1 + f2 + offset(log(exposicion))
+```
+
+**Sin parte de ceros** (Poisson, quasi-Poisson, binomial negativa):
+
+```r
+m <- glm(fo, family = FAM, data = d)        # FAM = poisson | quasipoisson
+m <- MASS::glm.nb(fo, data = d)             # NB2; m$theta es su theta
+m <- glmmTMB(fo, family = FAM, data = d)    # FAM = poisson | nbinom2 | nbinom1
+```
+
+- **Poisson** ([Unidad 2.1](#sec-u21-modelizacion)): `glm` o `glmmTMB` con `poisson` dan los mismos
+  coeficientes.
+- **Quasi-Poisson** ([§ Quasi-Poisson](#sec-u23-quasi)): solo con `glm`. Coeficientes idénticos a los de
+  la Poisson; los errores estándar se multiplican por $\sqrt{\hat\phi}$, con
+  $\hat\phi$ = `summary(m)$dispersion`.
+- **Binomial negativa** ([§ Binomial negativa](#sec-u23-nb)): NB2 con `glm.nb` o con
+  `glmmTMB(..., nbinom2)`, donde `sigma(m)` es la misma $\theta$; NB1 solo con
+  `glmmTMB(..., nbinom1)`, donde `sigma(m)` es $\alpha$ en $\mathrm{Var} = \mu(1 + \alpha)$.
+
+**Con parte de ceros** (siempre `glmmTMB`): se añade `ziformula`, que modela con enlace logit la
+probabilidad del cero estructural (inflados) o de $Y = 0$ (*hurdle*); `ziformula = ~ 1` la deja
+constante.
+
+```r
+m <- glmmTMB(fo, ziformula = ~ x, family = FAM, data = d)
+```
+
+- ZIP: `FAM = poisson`; ZINB: `nbinom2` ([§ ZIP/ZINB](#sec-u24-zi)).
+- *Hurdle* Poisson: `truncated_poisson`; *hurdle* NB: `truncated_nbinom2`
+  ([§ Hurdle](#sec-u24-hurdle)).
+
+**Leer cualquiera de ellos.** `exp(coef(m))` (con `glm`) o `exp(fixef(m)$cond)` (con `glmmTMB`) da las
+razones de tasas (IRR); `fixef(m)$zi`, los coeficientes de la parte de ceros en escala logit;
+`AIC(m1, m2)` y `anova(m1, m2)` comparan modelos; `predict(m, type = "response")` predice el conteo
+esperado.
+
+## Con efectos aleatorios {#sec-u2r-mixtos}
+
+El único cambio es añadir el término aleatorio a la fórmula y ajustar con `glmmTMB`, con los mismos
+valores de `FAM` que en la sección anterior ([§ El modelo mixto](#sec-u25-modelo)):
+
+```r
+fo_mix <- update(fo, . ~ . + (1 | A/B))     # intercepto por A y por B dentro de A
+m <- glmmTMB(fo_mix, family = FAM, data = d)                            # poisson | nbinom2 | nbinom1
+m <- glmmTMB(fo_mix, ziformula = ~ x + (1 | A), family = FAM, data = d) # ZIP, ZINB, hurdle
+```
+
+- Otras estructuras, cambiando solo el término: un nivel, `(1 | A)`; pendiente aleatoria de `x`,
+  `(1 + x | A)`. Si las etiquetas de `B` no se repiten entre niveles de `A`, `(1 | A) + (1 | B)` es
+  equivalente a `(1 | A/B)`; si se repiten, hace falta `A/B`.
+- **OLRE**: `+ (1 | obs)` da una Poisson-lognormal, alternativa a la binomial negativa para la
+  sobredispersión ([§ OLRE](#sec-u25-olre)).
+- En los modelos con ceros, el efecto aleatorio puede ir en el conteo (`fo_mix`), en `ziformula` o en
+  ambos.
+- **Quasi-Poisson**: no tiene versión mixta (`glmmTMB` no admite familias *quasi*); se sustituye por
+  el OLRE o por la binomial negativa mixta.
+- Leer: `VarCorr(m)` (desviaciones típicas de cada nivel), `ranef(m)` (BLUP),
+  `predict(m, type = "response")` (condicional, con el efecto de su grupo) y
+  `predict(m, type = "response", re.form = NA)` (grupo típico, $u = 0$)
+  ([§ Predicción](#sec-u25-prediccion)).
+
+## Con regularización (efectos fijos) {#sec-u2r-reg}
+
+`glmnet` no lee fórmulas: recibe la matriz de diseño, que se construye con `model.matrix()`
+([§ Regularización](#sec-u21-regularizacion)). El *offset* va en su propio argumento, nunca dentro de
+`X`, y las columnas se estandarizan internamente.
+
+```r
+X  <- model.matrix(~ x + f1 + f2, data = d)[, -1]   # sin intercepto; cada factor, en indicadoras
+cv <- cv.glmnet(X, d$y, family = FAM, offset = log(d$exposicion), alpha = a)
+coef(cv, s = "lambda.min")                           # o "lambda.1se": el modelo más corto
+predict(cv, newx = X0, newoffset = log(e0), s = "lambda.1se", type = "response")
+```
+
+- `alpha`: `0` *ridge*, `1` *lasso*, entre 0 y 1 *elastic-net*.
+- Poisson y quasi-Poisson: `FAM = "poisson"`. Las estimaciones de la quasi son las de la Poisson y
+  `glmnet` no da errores estándar, así que la regularización es la misma.
+- NB2: `FAM = MASS::negative.binomial(theta = th)`, con `th <- MASS::glm.nb(fo, data = d)$theta`: la
+  $\theta$ queda fija de antemano [@tay2023].
+- *Hurdle*: su verosimilitud se separa en dos partes. La barrera es una logística, que se regulariza con
+  `cv.glmnet(X, as.integer(d$y > 0), family = "binomial", alpha = a)`; la parte truncada no tiene
+  familia en `glmnet` y se regulariza con *ridge* (bloque siguiente).
+- NB1, ZIP y ZINB: no tienen familia en `glmnet`; se regularizan con *ridge*. El *lasso* para los
+  inflados existe en `mpath::zipath()`, fuera de la pila del curso [VERIFICAR: no probado].
+
+***Ridge* con `glmmTMB`** (argumento `priors`, desde la versión 1.1.9; compruébalo con
+`packageVersion("glmmTMB")`). Una prior normal centrada en cero sobre los efectos fijos equivale a una
+penalización *ridge*. Vale para cualquier modelo ajustado con `glmmTMB`:
+
+```r
+d$x <- as.numeric(scale(d$x))     # glmmTMB no estandariza: sin esto, la penalización depende de las unidades
+pr  <- data.frame(prior = c("normal(0,10)", "normal(0,1)"),   # intercepto casi libre; resto, encogido
+                  class = "fixef", coef = c("(Intercept)", ""))
+m_r <- update(m, priors = pr)     # [VERIFICAR: no probado; requiere glmmTMB >= 1.1.9]
+```
+
+- En ZIP, ZINB y *hurdle*, se añaden filas con `class = "fixef_zi"` para penalizar también la parte de
+  ceros.
+- La desviación típica de la prior hace de $\lambda$: cuanto menor, más encoge. No se elige sola, como
+  en `cv.glmnet`; se compara un par de valores. Y no anula coeficientes: es *ridge*, no *lasso*.
+
+## Con efectos aleatorios y regularización {#sec-u2r-mixreg}
+
+`glmnet` no admite efectos aleatorios. Hay tres vías:
+
+1. **En dos pasos (recomendada).** Se seleccionan las variables con `cv.glmnet` sobre el modelo de
+   efectos fijos (sección anterior) y después se ajusta el mixto con las retenidas. Funciona con todas las
+   familias, usa solo paquetes de la pila y mantiene el *offset*.
+
+   ```r
+   # bloques de validación por grupo: las filas de un mismo A no se reparten entre bloques
+   cv <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion), foldid = as.integer(d$A))
+   b  <- coef(cv, s = "lambda.1se")[-1, 1]
+   names(b)[b != 0]        # columnas retenidas: un factor entra si sobrevive alguna de sus indicadoras
+   m  <- glmmTMB(y ~ x + f1 + offset(log(exposicion)) + (1 | A/B), family = FAM, data = d)
+   ```
+
+   En el último paso, la fórmula lleva solo lo retenido (aquí, por ejemplo, `x` y `f1`). La selección
+   ignora el agrupamiento salvo por los bloques; por eso se forman por grupo.
+
+2. ***Ridge* en un paso.** El mismo `update(m, priors = pr)` de la sección anterior, aplicado al modelo
+   mixto, sea cual sea su familia (Poisson, NB, ZIP, ZINB, *hurdle*). Penaliza solo los efectos fijos; las
+   varianzas de `A` y `B` se estiman como siempre [VERIFICAR: no probado].
+3. ***Lasso* en un paso** con `glmmLasso`, fuera de la pila del curso:
+
+   ```r
+   glmmLasso(fix = y ~ x + f1 + f2, rnd = list(A = ~1), family = poisson(link = "log"),
+             lambda = l, data = d)       # [VERIFICAR: no probado]
+   ```
+
+   Tiene tres limitaciones según su documentación: no admite *offset* (modela recuentos, no tasas), sus
+   ejemplos usan un solo factor de agrupación y $\lambda$ se elige recorriendo una rejilla y comparando
+   el `$bic` de cada ajuste.
+
+La quasi-Poisson no tiene versión mixta, así que tampoco la tiene regularizada.

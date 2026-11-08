@@ -39,7 +39,7 @@ PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
   glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  pscl = "1.5.9", purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
+  purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
   tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13",
   vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
@@ -62,7 +62,6 @@ rm(.falta, .instalada, .otra)
 library(broom)
 library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
-library(pscl)          # hurdle / zeroinfl
 library(glmmTMB)       # conteos mixtos / ceros
 library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
@@ -414,12 +413,12 @@ dplyr::bind_rows(
 #   6 · Del conteo al reloj. Supervivencia
 #     > 6.5 Fragilidad ≡ GLMM de Poisson
 # -----------------------------------------------------------------------------
-m_frag <- glmer(
+m_frag <- glmmTMB(
   y ~ tramo + edad_conductor + antiguedad_carnet + sexo + tipo_vehiculo + zona_circulacion +
     (1 | agencia),
   family = poisson, data = pp
 )
-sd_frag <- as.data.frame(VarCorr(m_frag))$sdcor[1]
+sd_frag <- attr(VarCorr(m_frag)$cond$agencia, "stddev")[[1]]
 c(sigma_agencia = sd_frag)
 
 # -----------------------------------------------------------------------------

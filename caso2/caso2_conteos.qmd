@@ -42,7 +42,6 @@ library(broom)
 library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
 library(glmmTMB)       # conteos mixtos / ceros
-library(lme4)          # glmer (Poisson)
 library(DHARMa); library(performance); library(marginaleffects)
 library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
@@ -140,6 +139,8 @@ Generamos la cartera y la miramos por encima:
 #| label: cartera-sim
 source("R/dgp_conteos.R")            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
 cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
+source("R/dgp_panel.R")              # panel póliza-año de partes (Unidad 2.6): proceso independiente que solo LEE la cartera
+panel <- cargar_panel_partes(cartera)
 glimpse(cartera)
 head(cartera)
 ```
@@ -190,6 +191,8 @@ cartera |>
 {{< include _unidad_2_4.qmd >}}
 
 {{< include _unidad_2_5.qmd >}}
+
+{{< include _resumen_modelos_2.qmd >}}
 
 {{< include _unidad_2_6.qmd >}}
 
