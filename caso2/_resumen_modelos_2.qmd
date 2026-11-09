@@ -1,47 +1,17 @@
-<!-- Partial · Resumen de sintaxis del Caso 2. Incluir con {{< include _resumen_modelos_2.qmd >}}
-     tras _unidad_2_6.qmd. Sin YAML. Sin chunks ejecutables: los bloques de código R van sin llaves (no se evalúan).
-CIFRAS: ninguna. Es una chuleta de sintaxis; no hay salidas que citar.
-VERIFICADO (R 4.3.3, glmmTMB 1.1.8, glmnet 4.1-8, MASS, sobre datos simulados con la notación
-genérica d, y, x, f1, f2, A, B, exposicion, obs): todos los bloques corren sin errores, salvo los
-que dependen de paquetes no instalables aquí, ejecutados por la autora (abajo).
-mpath::zipath: ejecutado por la autora sobre n_fraude de la 2.4 (ZIP de m_zip). RESPETA el offset, en la
-fórmula o con offset = (intercepto del conteo 1.441; pscl con offset 1.447, sin offset 1.022).
-family = "negbin" corre. BIC sobre el camino eligió el lambda más pequeño: no descartó ninguna
-variable (todas eran predictores reales), así que su capacidad de selección no queda probada.
-glmmLasso 1.6.4: ejecutado por la autora sobre n_gestiones de la 2.5. offset() en la fórmula no da
-error pero se IGNORA (coeficientes y sd de agencia = glmmTMB sin offset: -1.503 vs -1.528; 0.665 vs
-0.666). rnd = list(region = ~1, agencia = ~1) corre; etiquetas de agencia únicas (30 = 30 pares).
-BIC mínimo en lambda = 10 retuvo dos variables de ruido (antiguedad_carnet, km_declarados).
-priors: ejecutado por la autora con glmmTMB 1.1.14 sobre el GLMM de la 2.5 (encoge los fijos;
-varianzas de región y agencia casi intactas).
-Comprobado: quasipoisson da los mismos coeficientes que poisson; dplyr::count() omite las celdas
-vacías salvo con .drop = FALSE, xtabs() las conserva; cv.glmnet admite offset con
-MASS::negative.binomial(); predict(cv, newoffset = ) funciona.
-Añadido 08-nov (verificado en R 4.3 con datos simulados, notación genérica): drop1() sobre glmmTMB;
-foldid con los grupos repartidos en 10 bloques (cada grupo entero en uno); penalty.factor = 0 deja sin
-penalizar las columnas de un término. Inestabilidad del lasso con pocos candidatos observada en datos
-de la autora (lambda.min lo retiene todo; lambda.1se descarta efectos significativos en el mixto).
-ENCUADRE: tablas sin regularización ni efectos aleatorios. Mixto + regularización (revisado 09-nov con
-heinze2018, schelldorfer2011, groll2014, bolker2009): pocos candidatos -> sin regularizar (LRT sobre el
-mixto o modelo completo); muchos -> penalizar DENTRO del mixto (ridge con priors, admite offset; lasso
-con glmmLasso, sin offset). Los dos pasos (glmnet sobre el modelo fijo + mixto) quedan como cribado
-exploratorio, NO recomendado: selecciona ignorando la agrupación y el mixto reajustado no descuenta la
-selección. glmmLasso ignora el offset en silencio (comprobado, 1.6.4) y estandariza por defecto (ayuda).
-Fragilidad y riesgos a trozos (2.6): sintaxis probada en R 4.3 con datos sujeto-periodo simulados.
-SELECCIÓN (#sec-u2r-seleccion, 09-nov): LRT solo anidados, ML, mismas filas; borde (Poisson vs NB, varianza
-de un efecto aleatorio) -> p/2 [selfliang1987; stramlee1994]; no anidados y Poisson vs ZIP -> AIC/BIC
-[wilson2015]; quasi -> F y QAIC. Comprobado en R: anova() de glmmTMB da el p ingenuo; logLik de glm,
-glm.nb, pscl y glmmTMB coinciden para el mismo modelo; AIC() de una quasipoisson es NA.
-REGULARIZACIÓN (#sec-u2r-reg, 09-nov): ridge glmmTMB = prior normal(0,s) por coeficiente nombrado
-(?priors: coef = "" excluye el intercepto, que solo lleva prior si se pone explícita). Equivalencia
-s = 1/sqrt(n*lambda) con el ridge de glmnet COMPROBADA numéricamente (X tipificada, MAP con optim = glmnet).
-Bucle de CV por bloques de grupo probado SIN priors (1.1.8 aquí): predict sobre grupos nuevos exige
-allow.new.levels = TRUE. Prior por coeficiente nombrado: PENDIENTE de prueba con glmmTMB 1.1.14.
-glmmPen: offset documentado (Poisson/binomial/normal, un factor de agrupación); no probado.
-NOMENCLATURA: f1 y f2 son factores; en las tablas de cambio, la misma clasificación en dos
-momentos (mismos niveles). B anidado en A. FAM = el argumento que cambia entre modelos. -->
+<!-- Partial · Resumen de sintaxis del Caso 2. Se incluye tras _unidad_2_6.qmd. Sin YAML; bloques ```r
+sin evaluar. Sin cifras de datos.
+NOTACIÓN: d, y (conteo), x, f1, f2 (en tablas de cambio, la misma clasificación en dos momentos),
+exposicion (offset), A/B (B anidado en A), obs (OLRE), id y trozo (sujeto-periodo). FAM = el argumento que
+cambia entre modelos.
+ENCUADRE: tablas sin regularización ni efectos aleatorios. Selección: LRT solo entre anidados; en el borde,
+p/2; Poisson vs ZIP y no anidados, AIC/BIC; quasi, F y QAIC. Mixtos con muchos candidatos: penalizar
+dentro del mixto (ridge con priors de glmmTMB; lasso con glmmLasso, que ignora el offset sin avisar);
+glmnet sobre el modelo fijo + mixto, solo como cribado.
+VERIFICADO: sintaxis en R 4.3 (glmmTMB 1.1.8) con datos simulados; priors, glmmLasso 1.6.4 y mpath
+(respeta el offset) ejecutados por la autora; ridge s = 1/sqrt(n*lambda) comprobado numéricamente.
+PENDIENTE: que la prior por coeficiente nombrado deje libres los no nombrados (glmmTMB 1.1.14). -->
 
-# 📋 Resumen · Cómo se escribe cada modelo del Caso 2 {#sec-u2r}
+# 📋 Resumen · Caso 2 {#sec-u2r}
 
 Esta chuleta reúne la sintaxis de los modelos de las unidades 2.1 a 2.6 con una notación genérica.
 No repite la teoría: cada bloque remite a la unidad donde se explica. Cuando varios modelos comparten

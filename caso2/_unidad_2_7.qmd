@@ -188,9 +188,9 @@ siniestralidad**: empiezas por una modelización base que vas afinando en funci�
 (IRR, probabilidades, partes por año) y **recomienda** en términos que el comité entienda.
 
 
-## Pistas · Qué hay detrás de cada pregunta del comité
+### Pistas · Qué hay detrás de cada pregunta del comité
 
-1. **P1 · Dirección comercial.**
+- **P1 · Dirección comercial.**
   - *Variables:* `tipo_vehiculo`, `zona_circulacion` y `tuvo_siniestro`.
   - *Se trabaja en:* [Unidad 2.2](#sec-u22) (tablas y modelos log-lineales).
 
@@ -199,7 +199,7 @@ falta: si cada factor se asocia con tener siniestro, si se asocian entre sí y s
 cambia con el otro factor. De ahí sale si basta con las tablas de dos en dos o es preciso la de tres vías. 
 Antes de fiarte de un $p$-valor, comprueba que las celdas no están casi vacías.
 
-1. **P2 - P3 · Dirección técnica y Dirección de red territorial**
+- **P2 - P3 · Dirección técnica y Dirección de red territorial**
   - *Variable respuesta:* `n_siniestros`, con `offset(log(antiguedad))`.
   - *Se trabaja en:* [Unidades 2.1](#sec-u21), [2.3](#sec-u23) y [2.4](#sec-u24) (Poisson,
     sobredispersión, ceros).
@@ -212,7 +212,7 @@ Antes de fiarte de un $p$-valor, comprueba que las celdas no están casi vacías
 
 > Extrae conclusiones sobre el peso de cada factor en términos de IRR con sus intervalos, y construye las predicciones solicitadas (una **agencia concreta**, para una **región concreta** y para una **agencia genérica** en P3). 
  
-1. **P4 · Dirección financiera.**
+- **P4 · Dirección financiera.**
   - *Variables:* `bonus_malus_prev` y `bonus_malus_act`, como tabla cuadrada.
   - *Se trabaja en:* [Unidad 2.2](#sec-u22-cuadradas) (tablas de cambio).
 
@@ -223,7 +223,7 @@ Antes de fiarte de un $p$-valor, comprueba que las celdas no están casi vacías
   
 > Los clientes nuevos no se revisan hasta su segundo año: súmalos al nivel 3 después de aplicar las transiciones. Da el intervalo de **predicción** para el próximo año y especifica los supuestos asumidos.
 
-1. **P5 · Dirección de clientes.**
+- **P5 · Dirección de clientes.**
   - *Variable respuesta:* `n_partes_anual`, de `panel.csv`, con `offset(log(expo_anual))`. El panel
     no trae las características del cliente: únelas desde `cartera.csv` por `id_poliza`.
   - *Se trabaja en:* [Unidad 2.6](#sec-u26) (riesgos a trozos).
@@ -232,7 +232,9 @@ Antes de fiarte de un $p$-valor, comprueba que las celdas no están casi vacías
 aquí lo pones a prueba, con el modelo que ya afinaste llevado al panel año a año. Resuelve el análisis exploratorio con la **tasa empírica de cada año**, y fija los **trozos** de antigüedad con un criterio explícito y justificado. Ajusta un modelo de riesgos a trozos y considera un **efecto aleatorio por póliza**, decidiendo qué variables se quedan. Comprueba que cada característica actúa igual en todos los trozos y realiza los diagnósticos pertinentes. Predice el **cliente nuevo** (en media y con su intervalo). 
 
 
-## 7.4 El entregable: un informe ejecutivo
+## 7.4 El entregable
+
+### Foco: informe ejecutivo
 
 El lector es el **comité**, que necesita decidir. Tienes una guía completa en la plantilla
 `Plantilla_informe_ejecutivo.qmd` (en la plantilla del proyecto de tu equipo y en
@@ -254,24 +256,25 @@ básico es esto:
 - Cierra el informe una **Reflexión ética sobre la IA** (obligatorio): qué herramientas usasteis y para qué,
 los **prompts relevantes**, y —sobre todo— cómo **verificasteis y validasteis** lo que produjeron (qué
 comprobasteis, qué corregisteis, qué descartasteis).
-:::
 
-::: {.callout-important}
-## El anexo técnico (obligatorio)
+
+### El anexo técnico 
+
 El cuerpo del informe calla el proceso; el **anexo técnico** lo cuenta, para que el comité pueda
 pasar el informe a sus técnicos. Tiene dos partes:
 
 1. **Un relato en prosa**, claro y **sintético**, con la narrativa pregunta a pregunta, sobre las hipótesis, decisiones, modelizaciones y comprobaciones que realizasteis, incluyendo las formulaciones de los modelos definitivos e interpretaciones de los parámetros estimados propuestos. Los contenidos han de aparecer relacionados con los resultados presentados. 
 2. **Un enlace al fichero con el código** y los comentarios pertinentes que facilitan su interpretación y reproducibilidad, en el repositorio del equipo.
 
-## Entrega
+### Entrega
 
-- En la entrega ha de figurar el enlace a **informe.pdf** (renderizado), **informe.html** (renderizado), **informe.qmd**, junto con la presentación, preferiblemente en pdf. Los tres ficheros han de estar ubicados en la rama `/main/` del repositorio.
+- En la entrega, realizada a través de un *issue* en GithHub, ha de figurar el enlace a **informe.pdf** (renderizado), **informe.html** (renderizado), **informe.qmd**, junto con la presentación, preferiblemente en pdf.
+- Todos estos ficheros han de estar ubicados en la rama `/main/` del repositorio.
 
-## Reproducibilidad
+### Reproducibilidad
+
 - El `informe.qmd` que entreguéis tiene que renderizarse **de cero en otro ordenador, sin errores**, y
 dar el mismo informe. Antes de entregar, reiniciad R, borrad la caché y renderizad. Los fallos
 habituales son cuatro: rutas absolutas, paquetes que no se cargan en el *chunk* `setup`, objetos
 creados en otra sesión y simulaciones o particiones sin `set.seed()`. Cerrad con la salida de
 `sessionInfo()`.
-:::
