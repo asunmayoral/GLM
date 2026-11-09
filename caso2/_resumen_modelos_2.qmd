@@ -1,5 +1,5 @@
 <!-- Partial · Resumen de sintaxis del Caso 2. Incluir con {{< include _resumen_modelos_2.qmd >}}
-     tras _unidad_2_5.qmd. Sin YAML. Sin chunks ejecutables: los bloques de código R van sin llaves (no se evalúan).
+     tras _unidad_2_6.qmd. Sin YAML. Sin chunks ejecutables: los bloques de código R van sin llaves (no se evalúan).
 CIFRAS: ninguna. Es una chuleta de sintaxis; no hay salidas que citar.
 VERIFICADO (R 4.3.3, glmmTMB 1.1.8, glmnet 4.1-8, MASS, sobre datos simulados con la notación
 genérica d, y, x, f1, f2, A, B, exposicion, obs): todos los bloques corren sin errores, salvo los
@@ -21,15 +21,29 @@ Añadido 08-nov (verificado en R 4.3 con datos simulados, notación genérica): 
 foldid con los grupos repartidos en 10 bloques (cada grupo entero en uno); penalty.factor = 0 deja sin
 penalizar las columnas de un término. Inestabilidad del lasso con pocos candidatos observada en datos
 de la autora (lambda.min lo retiene todo; lambda.1se descarta efectos significativos en el mixto).
-ENCUADRE: tablas sin regularización ni efectos aleatorios. Mixto + regularización: vía recomendada
-en dos pasos (selección con glmnet sobre el modelo fijo, después el mixto); ridge con priors como
-alternativa en un paso. glmmLasso ignora el offset en silencio (comprobado, 1.6.4).
+ENCUADRE: tablas sin regularización ni efectos aleatorios. Mixto + regularización (revisado 09-nov con
+heinze2018, schelldorfer2011, groll2014, bolker2009): pocos candidatos -> sin regularizar (LRT sobre el
+mixto o modelo completo); muchos -> penalizar DENTRO del mixto (ridge con priors, admite offset; lasso
+con glmmLasso, sin offset). Los dos pasos (glmnet sobre el modelo fijo + mixto) quedan como cribado
+exploratorio, NO recomendado: selecciona ignorando la agrupación y el mixto reajustado no descuenta la
+selección. glmmLasso ignora el offset en silencio (comprobado, 1.6.4) y estandariza por defecto (ayuda).
+Fragilidad y riesgos a trozos (2.6): sintaxis probada en R 4.3 con datos sujeto-periodo simulados.
+SELECCIÓN (#sec-u2r-seleccion, 09-nov): LRT solo anidados, ML, mismas filas; borde (Poisson vs NB, varianza
+de un efecto aleatorio) -> p/2 [selfliang1987; stramlee1994]; no anidados y Poisson vs ZIP -> AIC/BIC
+[wilson2015]; quasi -> F y QAIC. Comprobado en R: anova() de glmmTMB da el p ingenuo; logLik de glm,
+glm.nb, pscl y glmmTMB coinciden para el mismo modelo; AIC() de una quasipoisson es NA.
+REGULARIZACIÓN (#sec-u2r-reg, 09-nov): ridge glmmTMB = prior normal(0,s) por coeficiente nombrado
+(?priors: coef = "" excluye el intercepto, que solo lleva prior si se pone explícita). Equivalencia
+s = 1/sqrt(n*lambda) con el ridge de glmnet COMPROBADA numéricamente (X tipificada, MAP con optim = glmnet).
+Bucle de CV por bloques de grupo probado SIN priors (1.1.8 aquí): predict sobre grupos nuevos exige
+allow.new.levels = TRUE. Prior por coeficiente nombrado: PENDIENTE de prueba con glmmTMB 1.1.14.
+glmmPen: offset documentado (Poisson/binomial/normal, un factor de agrupación); no probado.
 NOMENCLATURA: f1 y f2 son factores; en las tablas de cambio, la misma clasificación en dos
 momentos (mismos niveles). B anidado en A. FAM = el argumento que cambia entre modelos. -->
 
 # 📋 Resumen · Cómo se escribe cada modelo del Caso 2 {#sec-u2r}
 
-Esta chuleta reúne la sintaxis de los modelos de las unidades 2.1 a 2.5 con una notación genérica.
+Esta chuleta reúne la sintaxis de los modelos de las unidades 2.1 a 2.6 con una notación genérica.
 No repite la teoría: cada bloque remite a la unidad donde se explica. Cuando varios modelos comparten
 la llamada y solo cambia un argumento, se escribe una vez y se indica qué valor toma ese argumento en
 cada modelo (lo llamamos `FAM`).
@@ -45,6 +59,9 @@ cada modelo (lo llamamos `FAM`).
 - `A`, `B`: factores de agrupación, con `B` **anidado** en `A` (en el caso, agencia dentro de región).
 - `obs`: un identificador por fila, `d$obs <- factor(seq_len(nrow(d)))`, para el efecto aleatorio por
   observación (OLRE).
+- `id`, `trozo`: en datos **sujeto-periodo** (una fila por sujeto y periodo, Unidad 2.6), `id` identifica
+  al sujeto y `trozo` es el factor que agrupa los periodos en intervalos de tiempo; `exposicion` es
+  entonces el tiempo en riesgo de cada fila.
 
 ## Tablas de contingencia y de cambio {#sec-u2r-tablas}
 
@@ -142,15 +159,23 @@ m <- glmmTMB(fo, ziformula = ~ x, family = FAM, data = d)
 - *Hurdle* Poisson: `truncated_poisson`; *hurdle* NB: `truncated_nbinom2`
   ([§ Hurdle](#sec-u24-hurdle)).
 
+**Riesgos a trozos** ([§ El modelo](#sec-u26-modelo)): es la Poisson con *offset* sobre datos
+sujeto-periodo, con el trozo como un predictor más. `exp()` de los coeficientes de `trozo` da la tasa de
+cada trozo frente al primero.
+
+```r
+m <- glm(y ~ trozo + x + f1 + f2 + offset(log(exposicion)), family = poisson, data = d)
+```
+
 **Leer cualquiera de ellos.** `exp(coef(m))` (con `glm`) o `exp(fixef(m)$cond)` (con `glmmTMB`) da las
 razones de tasas (IRR); `fixef(m)$zi`, los coeficientes de la parte de ceros en escala logit;
 `AIC(m1, m2)` y `anova(m1, m2)` comparan modelos; `predict(m, type = "response")` predice el conteo
 esperado.
 
-## Con efectos aleatorios {#sec-u2r-mixtos}
+## Modelos mixtos para el conteo: efectos aleatorios {#sec-u2r-mixtos}
 
 El único cambio es añadir el término aleatorio a la fórmula y ajustar con `glmmTMB`, con los mismos
-valores de `FAM` que en la sección anterior ([§ El modelo mixto](#sec-u25-modelo)):
+valores de `FAM` que en los efectos fijos ([§ El modelo mixto](#sec-u25-modelo)):
 
 ```r
 fo_mix <- update(fo, . ~ . + (1 | A/B))     # intercepto por A y por B dentro de A
@@ -158,11 +183,23 @@ m <- glmmTMB(fo_mix, family = FAM, data = d)                            # poisso
 m <- glmmTMB(fo_mix, ziformula = ~ x + (1 | A), family = FAM, data = d) # ZIP, ZINB, hurdle
 ```
 
-- Otras estructuras, cambiando solo el término: un nivel, `(1 | A)`; pendiente aleatoria de `x`,
-  `(1 + x | A)`. Si las etiquetas de `B` no se repiten entre niveles de `A`, `(1 | A) + (1 | B)` es
-  equivalente a `(1 | A/B)`; si se repiten, hace falta `A/B`.
-- **OLRE**: `+ (1 | obs)` da una Poisson-lognormal, alternativa a la binomial negativa para la
-  sobredispersión ([§ OLRE](#sec-u25-olre)).
+Lo que cambia de un modelo a otro es el término aleatorio, es decir, qué agrupa las filas:
+
+- **Anidamiento** ([§ El modelo mixto](#sec-u25-modelo)): `(1 | A/B)`, un intercepto por `A` y otro por
+  cada `B` dentro de su `A`. Si las etiquetas de `B` no se repiten entre niveles de `A`,
+  `(1 | A) + (1 | B)` es equivalente; si se repiten, hace falta `A/B`. Con un solo nivel, `(1 | A)`;
+  con pendiente aleatoria de `x`, `(1 + x | A)`.
+- **OLRE** ([§ OLRE](#sec-u25-olre)): `(1 | obs)`, un efecto por fila. Da una Poisson-lognormal,
+  alternativa a la binomial negativa para la sobredispersión. Puede convivir con el anidamiento:
+  `(1 | A/B) + (1 | obs)`.
+- **Fragilidad** ([§ Efecto por póliza](#sec-u26-poliza)): `(1 | id)` sobre datos sujeto-periodo, un
+  efecto por sujeto que multiplica su tasa por $e^{u_i}$ en todos sus periodos. Es el modelo de riesgos a
+  trozos con efecto aleatorio:
+
+```r
+m <- glmmTMB(y ~ trozo + x + f1 + offset(log(exposicion)) + (1 | id), family = poisson, data = d)
+```
+
 - En los modelos con ceros, el efecto aleatorio puede ir en el conteo (`fo_mix`), en `ziformula` o en
   ambos.
 - **Quasi-Poisson**: no tiene versión mixta (`glmmTMB` no admite familias *quasi*); se sustituye por
@@ -171,12 +208,116 @@ m <- glmmTMB(fo_mix, ziformula = ~ x + (1 | A), family = FAM, data = d) # ZIP, Z
   `predict(m, type = "response")` (condicional, con el efecto de su grupo) y
   `predict(m, type = "response", re.form = NA)` (grupo típico, $u = 0$)
   ([§ Predicción](#sec-u25-prediccion)).
+  
+  
 
-## Con regularización (efectos fijos) {#sec-u2r-reg}
+## Selección de variables y comparación de modelos {#sec-u2r-seleccion}
 
-`glmnet` no lee fórmulas: recibe la matriz de diseño, que se construye con `model.matrix()`
-([§ Regularización](#sec-u21-regularizacion)). El *offset* va en su propio argumento, nunca dentro de
-`X`, y las columnas se estandarizan internamente.
+Dos modelos se comparan con un contraste de razón de verosimilitudes (LRT) solo si están **anidados** y
+la hipótesis nula no deja ningún parámetro en el **borde** de sus valores posibles. Si lo deja, el
+contraste se corrige; si los modelos no están anidados, o no tienen verosimilitud, se comparan con
+criterios de información.
+
+**El LRT y sus condiciones.**
+
+- Modelos anidados: el pequeño se obtiene fijando parámetros del grande (a 0, o iguales entre sí).
+- Ajustados por máxima verosimilitud y **sobre las mismas filas**: un `NA` en una covariable que solo
+  usa uno de los dos modelos cambia las filas sin avisar.
+- $2(\ell_1-\ell_0)$ se compara con una $\chi^2$ con tantos grados de libertad como parámetros separan
+  los dos modelos. Es un resultado asintótico, para muestras grandes.
+
+```r
+anova(m0, m1, test = "LRT")    # glm: m0 anidado en m1
+anova(m0, m1)                  # glmmTMB y MASS::glm.nb
+drop1(m, test = "Chisq")       # cada término frente al modelo sin él; un factor se contrasta entero
+```
+
+En el caso, así se contrasta:
+
+- añadir o quitar efectos fijos en la Poisson, la binomial negativa y las dos partes de ZIP, ZINB y
+  *hurdle* ([§ Inferencia](#sec-u21-inferencia));
+- la jerarquía de los log-lineales, y la homogeneidad marginal como simetría frente a cuasi-simetría
+  ([§ Tablas de cambio](#sec-u22-cuadradas));
+- en riesgos a trozos, fusionar trozos contiguos (iguala sus tasas) o la proporcionalidad, añadiendo
+  `trozo:x` ([§ Diagnóstico](#sec-u26-diagnostico)).
+
+En un **modelo mixto**, los efectos fijos se contrastan sobre el mixto, nunca sobre el modelo sin
+efectos aleatorios: tratar como independientes las filas de un mismo grupo es pseudorreplicación y da
+contrastes demasiado optimistas. El LRT es adecuado si el modelo se estima por máxima verosimilitud
+(`glmmTMB` lo hace por defecto) y hay muchas observaciones y muchos niveles del efecto aleatorio
+[@bolker2009].
+
+**LRT en el borde: la mitad del p-valor.** Si la hipótesis nula fija una varianza o una dispersión en
+0, el parámetro está en el borde (no puede ser negativo) y el estadístico ya no sigue una $\chi^2_1$,
+sino una mezcla al 50 % de $\chi^2_0$ y $\chi^2_1$: el p-valor correcto es la mitad del que se obtiene
+con la $\chi^2_1$ [@selfliang1987; @stramlee1994] ([§ Componentes de varianza](#sec-u25-varianza)).
+Es el caso de:
+
+- Poisson frente a NB2 o NB1;
+- un modelo frente al mismo con un efecto aleatorio más: GLM frente a mixto, `(1 | A)` frente a
+  `(1 | A/B)`, Poisson frente a OLRE, riesgos a trozos frente al mismo con fragilidad.
+
+```r
+LR <- 2 * (as.numeric(logLik(m1)) - as.numeric(logLik(m0)))
+pchisq(LR, df = 1, lower.tail = FALSE) / 2    # anova() imprime el p-valor sin dividir
+```
+
+Si el término añadido trae más de una varianza, como una pendiente aleatoria con su correlación, la
+mezcla es otra: con una pendiente, de $\chi^2_1$ y $\chi^2_2$ [@stramlee1994].
+
+**Solo AIC o BIC.** Cuando no hay LRT, se elige el modelo de menor AIC o BIC [@akaike1974;
+@schwarz1978; @burnham2002]:
+
+- Modelos no anidados: ZIP frente a *hurdle* Poisson, ZINB frente a *hurdle* NB, NB1 frente a NB2, NB
+  frente a OLRE, dos particiones en trozos que no se obtienen una de otra fusionando trozos, o dos
+  log-lineales no anidados.
+- Con y sin ceros extra (Poisson frente a ZIP, NB frente a ZINB): el modelo sin inflación es el límite
+  en que la probabilidad de cero estructural vale 0, que en escala logit está en $-\infty$, y no hay LRT
+  estándar. El test de Vuong no sirve para esto [@wilson2015]: se compara por AIC y con el contraste de
+  ceros de `DHARMa` ([§ ZIP/ZINB](#sec-u24-zi)). Para una inflación constante, sin covariables, existe un
+  test *score* específico [@vandenbroek1995].
+
+```r
+AIC(m1, m2, m3); BIC(m1, m2, m3)   # avisa si no se ajustaron sobre el mismo número de filas
+```
+
+- Exigen la misma respuesta, sin transformar, y las mismas filas; el *offset* no impide comparar.
+- Se pueden mezclar funciones: `glm`, `glm.nb`, `pscl` y `glmmTMB` dan la misma log-verosimilitud para
+  el mismo modelo.
+- El AIC se orienta a predecir; el BIC penaliza cada parámetro con $\log n$ en lugar de 2 y tiende a
+  modelos más cortos.
+
+**Quasi-Poisson.** No tiene verosimilitud, así que no admite LRT ni AIC (`AIC()` devuelve `NA`). Los
+modelos anidados se comparan con un contraste F y los no anidados, con el QAIC [@burnham2002]
+([§ Quasi-Poisson](#sec-u23-quasi)).
+
+```r
+anova(m0, m1, test = "F"); drop1(m, test = "F")
+```
+
+**La deviance no mide la bondad de ajuste con conteos individuales.** Compararla con una
+$\chi^2_{n-p}$ solo es fiable con medias esperadas altas, como en las tablas o en datos agrupados; con
+conteos individuales y muchos ceros, la aproximación falla [@mccullagh1989]
+([§ Bondad de ajuste](#sec-u21-diagnostico)).
+
+**Seleccionar tiene un coste.** Elegir variables por LRT o AIC compromete la estabilidad del modelo y
+vuelve optimistas los valores p e intervalos del modelo elegido [@heinze2018]. Con pocos candidatos, a
+menudo es mejor conservar el modelo completo; en un mixto, primero se fija la estructura aleatoria que
+impone el diseño y después se seleccionan los efectos fijos [@bolker2009].
+
+## Regularización con muchos predictores {#sec-u2r-reg}
+
+Con muchas variables candidatas, la regularización estima todos los coeficientes a la vez y los
+**encoge** hacia 0 con una penalización: el *ridge* penaliza su suma de cuadrados y solo encoge
+[@hoerl1970]; el *lasso* penaliza su suma de valores absolutos y deja algunos en 0 exactamente, es decir,
+selecciona [@tibshirani1996]; el *elastic-net* combina ambas [@zou2005]. La intensidad, $\lambda$, se
+elige por validación cruzada. A cambio, los coeficientes quedan sesgados hacia 0 y no tienen valores p
+ni intervalos válidos [@heinze2018]: la regularización sirve para **predecir** y para **cribar**, no para
+contrastar efectos.
+
+**Con `glmnet`** [@friedman2010]. No lee fórmulas: recibe la matriz de diseño, que se construye con
+`model.matrix()` ([§ Regularización](#sec-u21-regularizacion)). El *offset* va en su propio argumento,
+nunca dentro de `X`, y las columnas se estandarizan internamente.
 
 ```r
 X  <- model.matrix(~ x + f1 + f2, data = d)[, -1]   # sin intercepto; cada factor, en indicadoras
@@ -185,18 +326,22 @@ coef(cv, s = "lambda.min")                           # o "lambda.1se": el modelo
 predict(cv, newx = X0, newoffset = log(e0), s = "lambda.1se", type = "response")
 ```
 
-- `alpha`: `0` *ridge*, `1` *lasso*, entre 0 y 1 *elastic-net*.
+- `alpha`: `0` *ridge*, `1` *lasso*, entre 0 y 1 *elastic-net*. `lambda.min` minimiza el error de
+  validación; `lambda.1se` es la mayor $\lambda$ a un error estándar de ese mínimo, que da un modelo más
+  corto [@hastie2009].
 - Poisson y quasi-Poisson: `FAM = "poisson"`. Las estimaciones de la quasi son las de la Poisson y
   `glmnet` no da errores estándar, así que la regularización es la misma.
 - NB2: `FAM = MASS::negative.binomial(theta = th)`, con `th <- MASS::glm.nb(fo, data = d)$theta`: la
   $\theta$ queda fija de antemano [@tay2023].
+- Riesgos a trozos: `FAM = "poisson"` sobre los datos sujeto-periodo, con
+  `penalty.factor = ifelse(grepl("^trozo", colnames(X)), 0, 1)` para no encoger la tasa base.
 - *Hurdle*: su verosimilitud se separa en dos partes. La barrera es una logística, que se regulariza con
   `cv.glmnet(X, as.integer(d$y > 0), family = "binomial", alpha = a)`; la parte truncada no tiene
-  familia en `glmnet` y se regulariza con *ridge* (bloque siguiente).
-- NB1: no tiene familia en `glmnet`; se regulariza con *ridge* (bloque siguiente).
+  familia en `glmnet` y se regulariza con *ridge* en `glmmTMB` (más abajo).
+- NB1: no tiene familia en `glmnet`; *ridge* en `glmmTMB`.
 - ZIP y ZINB: no tienen familia en `glmnet`. El *lasso* (o *elastic-net*) de las dos partes está en
   `mpath::zipath()`, fuera de la pila del curso, con la fórmula de `pscl` (conteo `|` ceros); también
-  pueden regularizarse con *ridge* (bloque siguiente).
+  admiten *ridge* en `glmmTMB`.
 
 ```r
 p <- mpath::zipath(y ~ x + f1 + f2 + offset(log(exposicion)) | x + f1,
@@ -207,85 +352,105 @@ coef(p, which = which.min(p$bic))                 # $count y $zero; 0 = descarta
   Cada parte tiene su propio camino de $\lambda$ (`p$lambda.count`, `p$lambda.zero`), y el *offset*
   se respeta, tanto en la fórmula como con el argumento `offset =`.
 
-***Ridge* con `glmmTMB`** (argumento `priors`, desde la versión 1.1.9; compruébalo con
-`packageVersion("glmmTMB")`). Una prior normal centrada en cero sobre los efectos fijos equivale a una
-penalización *ridge*. Vale para cualquier modelo ajustado con `glmmTMB`:
+### *Ridge* con `glmmTMB` {#sec-u2r-ridge}
+
+El argumento `priors` (desde la versión 1.1.9, y todavía experimental) añade una prior a los
+parámetros y estima la moda a posteriori. Una prior $\beta_j \sim N(0, s^2)$ resta $\beta_j^2/(2s^2)$ a
+la log-verosimilitud: es el *ridge*, con la desviación típica $s$ en el papel de $\lambda$. Con las
+continuas tipificadas, coincide con el *ridge* de `glmnet` cuando $s = 1/\sqrt{n\lambda}$ (comprobado
+numéricamente). La prior no basta con estar centrada en 0: **hay que decidir $s$**, y a qué coeficientes
+se aplica.
+
+1. **Tipifica las continuas** (`glmmTMB`, a diferencia de `glmnet`, no lo hace): con la misma $s$ para
+   todas, la penalización solo es comparable si están en la misma escala.
+2. **Nombra los coeficientes que se encogen.** `coef = ""` aplica la prior a todos los coeficientes
+   salvo el intercepto, que solo lleva prior si se le pone explícitamente. Para dejar libres otros
+   términos (los trozos, o un factor que debe quedarse), se nombran uno a uno los que sí se penalizan,
+   tal como aparecen en `names(fixef(m)$cond)`; lo que no se nombra queda sin prior.
+3. **Elige $s$.** Un punto de partida es la equivalencia con `glmnet`: $s_0 = 1/\sqrt{n\lambda}$, con la
+   $\lambda$ del *ridge* de `cv.glmnet`. Después se prueban valores alrededor de $s_0$ y se elige el que
+   mejor predice en una validación cruzada por bloques de grupo (cuanto menor $s$, más encoge).
 
 ```r
-d$x <- as.numeric(scale(d$x))     # glmmTMB no estandariza: sin esto, la penalización depende de las unidades
-pr  <- data.frame(prior = c("normal(0,10)", "normal(0,1)"),   # intercepto casi libre; resto, encogido
-                  class = "fixef", coef = c("(Intercept)", ""))
-m_r <- update(m, priors = pr)
+d$x <- as.numeric(scale(d$x))
+pen <- c("x", "f12", "f13", "f22", "f23")             # los que se encogen: names(fixef(m)$cond)
+prior_ridge <- \(s) data.frame(prior = sprintf("normal(0,%g)", s), class = "fixef", coef = pen)
+
+# punto de partida: la lambda del ridge de glmnet, con bloques por grupo
+bloque <- sample(rep(1:5, length.out = nlevels(d$A)))[as.integer(d$A)]
+cv0 <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion), alpha = 0, foldid = bloque)
+s0  <- 1 / sqrt(nrow(X) * cv0$lambda.min)
+
+# validación cruzada por bloques de grupo: deviance Poisson de los grupos que el ajuste no ha visto
+s_rej  <- s0 * c(0.25, 0.5, 1, 2, 4)
+dev_cv <- sapply(s_rej, \(s) sum(sapply(1:5, \(k) {
+  m_k <- update(m, data = d[bloque != k, ], priors = prior_ridge(s))
+  mu  <- predict(m_k, newdata = d[bloque == k, ], type = "response",
+                 re.form = NA, allow.new.levels = TRUE)
+  y   <- d$y[bloque == k]
+  2 * sum(ifelse(y > 0, y * log(y / mu), 0) - (y - mu))
+})))
+m_r <- update(m, priors = prior_ridge(s_rej[which.min(dev_cv)]))
 ```
 
-- En ZIP, ZINB y *hurdle*, se añaden filas con `class = "fixef_zi"` para penalizar también la parte de
-  ceros.
-- La desviación típica de la prior hace de $\lambda$: cuanto menor, más encoge. No se elige sola, como
-  en `cv.glmnet`; se compara un par de valores. Y no anula coeficientes: es *ridge*, no *lasso*.
+- La misma llamada vale para un modelo con o sin efectos aleatorios, y para todas las familias de
+  `glmmTMB`. En ZIP, ZINB y *hurdle*, la parte de ceros se penaliza con filas de `class = "fixef_zi"`.
+- `allow.new.levels = TRUE` es necesario para predecir sobre grupos que el ajuste no ha visto.
+- Para ampliar: la ayuda `?glmmTMB::priors` y la viñeta *Priors in glmmTMB*
+  (`vignette("priors", package = "glmmTMB")`).
 
-## Con efectos aleatorios y regularización {#sec-u2r-mixreg}
+### Regularización en modelos mixtos {#sec-u2r-mixreg}
 
-**Con pocos candidatos, sin regularizar.** Se seleccionan los efectos fijos por razón de verosimilitudes
-**sobre el modelo mixto**, nunca sobre el que ignora la agrupación: tratar como independientes las filas de
-un mismo grupo es pseudorreplicación y da contrastes demasiado optimistas. El contraste es fiable si el
-modelo se estima por máxima verosimilitud (`glmmTMB` lo hace por defecto) y hay muchas observaciones y
-muchos niveles del efecto aleatorio [@bolker2009].
+**Lo que falta en las librerías.** `glmnet` no admite efectos aleatorios. Dentro de la pila del curso,
+el único modo de penalizar un mixto es el *ridge* de `glmmTMB`, que encoge pero no selecciona. Fuera de
+ella, `glmmLasso` [@groll2014] hace *lasso* dentro del mixto, pero no admite *offset* (lo ignora sin
+avisar) y sus ejemplos usan un solo factor de agrupación. `glmmPen` documenta *offset*, pero solo para
+Poisson, binomial y normal, con un único factor de agrupación, y no lo hemos probado. Ninguna cubre la
+binomial negativa, los ceros inflados ni el *hurdle* con *lasso*.
 
-```r
-drop1(m_mix, test = "Chisq")           # razón de verosimilitudes al quitar cada efecto fijo
-m_fin <- update(m_mix, . ~ . - f2)     # si f2 sobra
-```
+**Qué hacer**, según el número de candidatos y el objetivo:
 
-**Con muchos candidatos**, la selección se regulariza, pero `glmnet` no admite efectos aleatorios. Hay
-tres vías:
+1. **Pocos candidatos: no se regulariza.** Se seleccionan los efectos fijos por razón de verosimilitudes
+   sobre el modelo mixto, o se conserva el modelo completo ([§ Selección](#sec-u2r-seleccion)).
+2. **Muchos candidatos y solo se quiere estabilizar la predicción: *ridge* con `glmmTMB`**
+   ([§ *Ridge*](#sec-u2r-ridge)), con los efectos aleatorios en el modelo. El efecto aleatorio se estima
+   como siempre, se respeta el *offset* y sirve para todas las familias; no deja ningún coeficiente en
+   0, así que no selecciona.
+3. **Muchos candidatos y se quieren seleccionar variables: *lasso* dentro del modelo mixto**, que es lo
+   que proponen los métodos publicados [@groll2014; @schelldorfer2011].
+   - Sin *offset* (misma exposición para todas las filas): `glmmLasso`, fuera de la pila del curso.
 
-1. **En dos pasos (recomendada).** Se seleccionan las variables con `cv.glmnet` sobre el modelo de
-   efectos fijos (sección anterior) y después se ajusta el mixto con las retenidas. Funciona con todas las
-   familias, usa solo paquetes de la pila y mantiene el *offset*.
+     ```r
+     rejilla <- c(500, 200, 100, 50, 20, 10, 1)
+     ajustes <- lapply(rejilla, \(l) glmmLasso(fix = y ~ x + f1 + f2, rnd = list(A = ~1, B = ~1),
+                                               family = poisson(link = "log"), lambda = l, data = d))
+     m <- ajustes[[which.min(sapply(ajustes, \(a) a$bic))]]   # lambda por BIC
+     m$coefficients; m$StdDev                                  # fijos (0 = descartado) y sd de cada nivel
+     ```
 
-   ```r
-   # bloques de validación por grupo: cada A, entero, a uno de 10 bloques al azar
-   bloque_A <- sample(rep(1:10, length.out = nlevels(d$A)))
-   cv <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion),
-                   foldid = bloque_A[as.integer(d$A)])
-   b  <- coef(cv, s = "lambda.1se")[-1, 1]
-   names(b)[b != 0]        # columnas retenidas: un factor entra si sobrevive alguna de sus indicadoras
-   m  <- glmmTMB(y ~ x + f1 + offset(log(exposicion)) + (1 | A/B), family = FAM, data = d)
-   ```
+     Dos niveles con `rnd = list(A = ~1, B = ~1)` equivalen a `(1 | A/B)` solo si las etiquetas de `B`
+     no se repiten entre niveles de `A`. Estandariza las covariables por defecto y devuelve los
+     coeficientes en su escala original. En el ejemplo de `n_gestiones`, el BIC retuvo dos variables de
+     ruido.
+   - Con *offset*: no hay herramienta correcta en la pila. Como mucho, un **cribado** con `cv.glmnet`
+     sin efectos aleatorios y bloques de validación por grupo, y después el mixto con las variables
+     retenidas. Tiene dos defectos: selecciona tratando como independientes las filas de un mismo
+     grupo, lo que hace más variables los coeficientes [@schelldorfer2011], y los valores p e intervalos
+     del mixto reajustado no descuentan la selección y salen optimistas [@heinze2018].
 
-   En el último paso, la fórmula lleva solo lo retenido (aquí, por ejemplo, `x` y `f1`). La selección
-   ignora el agrupamiento salvo por los bloques; por eso se forman por grupo.
+     ```r
+     bloque <- sample(rep(1:10, length.out = nlevels(d$A)))[as.integer(d$A)]   # cada A, entero, a un bloque
+     cv <- cv.glmnet(X, d$y, family = "poisson", offset = log(d$exposicion), foldid = bloque)
+     b  <- coef(cv, s = "lambda.1se")[-1, 1]
+     names(b)[b != 0]        # columnas retenidas: un factor entra si sobrevive alguna de sus indicadoras
+     m  <- glmmTMB(y ~ x + f1 + offset(log(exposicion)) + (1 | A/B), family = FAM, data = d)
+     ```
 
-   - **Bloques.** Las filas de un mismo grupo deben ir al mismo bloque: si no, el modelo «conoce» al
-     grupo que tiene que predecir y la validación resulta optimista. Repartir los grupos en 10 bloques
-     sirve tanto con pocos grupos como con miles; un bloque por grupo (`foldid = as.integer(d$A)`) solo
-     es práctico con pocos.
-   - **Términos que no se seleccionan.** El *lasso* encoge y puede anular cualquier columna de `X`. Un
-     término que debe quedarse siempre en el modelo (aquí, por ejemplo, `f1`) se exime con
-     `penalty.factor`, que vale 0 en sus columnas:
-     `cv.glmnet(..., penalty.factor = ifelse(grepl("^f1", colnames(X)), 0, 1))`.
-   - **Con pocos candidatos, casi todos con efecto**, la selección del *lasso* es inestable: depende del
-     criterio para elegir $\lambda$ (`lambda.min` puede retenerlo todo y `lambda.1se`, descartar efectos
-     reales). Ahí es mejor la razón de verosimilitudes sobre el mixto (arriba).
-
-2. ***Ridge* en un paso.** El mismo `update(m, priors = pr)` de la sección anterior, aplicado al modelo
-   mixto, sea cual sea su familia (Poisson, NB, ZIP, ZINB, *hurdle*). Penaliza solo los efectos fijos; las
-   varianzas de `A` y `B` se estiman como siempre.
-3. ***Lasso* en un paso** con `glmmLasso`, fuera de la pila del curso:
-
-   ```r
-   rejilla <- c(500, 200, 100, 50, 20, 10, 1)
-   ajustes <- lapply(rejilla, \(l) glmmLasso(fix = y ~ x + f1 + f2, rnd = list(A = ~1, B = ~1),
-                                             family = poisson(link = "log"), lambda = l, data = d))
-   m <- ajustes[[which.min(sapply(ajustes, \(a) a$bic))]]   # lambda por BIC
-   m$coefficients; m$StdDev                                  # fijos (0 = descartado) y sd de cada nivel
-   ```
-
-   - **No admite *offset*, y no avisa:** `offset(log(exposicion))` en `fix` no da error, pero el ajuste
-     sale igual que sin él. Modela recuentos, no tasas.
-   - Dos niveles con `rnd = list(A = ~1, B = ~1)`. Equivale a `(1 | A/B)` solo si las etiquetas de `B`
-     no se repiten entre niveles de `A` (como en el apartado de efectos aleatorios).
-   - Conviene tipificar antes las continuas, como hacen los ejemplos de su ayuda. $\lambda$ se elige por rejilla
-     y BIC, y en el ejemplo de `n_gestiones` ese criterio retuvo dos variables de ruido.
+     En el último paso, la fórmula lleva solo lo retenido (aquí, por ejemplo, `x` y `f1`). Las filas de
+     un mismo grupo van al mismo bloque: si no, el modelo «conoce» al grupo que tiene que predecir y la
+     validación resulta optimista. Un término que debe quedarse siempre se exime con
+     `penalty.factor = ifelse(grepl("^f1", colnames(X)), 0, 1)`. Con pocos candidatos, casi todos con
+     efecto, la selección es inestable (`lambda.min` puede retenerlo todo y `lambda.1se`, descartar
+     efectos reales).
 
 La quasi-Poisson no tiene versión mixta, así que tampoco la tiene regularizada.

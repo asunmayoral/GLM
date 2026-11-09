@@ -33,9 +33,7 @@ Caso 3** (coste de los siniestros y duración de la póliza): lo que aquí model
 una de las **tres lentes** del cliente.
 :::
 
-## 7.1 El estudio de caso (entregable) {#sec-u27-caso}
-
-### La empresa y sus datos
+## 7.1 La empresa y sus datos
 
 Te contrata una **aseguradora de automóvil** que gestiona su cartera a través de una red de
 **agencias**, y te da acceso a sus datos. En la carpeta de tu equipo (`datos_equipos_auto/equipo_XX/`)
@@ -105,7 +103,7 @@ no es la cartera de las unidades de teoría, aunque muchas variables se llamen i
 ```
 :::
 
-### El encargo
+## 7.2 El encargo
 
 El **comité de dirección** de la aseguradora va a renovar la **tarifa de frecuencia** del año
 próximo y, antes de hacerlo, quiere respuestas a los problemas que cada director ve desde su área. No
@@ -177,134 +175,83 @@ antemano cuáles conservará tu modelo. Un año de póliza es `antiguedad = 1`.
 
 : Fichas de los cinco clientes tipo de las preguntas 2 y 5. Cubren perfiles que interesan al comité: un conductor joven de ciudad, una familia en zona rural, una moto urbana, una furgoneta de uso comercial con mucho kilometraje y un conductor mayor que apenas circula. Los campos que no aparecen en la tabla son iguales en los cinco: `color_vehiculo` = gris, `estado_civil` = casado, `forma_pago` = anual, `financiado` = 0, `n_conductores` = 1, `nivel_estudios` = medio, `medio_contacto` = presencial. Si tu modelo agrupa o transforma alguna variable (tramos de edad, logaritmo de los km), aplica a estas fichas la misma transformación. {#tbl-u27-perfil}
 
-### Tu trabajo
+## 7.3 Indicaciones de trabajo
 
-Entregas un **informe ejecutivo reproducible** dirigido al comité. No respondas las preguntas una a
-una, como ejercicios sueltos: léelas todas antes de empezar y plantea **un objetivo común**, explicar
-y predecir **cuántos partes da cada cliente**. P2, P3 y P5 se responden con **un solo modelo de
-siniestralidad** que vas afinando: empiezas por la Poisson y añades lo que tus datos pidan —más
-variabilidad, ceros, agencia, el efecto de la antigüedad—. Lo que descubras al responder una
-pregunta puede obligarte a cambiar el modelo con el que respondiste otra; si ocurre, rehaz esa
-respuesta, de modo que todas salgan del **mismo modelo final**. P1 y P4 se responden con tablas, y
-sus conclusiones no deben contradecir las del modelo.
+1.  Enfoca tu público objetivo. 
+1. No respondas las preguntas una a una, como ejercicios sueltos: léelas todas antes de empezar y plantea **un objetivo común**, explicar y predecir **cuántos partes da cada cliente**.
+1. Cada pregunta se responde con **un solo modelo de
+siniestralidad**: empiezas por una modelización base que vas afinando en función de las posibilidades que hemos estudiado en clase, indagando y aceptando/descartando variaciones. 
+1. P1 y P4 se responden con tablas, y sus conclusiones no deben contradecir las del modelo.
+1. Las variables clave son las asociadas a la siniestralidad: `tuvo_siniestro` (dicotómica), `n_siniestros` (número total de siniestros de cada póliza) y `n_partes_anuales` (con la siniestralidad anual de cada póliza durante su vigencia en la cartera). Identifica las variables con las que cuantificar la exposición cuando sea precisa.
 
-Que un paso **no merezca la pena** es una respuesta tan válida como la contraria; lo que importa es
-que cada decisión esté **justificada** —con contraste, criterio de información y diagnóstico— y
-**traducida** a lo que significa para el comité.
-
-Para **cada** pregunta sigues el ciclo del Caso 1: **identifica el objetivo** (qué te preguntan de
-verdad), **propón y justifica** el análisis, **resuélvelo**, **interprétalo en la escala correcta**
+1. A la hora de trabajar, para **cada** pregunta sigues el ciclo del Caso 1: **identifica el objetivo** (qué te preguntan de verdad), **propón y justifica** el análisis, **resuélvelo**, **interprétalo en la escala correcta**
 (IRR, probabilidades, partes por año) y **recomienda** en términos que el comité entienda.
 
-::: {.callout-tip}
-## Pistas · Qué hay detrás de cada pregunta del comité
-El comité pregunta en su lenguaje. Antes de modelizar, decide qué pregunta estadística responde a cada
-una.
 
-- **P1 · Dirección comercial.**
+## Pistas · Qué hay detrás de cada pregunta del comité
+
+1. **P1 · Dirección comercial.**
   - *Variables:* `tipo_vehiculo`, `zona_circulacion` y `tuvo_siniestro`.
   - *Se trabaja en:* [Unidad 2.2](#sec-u22) (tablas y modelos log-lineales).
 
-  Construye la tabla de tres vías y busca, con modelos log-lineales, qué **interacciones** hacen
-  falta: si cada factor se asocia con tener siniestro, si se asocian entre sí y si alguna asociación
-  cambia con el otro factor. De ahí sale si basta con las tablas de dos en dos. Antes de fiarte de un
-  $p$-valor, comprueba que las celdas no están casi vacías.
+>Construye la tabla de tres vías y busca, con modelos log-lineales, qué **interacciones** hacen
+falta: si cada factor se asocia con tener siniestro, si se asocian entre sí y si alguna asociación
+cambia con el otro factor. De ahí sale si basta con las tablas de dos en dos o es preciso la de tres vías. 
+Antes de fiarte de un $p$-valor, comprueba que las celdas no están casi vacías.
 
-- **P2 · Dirección técnica.**
+1. **P2 - P3 · Dirección técnica y Dirección de red territorial**
   - *Variable respuesta:* `n_siniestros`, con `offset(log(antiguedad))`.
   - *Se trabaja en:* [Unidades 2.1](#sec-u21), [2.3](#sec-u23) y [2.4](#sec-u24) (Poisson,
     sobredispersión, ceros).
 
-  Empieza por **explorar**: distribución de los partes, proporción de ceros, varianza frente a media
+> Empieza por **explorar**: distribución de los partes, proporción de ceros, varianza frente a media
   y tasas brutas por factor. Después sube la escalera, diagnosticando cada peldaño antes de pasar al
-  siguiente (índice de dispersión, **rootograma**, residuos simulados):
+  siguiente (índice de dispersión, **rootograma**, residuos simulados).
 
-  - «Cuánto pesa» se responde en **IRR**. «Con cuáles nos quedamos», con **validación cruzada** y
-    **lasso**: una variable se queda si mejora la predicción de pólizas que el modelo no ha visto, no
-    solo si es significativa. Esa validación es también la prueba de que el modelo acierta con
-    clientes nuevos.
-  - Lo que cuentan en siniestros son dos pistas: muchísimos partes en unos pocos clientes apunta a
-    **sobredispersión** (quasi-Poisson, binomial negativa); coches que apenas circulan, a **ceros
-    estructurales** (hurdle, zero-inflated), que se contrastan frente al modelo que ya recoge la
-    sobredispersión. Compara los modelos anidados con LRT y los de familias distintas con **AIC y
-    BIC**; el rootograma enseña qué conteos reproduce cada uno.
-  - «Entre qué valores»: distingue el intervalo de la **tasa media** de la ficha del intervalo de
-    predicción del **número de partes** de un cliente. Con sobredispersión, los de la Poisson se
-    quedan cortos.
+> Cuantifica los indicios de **sobredispersión** y **exceso de ceros** y valora opciones: quasi-Poisson, binomial negativa, versus o combinado con hurdle, zero-inflated, o incluso la inclusión de **efectos aleatorios** agencia/región para responder a la red territorial. Compara los modelos anidados con LRT y los de familias distintas con **AIC y BIC**, y considera la **validación cruzada** (y opcionalmente a la regularización Lasso) para dar más confiabilidad al acierto del modelo con clientes nuevos.
 
-  Resume el modelo final en IRR con sus intervalos.
-
-- **P3 · Dirección de red territorial.**
-  - *Variable respuesta:* `n_siniestros`, con `offset(log(antiguedad))` y efectos aleatorios
-    `(1 | id_region/id_agencia)`.
-  - *Se trabaja en:* [Unidad 2.5](#sec-u25) (modelos mixtos).
-
-  Una agencia puede parecer peor por los clientes que tiene, por azar o porque la sobredispersión de
-  P2 se confunde con un efecto de agencia: separa esas explicaciones. Con solo **6 regiones**, sé
-  prudente con su varianza. Para decidir dónde intervenir, usa el **efecto predicho** de cada agencia
-  con su intervalo, no su tasa bruta. Y prepara las predicciones que pueda pedirte el comité: para
-  una **agencia concreta**, para una **región concreta** y para una **agencia genérica**, como la que
-  se va a abrir, distinguiendo la agencia típica de la media de todas.
-
-- **P4 · Dirección financiera.**
+> Extrae conclusiones sobre el peso de cada factor en términos de IRR con sus intervalos, y construye las predicciones solicitadas (una **agencia concreta**, para una **región concreta** y para una **agencia genérica** en P3). 
+ 
+1. **P4 · Dirección financiera.**
   - *Variables:* `bonus_malus_prev` y `bonus_malus_act`, como tabla cuadrada.
   - *Se trabaja en:* [Unidad 2.2](#sec-u22-cuadradas) (tablas de cambio).
 
-  Empieza por el **mapa de calor**. Contrasta si el trasiego entre niveles está equilibrado y si el
+>Empieza por el **mapa de calor**. Contrasta si el trasiego entre niveles está equilibrado y si el
   reparto ha cambiado (simetría, homogeneidad marginal), y busca un modelo que **ajuste** aprovechando
   el orden de los niveles: con él proyectas, suponiendo que las probabilidades de pasar de un nivel a
-  otro se mantienen. Los clientes nuevos no se revisan hasta su segundo año: súmalos al nivel 3
-  después de aplicar las transiciones. Da dos intervalos —el de **confianza** del número esperado en
-  cada nivel y el de **predicción** del número que habrá realmente, que es el que sirve para
-  presupuestar— y di de qué supuestos dependen.
+  otro se mantienen. 
+  
+> Los clientes nuevos no se revisan hasta su segundo año: súmalos al nivel 3 después de aplicar las transiciones. Da el intervalo de **predicción** para el próximo año y especifica los supuestos asumidos.
 
-- **P5 · Dirección de clientes.**
+1. **P5 · Dirección de clientes.**
   - *Variable respuesta:* `n_partes_anual`, de `panel.csv`, con `offset(log(expo_anual))`. El panel
     no trae las características del cliente: únelas desde `cartera.csv` por `id_poliza`.
   - *Se trabaja en:* [Unidad 2.6](#sec-u26) (riesgos a trozos).
 
-  El *offset* de P2 supone que un cliente da partes al mismo ritmo toda su vida con la aseguradora;
-  aquí lo pones a prueba, con el modelo que ya afinaste llevado al panel año a año. Empieza por la
-  **tasa empírica de cada año**, con su intervalo, y fija los **trozos** de antigüedad con un criterio
-  explícito —por ejemplo, un mínimo de partes por trozo— **antes** de ajustar. Las **razones de
-  tasas** de cada trozo frente al primero, con su intervalo, son el factor de renovación que pide el
-  comité. Como cada cliente aporta varias filas, añade un **efecto aleatorio por póliza** y decide
-  sobre ese modelo qué variables se quedan. Para los clientes tipo, distingue el **cliente típico** del
-  **cliente nuevo** (en media y con su intervalo); para el cliente que ya conocéis, la predicción del
-  **cliente observado**, en la que su historial corrige lo que predice su ficha. Comprueba que cada
-  característica actúa igual en todos los trozos y que el modelo reproduce la **tasa acumulada de
-  Nelson–Aalen**, que se calcula con los instantes de los partes de `siniestros.csv`.
-:::
+> El *offset* de P2 supone que un cliente da partes al mismo ritmo toda su vida con la aseguradora;
+aquí lo pones a prueba, con el modelo que ya afinaste llevado al panel año a año. Resuelve el análisis exploratorio con la **tasa empírica de cada año**, y fija los **trozos** de antigüedad con un criterio explícito y justificado. Ajusta un modelo de riesgos a trozos y considera un **efecto aleatorio por póliza**, decidiendo qué variables se quedan. Comprueba que cada característica actúa igual en todos los trozos y realiza los diagnósticos pertinentes. Predice el **cliente nuevo** (en media y con su intervalo). 
 
-::: {.callout-note}
-## Lo que no necesitas en este encargo
-La cartera trae otros conteos (`n_asistencia`, `n_fraude`, `n_gestiones`): no forman parte de este
-encargo, que solo tarifica la **frecuencia de siniestros**. Tampoco el coste ni la baja (ver «La misma
-cartera, tres lentes», más arriba).
-:::
 
-### El formato: un informe ejecutivo
+## 7.4 El entregable: un informe ejecutivo
 
 El lector es el **comité**, que necesita decidir. Tienes una guía completa en la plantilla
 `Plantilla_informe_ejecutivo.qmd` (en la plantilla del proyecto de tu equipo y en
 [`evaluacion/plantillas`](https://github.com/asunmayoral/GLM/tree/master/evaluacion/plantillas)); lo
 básico es esto:
 
-- **Directo a la respuesta.** Abre con un **resumen ejecutivo** de una página como máximo: la
-  respuesta a cada director y la recomendación principal.
+- **Tamaño máximo**: 6 páginas (en el pdf) sin anexos.
+
+- **Directo a la respuesta y dirigido al comité directivo.** Abre con un **resumen ejecutivo** de una página como máximo: la respuesta a cada director y la recomendación principal.
 - **Una sección por director**, en el orden del encargo y de una página como máximo: la respuesta en
   la primera frase, la cifra que la sostiene con su margen, la **recomendación** concreta y la cautela
   que conviene tener presente.
-- **En su lenguaje.** Partes por año, probabilidades, «un 20 % más que…»: nada de coeficientes,
-  $p$-valores ni nombres de modelos en el cuerpo, y nada de código.
+- **En su lenguaje.** Partes por año, probabilidades, «un 20 % más que…»: **nada de coeficientes**,
+  $p$-valores, **nada de modelos** en el cuerpo, y **nada de código**.
 - **Pocas tablas y figuras**, cada una con un título que diga lo que muestra, citada en el texto y
   comentada.
 - **Recomendaciones priorizadas**, y las limitaciones dichas en términos de negocio: qué puede salir
   mal al aplicarlas y qué conviene vigilar.
-
-::: {.callout-important}
-## Apartado de Reflexión sobre el uso de la IA (obligatorio)
-Cierra el informe con un apartado de **Reflexión ética sobre la IA**: qué herramientas usasteis y para qué,
+- Cierra el informe una **Reflexión ética sobre la IA** (obligatorio): qué herramientas usasteis y para qué,
 los **prompts relevantes**, y —sobre todo— cómo **verificasteis y validasteis** lo que produjeron (qué
 comprobasteis, qué corregisteis, qué descartasteis).
 :::
@@ -314,19 +261,15 @@ comprobasteis, qué corregisteis, qué descartasteis).
 El cuerpo del informe calla el proceso; el **anexo técnico** lo cuenta, para que el comité pueda
 pasar el informe a sus técnicos. Tiene dos partes:
 
-1. **Un relato en prosa**, claro y sintético, de lo que fuisteis haciendo, pregunta a pregunta y en
-   el orden en que trabajasteis: qué modelos ajustasteis —también los que descartasteis—, qué
-   diagnóstico o contraste os llevó de uno a otro, cuál es el modelo final y de qué salida sale cada
-   cifra del cuerpo.
-2. **Un enlace al fichero con el código**, en el repositorio del equipo, comentado para que un
-   técnico pueda seguirlo y repetir el análisis.
+1. **Un relato en prosa**, claro y **sintético**, con la narrativa pregunta a pregunta, sobre las hipótesis, decisiones, modelizaciones y comprobaciones que realizasteis, incluyendo las formulaciones de los modelos definitivos e interpretaciones de los parámetros estimados propuestos. Los contenidos han de aparecer relacionados con los resultados presentados. 
+2. **Un enlace al fichero con el código** y los comentarios pertinentes que facilitan su interpretación y reproducibilidad, en el repositorio del equipo.
 
-En el informe no se ve código: los *chunks* se ejecutan al renderizar, pero no se muestran.
-:::
+## Entrega
 
-::: {.callout-warning}
-## Reproducibilidad: el informe se tiene que poder renderizar
-El `informe.qmd` que entreguéis tiene que renderizarse **de cero en otro ordenador, sin errores**, y
+- En la entrega ha de figurar el enlace a **informe.pdf** (renderizado), **informe.html** (renderizado), **informe.qmd**, junto con la presentación, preferiblemente en pdf. Los tres ficheros han de estar ubicados en la rama `/main/` del repositorio.
+
+## Reproducibilidad
+- El `informe.qmd` que entreguéis tiene que renderizarse **de cero en otro ordenador, sin errores**, y
 dar el mismo informe. Antes de entregar, reiniciad R, borrad la caché y renderizad. Los fallos
 habituales son cuatro: rutas absolutas, paquetes que no se cargan en el *chunk* `setup`, objetos
 creados en otra sesión y simulaciones o particiones sin `set.seed()`. Cerrad con la salida de

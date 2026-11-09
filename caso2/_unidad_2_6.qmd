@@ -1,37 +1,23 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-.
-DATOS: `panel` (póliza-año de partes), generado por R/dgp_panel.R con cargar_panel_partes(cartera) en el
-maestro. Proceso INDEPENDIENTE de la cartera: solo lee exposicion y covariables; no altera nada de 2.1–2.5.
-Semilla 20252032. attr(panel, "partes"): una fila por parte con su instante t (años desde el alta).
-attr(panel, "verdad"): h0 (tasa base por año), beta, sigma_frag = 0.6, T_max = 10. La verdad SOLO en §6.7.
-ENCUADRE: la respuesta es un CONTEO por año-póliza con exposición (expo_anual) -> se modela una TASA (partes
-por año-póliza), nunca una probabilidad. El cliente sigue en riesgo tras un parte (eventos recurrentes).
-No es el persona-periodo cloglog del Caso 1 (allí 0/1, probabilidad por periodo, se sale tras el evento).
-Sin Kaplan–Meier ni Cox: lo no paramétrico es Nelson–Aalen de la tasa acumulada (§6.6); Cox va a U3.6/U3.7.
-§6.6 HECHO: Nelson–Aalen como referencia sin modelo para calibrar (no en la exploración, decisión de la
-autora 08-nov). Las tasas anuales NO sirven de referencia: el glm con un factor por año las reproduce
-(circular). Calibración con m_pw (GLM, tasa media de la cartera). Cifras: NA 0.79 a 5 años y 1.43 al
-final; modelo 0.79 y 1.42. Proporcionalidad (LRT trozo:x sobre m_pw_fin): ningún p < 0.17 (mín. uso 0.174;
-edad 0.919, carnet 0.935, potencia 0.722, zona 0.236, vehículo 0.489).
-§6.6 DHARMa: createDHARMa con simulate(m_pw_fin) INCONDICIONAL (glmmTMB 1.1.8 simula fragilidad nueva:
-cor por póliza total obs/sim medio 0.33 frente a 0.88 con la media condicional); NO simulateResiduals
-(condiciona a los BLUP desde DHARMa 0.5; comprobado: en 12 paneles simulados del propio DGP la versión condicional rechaza ceros siempre y uniformidad casi siempre, porque var(û)=0.101 frente a σ̂²=0.399 y predice ~9 % menos partes; con la autora, DHARMa 0.5.0 condicional dio disp 1.342 p 0 por póliza). Réplica manual SIN DHARMa (no instalable aquí), 250 sims:
-por fila unif 0.91, disp 0.98 (p 0.46), ceros p 0.69; por póliza unif 0.95, disp 0.94 (p 0.29), ceros
-p 0.58. CONFIRMADO con DHARMa en el render de la autora (08-nov, borrador_u26): por fila unif 0.664,
-disp 0.986 (p 0.576), ceros p 0.528; por póliza unif 0.450, disp 0.954 (p 0.392), ceros p 0.576.
-§6.5 SELECCIÓN (decisión de la autora, 08-nov, con bolker2009): drop1 sobre el MIXTO, no sobre el GLM
-(pseudorreplicación). Solo sobra sexo (p 0.70). GLM frente a mixto: uso 0.0056 -> 0.035; vehículo 0.0014 ->
-0.019. Modelo final m_pw_fin = m_pw_mix sin sexo; sigma 0.632. Regularización: NO en esta unidad (probado:
-lasso con bloques por póliza y trozo sin penalizar retiene todo con lambda.min y quita zona/uso/vehículo
-con lambda.1se); solo remisión al resumen #sec-u2r-mixreg.
-Simplificación del DGP: la antigüedad no depende del riesgo (sin abandono selectivo); se discute como
-limitación en §6.5 [feldblum1996; cohen2005]. Covariables constantes en el tiempo (las de la cartera hoy).
+<!-- Partial. Incluir con {{< include _unidad_2_6.qmd >}}. Sin YAML. Chunks u26-.
+DATOS: `panel` (póliza-año de partes), de R/dgp_panel.R con cargar_panel_partes(cartera) en el maestro.
+Proceso independiente de la cartera: solo lee exposicion y covariables; no altera 2.1–2.5. Semilla 20252032.
+attr(panel, "partes"): un parte por fila, con su instante. attr(panel, "verdad"): solo en §6.7.
+ENCUADRE: se modela una TASA (partes por año-póliza), nunca una probabilidad; el cliente sigue en riesgo
+tras un parte. No es el persona-periodo cloglog del Caso 1. Sin Kaplan–Meier ni Cox (Cox, en U3.6/U3.7).
+Nelson–Aalen solo en §6.6, como referencia sin modelo para calibrar: las tasas anuales no sirven (el glm
+con un factor por año las reproduce). Selección de variables con drop1 sobre el MIXTO, no sobre el GLM.
+DHARMa con simulate() de glmmTMB (incondicional) + createDHARMa; NO simulateResiduals(), que condiciona a
+los efectos de póliza encogidos y da falsas alarmas. El DGP no tiene abandono selectivo: se discute como
+limitación en §6.5.
 TÉRMINOS: tasa (partes/año-póliza) · trozo (intervalo de antigüedad con tasa constante) · exposición
 (expo_anual) · fragilidad (efecto de póliza). «Riesgos a trozos» solo como nombre del modelo.
-FUENTES: lawless1998 (núcleo), cook2007 (cap. 3), lawless1995 (Nelson–Aalen/función media), holford1980,
-laird1981, vaupel1979, lawless1987 (Poisson mixta), brooks2017 (glmmTMB).
-CIFRAS VERIFICADAS (réplica R 4.3, 08-nov; comprobar contra el render): panel 21331 filas, 3071 pólizas,
-2975 partes; antigüedad 3 a 9.99 años; 3030 filas con expo_anual < 1; 255 filas con 2 o más partes; máximo
-4 partes en un año. Póliza ejemplo 94: antigüedad 5.39, partes 0,1,2,1,0,0, último año 0.39. -->
+CIFRAS VERIFICADAS (render de la autora): panel 21331 filas, 3071 pólizas, 2975 partes; antigüedad 3 a
+9.99 años; 3030 filas con expo_anual < 1; 255 filas con 2 o más partes; máximo 4 partes en un año.
+Póliza 94: antigüedad 5.39, partes 0,1,2,1,0,0, último año 0.39. Calibración: Nelson–Aalen 0.79 a 5 años
+y 1.43 al final; modelo 0.79 y 1.42. Proporcionalidad (LRT trozo:x): p mínimo 0.174 (uso). Selección: solo
+sobra sexo (p 0.70); uso 0.0056 -> 0.035 y vehículo 0.0014 -> 0.019 al pasar del GLM al mixto. σ̂ 0.632.
+DHARMa por fila: unif 0.664, disp 0.986 (p 0.576), ceros p 0.528; por póliza: unif 0.450, disp 0.954
+(p 0.392), ceros p 0.576. -->
 
 # 6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad {#sec-u26}
 
@@ -749,20 +735,16 @@ m_pw_fin <- update(m_pw_mix, . ~ . - sexo)
 
 ::: {.callout-note}
 ## Recomendaciones: seleccionar variables con datos agrupados
+
 - **Primero la estructura, después la selección.** Los efectos aleatorios que impone el diseño —aquí, la
-  póliza, porque cada cliente aporta varios años— se incluyen desde el principio y se conservan; la
-  selección se hace sobre los efectos fijos de ese modelo [@bolker2009].
-- **No seleccionar sobre el modelo que ignora la agrupación.** Tratar como independientes las filas de un
-  mismo cliente es pseudorreplicación: los errores estándar salen demasiado pequeños y los contrastes,
-  demasiado optimistas [@bolker2009].
-- **La razón de verosimilitudes para efectos fijos**, con dos condiciones: que el modelo se estime por
-  máxima verosimilitud (lo que hace `glmmTMB` por defecto) y que haya muchas observaciones y muchos
-  niveles del efecto aleatorio [@bolker2009]. Aquí hay `r nrow(panel)` filas y
-  `r dplyr::n_distinct(panel$id_poliza)` pólizas, así que el contraste es fiable.
-- **Con muchos candidatos**, la vía es la regularización en dos pasos del
-  [resumen de modelos](#sec-u2r-mixreg): seleccionar con `cv.glmnet` sobre el modelo de efectos fijos,
-  formando los bloques de validación por cliente, y ajustar después el mixto con las variables retenidas.
-  El trozo, que describe la tasa base, no debe penalizarse.
+  póliza— se incluyen desde el principio y se mantienen; solo se seleccionan los efectos fijos, y sobre ese
+  modelo mixto [@bolker2009]. Ignorar la agrupación da errores estándar demasiado pequeños y exagera la
+  evidencia (@tbl-u26-seleccion).
+- **Con pocos candidatos: eliminación hacia atrás.** Se parte de las variables que justifica el conocimiento del
+  problema y se retira, una a una, la que menos aporta, con la razón de verosimilitudes (`drop1`) o con el
+  AIC [@heinze2018]. Ambos comparan modelos con distintos efectos fijos, así que exigen ajustar por máxima
+  verosimilitud, no por REML; y la razón de verosimilitudes solo es fiable con muchas observaciones por
+  parámetro y muchos grupos [@bolker2009], como aquí.
 :::
 
 ### Predicción: qué cliente
@@ -771,12 +753,12 @@ Con el efecto de póliza, la tasa de un perfil deja de ser un único número: de
 suponga. Son los mismos cuatro tipos de predicción de la [Unidad 2.5](#sec-u25-prediccion), con el
 cliente en el papel de la agencia (allí se deducen las fórmulas):
 
-| Predicción | Tasa | Error que incorpora |
-|:--|:--|:--|
-| **Cliente observado** | $e^{\hat\eta+\hat u_i}$ | el de $\hat{\boldsymbol\beta}$ y $\hat u_i$, conjuntamente |
-| **Cliente típico** ($u=0$; la mediana) | $e^{\hat\eta}$ | el de $\hat{\boldsymbol\beta}$ |
-| **Cliente nuevo, en media** | $e^{\hat\eta}\,e^{\sigma^2/2}$ | el de $\hat{\boldsymbol\beta}$ ($\sigma$ tratada como conocida) |
-| **Cliente nuevo, intervalo de predicción** | $e^{\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2}}$ | el de $\hat{\boldsymbol\beta}$ y la variación entre clientes |
+| Predicción | Tasa | Intervalo al 95 % | Error que incorpora |
+|:--|:--|:--|:--|
+| **Cliente observado** | $e^{\hat\eta+\hat u_i}$ | $e^{(\hat\eta+\hat u_i)\pm1.96\,\operatorname{SE}(\hat\eta+\hat u_i)}$ | el de $\hat{\boldsymbol\beta}$ y $\hat u_i$, conjuntamente |
+| **Cliente típico** ($u=0$; la mediana) | $e^{\hat\eta}$ | $e^{\hat\eta\pm1.96\,\operatorname{SE}(\hat\eta)}$ | el de $\hat{\boldsymbol\beta}$ |
+| **Cliente nuevo, en media** | $e^{\hat\eta}\,e^{\sigma^2/2}$ | $e^{\hat\eta+\sigma^2/2\,\pm\,1.96\,\operatorname{SE}(\hat\eta)}$ | el de $\hat{\boldsymbol\beta}$ ($\sigma$ tratada como conocida) |
+| **Cliente nuevo, uno concreto** | $e^{\hat\eta+u}$, con $u\sim N(0,\sigma^2)$ desconocido | $e^{\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2}}$ (de predicción) | el de $\hat{\boldsymbol\beta}$ y la variación entre clientes |
 
 Aquí $\hat\eta=\hat\alpha_k+\mathbf{x}^\top\hat{\boldsymbol\beta}$ es el predictor lineal del perfil en el
 trozo $k$. Lo aplicamos a los tres perfiles prototipo de la [§6.4](#sec-u26-ajuste), con el modelo final:

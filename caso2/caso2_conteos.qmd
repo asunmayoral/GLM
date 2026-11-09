@@ -192,9 +192,9 @@ cartera |>
 
 {{< include _unidad_2_5.qmd >}}
 
-{{< include _resumen_modelos_2.qmd >}}
-
 {{< include _unidad_2_6.qmd >}}
+
+{{< include _resumen_modelos_2.qmd >}}
 
 {{< include _unidad_2_7.qmd >}}
 
