@@ -38,8 +38,8 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", glmmTMB = "1.1.14",
   glmnet = "5.0", marginaleffects = "0.32.0", performance = "0.17.0",
-  sessioninfo = "1.2.4", survival = "3.8.6", tidyverse = "2.0.0",
-  vcd = "1.4.13", vcdExtra = "0.9.6")
+  sessioninfo = "1.2.4", tidyverse = "2.0.0", vcd = "1.4.13",
+  vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -62,7 +62,6 @@ library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
 library(glmmTMB)       # conteos mixtos / ceros
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)

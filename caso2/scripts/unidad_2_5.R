@@ -39,8 +39,8 @@ PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13", dplyr = "1.2.1",
   forcats = "1.0.1", ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
   insight = "1.5.1", marginaleffects = "0.32.0", performance = "0.17.0",
-  purrr = "1.2.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  tibble = "3.3.1", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
+  purrr = "1.2.2", sessioninfo = "1.2.4", tibble = "3.3.1",
+  tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -63,7 +63,6 @@ library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
 library(glmmTMB)       # conteos mixtos / ceros
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
@@ -75,14 +74,13 @@ theme_set(theme_minimal(base_size = 12))
 source(url_glm("caso2/R/dgp_conteos.R"))   # funciones del proceso generador
 cartera <- leer_datos_glm("caso2/datos/cartera_auto_20252026.rds")   # cartera de auto del curso
 source(url_glm("caso2/R/dgp_panel.R"))   # funciones del proceso generador
-panel <- cargar_panel_partes(cartera)
+panel <- leer_datos_glm("caso2/datos/panel_partes_20252032.rds")   # panel póliza-año de partes (Unidad 2.6)
 glimpse(cartera)
 head(cartera)
 
 # -----------------------------------------------------------------------------
 # [fig-u25-anidamiento]
-#   5 · Efectos Aleatorios y Modelos Mixtos
-#     > 5.1 Agrupamiento y anidamiento
+#   5 · Efectos Aleatorios y Modelos Mixtos > 5.1 Agrupamiento y anidamiento
 # -----------------------------------------------------------------------------
 tasa_global <- sum(cartera$n_gestiones) / sum(cartera$exposicion)
 cartera |>

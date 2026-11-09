@@ -28,6 +28,7 @@ editor:
 <!-- ============================================================================
      Caso 2 (Poisson).
        - TEORÍA (unidades 2.1-2.6): R/dgp_conteos.R, contexto "auto" -> cartera de teoría.
+         La Unidad 2.6 usa además R/dgp_panel.R -> panel póliza-año de partes (solo LEE la cartera).
        - ESTUDIO DE CASO (Unidad 2.7) y Caso 3: R/dgp_auto.R -> cartera de auto de cada
          equipo (datos_equipos_auto/equipo_XX/).
 ============================================================================ -->
@@ -43,7 +44,6 @@ library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
 library(glmmTMB)       # conteos mixtos / ceros
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)
@@ -137,7 +137,7 @@ Generamos la cartera y la miramos por encima:
 
 ```{r}
 #| label: cartera-sim
-source("R/dgp_conteos.R")            # define simular_cartera(), cargar_cartera(), expandir_poliza_tramo()
+source("R/dgp_conteos.R")            # define simular_cartera(), cargar_cartera()
 cartera <- cargar_cartera("auto")    # lee datos/cartera_auto_*.rds si existe; si no (o si cambió el DGP), simula y lo guarda
 source("R/dgp_panel.R")              # panel póliza-año de partes (Unidad 2.6): proceso independiente que solo LEE la cartera
 panel <- cargar_panel_partes(cartera)

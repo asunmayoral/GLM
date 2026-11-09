@@ -14,7 +14,7 @@ final; modelo 0.79 y 1.42. Proporcionalidad (LRT trozo:x sobre m_pw_fin): ningú
 edad 0.919, carnet 0.935, potencia 0.722, zona 0.236, vehículo 0.489).
 §6.6 DHARMa: createDHARMa con simulate(m_pw_fin) INCONDICIONAL (glmmTMB 1.1.8 simula fragilidad nueva:
 cor por póliza total obs/sim medio 0.33 frente a 0.88 con la media condicional); NO simulateResiduals
-(condiciona a los BLUP desde DHARMa 0.5). Réplica manual SIN DHARMa (no instalable aquí), 250 sims:
+(condiciona a los BLUP desde DHARMa 0.5; comprobado: en 12 paneles simulados del propio DGP la versión condicional rechaza ceros siempre y uniformidad casi siempre, porque var(û)=0.101 frente a σ̂²=0.399 y predice ~9 % menos partes; con la autora, DHARMa 0.5.0 condicional dio disp 1.342 p 0 por póliza). Réplica manual SIN DHARMa (no instalable aquí), 250 sims:
 por fila unif 0.91, disp 0.98 (p 0.46), ceros p 0.69; por póliza unif 0.95, disp 0.94 (p 0.29), ceros
 p 0.58. CONFIRMADO con DHARMa en el render de la autora (08-nov, borrador_u26): por fila unif 0.664,
 disp 0.986 (p 0.576), ceros p 0.528; por póliza unif 0.450, disp 0.954 (p 0.392), ceros p 0.576.
@@ -839,7 +839,8 @@ La @fig-u26-pred-mix enseña tres cosas, con el conductor joven y urbano en su p
   coche y su zona no basta para conocer su riesgo; lo que falta lo pone su propio historial.
 
 Eso último es lo que aprovecha la predicción del **cliente observado**. Volvamos a la póliza 94 de la
-@tbl-u26-panel, que dio partes en tres de sus años:
+@tbl-u26-panel, que dio partes en tres de sus años. La @tbl-u26-pred-94 compara su predicción como
+cliente observado con la de un cliente típico de sus mismas características:
 
 ```{r}
 #| label: tbl-u26-pred-94
@@ -1092,9 +1093,12 @@ DHARMa::testDispersion(res_id)
 ```
 
 En un modelo **sin** efectos aleatorios basta `res <- DHARMa::simulateResiduals(m)` en lugar de los pasos 1
-y 2. Con efectos aleatorios, `simulateResiduals()` simula condicionando a los efectos estimados de cada
-sujeto (por defecto desde `DHARMa` 0.5.0); para comprobar también la fragilidad, y para sumar por sujeto,
-hay que simular de forma incondicional, como aquí. Si `testDispersion` diera un cociente claramente mayor
+y 2. Con efectos aleatorios, **no**: desde `DHARMa` 0.5.0, `simulateResiduals()` simula condicionando a
+los efectos estimados de cada sujeto, y estos están encogidos hacia 0 cuando cada sujeto aporta pocos
+eventos. Las simulaciones predicen entonces menos eventos de los observados y los contrastes rechazan
+aunque el modelo sea el correcto. Hay que simular de forma incondicional, como aquí, en una sesión limpia:
+`DHARMa` 0.5.0 deja el modelo en modo condicional tras llamar a `simulateResiduals()` (corregido en
+0.5.1), y a partir de ahí también `simulate()` saldría condicional. Si `testDispersion` diera un cociente claramente mayor
 que 1, quedaría variabilidad sin explicar y habría que pasar a una binomial negativa
 ([Unidad 2.3](#sec-u23)).
 

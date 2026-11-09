@@ -40,8 +40,8 @@ PAQUETES  <- c(
   broom.mixed = "0.2.9.7", dplyr = "1.2.1", forcats = "1.0.1",
   ggplot2 = "4.0.3", glmmTMB = "1.1.14", glmnet = "5.0",
   marginaleffects = "0.32.0", performance = "0.17.0", purrr = "1.2.2",
-  sessioninfo = "1.2.4", survival = "3.8.6", tibble = "3.3.1",
-  tidyr = "1.3.2", tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
+  sessioninfo = "1.2.4", tibble = "3.3.1", tidyr = "1.3.2",
+  tidyverse = "2.0.0", vcd = "1.4.13", vcdExtra = "0.9.6")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -64,7 +64,6 @@ library(tidyverse)
 library(MASS)          # glm.nb (base-recommended)
 library(glmmTMB)       # conteos mixtos / ceros
 library(DHARMa); library(performance); library(marginaleffects)
-library(survival)      # riesgos a trozos (base-recommended)
 library(glmnet)       # regularización (2.1)
 library(vcd)           # mosaicos para tablas de contingencia (2.2)
 library(vcdExtra)      # zero-inflated (2.4) y utilidades de tablas (2.2)

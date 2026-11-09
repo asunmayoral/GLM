@@ -1115,7 +1115,7 @@ tibble::tibble(k = K,
 ```
 
 **Residuos simulados.** Como en el ZIP, `DHARMa` simula directamente desde `m_hp`: primero la barrera
-y, para las pólizas que la cruzan, un conteo truncado en 0:
+y, para las pólizas que la cruzan, un conteo truncado en 0 (@fig-u24-hurdle-dharma):
 
 ```{r}
 #| label: fig-u24-hurdle-dharma

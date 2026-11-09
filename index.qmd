@@ -173,7 +173,7 @@ Quince semanas y **60 horas de clase**, generalmente con dos sesiones de dos hor
 | 6 | Caso 2 | Poisson; tasas, *offset* e IRR; inferencia y predicción; selección, CV y regularización | `glm(poisson)` + *offset*; `marginaleffects`; `glmnet`, `cv.glmnet` | 2.1 |
 | 7 | Caso 2 | Modelos log-lineales para tablas; sobredispersión | Tablas de contingencia y cuadradas; `glm.nb`, quasi-Poisson | 2.2, 2.3 |
 | 8 | Caso 2 | Exceso de ceros; conteos agrupados | `pscl`/`glmmTMB`; `glmer`; ICC y BLUP | 2.4, 2.5 |
-| 9 | Caso 2 | Riesgos a trozos ≡ Poisson | Persona-periodo; `survival` | 2.6 |
+| 9 | Caso 2 | Riesgos a trozos ≡ Poisson; fragilidad por cliente | Panel póliza-año: `glm(poisson)` + *offset* por trozos; `glmmTMB`; `DHARMa` | 2.6 |
 | 10 | Caso 2 | — | **Estudio de caso**, exposiciones y defensas | 2.7 |
 | 11 | Caso 3 | Gamma e inversa gaussiana; enlaces; media-varianza y log-OLS | `glm(Gamma(link="log"))`; *smearing*; comparación por AIC | 3.1, 3.2 |
 | 12 | Caso 3 | GLMM Gamma; la familia **Tweedie** y el índice $p$ | `glmmTMB` (Gamma y `tweedie`); `DHARMa`; `group_vfold_cv` | 3.3, 3.4 |

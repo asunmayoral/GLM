@@ -46,6 +46,25 @@ contexto (seguro de automóvil) y nombres de variables, pero **no** son el mismo
   ceros observados con los que predice una Poisson de la misma media, no por el porcentaje bruto de
   ceros.
 
+## `dgp_panel.R` — panel póliza-año de partes (Unidad 2.6)
+
+- **Qué hace.** Un proceso **independiente** de la cartera de teoría: solo **lee** de `cartera` el
+  identificador, la `exposicion` y las covariables, sin modificar ninguna columna ni consumir su flujo
+  aleatorio. La antigüedad del cliente es `10 × exposicion` años; en cada año de antigüedad `k` los
+  partes son Poisson con tasa `h0_k · exp(x'β + u_i) · expo_anual`, con `h0_k` decreciente (mejoras
+  anuales menguantes, Feldblum 1996) y una fragilidad normal `u_i` por póliza. Sin abandono selectivo;
+  `sexo` no interviene (control negativo).
+- **Funciones.** `simular_panel_partes()`, `cargar_panel_partes()`, `betas_panel_defecto()`.
+- **Semilla propia.** `SEMILLA_PANEL = SEMILLA_CURSO + 6` (`20252032`). Requiere haber cargado antes
+  `dgp_conteos.R`.
+- **Caché.** `caso2/datos/panel_partes_20252032.rds`, más dos `.csv`: `panel_partes_20252032.csv`
+  (póliza-año) y `partes_20252032.csv` (una fila por parte, con su instante). Se regenera si no existe,
+  si se pide `refrescar = TRUE` o si `dgp_panel.R` o la cartera son más recientes.
+- **La verdad** va en `attr(panel, "verdad")` (`h0`, `beta`, `sigma_frag`, `u`, …); los partes con su
+  instante, en `attr(panel, "partes")`.
+- **Quién lo usa.** `caso2_conteos.qmd` y, por inclusión, la Unidad 2.6. Las unidades 2.1–2.5 no
+  dependen de él.
+
 ## `dgp_auto.R` — DGP de la cartera de auto (estudio de caso)
 
 - **Qué hace.** Proceso puntual **marcado** con **fragilidad** por póliza: los siniestros llegan
