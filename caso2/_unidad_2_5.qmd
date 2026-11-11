@@ -4,16 +4,21 @@ ENCUADRE (G): formulación general con sigma2_ag,r por región; se asume común 
 chi2_4; Bates 2010: ~6 niveles mínimo). G = diag por bloques (sigma2_reg I_6, sigma2_ag I_30). VarCorr no
 muestra covarianzas porque no hay que estimar; la correlación entre las ESTIMACIONES está en vcov(full = TRUE).
 ENCUADRE (efectos): IRR condicional = IRR poblacional (log + solo interceptos): solo un callout, sin
-desarrollo. Predicción: observada (SE conjunto beta-u), típica u = 0 (SE de beta), media de agencia nueva
-(x exp(s2/2)), intervalo de predicción (suma s2_reg + s2_ag). re.form = NA es la típica, no la poblacional.
+desarrollo. Predicción (Skrondal & Rabe-Hesketh 2009, §7): típica u = 0 = mediana (SE de beta); rango entre agencias
+exp(eta +- 1.96 sigma_u) (NO es IC); media de agencia nueva exp(eta + s2/2) con IC por SIMULACIÓN de
+(beta, log sigma) (p. 674; el delta recorta la cola); existente = media a posteriori exp(eta + u + SE2/2),
+NO el BLUP sustituido (p. 674); conteo P(Y=k) con integrate(), no Monte Carlo. re.form = NA es la típica,
+no la poblacional. SE conjunto de predict() < suma de condVar: beta y BLUP correlacionados.
 Shrinkage: lambda_j = I_j s2_ag/(1+I_j s2_ag), I_j = suma de mu_ij.
 CIFRAS (réplica en R 4.3.3, glmmTMB 1.1.8; comprobar contra el render). MODELO: potencia_c + uso
 (potencia centrada en CV), elegido tras el cribado de 16 candidatos sobre el mixto nulo (potencia p 2.2e-6,
 uso 1.9e-4; carnet 0.12, resto > 0.15; edad+carnet juntos p 0.30). Selección: añadir uno a uno los 14 restantes, ninguno entra (mín. p 0.148, carnet).
 Pendientes por región (solo LRT, en Selección; la figura exploratoria se quitó): potencia y uso LR 0.
 sd_reg 0.538 [0.284, 1.018], sd_ag 0.368 [0.250, 0.542], corr. estimaciones -0.039. Partición: fijos 0.021,
-región 0.162, agencia 0.076, Poisson 0.741. LRT región 15.47, agencia 51.37. Póliza 1: observada 0.184
-[0.115, 0.297], típica 0.364 [0.230, 0.576], media nueva 0.450, predicción [0.094, 1.414].
+región 0.162, agencia 0.076, Poisson 0.741. LRT región 15.47, agencia 51.37. Póliza 1 (e = 1): típica 0.364
+[0.230, 0.576]; rango agencias [0.101, 1.305]; media nueva 0.450 [0.285, 0.808] (sim. 1e4, seed 2025);
+existente (media a posteriori) 0.190 [0.115, 0.297], BLUP sustituido 0.184; P(Y=0) 0.828 / 0.662 y
+P(Y>=2) 0.017 / 0.091 (existente / nueva).
 DGP: potencia 0.160/DT (verdad 0.15), comercial 0.324 (verdad 0.25); efectos pequeños reales no detectados.
 OLRE: sigma_obs 0.94 [0.89, 1.00], LR vs Poisson 1357.5; AIC Poisson 10765.9, NB2 9417.7, OLRE 9410.4. Sin RMSE. DHARMa del OLRE con simulación INCONDICIONAL (createDHARMa; condicionar a v_i apiña los residuos en 0.5): uniformidad 0.370, dispersión 0.096, atípicos 0.154, ceros 0.224 (render 08-nov). -->
 
@@ -605,95 +610,231 @@ esperadas**. La agencia con menos información, la `r as.character(shrink$agenci
 de `r round(shrink$blup[1], 2)`. Las agencias que tramitan poco, por sí mismas o por su región, se encogen
 más porque generan menos datos.
 
-### Predicción de la tasa y su incertidumbre {#sec-u25-prediccion}
+### Predicción de la tasa y del número de gestiones {#sec-u25-prediccion}
 
-Para una póliza con covariables $\mathbf x$, la tasa esperada depende de qué agencia se suponga:
+La pregunta práctica es sencilla: *¿cuántas gestiones esperamos de esta póliza?* En un GLM la respuesta es
+única, $\hat\mu=e\,\exp(\mathbf x^{\top}\hat{\boldsymbol\beta})$. En el modelo mixto, en cambio, depende de
+**qué sabemos de su agencia**, porque el número esperado de gestiones de una póliza con covariables
+$\mathbf x$ y exposición $e$ es
 
-| Predicción | Tasa | Error que incorpora |
-|:--|:--|:--|
-| **Agencia observada** | $e^{\hat\eta+\hat u^{\text{reg}}_{r}+\hat u^{\text{ag}}_{j}}$ | el de $\hat{\boldsymbol\beta}$ y $\hat{\mathbf u}$, conjuntamente |
-| **Agencia típica** ($u=0$; la mediana) | $e^{\hat\eta}$ | el de $\hat{\boldsymbol\beta}$ |
-| **Agencia nueva (región cualquiera), en media** | $e^{\hat\eta}\,e^{(\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}})/2}$ | el de $\hat{\boldsymbol\beta}$ ($\sigma$ tratadas como conocidas) |
-| **Agencia nueva (región cualquiera), intervalo de predicción** | $e^{\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}}}}$ | el de $\hat{\boldsymbol\beta}$ y la variación entre agencias |
+$$
+\mu = e\,\exp(\eta+u),\qquad \eta=\mathbf x^{\top}\boldsymbol\beta,\qquad
+u=u^{\text{reg}}+u^{\text{ag}}\sim N(0,\sigma^2_u),\quad \sigma^2_u=\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}},
+$$
 
-Los intervalos de confianza se construyen en la escala del predictor, $\hat\eta\pm1.96\,\operatorname{SE}$,
-y se exponencian. `predict(m, nd, type = "link", se.fit = TRUE)` da $\operatorname{SE}$ para la agencia
-observada (`re.form = NULL`, por defecto) y para la típica (`re.form = NA`). El último intervalo no es de
-confianza: dice dónde caerá la tasa de una agencia nueva, porque suma la varianza entre agencias.
+y $u$ es el efecto, desconocido, de su región y su agencia. La tasa es $\mu/e$; con $e=1$, una ventana de
+exposición completa, tasa y número esperado coinciden, y así trabajaremos.
+
+@skrondal2009 [§7] distinguen tres situaciones según lo que sepamos de $u$: una agencia **hipotética** con un
+$u$ fijado de antemano, una agencia **nueva** extraída al azar, de la que no sabemos nada, y una agencia
+**existente**, de la que ya tenemos datos. A ellas añadimos una cuarta pregunta, la más operativa: no la
+tasa, sino el **número** de gestiones que hará la póliza. Las recorremos en orden, cada una un paso más
+allá que la anterior.
+
+Antes, una distinción que atraviesa toda la sección. Unas veces **estimamos** un valor esperado, una tasa
+fija pero desconocida, y su intervalo de **confianza** recoge solo la incertidumbre de la estimación:
+crecería la muestra y se estrecharía. Otras veces **predecimos** algo que varía de por sí, como la tasa de
+una agencia que aún no hemos visto o el número de gestiones de una póliza, y entonces el intervalo o la
+distribución de **predicción** recoge además esa variabilidad, que no desaparece por muchos datos que
+tengamos.
+
+**1. Agencia típica: $u=0$.** Es la agencia que ni acelera ni frena,
+$\hat\mu_{\text{típ}}=e\,\exp(\hat\eta)$. Como la exponencial conserva el orden, es también la **mediana**
+de la tasa entre agencias: la mitad de las agencias tramita más deprisa y la otra mitad, más despacio. Su
+incertidumbre es solo la de $\hat{\boldsymbol\beta}$,
+$\operatorname{SE}^2_{\text{típ}}=\mathbf x^{\top}\widehat{\operatorname{cov}}(\hat{\boldsymbol\beta})\,\mathbf x$, y
+el intervalo de confianza se construye en la escala del predictor y se exponencia
+[@skrondal2009, p. 673]:
+$\exp\big(\hat\eta\pm1.96\operatorname{SE}_{\text{típ}}\big)$. **Cuándo se usa:** para comparar perfiles de
+covariables a igualdad de agencia, que es lo que miden los IRR.
+
+**2. Rango entre agencias.** Si en lugar de fijar $u=0$ dejamos que $u$ recorra su distribución, la tasa de
+la póliza cambia de una agencia a otra. Como $u\sim N(0,\sigma^2_u)$, el 95 % de las agencias le darían una
+tasa entre $e\,\exp\big(\hat\eta\pm1.96\,\hat\sigma_u\big)$ [@skrondal2009, p. 673]. **No es un intervalo
+de confianza**: no mide lo bien que hemos estimado nada, sino cuánto difieren las agencias entre sí, y no se
+estrecharía con más pólizas. **Cuándo se usa:** para dar la dimensión de la heterogeneidad en unidades de
+negocio, en gestiones y no en varianzas.
+
+**3. Agencia nueva, en media.** Una agencia que abre es una extracción al azar de esa distribución. Su tasa
+esperada, promediada sobre todas las agencias posibles, es la **media poblacional**
+$\bar\mu=E_u\big[e\,\exp(\eta+u)\big]$ [@skrondal2009, §7.2]. Con enlace log la integral tiene solución
+cerrada:
+
+$$
+\hat{\bar\mu}=e\,\exp\big(\hat\eta+\hat\sigma^2_u/2\big),
+$$
+
+que queda **por encima** de la mediana del punto 1: la distribución de tasas es asimétrica a la derecha, y
+las agencias rápidas suben la media más de lo que las lentas la bajan. Su intervalo de confianza debe
+recoger la incertidumbre de $\hat{\boldsymbol\beta}$ **y también la de $\hat\sigma_u$**, que con solo 6
+regiones es grande. Seguimos a @skrondal2009 [p. 674]: simulamos muchos vectores de parámetros de su
+distribución asintótica, $(\boldsymbol\beta,\log\sigma)\sim N\big(\hat{\boldsymbol\vartheta},
+\widehat{\operatorname{cov}}(\hat{\boldsymbol\vartheta})\big)$, calculamos $\bar\mu$ con cada uno y tomamos
+los percentiles 2.5 y 97.5. **Cuándo se usa:** para planificar la carga total de agencias que aún no
+existen, porque las medias, a diferencia de las medianas, se suman.
+
+**4. Agencia existente: su $\hat u$.** Si la agencia ya está en la cartera, sabemos algo de ella: su BLUP.
+Pero no sabemos $u$ con exactitud, sino que tenemos su **distribución a posteriori**, centrada en el BLUP.
+La predicción correcta es la media de la tasa sobre esa distribución [@skrondal2009, §7.3], y con un
+enlace no lineal **no es** sustituir el BLUP en la fórmula, $e\,\exp(\hat\eta+\hat u)$, aunque sea práctica
+común [@skrondal2009, p. 674]. Si aproximamos la distribución de $\eta+u$ por una normal centrada en
+$\hat\eta+\hat u$ con la varianza $\operatorname{SE}^2_{\text{ag}}$ que da `predict(..., se.fit = TRUE)`, la
+media lognormal vuelve a dar una fórmula cerrada:
+
+$$
+\tilde\mu=e\,\exp\big(\hat\eta+\hat u+\operatorname{SE}^2_{\text{ag}}/2\big),
+\qquad \text{IC: }\exp\big(\hat\eta+\hat u\pm1.96\operatorname{SE}_{\text{ag}}\big).
+$$
+
+`glmmTMB` calcula $\operatorname{SE}_{\text{ag}}$ con la matriz de covarianzas **conjunta** de
+$\hat{\boldsymbol\beta}$ y $\hat{\mathbf u}$, que recoge que la estimación del intercepto y los BLUP de región
+y agencia están correlacionados. **Cuándo se usa:** para tarificar o prever las pólizas de la cartera
+actual, aprovechando lo que ya sabemos de su agencia.
+
+**5. El número de gestiones.** Las cuatro predicciones anteriores son tasas esperadas; la póliza, en cambio,
+registrará un número entero de gestiones, $Y\sim\operatorname{Poisson}(\mu)$. Su **distribución predictiva**
+combina la variabilidad de la Poisson con la incertidumbre sobre $\eta+u$:
+
+$$
+P(Y=k)=\int \operatorname{Poisson}\big(k;\,e\,e^{t}\big)\,\phi\big(t;\,m,\,s^2\big)\,dt ,
+$$
+
+con $m=\hat\eta+\hat u$ y $s^2=\operatorname{SE}^2_{\text{ag}}$ en una agencia existente, y $m=\hat\eta$ y
+$s^2=\operatorname{SE}^2_{\text{típ}}+\hat\sigma^2_u$ en una agencia nueva. Es una mezcla
+**Poisson-lognormal**, la misma que reaparecerá con el OLRE en la [§5.7](#sec-u25-olre). Esta integral no
+tiene fórmula cerrada, pero es de una sola dimensión y `integrate()` la resuelve numéricamente sin
+simular. Con tasas en torno a 0.4, un intervalo del 95 % para $Y$ sería tosco ($[0,1]$ o $[0,2]$), así que
+informamos de la distribución: $P(Y=0)$, $P(Y=1)$ y $P(Y\ge2)$. **Cuándo se usa:** para la operativa,
+para saber cuántas gestiones generará la póliza. Este paso no está en @skrondal2009, que solo da la
+varianza del error de predicción en el modelo lineal [p. 673]; es su extensión natural al conteo.
 
 ::: {.callout-note collapse="true"}
-## De dónde salen las fórmulas de la agencia nueva
-En una agencia nueva de una región cualquiera, los efectos aleatorios no se han observado: son una
-extracción nueva de su distribución, $u=u^{\text{reg}}+u^{\text{ag}}\sim N(0,\sigma^2_u)$, con
-$\sigma^2_u=\sigma^2_{\text{reg}}+\sigma^2_{\text{ag}}$, independiente de los datos. Su tasa es
-$\mu=e\,\exp(\eta+u)$, con $\eta=\mathbf x^{\top}\boldsymbol\beta$, y como $\log\mu$ es normal, $\mu$ es
-**lognormal**.
-
-**Mediana y media.** La exponencial conserva el orden, así que la mediana de $\mu$ es la de $u=0$:
-$e^{\eta}$, la agencia típica. La media, en cambio, usa la función generadora de momentos de la normal,
-$E[e^{u}]=e^{\sigma^2_u/2}$:
+## De dónde salen las fórmulas
+**Mediana y media de una lognormal.** Si $u\sim N(0,\sigma^2_u)$, $\log\mu=\log e+\eta+u$ es normal y $\mu$
+es **lognormal**. La exponencial conserva el orden, así que la mediana de $\mu$ es la de $u=0$,
+$e\,\exp(\eta)$. La media usa la función generadora de momentos de la normal, $E[e^{u}]=e^{\sigma^2_u/2}$:
 
 $$
-E[\mu]=e^{\eta}\,E\big[e^{u}\big]=e^{\eta}\,e^{\sigma^2_u/2}.
+E[\mu]=e\,e^{\eta}\,E\big[e^{u}\big]=e\,e^{\eta}\,e^{\sigma^2_u/2}.
 $$
 
-Como $e^{\sigma^2_u/2}>1$, la media queda por encima de la mediana: la lognormal es asimétrica a la derecha,
-y las agencias rápidas tiran de la media más de lo que las lentas la frenan. Su intervalo de confianza es el
-de la típica multiplicado por ese factor, tratando $\sigma^2_u$ como conocida.
+El mismo argumento, aplicado a la distribución a posteriori $\eta+u\sim N\big(\hat\eta+\hat u,
+\operatorname{SE}^2_{\text{ag}}\big)$, da la media de la agencia existente.
 
-**Intervalo de predicción.** Al sustituir $\eta$ por su estimación, el logaritmo de la tasa de la agencia
-nueva se descompone en dos errores:
+**Por qué el intervalo de la agencia nueva se simula.** El logaritmo de $\bar\mu$ es
+$\eta+\sigma^2_u/2$, y $\sigma^2_u$ depende de los parámetros que estima `glmmTMB`,
+$\theta=\log\sigma$, a través de $\sigma^2=e^{2\theta}$, una función muy convexa. El método delta
+linealizaría esa función y daría un intervalo simétrico en la escala log; con solo 6 regiones,
+$\hat\theta_{\text{reg}}$ es muy imprecisa y la distribución de $\hat\sigma^2_{\text{reg}}$ tiene una cola
+derecha larga que el método delta recorta. La simulación no linealiza nada: transforma cada vector simulado
+exactamente.
+
+**Por qué las varianzas se suman en la agencia nueva.** Al sustituir $\eta$ por su estimación, el
+logaritmo de la tasa de una agencia nueva se descompone en dos errores:
 
 $$
-\log\mu-\hat\eta=\underbrace{(\eta-\hat\eta)}_{\text{estimación de }\boldsymbol\beta}
+(\eta+u)-\hat\eta=\underbrace{(\eta-\hat\eta)}_{\text{estimación de }\boldsymbol\beta}
 +\underbrace{u}_{\text{agencia nueva}},
 \qquad
-\operatorname{Var}(\log\mu-\hat\eta)\approx\operatorname{SE}^2(\hat\eta)+\sigma^2_u,
+\operatorname{Var}\big((\eta+u)-\hat\eta\big)\approx\operatorname{SE}^2_{\text{típ}}+\sigma^2_u ,
 $$
 
-y las varianzas se suman porque $u$ es independiente de los datos con que se estimó $\hat{\boldsymbol\beta}$.
-Con la aproximación normal, $\log\mu$ cae con probabilidad 0.95 en
-$\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2_u}$, y como la exponencial es creciente,
-exponenciar los extremos da el intervalo para $\mu$. Casi toda su anchura la pone $\sigma^2_u$: aunque
-$\hat{\boldsymbol\beta}$ fuera exacto, el intervalo seguiría siendo ancho, porque refleja cuánto difieren las
-agencias entre sí. Dos simplificaciones: $\sigma^2_u$ se trata como conocida, y el intervalo es para la
-**tasa esperada** de la agencia, no para el número de gestiones, que añadiría la variabilidad de la Poisson.
+y las varianzas se suman porque la $u$ de una agencia nueva es independiente de los datos con que se estimó
+$\hat{\boldsymbol\beta}$. Es la $s^2$ de la distribución predictiva del conteo en una agencia nueva. En el
+modelo lineal es la varianza del error de predicción de @skrondal2009 [p. 673], que suma además la varianza
+residual; en el conteo, ese último papel lo hace la Poisson.
+
+**Por qué no basta sumar las varianzas condicionales de los BLUP.** En la agencia existente,
+$\operatorname{SE}^2_{\text{ag}}$ no es la suma de las varianzas condicionales de $\hat u^{\text{reg}}$ y
+$\hat u^{\text{ag}}$ que da `ranef(condVar = TRUE)` más la de $\hat\eta$: esas tres estimaciones están
+correlacionadas (un intercepto algo más alto se compensa con BLUP algo más bajos), y `predict()` lo tiene en
+cuenta porque usa su matriz de covarianzas conjunta.
 :::
 
-Lo aplicamos a la primera póliza de la cartera, con la exposición completa (`exposicion = 1`):
+Lo aplicamos a la primera póliza de la cartera, con la exposición completa (`exposicion = 1`). Las cuatro
+tasas, en el orden de la exposición:
 
 ```{r}
 #| label: u25-pred
 nd <- cartera |>
   dplyr::slice(1) |>
-  dplyr::mutate(exposicion = 1)                       # ventana de exposición completa
-p_obs <- predict(m_glmm, nd, type = "link", se.fit = TRUE)                 # su agencia
-p_tip <- predict(m_glmm, nd, type = "link", se.fit = TRUE, re.form = NA)   # agencia típica
+  dplyr::mutate(exposicion = 1)                       # e = 1: tasa y número esperado coinciden
+p_tip <- predict(m_glmm, nd, type = "link", se.fit = TRUE, re.form = NA)   # u = 0; SE solo de beta
+p_obs <- predict(m_glmm, nd, type = "link", se.fit = TRUE)                 # su agencia; SE conjunto
 s2_u  <- sd_reg^2 + sd_ag^2
-ic <- \(eta, se) exp(eta + c(-1.96, 0, 1.96) * se)    # IC en escala log, devuelto a la tasa
+ic    <- \(eta, se) exp(eta + c(-1.96, 0, 1.96) * se) # IC en escala log, devuelto a la tasa
+
+# IC de la media de una agencia nueva: simulamos (beta, log sigma) de su distribución asintótica
+set.seed(2025)
+X_nd  <- model.matrix(delete.response(terms(m_glmm)), nd)
+sims  <- MASS::mvrnorm(1e4, c(fixef(m_glmm)$cond, getME(m_glmm, "theta")), V_full)
+media_nueva <- exp(sims[, colnames(X_nd)] %*% t(X_nd) + rowSums(exp(2 * sims[, theta])) / 2)
+
 pred_tabla <- rbind(
-  agencia_observada  = ic(p_obs$fit, p_obs$se.fit),
-  agencia_tipica     = ic(p_tip$fit, p_tip$se.fit),
-  agencia_nueva_media = ic(p_tip$fit, p_tip$se.fit) * exp(s2_u / 2),
-  agencia_nueva_pred = ic(p_tip$fit, sqrt(p_tip$se.fit^2 + s2_u))
+  agencia_tipica    = ic(p_tip$fit, p_tip$se.fit),
+  rango_agencias    = exp(p_tip$fit + c(-1.96, 0, 1.96) * sqrt(s2_u)),
+  agencia_nueva     = c(quantile(media_nueva, 0.025), exp(p_tip$fit + s2_u / 2),
+                        quantile(media_nueva, 0.975)),
+  agencia_existente = c(ic(p_obs$fit, p_obs$se.fit)[1], exp(p_obs$fit + p_obs$se.fit^2 / 2),
+                        ic(p_obs$fit, p_obs$se.fit)[3])
 )
-colnames(pred_tabla) <- c("inferior", "tasa", "superior")
+colnames(pred_tabla) <- c("inferior", "estimacion", "superior")
 round(pred_tabla, 3)
 c(u_region = re_reg[as.character(nd$region), 1])   # BLUP de la región de la póliza
 ```
 
-La póliza es de la región `r as.character(nd$region)`, una región lenta ($\hat u^{\text{reg}}=$
-`r round(re_reg[as.character(nd$region), 1], 2)`). En **su** agencia se esperan
-`r round(pred_tabla["agencia_observada", "tasa"], 3)` gestiones, con un intervalo de
-`r round(pred_tabla["agencia_observada", "inferior"], 3)` a `r round(pred_tabla["agencia_observada", "superior"], 3)`.
-En una agencia típica, `r round(pred_tabla["agencia_tipica", "tasa"], 3)`; y en una agencia nueva de una región cualquiera,
-`r round(pred_tabla["agencia_nueva_media", "tasa"], 3)` de media, por encima de la típica porque las
-agencias rápidas suben la media más de lo que las lentas la bajan. El dato más informativo es el último:
-la tasa de una agencia nueva puede caer entre `r round(pred_tabla["agencia_nueva_pred", "inferior"], 3)` y
-`r round(pred_tabla["agencia_nueva_pred", "superior"], 3)`, un intervalo mucho más ancho que el de
-confianza, porque lo domina la variación entre agencias y no la incertidumbre de $\hat{\boldsymbol\beta}$.
-Estos intervalos son para la **tasa esperada**; el número de gestiones que de hecho se registre añade,
-además, la variabilidad de la Poisson.
+En una agencia **típica** esta póliza generaría `r round(pred_tabla["agencia_tipica", "estimacion"], 3)`
+gestiones por ventana, con un intervalo de confianza de `r round(pred_tabla["agencia_tipica", "inferior"], 3)`
+a `r round(pred_tabla["agencia_tipica", "superior"], 3)`. Pero entre agencias la tasa se mueve mucho más que
+eso: el **rango** del 95 % va de `r round(pred_tabla["rango_agencias", "inferior"], 3)` a
+`r round(pred_tabla["rango_agencias", "superior"], 3)`: el extremo alto multiplica por
+`r round(pred_tabla["rango_agencias", "superior"] / pred_tabla["rango_agencias", "inferior"])` al bajo. Esa
+asimetría es la que eleva la **media de una agencia nueva** a
+`r round(pred_tabla["agencia_nueva", "estimacion"], 3)`, por encima de la mediana, con un intervalo de
+confianza de `r round(pred_tabla["agencia_nueva", "inferior"], 3)` a
+`r round(pred_tabla["agencia_nueva", "superior"], 3)`, asimétrico y más ancho por arriba porque recoge la
+incertidumbre de $\hat\sigma_{\text{reg}}$.
+
+La póliza, sin embargo, no está en una agencia cualquiera: es de la región `r as.character(nd$region)`, una
+región lenta ($\hat u^{\text{reg}}=$ `r round(re_reg[as.character(nd$region), 1], 2)`). Con lo que sabemos
+de **su** agencia, la predicción baja a `r round(pred_tabla["agencia_existente", "estimacion"], 3)`, con un
+intervalo de `r round(pred_tabla["agencia_existente", "inferior"], 3)` a
+`r round(pred_tabla["agencia_existente", "superior"], 3)`. Sustituir directamente el BLUP habría dado
+`r round(exp(p_obs$fit), 3)`: la diferencia es pequeña, porque la agencia está bien informada, pero va
+siempre en el mismo sentido.
+
+Queda el número de gestiones. Calculamos su distribución predictiva, en su agencia y en una agencia nueva:
+
+```{r}
+#| label: u25-pred-conteo
+# P(Y = k): Poisson promediada sobre la incertidumbre de eta + u (integral en una dimensión)
+p_k <- \(k, m, s) integrate(\(t) dpois(k, nd$exposicion * exp(t)) * dnorm(t, m, s), -Inf, Inf)$value
+pred_y <- \(m, s) {
+  p <- sapply(0:1, p_k, m = m, s = s)
+  c(P0 = p[1], P1 = p[2], P2_o_mas = 1 - sum(p))
+}
+pred_conteo <- rbind(
+  agencia_existente = pred_y(p_obs$fit, p_obs$se.fit),
+  agencia_nueva     = pred_y(p_tip$fit, sqrt(p_tip$se.fit^2 + s2_u))
+)
+round(pred_conteo, 3)
+```
+
+En su agencia, lo más probable con diferencia es que la póliza no genere ninguna gestión
+($P(Y=0)=$ `r round(pred_conteo["agencia_existente", "P0"], 2)`), y dos o más son casi descartables
+(`r round(pred_conteo["agencia_existente", "P2_o_mas"], 3)`). En una agencia nueva, la misma póliza tiene
+$P(Y=0)=$ `r round(pred_conteo["agencia_nueva", "P0"], 2)` y una probabilidad de dos o más gestiones de
+`r round(pred_conteo["agencia_nueva", "P2_o_mas"], 3)`. La diferencia tiene dos causas: su región es lenta,
+y en una agencia nueva $u$ es desconocido, de modo que su variabilidad engorda la cola derecha de la
+distribución.
+
+El mensaje de la sección cabe en una comparación. El intervalo de confianza de la agencia típica, que solo
+recoge la incertidumbre de $\hat{\boldsymbol\beta}$, va de
+`r round(pred_tabla["agencia_tipica", "inferior"], 3)` a `r round(pred_tabla["agencia_tipica", "superior"], 3)`;
+el rango entre agencias, de `r round(pred_tabla["rango_agencias", "inferior"], 3)` a
+`r round(pred_tabla["rango_agencias", "superior"], 3)`. En este modelo, **saber en qué agencia está una
+póliza cambia la predicción mucho más que la incertidumbre de los coeficientes**, y por eso hay que decir
+siempre qué predicción se da: la de una agencia típica, la media de una agencia nueva o la de su agencia.
 
 ::: {.callout-tip}
 ## 🔧 En R. Interpretar y predecir con un GLMM de Poisson
@@ -721,18 +862,47 @@ performance::icc(m, by_group = TRUE)
 re <- ranef(m, condVar = TRUE)$cond$`agencia:region`
 se <- sqrt(as.numeric(attr(re, "condVar")))
 
-# Predicción para las covariables de nd: en escala log, y se exponencian los extremos
-p_obs <- predict(m, nd, type = "link", se.fit = TRUE)                 # su agencia
-p_tip <- predict(m, nd, type = "link", se.fit = TRUE, re.form = NA)   # agencia típica (u = 0)
+# Predicción para las covariables de nd, con exposición e (e = 1: una ventana completa)
+p_tip <- predict(m, nd, type = "link", se.fit = TRUE, re.form = NA)   # eta con u = 0; SE solo de beta
+p_obs <- predict(m, nd, type = "link", se.fit = TRUE)                 # eta + u predicho; SE conjunto
 s2_u  <- sum(sapply(VarCorr(m)$cond, \(v) attr(v, "stddev")^2))       # sigma2_reg + sigma2_ag
-exp(p_tip$fit) * exp(s2_u / 2)                                        # media de una agencia nueva
-exp(p_tip$fit + c(-1.96, 1.96) * sqrt(p_tip$se.fit^2 + s2_u))         # intervalo de predicción
+ic    <- \(eta, se) exp(eta + c(-1.96, 0, 1.96) * se)                 # IC en escala log, devuelto
+
+# 1. Agencia típica (u = 0): la mediana entre agencias, con su IC
+ic(p_tip$fit, p_tip$se.fit)
+
+# 2. Rango del 95 % entre agencias: variabilidad poblacional, no incertidumbre de estimación
+exp(p_tip$fit + c(-1.96, 1.96) * sqrt(s2_u))
+
+# 3. Agencia nueva, en media: e^(eta + sigma2/2); IC simulando (beta, log sigma)
+exp(p_tip$fit + s2_u / 2)
+V    <- vcov(m, full = TRUE)                                          # incluye theta = log sigma
+sims <- MASS::mvrnorm(1e4, c(fixef(m)$cond, getME(m, "theta")), V)
+X    <- model.matrix(delete.response(terms(m)), nd)
+eta  <- sims[, colnames(X)] %*% t(X)
+s2   <- rowSums(exp(2 * sims[, grep("^theta", colnames(V))]))
+quantile(exp(eta + s2 / 2), c(0.025, 0.975))
+
+# 4. Agencia existente: media a posteriori e^(eta + u + SE^2/2), no el BLUP sustituido
+exp(p_obs$fit + p_obs$se.fit^2 / 2)
+ic(p_obs$fit, p_obs$se.fit)
+
+# 5. Número de gestiones: distribución predictiva por integración numérica (sin simular)
+p_k    <- \(k, m, s) integrate(\(t) dpois(k, nd$exposicion * exp(t)) * dnorm(t, m, s), -Inf, Inf)$value
+pred_y <- \(m, s) { p <- sapply(0:1, p_k, m = m, s = s); c(P0 = p[1], P1 = p[2], P2_o_mas = 1 - sum(p)) }
+rbind(agencia_existente = pred_y(p_obs$fit, p_obs$se.fit),
+      agencia_nueva     = pred_y(p_tip$fit, sqrt(p_tip$se.fit^2 + s2_u)))
 ```
 
 - El IRR condicional coincide con el poblacional solo con enlace log y sin pendientes aleatorias.
 - Las fracciones de la partición dependen de la aproximación de $\sigma^2_\varepsilon$; las razones entre
   los componentes aleatorios y fijos, no.
 - Los BLUP se encogen hacia 0 tanto más cuantas menos gestiones espera el modelo en la agencia.
+- Predicción: di siempre **cuál** das. La típica (1) sirve para comparar perfiles; el rango (2), para medir
+  la heterogeneidad; la media de una agencia nueva (3), para planificar; la de su agencia (4), para la
+  cartera actual; la distribución del conteo (5), para la operativa.
+- El IC de la media de una agencia nueva se simula porque $\sigma^2=e^{2\theta}$ es muy convexa y el método
+  delta recortaría su cola derecha; con `1e4` simulaciones, el límite superior es estable en la segunda cifra.
 :::
 
 ## 5.4 Selección de variables y distribución {#sec-u25-seleccion}
@@ -1324,8 +1494,9 @@ Sobre la cartera de tu equipo modelas `n_gestiones` con un GLMM de Poisson, inte
 - **P11 · Agencias atípicas.** Con BLUPs / *caterpillar*, identifica las que se **desvían** y comenta el
   **shrinkage**.
 - **P12 · Agencia nueva.** Distingue predicción **condicional** vs **marginal**: ¿qué esperar de una agencia
-  sin historial? *Tip:* da la tasa de la agencia típica ($u=0$, la mediana), la media de una agencia nueva y
-  su **intervalo de predicción**, que suma la varianza entre agencias ([§Predicción](#sec-u25-prediccion)).
+  sin historial? *Tip:* da la tasa de la agencia típica ($u=0$, la mediana), el **rango** entre agencias, la
+  media de una agencia nueva con su intervalo y la probabilidad de cero gestiones
+  ([§Predicción](#sec-u25-prediccion)).
 
 Diagnostica con `DHARMa` y el $R^2$ de Nakagawa, y **valida** los componentes de varianza estimados frente a
 $\sigma_a$ y $\sigma_{reg}$ del DGP (`attr(cartera, "verdad")$sigma_ag`, `$sigma_reg`).

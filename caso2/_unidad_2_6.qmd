@@ -9,6 +9,10 @@ con un factor por año las reproduce). Selección de variables con drop1 sobre e
 DOS MODELOS desde §6.5: m_pw_fin (trozos) y m_lin (tendencia lineal en t_mid, punto medio del trozo: 8
 para 7-10). t_mid hace que el lineal esté ANIDADO en el de trozos (LRT válido); con `anio` no lo estaría.
 §6.6 diagnostica y predice con los dos; la calibración usa la tasa media e^(eta+s2/2) de los mixtos.
+PREDICCIÓN (§6.6, misma estructura que U2.5, Skrondal & Rabe-Hesketh 2009 §7): 1 típico u = 0 (mediana);
+2 rango entre clientes e^(eta +- 1.96 sigma), NO es IC; 3 nuevo en media e^(eta + s2/2), IC por simulación
+de (beta, log sigma); 4 observado = media a posteriori e^(eta + u + SE2/2), no el efecto sustituido;
+5 partes el próximo año con integrate().
 DHARMa con simulate() de glmmTMB (incondicional) + createDHARMa; NO simulateResiduals(), que condiciona a
 los efectos de póliza encogidos y da falsas alarmas. El DGP no tiene abandono selectivo: se discute como
 limitación en §6.6.
@@ -1078,39 +1082,64 @@ ellos depende, entonces, de para qué se quiera el modelo, que es lo que vemos a
 
 ### Predicción: qué cliente
 
-Con el efecto de póliza, la tasa de un perfil deja de ser un único número: depende de **qué cliente** se
-suponga. Son los mismos cuatro tipos de predicción de la [Unidad 2.5](#sec-u25-prediccion), con el
-cliente en el papel de la agencia (allí se deducen las fórmulas):
+Con el efecto de póliza, la tasa de un perfil deja de ser un único número: depende de **qué sabemos del
+cliente**. Es la misma situación que la de la agencia en la [Unidad 2.5](#sec-u25-prediccion), con el
+cliente en su papel, y la recorremos con la misma estructura (allí se deducen las fórmulas). La tasa de un
+cliente con covariables $\mathbf x$ en el trozo $k$ es
 
-| Predicción | Tasa | Intervalo al 95 % | Error que incorpora |
-|:--|:--|:--|:--|
-| **Cliente observado** | $e^{\hat\eta+\hat u_i}$ | $e^{(\hat\eta+\hat u_i)\pm1.96\,\operatorname{SE}(\hat\eta+\hat u_i)}$ | el de $\hat{\boldsymbol\beta}$ y $\hat u_i$, conjuntamente |
-| **Cliente típico** ($u=0$; la mediana) | $e^{\hat\eta}$ | $e^{\hat\eta\pm1.96\,\operatorname{SE}(\hat\eta)}$ | el de $\hat{\boldsymbol\beta}$ |
-| **Cliente nuevo, en media** | $e^{\hat\eta}\,e^{\sigma^2/2}$ | $e^{\hat\eta+\sigma^2/2\,\pm\,1.96\,\operatorname{SE}(\hat\eta)}$ | el de $\hat{\boldsymbol\beta}$ ($\sigma$ tratada como conocida) |
-| **Cliente nuevo, uno concreto** | $e^{\hat\eta+u}$, con $u\sim N(0,\sigma^2)$ desconocido | $e^{\hat\eta\pm1.96\sqrt{\operatorname{SE}^2(\hat\eta)+\sigma^2}}$ (de predicción) | el de $\hat{\boldsymbol\beta}$ y la variación entre clientes |
+$$
+\lambda=\exp(\eta+u),\qquad \eta=\alpha_k+\mathbf x^{\top}\boldsymbol\beta,\qquad u\sim N(0,\sigma^2),
+$$
 
-Aquí $\hat\eta=\hat\alpha_k+\mathbf{x}^\top\hat{\boldsymbol\beta}$ es el predictor lineal del perfil en el
-trozo $k$. Lo aplicamos a los tres perfiles prototipo de la [§6.4](#sec-u26-ajuste), con el modelo a trozos:
+y $u$ es su fragilidad, desconocida. Con la exposición fijada en un año, $\lambda$ es el número esperado de
+partes en ese año. Como allí, unas predicciones **estiman** un valor esperado, con un intervalo de
+**confianza** que solo recoge la incertidumbre de la estimación, y otras **predicen** algo que varía de un
+cliente a otro o de un año a otro, con un rango o una distribución que recoge además esa variabilidad.
+
+| Paso | Qué responde | Estimación | Intervalo | Cuándo se usa |
+|:--|:--|:--|:--|:--|
+| **1. Cliente típico** ($u=0$) | la mediana entre clientes del perfil | $e^{\hat\eta}$ | IC: $e^{\hat\eta\pm1.96\operatorname{SE}_{\text{típ}}}$ | comparar perfiles, a igualdad de fragilidad |
+| **2. Rango entre clientes** | cuánto difieren los clientes de un mismo perfil | — | $e^{\hat\eta\pm1.96\hat\sigma}$ (no es un IC) | medir la heterogeneidad en partes por año |
+| **3. Cliente nuevo, en media** | la tasa media de los clientes que entran | $e^{\hat\eta+\hat\sigma^2/2}$ | IC simulando $(\boldsymbol\beta,\log\sigma)$ | tarificar a los clientes nuevos |
+| **4. Cliente observado** | la tasa de un cliente con historial | $e^{\hat\eta+\hat u_i+\operatorname{SE}^2_i/2}$ | IC: $e^{\hat\eta+\hat u_i\pm1.96\operatorname{SE}_i}$ | tarificar por experiencia (*bonus-malus*) |
+| **5. Número de partes** | cuántos partes dará el cliente el próximo año | $P(Y=k)$ | distribución predictiva | prever la siniestralidad de una póliza |
+
+Las fórmulas y sus fuentes son las de la [Unidad 2.5](#sec-u25-prediccion) [@skrondal2009, §7]. Aquí
+$\operatorname{SE}_{\text{típ}}$ es el error de $\hat\eta$ y $\operatorname{SE}_i$, el error conjunto de
+$\hat\eta+\hat u_i$ que da `predict(..., se.fit = TRUE)`. Lo aplicamos primero a los tres perfiles
+prototipo de la [§6.4](#sec-u26-ajuste), con el modelo a trozos (pasos 1 a 3):
 
 ```{r}
 #| label: u26-pred-mix
 s2_pol <- glmmTMB::VarCorr(m_pw_fin)$cond$id_poliza[1]          # varianza de la fragilidad
 nd_mix <- dplyr::mutate(pred, id_poliza = NA)                     # perfiles y trozos de la §6.4
 p_tip  <- predict(m_pw_fin, newdata = nd_mix, type = "link", se.fit = TRUE, re.form = NA)
+
+# IC de la media de un cliente nuevo: simulamos (beta, log sigma) de su distribución asintótica
+set.seed(2025)
+V_pol <- vcov(m_pw_fin, full = TRUE)                              # incluye theta = log sigma
+sims  <- MASS::mvrnorm(1e4, c(glmmTMB::fixef(m_pw_fin)$cond, glmmTMB::getME(m_pw_fin, "theta")), V_pol)
+tt    <- delete.response(terms(m_pw_fin))
+X_mix <- model.matrix(tt, nd_mix, xlev = .getXlevels(tt, m_pw_fin$frame))   # mismos niveles que el ajuste
+media_nueva <- exp(sims[, colnames(X_mix)] %*% t(X_mix) +
+                   exp(2 * sims[, grep("^theta", colnames(V_pol))]) / 2)   # una columna por fila de nd_mix
+
 pred_mix <- nd_mix |>
   dplyr::transmute(perfil, trozo,
                    efectos_fijos = tasa,                                   # modelo de la §6.4
-                   tipico        = exp(p_tip$fit),
+                   tipico        = exp(p_tip$fit),                         # paso 1
                    tipico_inf    = exp(p_tip$fit - 1.96 * p_tip$se.fit),
                    tipico_sup    = exp(p_tip$fit + 1.96 * p_tip$se.fit),
-                   nuevo_media   = exp(p_tip$fit + s2_pol / 2),
-                   nuevo_inf     = exp(p_tip$fit - 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)),
-                   nuevo_sup     = exp(p_tip$fit + 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)))
+                   rango_inf     = exp(p_tip$fit - 1.96 * sqrt(s2_pol)),   # paso 2
+                   rango_sup     = exp(p_tip$fit + 1.96 * sqrt(s2_pol)),
+                   nuevo_media   = exp(p_tip$fit + s2_pol / 2),            # paso 3
+                   nuevo_inf     = apply(media_nueva, 2, quantile, 0.025),
+                   nuevo_sup     = apply(media_nueva, 2, quantile, 0.975))
 ```
 
 ```{r}
 #| label: fig-u26-pred-mix
-#| fig-cap: "Tasa predicha para los tres perfiles prototipo de la §6.4 a lo largo de la antigüedad, según el tipo de predicción (escala logarítmica). Línea negra discontinua: modelo de efectos fijos de la §6.4. Línea de color con banda oscura: cliente típico (u = 0) con su intervalo de confianza. Línea de puntos: cliente nuevo en media. Banda clara: intervalo de predicción para la tasa de un cliente nuevo. La predicción de efectos fijos coincide con la del cliente nuevo en media; la del cliente típico queda por debajo; y la tasa de un cliente concreto puede estar muy lejos de ambas."
+#| fig-cap: "Tasa predicha para los tres perfiles prototipo de la §6.4 a lo largo de la antigüedad, según el tipo de predicción (escala logarítmica). Línea negra discontinua: modelo de efectos fijos de la §6.4. Línea de color con banda oscura: cliente típico (u = 0) con su intervalo de confianza. Línea de puntos: cliente nuevo en media. Banda clara: rango del 95 % de las tasas entre clientes del mismo perfil, que no es un intervalo de confianza sino la heterogeneidad entre clientes. La predicción de efectos fijos coincide con la del cliente nuevo en media; la del cliente típico queda por debajo; y la de un cliente concreto puede estar muy lejos de ambas."
 #| fig-width: 10
 #| fig-height: 4
 pred_mix |>
@@ -1118,7 +1147,7 @@ pred_mix |>
                 perfil = factor(perfil, c("joven_urbano", "mediano", "veterano_rural"),
                                 c("joven, urbano", "mediano", "veterano, rural"))) |>
   ggplot() +
-  geom_rect(aes(xmin = desde, xmax = hasta, ymin = nuevo_inf, ymax = nuevo_sup, fill = perfil), alpha = 0.12) +
+  geom_rect(aes(xmin = desde, xmax = hasta, ymin = rango_inf, ymax = rango_sup, fill = perfil), alpha = 0.12) +
   geom_rect(aes(xmin = desde, xmax = hasta, ymin = tipico_inf, ymax = tipico_sup, fill = perfil), alpha = 0.35) +
   geom_segment(aes(x = desde, xend = hasta, y = tipico, yend = tipico, colour = perfil), linewidth = 1) +
   geom_segment(aes(x = desde, xend = hasta, y = nuevo_media, yend = nuevo_media, colour = perfil),
@@ -1137,27 +1166,36 @@ pred_mix |>
 pm <- function(per, k, col) round(pred_mix[[col]][pred_mix$perfil == per & pred_mix$trozo == k], 3)
 ```
 
-La @fig-u26-pred-mix enseña tres cosas, con el conductor joven y urbano en su primer año como ejemplo.
+La @fig-u26-pred-mix recorre los tres primeros pasos con el conductor joven y urbano en su primer año como
+ejemplo.
 
-- **La predicción de efectos fijos de la §6.4 es la del cliente nuevo en media**: `r pm("joven_urbano", "1", "efectos_fijos")`
-  frente a `r pm("joven_urbano", "1", "nuevo_media")`. El modelo sin efecto de póliza estima, sin
-  decirlo, la tasa **media** de los clientes con ese perfil.
-- **El cliente típico tiene una tasa menor**, `r pm("joven_urbano", "1", "tipico")`: la media queda por
-  encima de la mediana en un factor $e^{\hat\sigma^2/2}=$ `r round(exp(s2_pol / 2), 2)`, porque los
-  clientes más propensos suben la media más de lo que los menos propensos la bajan.
-- **La tasa de un cliente nuevo concreto es muy incierta**: puede caer entre
-  `r pm("joven_urbano", "1", "nuevo_inf")` y `r pm("joven_urbano", "1", "nuevo_sup")`. Saber su edad, su
-  coche y su zona no basta para conocer su riesgo; lo que falta lo pone su propio historial.
+- **Paso 1, cliente típico.** Un cliente de fragilidad nula tendría
+  `r pm("joven_urbano", "1", "tipico")` partes por año, con un intervalo de confianza de
+  `r pm("joven_urbano", "1", "tipico_inf")` a `r pm("joven_urbano", "1", "tipico_sup")`. Es la mediana:
+  la mitad de los clientes de este perfil da más partes y la otra mitad, menos.
+- **Paso 2, rango entre clientes.** Las tasas del 95 % de los clientes de este perfil van de
+  `r pm("joven_urbano", "1", "rango_inf")` a `r pm("joven_urbano", "1", "rango_sup")`. El intervalo de
+  confianza del paso 1 es estrecho; el rango, en cambio, abarca un factor
+  `r round(pm("joven_urbano", "1", "rango_sup") / pm("joven_urbano", "1", "rango_inf"))`. Saber la edad,
+  el coche y la zona de un cliente no basta para conocer su riesgo: lo que falta lo pone su historial.
+- **Paso 3, cliente nuevo en media.** La tasa media de los clientes que entran con este perfil es
+  `r pm("joven_urbano", "1", "nuevo_media")`, con un intervalo de confianza de
+  `r pm("joven_urbano", "1", "nuevo_inf")` a `r pm("joven_urbano", "1", "nuevo_sup")`. Queda por encima
+  de la mediana en un factor $e^{\hat\sigma^2/2}=$ `r round(exp(s2_pol / 2), 2)`, porque los clientes más
+  propensos suben la media más de lo que los menos propensos la bajan. Y coincide prácticamente con la
+  predicción del modelo de efectos fijos de la §6.4, `r pm("joven_urbano", "1", "efectos_fijos")`: el
+  modelo sin efecto de póliza estima, sin decirlo, la tasa **media** de los clientes con ese perfil.
 
-Eso último es lo que aprovecha la predicción del **cliente observado**. Lo vemos con un cliente que ha
-pasado por todos los trozos: la póliza 2141. La @tbl-u26-pred-cliente pone, trozo a trozo, lo que se
-observó (sus partes y los años que estuvo asegurado) junto a las dos predicciones del modelo a trozos: la
-de este cliente, con su efecto de póliza estimado, y la de un cliente típico ($u=0$) con sus mismas
-características. Las dos predicciones salen del mismo modelo mixto; solo difieren en el efecto de póliza.
+**Paso 4, cliente observado.** Es el que aprovecha el historial. Lo vemos con un cliente que ha pasado por
+todos los trozos: la póliza 2141. La @tbl-u26-pred-cliente pone, trozo a trozo, lo que se observó (sus
+partes y los años que estuvo asegurado) junto a dos predicciones del modelo a trozos: la de este cliente,
+con su efecto de póliza estimado, y la de un cliente típico ($u=0$) con sus mismas características. La del
+cliente es la **media a posteriori** del paso 4, no el efecto estimado sustituido en la fórmula
+[@skrondal2009, p. 674].
 
 ```{r}
 #| label: tbl-u26-pred-cliente
-#| tbl-cap: "La póliza 2141, trozo a trozo. `partes` y `exposicion`: lo observado (partes y años asegurados en el trozo). `tasa_cliente`: tasa predicha para este cliente, con su efecto de póliza estimado, e intervalo de confianza al 95 % (`inf`, `sup`). `tasa_tipico`: tasa predicha para un cliente típico (u = 0) con sus mismas características. Las tasas son partes por año y salen del mismo modelo mixto: su cociente es el mismo en todos los trozos."
+#| tbl-cap: "La póliza 2141, trozo a trozo. `partes` y `exposicion`: lo observado (partes y años asegurados en el trozo). `tasa_cliente`: tasa predicha para este cliente, la media a posteriori con su efecto de póliza, e intervalo de confianza al 95 % (`inf`, `sup`). `tasa_tipico`: tasa predicha para un cliente típico (u = 0) con sus mismas características. Las tasas son partes por año y salen del mismo modelo mixto."
 id_ej <- 2141
 obs_ej <- panel |>
   dplyr::filter(id_poliza == id_ej) |>
@@ -1172,7 +1210,7 @@ nd_ej <- panel |>                                  # sus características, un a�
 p_cli <- predict(m_pw_fin, newdata = nd_ej, type = "link", se.fit = TRUE)                # con su u_i
 p_tip_ej <- predict(m_pw_fin, newdata = nd_ej, type = "link", se.fit = TRUE, re.form = NA)  # u = 0
 pred_ej <- obs_ej |>
-  dplyr::mutate(tasa_cliente = exp(p_cli$fit),
+  dplyr::mutate(tasa_cliente = exp(p_cli$fit + p_cli$se.fit^2 / 2),       # media a posteriori
                 inf          = exp(p_cli$fit - 1.96 * p_cli$se.fit),
                 sup          = exp(p_cli$fit + 1.96 * p_cli$se.fit),
                 tasa_tipico  = exp(p_tip_ej$fit),
@@ -1182,12 +1220,45 @@ pred_ej
 ```
 
 En `r round(sum(pred_ej$exposicion), 2)` años, esta póliza ha dado `r sum(pred_ej$partes)` partes. Su
-efecto estimado es $\hat u=$ `r round(u_ej, 2)`: su tasa es `r round(exp(u_ej), 2)` veces la de un cliente
-típico con sus mismas características, en todos los trozos. En el primero, el modelo le asigna
-`r pred_ej$tasa_cliente[1]` partes por año, frente a `r pred_ej$tasa_tipico[1]` para el cliente típico. Es
-la base estadística de la tarificación por experiencia: el historial de cada cliente corrige lo que
-predicen sus características. La corrección no es completa, porque el efecto estimado se encoge hacia 0
-—como los BLUP de la Unidad 2.5—, tanto más cuantos menos años lleve el cliente en la cartera.
+efecto estimado es $\hat u=$ `r round(u_ej, 2)`, que multiplica por `r round(exp(u_ej), 2)` la tasa de
+un cliente típico con sus mismas características, en todos los trozos. En el primero, el modelo le asigna
+`r pred_ej$tasa_cliente[1]` partes por año, frente a `r pred_ej$tasa_tipico[1]` para el cliente típico.
+Sustituir directamente su efecto estimado habría dado `r round(exp(p_cli$fit[1]), 3)`: la media a posteriori
+es un `r round(100 * (exp(p_cli$se.fit[1]^2 / 2) - 1))` % mayor. La corrección es aquí mucho mayor que la de
+las agencias de la Unidad 2.5, porque cada cliente aporta pocos partes y su efecto se conoce peor: es lo que
+anticipan @skrondal2009 [p. 678] para los grupos pequeños. Es la base estadística de la tarificación por
+experiencia: el historial de cada cliente corrige lo que predicen sus características. La corrección no es
+completa, porque el efecto estimado se encoge hacia 0 —como los BLUP de la Unidad 2.5—, tanto más cuantos
+menos años lleve el cliente en la cartera.
+
+**Paso 5, número de partes.** Queda la pregunta más operativa: *¿cuántos partes dará este cliente el
+próximo año?* Su distribución predictiva combina la variabilidad de la Poisson con la incertidumbre sobre
+$\eta+u$, y se calcula con la misma integral de la [Unidad 2.5](#sec-u25-prediccion). La comparamos con la
+de un cliente nuevo de sus mismas características, los dos en el último trozo de antigüedad:
+
+```{r}
+#| label: u26-pred-conteo
+# P(Y = k): Poisson promediada sobre la incertidumbre de eta + u (integral en una dimensión)
+p_k <- \(k, m, s) integrate(\(t) dpois(k, exp(t)) * dnorm(t, m, s), -Inf, Inf)$value   # un año: e = 1
+pred_y <- \(m, s) {
+  p <- sapply(0:1, p_k, m = m, s = s)
+  c(P0 = p[1], P1 = p[2], P2_o_mas = 1 - sum(p))
+}
+k_ult <- nrow(nd_ej)                                        # último trozo de antigüedad
+pred_conteo <- rbind(
+  poliza_2141   = pred_y(p_cli$fit[k_ult], p_cli$se.fit[k_ult]),
+  cliente_nuevo = pred_y(p_tip_ej$fit[k_ult], sqrt(p_tip_ej$se.fit[k_ult]^2 + s2_pol))
+)
+round(pred_conteo, 3)
+```
+
+Para la póliza 2141, la probabilidad de no dar ningún parte el próximo año es
+`r round(pred_conteo["poliza_2141", "P0"], 2)`, y la de dar dos o más,
+`r round(pred_conteo["poliza_2141", "P2_o_mas"], 3)`. Un cliente nuevo con sus mismas características
+tendría `r round(pred_conteo["cliente_nuevo", "P0"], 2)` y `r round(pred_conteo["cliente_nuevo", "P2_o_mas"], 3)`.
+Al revés que la póliza de la Unidad 2.5, que estaba en una región lenta, este cliente es más propenso que
+la media de su perfil, y su historial lo delata: con él, la probabilidad de dos o más partes se multiplica
+por `r round(pred_conteo["poliza_2141", "P2_o_mas"] / pred_conteo["cliente_nuevo", "P2_o_mas"], 1)`.
 
 ### Predicción: trozos o tendencia lineal
 
@@ -1218,8 +1289,8 @@ Las predicciones de los dos modelos difieren como mucho un `r round(max(abs(pred
 (@tbl-u26-pred-lin), y en ninguna dirección fija: la recta suaviza los altibajos de los trozos. Esa
 diferencia es pequeña frente a todo lo demás que mueve la tasa. En su primer año, un cliente joven y urbano
 tiene una tasa `r round(pm("joven_urbano", "1", "nuevo_media") / pm("veterano_rural", "1", "nuevo_media"), 1)`
-veces la de uno veterano y rural; y la tasa de un cliente nuevo concreto del perfil mediano puede caer, en
-ese mismo año, entre `r pm("mediano", "1", "nuevo_inf")` y `r pm("mediano", "1", "nuevo_sup")`. A efectos
+veces la de uno veterano y rural; y las tasas de los clientes del perfil mediano se reparten, en
+ese mismo año, entre `r pm("mediano", "1", "rango_inf")` y `r pm("mediano", "1", "rango_sup")`. A efectos
 prácticos, los dos modelos predicen lo mismo.
 
 ### Qué hacer con el modelo: recomendaciones para la aseguradora
@@ -1245,7 +1316,7 @@ Las predicciones se traducen en decisiones concretas para la tarifa y la gestió
    un cliente típico con sus mismas características: su historial dice algo que sus características no
    dicen. El efecto de póliza estimado es la base de una tarificación por experiencia (*bonus-malus*), y
    su peso crece con los años que el cliente lleva en la cartera.
-5. **No esperar precisión individual.** El intervalo de un cliente nuevo concreto es muy ancho. La tarifa
+5. **No esperar precisión individual.** El rango entre clientes de un mismo perfil es muy ancho (paso 2). La tarifa
    equilibra ingresos y partes en el conjunto de la cartera, no cliente a cliente; por eso conviene
    combinarla con el historial de cada uno en cuanto se disponga de él.
 
@@ -1327,15 +1398,38 @@ tasa <- tapply(exp(predict(m_mix, nd, type = "link", re.form = NA) + s2 / 2), nd
 acum <- function(s) sum(tasa * pmax(0, pmin(s, limites[-1]) - limites[-length(limites)]))
 ```
 
-**Predicción** para unas covariables `nd` (con `expo = 1` e `id`), en escala log; se exponencian los
-extremos:
+**Predicción** para unas covariables `nd` (con `expo = 1` e `id`), en los cinco pasos de la sección y
+en el mismo orden; los intervalos se construyen en escala log y se exponencian:
 
 ```r
-p_obs <- predict(m_mix, nd, type = "link", se.fit = TRUE)                 # cliente observado (su u_i)
-p_tip <- predict(m_mix, nd, type = "link", se.fit = TRUE, re.form = NA)   # cliente típico (u = 0)
-exp(p_obs$fit + c(-1.96, 1.96) * p_obs$se.fit)                            # IC del cliente observado
-exp(p_tip$fit + s2 / 2)                                                   # cliente nuevo, en media
-exp(p_tip$fit + c(-1.96, 1.96) * sqrt(p_tip$se.fit^2 + s2))              # cliente nuevo, predicción
+p_tip <- predict(m_mix, nd, type = "link", se.fit = TRUE, re.form = NA)   # eta con u = 0; SE de beta
+p_obs <- predict(m_mix, nd, type = "link", se.fit = TRUE)                 # eta + u_i; SE conjunto
+s2    <- glmmTMB::VarCorr(m_mix)$cond$id[1]                               # varianza de la fragilidad
+
+# 1. Cliente típico (u = 0): la mediana entre clientes, con su IC
+exp(p_tip$fit + c(-1.96, 0, 1.96) * p_tip$se.fit)
+
+# 2. Rango del 95 % entre clientes del perfil: heterogeneidad, no incertidumbre de estimación
+exp(p_tip$fit + c(-1.96, 1.96) * sqrt(s2))
+
+# 3. Cliente nuevo, en media: e^(eta + s2/2); IC simulando (beta, log sigma)
+exp(p_tip$fit + s2 / 2)
+V    <- vcov(m_mix, full = TRUE)
+sims <- MASS::mvrnorm(1e4, c(glmmTMB::fixef(m_mix)$cond, glmmTMB::getME(m_mix, "theta")), V)
+tt   <- delete.response(terms(m_mix))
+X    <- model.matrix(tt, nd, xlev = .getXlevels(tt, m_mix$frame))       # mismos niveles que el ajuste
+apply(exp(sims[, colnames(X)] %*% t(X) + exp(2 * sims[, grep("^theta", colnames(V))]) / 2),
+      2, quantile, c(0.025, 0.975))
+
+# 4. Cliente observado: media a posteriori e^(eta + u_i + SE^2/2), no el efecto sustituido
+exp(p_obs$fit + p_obs$se.fit^2 / 2)
+exp(p_obs$fit + c(-1.96, 1.96) * p_obs$se.fit)
+
+# 5. Partes el próximo año (expo = 1): distribución predictiva por integración numérica
+p_k    <- \(k, m, s) integrate(\(t) dpois(k, exp(t)) * dnorm(t, m, s), -Inf, Inf)$value
+pred_y <- \(m, s) { p <- sapply(0:1, p_k, m = m, s = s); c(P0 = p[1], P1 = p[2], P2_o_mas = 1 - sum(p)) }
+pred_y(p_obs$fit[1], p_obs$se.fit[1])                                     # el cliente, con su historial
+pred_y(p_tip$fit[1], sqrt(p_tip$se.fit[1]^2 + s2))                        # un cliente nuevo como él
 # con el modelo lineal, lo mismo con m_lin y su propia s2, y la columna t_mid en nd
 ```
 :::

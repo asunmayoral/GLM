@@ -366,28 +366,216 @@ pv <- function(v, col) seleccion[[col]][seleccion$variable == v]   # valor p de 
 m_pw_fin <- update(m_pw_mix, . ~ . - sexo)
 
 # -----------------------------------------------------------------------------
-# [u26-pred-mix]
+# [u26-lin]
 #   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
 #     > 6.5 Los años de un mismo cliente no son independientes
+#       > ¿Hace falta un nivel por trozo? Una tendencia lineal
+# -----------------------------------------------------------------------------
+t_medio <- function(trozo) ((head(limites, -1) + tail(limites, -1)) / 2)[as.integer(trozo)]
+panel$t_mid <- t_medio(panel$trozo)
+
+m_lin <- update(m_pw_fin, . ~ . - trozo + t_mid)        # mismo modelo, con una recta en lugar de los trozos
+gamma_lin <- glmmTMB::fixef(m_lin)$cond["t_mid"]
+ee_gamma  <- sqrt(vcov(m_lin)$cond["t_mid", "t_mid"])
+cmp_lin   <- anova(m_lin, m_pw_fin)
+
+# -----------------------------------------------------------------------------
+# [tbl-u26-lin]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.5 Los años de un mismo cliente no son independientes
+#       > ¿Hace falta un nivel por trozo? Una tendencia lineal
+# -----------------------------------------------------------------------------
+tab_lin <- tibble::tibble(
+  modelo     = c("tendencia lineal", "trozos"),
+  parametros = cmp_lin$Df,
+  AIC        = round(cmp_lin$AIC, 1),
+  logLik     = round(cmp_lin$logLik, 1),
+  chi2       = c(NA, round(cmp_lin$Chisq[2], 2)),
+  gl         = c(NA, cmp_lin$`Chi Df`[2]),
+  p          = c(NA, round(cmp_lin$`Pr(>Chisq)`[2], 3)))
+tab_lin
+
+# -----------------------------------------------------------------------------
+# [fig-u26-lin]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.5 Los años de un mismo cliente no son independientes
+#       > ¿Hace falta un nivel por trozo? Una tendencia lineal
+# -----------------------------------------------------------------------------
+b_tro  <- glmmTMB::fixef(m_pw_fin)$cond
+ee_tro <- sqrt(diag(vcov(m_pw_fin)$cond))
+nombres_tro <- paste0("trozo", levels(panel$trozo)[-1])
+rr_tro <- tibble::tibble(t_mid = t_medio(seq_along(levels(panel$trozo))),
+                         rr  = exp(c(0, b_tro[nombres_tro])),
+                         inf = exp(c(0, b_tro[nombres_tro] - 1.96 * ee_tro[nombres_tro])),
+                         sup = exp(c(0, b_tro[nombres_tro] + 1.96 * ee_tro[nombres_tro])))
+rr_lin <- tibble::tibble(t_mid = seq(min(rr_tro$t_mid), max(rr_tro$t_mid), length.out = 50),
+                         rr  = exp(gamma_lin * (t_mid - min(t_mid))),
+                         inf = exp((gamma_lin - 1.96 * ee_gamma) * (t_mid - min(t_mid))),
+                         sup = exp((gamma_lin + 1.96 * ee_gamma) * (t_mid - min(t_mid))))
+ggplot() +
+  geom_ribbon(data = rr_lin, aes(t_mid, ymin = inf, ymax = sup), fill = "darkorange", alpha = 0.2) +
+  geom_line(data = rr_lin, aes(t_mid, rr), colour = "darkorange", linewidth = 1) +
+  geom_pointrange(data = rr_tro, aes(t_mid, rr, ymin = inf, ymax = sup)) +
+  scale_x_continuous(breaks = limites) +
+  labs(x = "antigüedad (años; cada trozo, en su punto medio)", y = "razón de tasas frente al primer trozo")
+
+# -----------------------------------------------------------------------------
+# [tbl-u26-prop]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > ¿Actúan los predictores por igual a cualquier antigüedad?
+# -----------------------------------------------------------------------------
+predictores_prop <- c("edad_10", "carnet_10", "potencia_10", "zona_circulacion", "uso", "tipo_vehiculo")
+contraste_int <- function(m, tiempo, v) {
+  a <- anova(m, update(m, as.formula(paste(". ~ . +", tiempo, ":", v))))
+  c(gl = a$`Chi Df`[2], p = round(a$`Pr(>Chisq)`[2], 3))
+}
+prop <- purrr::map_dfr(predictores_prop, \(v) {
+  tro <- contraste_int(m_pw_fin, "trozo", v)
+  lin <- contraste_int(m_lin, "t_mid", v)
+  tibble::tibble(predictor = v, gl_trozos = tro[["gl"]], p_trozos = tro[["p"]],
+                 gl_lineal = lin[["gl"]], p_lineal = lin[["p"]])
+})
+prop
+
+# -----------------------------------------------------------------------------
+# [u26-na]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > ¿Reproducen los modelos la evolución de los partes?
+# -----------------------------------------------------------------------------
+partes   <- attr(panel, "partes")
+clientes <- dplyr::distinct(panel, id_poliza, antiguedad)   # una fila por cliente
+na <- partes |>
+  dplyr::count(t, name = "d") |>                                        # partes en cada instante
+  dplyr::mutate(
+    en_obs = vapply(t, \(s) sum(clientes$antiguedad >= s), numeric(1)),  # clientes que seguían en la cartera
+    nelson = cumsum(d / en_obs))
+na_en <- function(s) max(c(0, na$nelson[na$t <= s]))   # tasa acumulada empírica en la antigüedad s
+
+# -----------------------------------------------------------------------------
+# [u26-acum-modelo]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > ¿Reproducen los modelos la evolución de los partes?
+# -----------------------------------------------------------------------------
+nd <- tidyr::crossing(
+  dplyr::distinct(panel, id_poliza, .keep_all = TRUE) |> dplyr::select(-trozo, -t_mid, -expo_anual),
+  trozo = factor(levels(panel$trozo), levels = levels(panel$trozo))) |>
+  dplyr::mutate(t_mid = t_medio(trozo), expo_anual = 1)
+
+# tasa media de la cartera en cada trozo: e^(eta + sigma^2/2) de cada cliente, promediada sobre los clientes
+tasa_cartera <- function(m) {
+  s2  <- glmmTMB::VarCorr(m)$cond$id_poliza[1]
+  eta <- predict(m, newdata = nd, type = "link", re.form = NA)
+  tapply(exp(eta + s2 / 2), nd$trozo, mean)
+}
+tasas <- list(trozos = tasa_cartera(m_pw_fin), lineal = tasa_cartera(m_lin))
+
+# tasa acumulada en la antigüedad s: tasa de cada trozo por el tiempo pasado en él hasta s
+acum_modelo <- function(tasa, s) sum(tasa * pmax(0, pmin(s, limites[-1]) - limites[-length(limites)]))
+
+# -----------------------------------------------------------------------------
+# [fig-u26-calibracion]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > ¿Reproducen los modelos la evolución de los partes?
+# -----------------------------------------------------------------------------
+rejilla <- tibble::tibble(t = seq(0, 10, by = 0.05)) |>
+  dplyr::mutate(trozos = vapply(t, \(s) acum_modelo(tasas$trozos, s), numeric(1)),
+                lineal = vapply(t, \(s) acum_modelo(tasas$lineal, s), numeric(1)))
+
+ggplot() +
+  geom_step(data = na, aes(t, nelson, colour = "Nelson–Aalen"), linewidth = 0.7) +
+  geom_line(data = rejilla, aes(t, trozos, colour = "modelo a trozos"), linetype = 2, linewidth = 0.8) +
+  geom_line(data = rejilla, aes(t, lineal, colour = "modelo lineal"), linetype = 3, linewidth = 1) +
+  scale_x_continuous(breaks = limites) +
+  scale_colour_manual(values = c("Nelson–Aalen" = "steelblue", "modelo a trozos" = "black",
+                                 "modelo lineal" = "darkorange")) +
+  labs(x = "antigüedad (años)", y = "partes acumulados por cliente", colour = NULL)
+
+# -----------------------------------------------------------------------------
+# [u26-dharma]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > Bondad de ajuste
+# -----------------------------------------------------------------------------
+# residuos simulados de un modelo: 250 paneles con fragilidad nueva en cada simulación
+residuos_dharma <- function(m) {
+  sim <- as.matrix(simulate(m, nsim = 250))
+  DHARMa::createDHARMa(simulatedResponse = sim, observedResponse = panel$n_partes_anual,
+                       fittedPredictedResponse = rowMeans(sim), integerResponse = TRUE)
+}
+set.seed(SEMILLA_CURSO)                                    # simulaciones reproducibles
+res_fin <- residuos_dharma(m_pw_fin)
+res_lin <- residuos_dharma(m_lin)
+
+# -----------------------------------------------------------------------------
+# [fig-u26-dharma]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > Bondad de ajuste
+# -----------------------------------------------------------------------------
+plot(res_fin)
+plot(res_lin)
+
+# -----------------------------------------------------------------------------
+# [tbl-u26-dharma]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > Bondad de ajuste
+# -----------------------------------------------------------------------------
+contrastes <- function(r) {
+  disp <- DHARMa::testDispersion(r, plot = FALSE)
+  c(uniformidad  = DHARMa::testUniformity(r, plot = FALSE)$p.value,
+    dispersion   = unname(disp$statistic),
+    p_dispersion = disp$p.value,
+    p_ceros      = DHARMa::testZeroInflation(r, plot = FALSE)$p.value)
+}
+por_poliza <- function(r) DHARMa::recalculateResiduals(r, group = panel$id_poliza)
+dharma <- tibble::tibble(
+  modelo = rep(c("trozos", "lineal"), each = 2),
+  nivel  = rep(c("por fila", "por póliza"), 2),
+  dplyr::bind_rows(contrastes(res_fin), contrastes(por_poliza(res_fin)),
+                   contrastes(res_lin), contrastes(por_poliza(res_lin)))) |>
+  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
+dharma
+
+# -----------------------------------------------------------------------------
+# [u26-pred-mix]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
 #       > Predicción: qué cliente
 # -----------------------------------------------------------------------------
 s2_pol <- glmmTMB::VarCorr(m_pw_fin)$cond$id_poliza[1]          # varianza de la fragilidad
 nd_mix <- dplyr::mutate(pred, id_poliza = NA)                     # perfiles y trozos de la §6.4
 p_tip  <- predict(m_pw_fin, newdata = nd_mix, type = "link", se.fit = TRUE, re.form = NA)
+
+# IC de la media de un cliente nuevo: simulamos (beta, log sigma) de su distribución asintótica
+set.seed(2025)
+V_pol <- vcov(m_pw_fin, full = TRUE)                              # incluye theta = log sigma
+sims  <- MASS::mvrnorm(1e4, c(glmmTMB::fixef(m_pw_fin)$cond, glmmTMB::getME(m_pw_fin, "theta")), V_pol)
+tt    <- delete.response(terms(m_pw_fin))
+X_mix <- model.matrix(tt, nd_mix, xlev = .getXlevels(tt, m_pw_fin$frame))   # mismos niveles que el ajuste
+media_nueva <- exp(sims[, colnames(X_mix)] %*% t(X_mix) +
+                   exp(2 * sims[, grep("^theta", colnames(V_pol))]) / 2)   # una columna por fila de nd_mix
+
 pred_mix <- nd_mix |>
   dplyr::transmute(perfil, trozo,
                    efectos_fijos = tasa,                                   # modelo de la §6.4
-                   tipico        = exp(p_tip$fit),
+                   tipico        = exp(p_tip$fit),                         # paso 1
                    tipico_inf    = exp(p_tip$fit - 1.96 * p_tip$se.fit),
                    tipico_sup    = exp(p_tip$fit + 1.96 * p_tip$se.fit),
-                   nuevo_media   = exp(p_tip$fit + s2_pol / 2),
-                   nuevo_inf     = exp(p_tip$fit - 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)),
-                   nuevo_sup     = exp(p_tip$fit + 1.96 * sqrt(p_tip$se.fit^2 + s2_pol)))
+                   rango_inf     = exp(p_tip$fit - 1.96 * sqrt(s2_pol)),   # paso 2
+                   rango_sup     = exp(p_tip$fit + 1.96 * sqrt(s2_pol)),
+                   nuevo_media   = exp(p_tip$fit + s2_pol / 2),            # paso 3
+                   nuevo_inf     = apply(media_nueva, 2, quantile, 0.025),
+                   nuevo_sup     = apply(media_nueva, 2, quantile, 0.975))
 
 # -----------------------------------------------------------------------------
 # [fig-u26-pred-mix]
 #   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.5 Los años de un mismo cliente no son independientes
+#     > 6.6 Diagnóstico y predicción
 #       > Predicción: qué cliente
 # -----------------------------------------------------------------------------
 pred_mix |>
@@ -395,7 +583,7 @@ pred_mix |>
                 perfil = factor(perfil, c("joven_urbano", "mediano", "veterano_rural"),
                                 c("joven, urbano", "mediano", "veterano, rural"))) |>
   ggplot() +
-  geom_rect(aes(xmin = desde, xmax = hasta, ymin = nuevo_inf, ymax = nuevo_sup, fill = perfil), alpha = 0.12) +
+  geom_rect(aes(xmin = desde, xmax = hasta, ymin = rango_inf, ymax = rango_sup, fill = perfil), alpha = 0.12) +
   geom_rect(aes(xmin = desde, xmax = hasta, ymin = tipico_inf, ymax = tipico_sup, fill = perfil), alpha = 0.35) +
   geom_segment(aes(x = desde, xend = hasta, y = tipico, yend = tipico, colour = perfil), linewidth = 1) +
   geom_segment(aes(x = desde, xend = hasta, y = nuevo_media, yend = nuevo_media, colour = perfil),
@@ -410,122 +598,81 @@ pred_mix |>
 # -----------------------------------------------------------------------------
 # [u26-pred-mix-aux]
 #   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.5 Los años de un mismo cliente no son independientes
+#     > 6.6 Diagnóstico y predicción
 #       > Predicción: qué cliente
 # -----------------------------------------------------------------------------
 pm <- function(per, k, col) round(pred_mix[[col]][pred_mix$perfil == per & pred_mix$trozo == k], 3)
 
 # -----------------------------------------------------------------------------
-# [tbl-u26-pred-94]
+# [tbl-u26-pred-cliente]
 #   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.5 Los años de un mismo cliente no son independientes
+#     > 6.6 Diagnóstico y predicción
 #       > Predicción: qué cliente
 # -----------------------------------------------------------------------------
-nd_94 <- panel |>
-  dplyr::filter(id_poliza == 94) |>
+id_ej <- 2141
+obs_ej <- panel |>
+  dplyr::filter(id_poliza == id_ej) |>
+  dplyr::group_by(trozo) |>
+  dplyr::summarise(partes = sum(n_partes_anual), exposicion = sum(expo_anual))
+nd_ej <- panel |>                                  # sus características, un año completo en cada trozo
+  dplyr::filter(id_poliza == id_ej) |>
   dplyr::distinct(id_poliza, .keep_all = TRUE) |>
   dplyr::select(-trozo, -expo_anual) |>
   tidyr::crossing(trozo = factor(levels(panel$trozo), levels = levels(panel$trozo))) |>
   dplyr::mutate(expo_anual = 1)
-p_obs_94 <- predict(m_pw_fin, newdata = nd_94, type = "link", se.fit = TRUE)               # con su u_i
-p_tip_94 <- predict(m_pw_fin, newdata = nd_94, type = "link", se.fit = TRUE, re.form = NA)  # u = 0
-pred_94 <- tibble::tibble(trozo     = nd_94$trozo,
-                          observado = exp(p_obs_94$fit),
-                          inf       = exp(p_obs_94$fit - 1.96 * p_obs_94$se.fit),
-                          sup       = exp(p_obs_94$fit + 1.96 * p_obs_94$se.fit),
-                          tipico    = exp(p_tip_94$fit)) |>
-  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
-u_94 <- glmmTMB::ranef(m_pw_fin)$cond$id_poliza["94", 1]          # su fragilidad estimada (escala log)
-pred_94
+p_cli <- predict(m_pw_fin, newdata = nd_ej, type = "link", se.fit = TRUE)                # con su u_i
+p_tip_ej <- predict(m_pw_fin, newdata = nd_ej, type = "link", se.fit = TRUE, re.form = NA)  # u = 0
+pred_ej <- obs_ej |>
+  dplyr::mutate(tasa_cliente = exp(p_cli$fit + p_cli$se.fit^2 / 2),       # media a posteriori
+                inf          = exp(p_cli$fit - 1.96 * p_cli$se.fit),
+                sup          = exp(p_cli$fit + 1.96 * p_cli$se.fit),
+                tasa_tipico  = exp(p_tip_ej$fit),
+                dplyr::across(c(exposicion, tasa_cliente:tasa_tipico), \(x) round(x, 3)))
+u_ej <- glmmTMB::ranef(m_pw_fin)$cond$id_poliza[as.character(id_ej), 1]   # su fragilidad estimada (escala log)
+pred_ej
 
 # -----------------------------------------------------------------------------
-# [tbl-u26-prop]
+# [u26-pred-conteo]
 #   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.6 Diagnóstico
-#       > ¿Actúan los predictores por igual en todos los trozos?
+#     > 6.6 Diagnóstico y predicción
+#       > Predicción: qué cliente
 # -----------------------------------------------------------------------------
-predictores_prop <- c("edad_10", "carnet_10", "potencia_10", "zona_circulacion", "uso", "tipo_vehiculo")
-prop <- purrr::map_dfr(predictores_prop, \(v) {
-  m_int <- update(m_pw_fin, as.formula(paste(". ~ . + trozo:", v)))
-  a <- anova(m_pw_fin, m_int)
-  tibble::tibble(predictor = v, gl = a$`Chi Df`[2], chi2 = round(a$Chisq[2], 2),
-                 p = round(a$`Pr(>Chisq)`[2], 3))
-})
-prop
-
-# -----------------------------------------------------------------------------
-# [u26-na]
-#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.6 Diagnóstico
-#       > ¿Reproduce el modelo la evolución de los partes?
-# -----------------------------------------------------------------------------
-partes   <- attr(panel, "partes")
-clientes <- dplyr::distinct(panel, id_poliza, antiguedad)   # una fila por cliente
-na <- partes |>
-  dplyr::count(t, name = "d") |>                                        # partes en cada instante
-  dplyr::mutate(
-    en_obs = vapply(t, \(s) sum(clientes$antiguedad >= s), numeric(1)),  # clientes que seguían en la cartera
-    nelson = cumsum(d / en_obs))
-na_en <- function(s) max(c(0, na$nelson[na$t <= s]))   # tasa acumulada empírica en la antigüedad s
-
-# -----------------------------------------------------------------------------
-# [u26-acum-modelo]
-#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.6 Diagnóstico
-#       > ¿Reproduce el modelo la evolución de los partes?
-# -----------------------------------------------------------------------------
-nd <- tidyr::crossing(
-  dplyr::distinct(panel, id_poliza, .keep_all = TRUE) |> dplyr::select(-trozo, -expo_anual),
-  trozo = factor(levels(panel$trozo), levels = levels(panel$trozo)))
-nd$expo_anual <- 1
-nd$tasa <- predict(m_pw, newdata = nd, type = "response")
-tasa_cartera <- dplyr::group_by(nd, trozo) |> dplyr::summarise(tasa = mean(tasa))
-
-# tasa acumulada del modelo en la antigüedad s: tasa de cada trozo por el tiempo pasado en él hasta s
-acum_modelo <- function(s) sum(tasa_cartera$tasa * pmax(0, pmin(s, limites[-1]) - limites[-length(limites)]))
-
-# -----------------------------------------------------------------------------
-# [fig-u26-calibracion]
-#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.6 Diagnóstico
-#       > ¿Reproduce el modelo la evolución de los partes?
-# -----------------------------------------------------------------------------
-rejilla <- tibble::tibble(t = seq(0, 10, by = 0.05))
-rejilla$modelo <- vapply(rejilla$t, acum_modelo, numeric(1))
-
-ggplot() +
-  geom_step(data = na, aes(t, nelson, colour = "Nelson–Aalen"), linewidth = 0.7) +
-  geom_line(data = rejilla, aes(t, modelo, colour = "modelo de riesgos a trozos"),
-            linetype = 2, linewidth = 0.8) +
-  scale_x_continuous(breaks = limites) +
-  scale_colour_manual(values = c("Nelson–Aalen" = "steelblue", "modelo de riesgos a trozos" = "black")) +
-  labs(x = "antigüedad (años)", y = "partes acumulados por cliente", colour = NULL)
-
-# -----------------------------------------------------------------------------
-# [tbl-u26-dharma]
-#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
-#     > 6.6 Diagnóstico
-#       > ¿Se ajustan los partes a una Poisson?
-# -----------------------------------------------------------------------------
-set.seed(SEMILLA_CURSO)                                    # simulaciones reproducibles
-sim_fin <- as.matrix(simulate(m_pw_fin, nsim = 250))       # fragilidad nueva en cada simulación
-res_fin <- DHARMa::createDHARMa(simulatedResponse = sim_fin,
-                                observedResponse  = panel$n_partes_anual,
-                                fittedPredictedResponse = rowMeans(sim_fin),
-                                integerResponse   = TRUE)
-res_fin_pol <- DHARMa::recalculateResiduals(res_fin, group = panel$id_poliza)
-
-contrastes <- function(r) {
-  disp <- DHARMa::testDispersion(r, plot = FALSE)
-  c(uniformidad  = DHARMa::testUniformity(r, plot = FALSE)$p.value,
-    dispersion   = unname(disp$statistic),
-    p_dispersion = disp$p.value,
-    p_ceros      = DHARMa::testZeroInflation(r, plot = FALSE)$p.value)
+# P(Y = k): Poisson promediada sobre la incertidumbre de eta + u (integral en una dimensión)
+p_k <- \(k, m, s) integrate(\(t) dpois(k, exp(t)) * dnorm(t, m, s), -Inf, Inf)$value   # un año: e = 1
+pred_y <- \(m, s) {
+  p <- sapply(0:1, p_k, m = m, s = s)
+  c(P0 = p[1], P1 = p[2], P2_o_mas = 1 - sum(p))
 }
-dharma <- tibble::tibble(nivel = c("por fila", "por póliza"),
-                         dplyr::bind_rows(contrastes(res_fin), contrastes(res_fin_pol))) |>
-  dplyr::mutate(dplyr::across(where(is.numeric), \(x) round(x, 3)))
-dharma
+k_ult <- nrow(nd_ej)                                        # último trozo de antigüedad
+pred_conteo <- rbind(
+  poliza_2141   = pred_y(p_cli$fit[k_ult], p_cli$se.fit[k_ult]),
+  cliente_nuevo = pred_y(p_tip_ej$fit[k_ult], sqrt(p_tip_ej$se.fit[k_ult]^2 + s2_pol))
+)
+round(pred_conteo, 3)
+
+# -----------------------------------------------------------------------------
+# [u26-pred-lin]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > Predicción: trozos o tendencia lineal
+# -----------------------------------------------------------------------------
+s2_lin  <- glmmTMB::VarCorr(m_lin)$cond$id_poliza[1]
+nd_lin  <- dplyr::mutate(nd_mix, t_mid = t_medio(trozo))
+pred_lin <- pred_mix |>
+  dplyr::select(perfil, trozo, trozos = nuevo_media) |>
+  dplyr::mutate(lineal = exp(predict(m_lin, newdata = nd_lin, type = "link", re.form = NA) + s2_lin / 2),
+                diferencia_pct = 100 * (lineal / trozos - 1))
+
+# -----------------------------------------------------------------------------
+# [tbl-u26-pred-lin]
+#   6 · Riesgos a trozos: la siniestralidad a lo largo de la antigüedad
+#     > 6.6 Diagnóstico y predicción
+#       > Predicción: trozos o tendencia lineal
+# -----------------------------------------------------------------------------
+pred_lin |>
+  dplyr::filter(perfil == "mediano") |>
+  dplyr::select(-perfil) |>
+  dplyr::mutate(dplyr::across(c(trozos, lineal), \(x) round(x, 3)), diferencia_pct = round(diferencia_pct, 1))
 
 # -----------------------------------------------------------------------------
 # [u26-verdad]
