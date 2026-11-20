@@ -82,7 +82,7 @@ clásico falla de forma evidente. La teoría entra a demanda para resolver ese p
   </a>
 
   <a href="caso2/caso2_conteos.html" class="tarjeta-caso">
-    <div class="etiqueta">Caso 2 · Semanas 6–10</div>
+    <div class="etiqueta">Caso 2 · Semanas 6–12</div>
     <div class="pregunta">¿Cuántas veces y a qué ritmo?</div>
     <p class="detalle">Conteos y tasas sobre una cartera de seguro: Poisson con <em>offset</em> e
     IRR, modelos log-lineales, sobredispersión, exceso de ceros, GLMM, riesgos a trozos y
@@ -90,11 +90,11 @@ clásico falla de forma evidente. La teoría entra a demanda para resolver ese p
   </a>
 
   <a href="caso3/caso3_continuas_positivas.html" class="tarjeta-caso">
-    <div class="etiqueta">Caso 3 · Semanas 11–15</div>
+    <div class="etiqueta">Caso 3 · Semanas 12–15</div>
     <div class="pregunta">¿Cuánto y hasta cuándo?</div>
-    <p class="detalle">Magnitudes positivas y vida útil: GLM Gamma e inversa gaussiana, la familia
-    Tweedie para el coste agregado con ceros, modelos AFT con censura y el modelo de Cox como
-    frontera del marco.</p>
+    <p class="detalle">Magnitudes positivas y vida útil: GLM Gamma e inversa gaussiana, GLMM
+    Gamma, modelos AFT con censura, el modelo de Cox como frontera del marco y las tres lentes
+    sobre un mismo riesgo.</p>
   </a>
 
 </div>
@@ -126,8 +126,8 @@ Y cuatro son las preguntas en torno a las cuales se ordena el curso:
 |:---|:---|:---|:--:|
 | **¿Ocurre un evento?** — y, si ocurre, ¿de qué clase o en qué grado? | Bernoulli, binomial, politómica nominal y ordinal, riesgo y Kaplan Meier | diagnóstico clínico, riesgo de impago, probabilidad de compra, pieza defectuosa, presencia de una especie, intención de voto | Caso 1 |
 | **¿Cuántas veces y a qué ritmo?** | Poisson, binomial negativa, multinomial y tablas de contingencia, ceros inflados, riesgos a trozos y Cox | ingresos hospitalarios, siniestros de una cartera, accidentes de tráfico, fallos de red, incendios forestales, goles | Caso 2 |
-| **¿Qué coste genera?** — una magnitud estrictamente positiva | Gamma, inversa gaussiana, Tweedie, AFT, Cox | coste de una reclamación, importe de una reparación, consumo energético, rendimiento de un cultivo | Caso 3 |
-| **¿Cuándo ocurre?** — sabiendo que a muchos aún no les ha pasado | Weibull y demás AFT, Cox | supervivencia de un paciente, vida útil de un equipo, abandono de clientes, duración de una póliza | 1.5 · 2.6 · 3.5–3.6 |
+| **¿Qué coste genera?** — una magnitud estrictamente positiva | Gamma, inversa gaussiana, AFT, Cox | coste de una reclamación, importe de una reparación, consumo energético, rendimiento de un cultivo | Caso 3 |
+| **¿Cuándo ocurre?** — sabiendo que a muchos aún no les ha pasado | Weibull y demás AFT, Cox | supervivencia de un paciente, vida útil de un equipo, abandono de clientes, duración de una póliza | 1.5 · 2.6 · 3.4–3.5 |
 
 
 Amplía información en la [Guía Docente](https://www.umh.es/contenido/Estudios/:asi_g_8370_O1/datos_es.html) de la asignatura.
@@ -172,14 +172,13 @@ Quince semanas y **60 horas de clase**, generalmente con dos sesiones de dos hor
 | 5 | Caso 1 | — | **Estudio de caso**, exposiciones y defensas | 1.6 |
 | 6 | Caso 2 | Poisson; tasas, *offset* e IRR; inferencia y predicción; selección, CV y regularización | `glm(poisson)` + *offset*; `marginaleffects`; `glmnet`, `cv.glmnet` | 2.1 |
 | 7 | Caso 2 | Modelos log-lineales para tablas; sobredispersión | Tablas de contingencia y cuadradas; `glm.nb`, quasi-Poisson | 2.2, 2.3 |
-| 8 | Caso 2 | Exceso de ceros; conteos agrupados | `pscl`/`glmmTMB`; `glmer`; ICC y BLUP | 2.4, 2.5 |
-| 9 | Caso 2 | Riesgos a trozos ≡ Poisson; fragilidad por cliente | Panel póliza-año: `glm(poisson)` + *offset* por trozos; `glmmTMB`; `DHARMa` | 2.6 |
-| 10 | Caso 2 | — | **Estudio de caso**, exposiciones y defensas | 2.7 |
-| 11 | Caso 3 | Gamma e inversa gaussiana; enlaces; media-varianza y log-OLS | `glm(Gamma(link="log"))`; *smearing*; comparación por AIC | 3.1, 3.2 |
-| 12 | Caso 3 | GLMM Gamma; la familia **Tweedie** y el índice $p$ | `glmmTMB` (Gamma y `tweedie`); `DHARMa`; `group_vfold_cv` | 3.3, 3.4 |
-| 13 | Caso 3 | Tiempo hasta el fallo: censura y modelos **AFT** | `Surv`, `survfit`, `survreg`; `survminer` | 3.5 |
-| 14 | Caso 3 | **Cox** como frontera y proporcionalidad; las tres lentes y las fronteras del marco | `coxph`, `frailty`, `cox.zph`; comparación de las tres lentes | 3.6, 3.7 |
-| 15 | Caso 3 | — | **Estudio de caso**, exposiciones, defensas y cierre | 3.8 |
+| 8–9 | Caso 2 | Exceso de ceros | `pscl`/`glmmTMB` | 2.4 |
+| 10 | Caso 2 | Conteos agrupados; riesgos a trozos ≡ Poisson; fragilidad por cliente | `glmer`; ICC y BLUP; panel póliza-año: `glm(poisson)` + *offset* por trozos; `glmmTMB`; `DHARMa` | 2.5, 2.6 |
+| 11 | Caso 2 | — | **Estudio de caso**: trabajo en el aula | 2.7 |
+| 12 | Caso 2 · Caso 3 | Exposiciones del Caso 2. Gamma: media-varianza, enlace log e interpretación multiplicativa | **Exposiciones** del estudio de caso 2 · `glm(Gamma(link="log"))`; `DHARMa` | 2.7 · 3.1 |
+| 13 | Caso 3 | Elegir familia y escala; GLMM Gamma. Tiempo hasta el fallo: censura y modelos **AFT** | inversa gaussiana, log-OLS y *smearing*, AIC con jacobiano; `glmmTMB`, ICC; `Surv`, `survfit`, `survreg`; `survminer` | 3.2, 3.3, 3.4 |
+| 14 | Caso 3 | **Cox** como frontera: riesgos proporcionales, fragilidad y Schoenfeld. Las tres lentes y las fronteras del marco | `coxph`, `frailty`, `cox.zph`; `glm(binomial("cloglog"))`, Poisson con *offset* y Cox *start-stop* | 3.5, 3.6 |
+| 15 | Caso 3 | — | **Estudio de caso**: trabajo en el aula, evaluación y cierre | 3.7 |
 :::
 
 ::: {.callout-note .acordeon collapse="true" icon=false}
@@ -465,7 +464,7 @@ Los tres casos están **desarrollados y completos** en esta web, cada uno como u
 |:--|:--|
 | [**Caso 1 · ¿Ocurre el evento? ¿Y cuándo?**](caso1/caso1_binaria.qmd) | 1.1 Cuando la recta no llega · 1.2 Logística: ajuste e interpretación · 1.3 Más de dos categorías · 1.4 Sujetos agrupados (GLMM) · 1.5 ¿Y cuándo ocurre? Supervivencia · 1.6 Estudio de caso |
 | [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Estudio de caso |
-| [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 Tweedie: el coste agregado · 3.5 AFT: del coste al tiempo · 3.6 Cox como frontera · 3.7 Más allá: las tres lentes · 3.8 Estudio de caso |
+| [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 AFT: del coste al tiempo · 3.5 Cox: del tiempo al riesgo · 3.6 Las tres lentes · 3.7 Estudio de caso |
 
 **El código viene plegado**, para que la narrativa se lea sin interrupciones. Tienes dos formas de desplegarlo:
 

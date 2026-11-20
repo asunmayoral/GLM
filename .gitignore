@@ -43,3 +43,6 @@ bibliografia/*.pdf
 Thumbs.db
 
 **/*.quarto_ipynb
+
+# --- Instrucciones locales de Claude Code (privadas, no se publican) ---
+CLAUDE.md
