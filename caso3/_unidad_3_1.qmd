@@ -2,7 +2,11 @@
      Unidad fundacional del Caso 3 (GLM Gamma) sobre el COSTE de una avería (banco$averias).
      Modelo: coste_euros ~ tipo_averia + criticidad * fase_proceso + antiguedad_anios + carga.
      fase_proceso (2 niveles: fase1=Corte/Mecanizado/Lijado, fase2=Ensamblaje/Acabado) resume el
-     proceso; su interacción con criticidad recupera la estructura del DGP (criticidad x cuello). -->
+     proceso; su interacción con criticidad recupera la estructura del DGP (criticidad x cuello).
+     Caso 3 resumido (21-11-2026): sin validación contra el DGP (salió la antigua subsección de
+     §1.5 con tbl-u31-verdad, tbl-u31-verdad-crit, tbl-u31-verdad-fab y sus dos callouts). La
+     duda sobre `fabricante` y la phi inflada se resuelven en la 3.4 (efectos aleatorios).
+     Sesión 1 · pregunta P1 del estudio de caso. -->
 
 # 1 · GLM Gamma {#sec-u31}
 
@@ -168,7 +172,7 @@ puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al a
 ([Sección 1.4](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
-otra mitad del caso, que modelaremos en la [Unidad 3.5](#sec-ELIM-u35).
+otra mitad del caso, que entrará con la Tweedie de la [Unidad 3.3](#sec-u33).
 
 Por último, condicionamos el coste por proceso **y** criticidad a la vez, que es donde el banco esconde
 su estructura más rica (@fig-u31-interaccion-eda):
@@ -286,9 +290,8 @@ c(phi_pearson  = summary(m_gamma)$dispersion,
 
 El `cv_implicado` es la lectura útil: dice que, alrededor del coste medio que predice el modelo, una
 reparación cualquiera se desvía en ese porcentaje **con independencia de si es cara o barata** —la firma
-Gamma de CV constante que motivó la familia—. Conviene retener esta cifra: al validar contra el DGP
-([Sección 1.5](#sec-u31-diagnostico)) comprobaremos que sale **más alta** que la dispersión «pura» con la que se
-simularon los datos, y esa brecha no es ruido, sino la pista de que al modelo le falta algo —lo que
+Gamma de CV constante que motivó la familia—. Conviene retener esta cifra: sale **más alta** de lo que
+le corresponde, y esa brecha no es ruido, sino la pista de que al modelo le falta algo —lo que
 comentamos a continuación—.
 
 ::: {.callout-important}
@@ -297,8 +300,8 @@ Cada máquina aporta **varias averías**, y las de una misma máquina se parecen
 independientes. Aquí las tratamos como si lo fueran —un modelo de efectos fijos sobre todas las
 averías—. Esa simplificación tiene un precio visible: el $\hat\phi$ que acabamos de estimar sale
 **inflado** respecto de la dispersión «pura» de la Gamma, porque absorbe la variabilidad **entre
-máquinas** que el modelo no incluye. Lo confirmaremos al validar contra el DGP ([Sección 1.5](#sec-u31-diagnostico)) y
-lo resolveremos con el **efecto aleatorio de máquina** de la [Unidad 3.4](#sec-u34).
+máquinas** que el modelo no incluye. Lo resolveremos con el **efecto aleatorio de máquina** de la
+[Unidad 3.4](#sec-u34).
 :::
 
 ## 1.3 Interpretación {#sec-u31-interpretacion}
@@ -364,7 +367,7 @@ moderada; en la **fase 2**, el sobrecoste se dispara —porque ahí la avería n
 sino que **para la línea**—. Señala **dónde una avería sale más cara** —las máquinas críticas de
 Ensamblaje y Acabado— y, por tanto, dónde conviene concentrar repuestos y capacidad de respuesta; si
 además compensa **prevenirla** dependerá de con qué frecuencia falle, que es ya otra pregunta (la
-[Unidad 3.5](#sec-ELIM-u35)). Lo vemos también en euros predichos frente a la antigüedad (@fig-u31-prediccion):
+[Unidad 3.3](#sec-u33)). Lo vemos también en euros predichos frente a la antigüedad (@fig-u31-prediccion):
 
 ```{r}
 #| label: fig-u31-prediccion
@@ -522,8 +525,8 @@ AIC(m_sin_int, m_gamma, m_fab) |> round(1)
 respalda y el AIC baja al incluirla). Y `fabricante`, contra lo que cabría esperar de una simple etiqueta
 de catálogo, **también baja el AIC** y sale significativo; siguiendo la evidencia, lo **incluimos
 provisionalmente**, de modo que el modelo con el que seguimos es `m_fab`. Es una decisión que dejamos
-**en cuarentena**: un único nivel significativo y un efecto pequeño invitan a la cautela, y en la
-validación contra el DGP ([Sección 1.5](#sec-u31-diagnostico)) veremos si ese efecto es real o un espejismo. Sobre
+**en cuarentena**: un único nivel significativo y un efecto pequeño invitan a la cautela, y con el
+efecto aleatorio de máquina de la [Unidad 3.4](#sec-u34) veremos si ese efecto es real o un espejismo. Sobre
 `m_fab` hacemos el diagnóstico.
 
 ```
@@ -556,9 +559,9 @@ y redundancia empieza ahí.
 
 Conviene, eso sí, **no pedirle al modelo más de lo que dice**. Todo lo anterior es una lectura de
 **severidad** —*cuánto* cuesta una avería **si ocurre**—; no hemos modelado la **frecuencia** (cada
-cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo y el efecto del mantenimiento son el
-objeto de la [Unidad 3.5](#sec-ELIM-u35); y el **presupuesto esperado = frecuencia × severidad** —donde la
-prevención se paga o no— se cierra con el enfoque Tweedie de la [Unidad 3.3](#sec-u33).
+cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo, el efecto del mantenimiento
+y el **presupuesto esperado = frecuencia × severidad** —donde la prevención se paga o no— se cierran con
+el enfoque Tweedie de la [Unidad 3.3](#sec-u33).
 
 Lo tercero es un matiz que evita una decisión equivocada, y que la interacción hace explícito: la fase del
 proceso **no** encarece las reparaciones «en general». Concentrar esfuerzo en las máquinas *auxiliares*
@@ -573,7 +576,7 @@ Es la fragilidad que infla el $\hat\phi$ y que, bien modelada, permite señalar 
 sustitución o vigilancia reforzada. De cómo estimarla —y de por qué mejora tanto la precisión— se ocupa
 la [Unidad 3.4](#sec-u34).
 
-## 1.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u31-diagnostico}
+## 1.5 Bondad de ajuste, diagnóstico y predicción {#sec-u31-diagnostico}
 
 ### Residuos: cuáles usar
 
@@ -645,98 +648,6 @@ ggplot(mv, aes(media, varianza)) +
        subtitle = paste0("pendiente estimada p = ", round(pendiente, 2)))
 ```
 
-### Validación contra el DGP
-
-La ventaja de trabajar con datos simulados: comparamos lo estimado con la **verdad**. Empezamos por los
-efectos que el modelo **identifica con precisión** —tipo de avería, antigüedad y carga— (@tbl-u31-verdad):
-
-```{r}
-#| label: tbl-u31-verdad
-#| tbl-cap: "Coeficientes estimados frente a los valores verdaderos del proceso generador, con el intervalo de confianza al 95 %."
-verdad <- attr(banco, "verdad")$beta_coste
-
-comparacion <- tibble::tibble(
-  term = c("tipo_averiaElectrica", "tipo_averiaHidraulica", "tipo_averiaElectronica",
-           "antiguedad_anios", "carga"),
-  verdadero = c(verdad[["Electrica"]], verdad[["Hidraulica"]], verdad[["Electronica"]],
-                verdad[["antiguedad"]], verdad[["carga"]]))
-
-broom::tidy(m_fab, conf.int = TRUE) |>
-  dplyr::inner_join(comparacion, by = "term") |>
-  dplyr::transmute(term,
-                   estimado = round(estimate, 3), verdadero = round(verdadero, 3),
-                   ic = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]"),
-                   cubre = ifelse(conf.low <= verdadero & verdadero <= conf.high, "sí", "NO"))
-```
-
-Se recuperan bien. ¿Y la **criticidad y su interacción**? Conviene mirar el efecto **combinado** de una
-máquina crítica en cada fase (base + interacción), no cada coeficiente por separado (@tbl-u31-verdad-crit):
-
-```{r}
-#| label: tbl-u31-verdad-crit
-#| tbl-cap: "Efecto de una máquina Crítica (frente a Auxiliar) sobre el coste, por fase: en escala log y como factor multiplicativo, estimado frente al verdadero del DGP."
-co <- coef(m_fab)
-crit_log <- c(fase1 = co[["criticidadCritica"]],
-              fase2 = co[["criticidadCritica"]] + co[["criticidadCritica:fase_procesofase2"]])
-verd_log <- c(fase1 = verdad[["Critica"]],
-              fase2 = verdad[["Critica"]] + verdad[["critxcuello.Critica"]])
-
-tibble::tibble(
-  fase             = c("fase 1", "fase 2"),
-  log_estimado     = round(crit_log, 2),      log_verdadero    = round(verd_log, 2),
-  factor_estimado  = round(exp(crit_log), 2), factor_verdadero = round(exp(verd_log), 2))
-```
-
-::: {.callout-important}
-## La criticidad se recupera «en bloque», no «en piezas» (y anticipa la 3.3)
-Dos cosas se cumplen y una avisa:
-
-- El **efecto combinado** de la criticidad —cuánto encarece una máquina crítica **en cada fase**— se
-  recupera razonablemente, y confirma la lectura industrial: el sobrecoste es mucho mayor en la fase 2.
-- Pero el **reparto** de ese efecto entre el término «base» y el de «interacción» es **impreciso**: sus
-  intervalos de confianza son anchos. La criticidad se apoya en relativamente pocas máquinas, y —sobre
-  todo— cada máquina aporta varias averías **correlacionadas** que el modelo de efectos fijos trata
-  como independientes.
-- Esa misma heterogeneidad entre máquinas no modelada **infla el $\hat\phi$** por encima de la
-  dispersión verdadera de la Gamma (`attr(banco,"verdad")$phi_coste`).
-
-Los intervalos anchos y la $\hat\phi$ inflada son **la misma señal**: la **fragilidad** de máquina que
-el modelo no ve. Es exactamente el problema que resuelven —y con más precisión estiman— los modelos
-mixtos de la [Unidad 3.4](#sec-u34).
-:::
-
-Y queda la cuenta pendiente que dejamos «en cuarentena»: el **`fabricante`** que la selección hizo entrar
-en el modelo. La verdad del DGP zanja la duda —en el proceso generador del coste **no interviene**, así
-que su efecto verdadero es **cero**— (@tbl-u31-verdad-fab):
-
-```{r}
-#| label: tbl-u31-verdad-fab
-#| tbl-cap: "El fabricante frente a su verdad: efecto verdadero nulo (no está en el DGP del coste) frente a lo estimado. Un nivel sale «significativo»: es un falso positivo."
-broom::tidy(m_fab) |>
-  dplyr::filter(grepl("fabricante", term)) |>
-  dplyr::transmute(term,
-                   estimado = round(estimate, 3), verdadero = 0,
-                   p_value = signif(p.value, 3),
-                   veredicto = ifelse(p.value < 0.05, "«significativo» (falso +)", "no signif."))
-```
-
-::: {.callout-important}
-## El `fabricante`: un falso positivo que anticipa la 3.3
-Lo incluimos siguiendo la evidencia ($F$ significativo, AIC menor), pero el DGP lo desmiente: su efecto
-verdadero es **cero**. ¿Cómo puede un efecto inexistente salir «significativo» y hasta **mejorar el
-AIC**? Por la **misma pseudorréplica que infla $\hat\phi$**. Cada máquina aporta varias averías
-**correlacionadas**; por puro azar, las máquinas de un fabricante resultaron algo más baratas, y el
-modelo —que trata cada avería como independiente— **cuenta esa coincidencia muchas veces** e infla la
-evidencia hasta convertirla en significación. No es un fallo del test, sino del **supuesto de
-independencia** que le damos.
-
-La prueba de que es un espejismo: con inferencia que respeta el agrupamiento —errores estándar por
-máquina, o el **efecto aleatorio** de la [Unidad 3.4](#sec-u34)— el efecto **se desvanecerá**. La moraleja va más allá de la incertidumbre: un modelo que
-ignora la correlación no solo estima mal los errores típicos, **también selecciona mal** (elige incluir
-lo que no debería). Cuando reajustemos con el agrupamiento y volvamos a testar `fabricante`, lo esperable
-es que **salga del modelo**.
-:::
-
 ### Predicción
 
 Predecir con un GLM Gamma-log es directo: el modelo da el **predictor lineal** $\hat\eta=x^{\top}\hat\beta$
@@ -764,25 +675,24 @@ marginaleffects::predictions(
 
 Es una predicción **marginal**: vale para una máquina *cualquiera* de ese perfil —la media de la
 población—. Es la única que un GLM puede dar, porque no distingue entre máquinas. En la [Unidad
-3.3](#sec-u34), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda predicción, la
+3.4](#sec-u34), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda predicción, la
 **condicional**: cuánto costará reparar *esta* máquina en concreto. La diferencia entre ambas es, en una
 frase, lo que aportan los modelos mixtos.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.1) · qué te llevas al estudio de caso
 Esta unidad te da la pieza central de la **severidad**: un GLM Gamma con enlace log sobre un importe
-individual. En la cartera de la [Unidad 3.6](#sec-u36) ese importe es `coste_k` de `siniestros.csv`
-—una fila por parte—, no `coste_medio` de la póliza.
+individual. Es la **pregunta 1** del [estudio de caso](#sec-u36-encargo): *¿cuánto cuesta un parte, y
+de qué depende?* En tu cartera ese importe es `coste_k` de `siniestros.csv` —una fila por parte—, no
+`coste_medio` de la póliza.
 
-- **[Propuesta 2 · Por dónde se cuela el sexo en la tarifa](#sec-u36-p2)** *(unidad base)*. El
-  modelo de severidad con y sin el *proxy* es exactamente el ajuste de esta unidad, repetido dos
-  veces. Ensáyalo aquí: quita `fabricante` del modelo del coste de una avería y comprueba cuánto se
-  mueven los demás coeficientes. Si no se mueve nada, no hay canal; si se mueve, lo hay.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u36-p1)**. La «vía A» necesita una
-  predicción de **coste medio por siniestro** en la escala del euro, no del log. Practica aquí la
-  lectura multiplicativa y el paso de $\hat\eta$ a euros.
+- **En clase.** Une `siniestros.csv` con `cartera.csv` por `id_poliza`, ajusta la Gamma con enlace
+  log sobre `coste_k` y lee cada coeficiente, exponenciado, como el factor por el que se multiplica
+  el coste medio de un parte. Recuerda que `sexo` no puede entrar en la tarifa.
+- **Para la pregunta 3.** El camino frecuencia × severidad necesitará la predicción del **coste
+  medio por parte** en la escala del euro, no del log. Practica aquí el paso de $\hat\eta$ a euros.
 
-**Aviso para las dos.** En la cartera, `coste_medio` es `NA` cuando la póliza no tuvo partes y
-promedia un número distinto de siniestros en cada póliza: **no** es la respuesta de un modelo de
-severidad. La respuesta es `coste_k`.
+**Aviso.** En la cartera, `coste_medio` es `NA` cuando la póliza no tuvo partes y promedia un
+número distinto de siniestros en cada póliza: **no** es la respuesta de un modelo de severidad. La
+respuesta es `coste_k`.
 :::
