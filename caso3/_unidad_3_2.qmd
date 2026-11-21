@@ -2,7 +2,10 @@
      Unidad de FAMILIA DE ALTERNATIVAS (banco de averías): problema/identificación -> bloque breve por
      modelo -> comparación al final. Modelo de referencia = el m_fab de la 3.1 (con fabricante):
      coste_euros ~ tipo_averia + criticidad * fase_proceso + antiguedad_anios + carga + fabricante.
-     BIB: Duan (1983) está en references.bib con clave duan1983 y se cita con [@duan1983]. -->
+     BIB: Duan (1983) está en references.bib con clave duan1983 y se cita con [@duan1983].
+     Caso 3 resumido (21-11-2026): salen la antigua §2.4 «Modelar la dispersión» (tbl-u32-dispersion,
+     m_disp, base_disp) y la validación contra el DGP (tbl-u32-verdad); la §2.5 pasa a §2.4.
+     Sesión 2 · pregunta P2 del estudio de caso. -->
 
 # 2 · Elegir familia y escala {#sec-u32}
 
@@ -16,8 +19,8 @@ predicciones de un modelo ajustado en logaritmos.
 ::: {.callout-note}
 ## Sobre esta unidad
 Objetivo general: **continuas positivas** — alternativas a la Gamma (**inversa gaussiana**,
-**lognormal / log-OLS**), la **función de varianza** como criterio y **modelar la dispersión**; saber
-elegir y justificar la elección.
+**lognormal / log-OLS**) y la **función de varianza** como criterio; saber elegir y justificar la
+elección.
 :::
 
 Partimos del modelo **tal como quedó** al cerrar la unidad anterior, con `fabricante` incluido
@@ -162,7 +165,7 @@ broom::glance(m_ln) |>
 ```
 
 Funciona: el $F$ global es **contundente** ($p$ minúsculo) y el ajuste no muestra patologías —un
-$R^2\approx 0{,}31$ es lo razonable con tanta heterogeneidad entre máquinas—. Nada en él avisa del
+$R^2\approx 0.31$ es lo razonable con tanta heterogeneidad entre máquinas—. Nada en él avisa del
 problema, y por eso es insidioso. Porque hay una diferencia conceptual que **no** es un tecnicismo:
 
 ::: {.callout-important}
@@ -220,42 +223,7 @@ para una previsión de gasto—. Además el error es **silencioso**: el modelo l
 residuos de aspecto impecable y nada advierte de que sus predicciones en euros están sesgadas.
 :::
 
-## 2.4 Modelar la dispersión {#sec-u32-dispersion}
-
-Las tres familias comparten un supuesto que aún no hemos cuestionado: que $\phi$ es **constante**, la
-misma para toda avería. Podría no serlo. Para comprobarlo, un truco sencillo: los residuos de Pearson al
-cuadrado estiman la dispersión observación a observación, así que basta **modelarlos** frente a las
-covariables y ver si alguna los mueve (@tbl-u32-dispersion).
-
-```{r}
-#| label: tbl-u32-dispersion
-#| tbl-cap: "Modelo auxiliar para la dispersión: residuos de Pearson al cuadrado explicados por las covariables. Un valor p pequeño señala que la dispersión no es constante respecto de esa variable."
-base_disp <- base |>
-  dplyr::mutate(pearson2 = residuals(m_gam, type = "pearson")^2)
-
-m_disp <- glm(pearson2 ~ tipo_averia + criticidad + fase_proceso + antiguedad_anios + carga,
-              family = Gamma(link = "log"), data = base_disp)
-
-broom::tidy(m_disp) |>
-  dplyr::filter(term != "(Intercept)") |>
-  dplyr::transmute(term, estimate = round(estimate, 3), p.value = round(p.value, 3))
-```
-
-El resultado es casi limpio: ni el tipo de avería, ni la criticidad, ni la fase, ni la carga mueven la
-dispersión. Pero asoma **un matiz**: la dispersión crece **débilmente con la antigüedad** (su $p$ es
-pequeño). No es motivo para cambiar de familia —la función de varianza sigue diciendo $p\approx 2$—, y
-tampoco es ruido: es un **indicio de estructura**. Las máquinas no son intercambiables; su coste se
-dispersa de forma distinta según la edad, algo que un modelo de **efectos fijos** no puede capturar. Lo
-retendremos: reaparecerá, ya explicado, en la [Unidad 3.4](#sec-u34), donde el efecto aleatorio de
-máquina —con una **pendiente aleatoria en la edad**— absorbe justamente esta heterogeneidad. Cambiar la
-distribución no arregla un problema de **dependencia**.
-
-Cuando la dispersión sí está claramente estructurada, la herramienta formal son los **GLM dobles**: un
-predictor lineal para la media y otro para la dispersión, ajustados conjuntamente
-[@mccullagh1989, cap. 10]. En R están en paquetes como `dglm` o `gamlss`; aquí, con una señal tan tenue y
-de origen estructural, no son el camino —lo es el modelo mixto—.
-
-## 2.5 Elegir, comparar y conectar {#sec-u32-elegir}
+## 2.4 Elegir, comparar y conectar {#sec-u32-elegir}
 
 Llega el momento de comparar las tres familias con un criterio común. Y aquí hay una trampa técnica que
 cuesta disgustos:
@@ -319,25 +287,8 @@ gaussiana** es la peor de las tres —coherente con la potencia estimada, mucho 
 Nótese de paso la magnitud del artefacto de escala: sin el jacobiano, la lognormal exhibía un AIC de otro
 orden por completo, y «habría ganado» por pura ilusión de cálculo.
 
-### Validación contra el DGP
-
-La @tbl-u32-verdad enfrenta la familia y la potencia estimadas con las del proceso generador:
-
-```{r}
-#| label: tbl-u32-verdad
-#| tbl-cap: "Contraste con el proceso generador: la familia y la potencia de la relación media-varianza verdaderas frente a las estimadas, y el parámetro de dispersión."
-verdad <- attr(banco, "verdad")
-
-tibble::tibble(
-  cantidad  = c("familia del coste", "potencia p de Var(Y) ∝ μ^p", "dispersión φ"),
-  verdadero = c("Gamma con enlace log", "2", as.character(round(verdad$phi_coste, 3))),
-  estimado  = c("Gamma (AIC más bajo de las tres)",
-                as.character(round(p_hat, 2)),
-                as.character(round(summary(m_gam)$dispersion, 3))))
-```
-
-Las dos vías —el diagnóstico media-varianza y la comparación por AIC— **coinciden y aciertan**: la
-familia es la Gamma. Que coincidan es tranquilizador, pero conviene fijar el orden de importancia:
+Las dos vías —el diagnóstico media-varianza y la comparación por AIC— **coinciden**: la familia es la
+Gamma. Que coincidan es tranquilizador, pero conviene fijar el orden de importancia:
 
 ::: {.callout-tip}
 ## El criterio, en orden
@@ -353,25 +304,25 @@ familia es la Gamma. Que coincidan es tranquilizador, pero conviene fijar el ord
 :::
 
 Una última observación que enlaza con lo que viene. La familia está bien elegida, y sin embargo
-$\hat\phi$ (en torno a **0.33**) **dobla** su valor verdadero (**0.17**); ninguna de las tres familias
-arregla eso, porque no es un problema de **familia** sino de **estructura**. Sobra variabilidad porque las
-averías se **agrupan por máquina** —cada máquina aporta varias, correlacionadas— y el modelo no lo sabe.
-Es la misma señal que ya vimos inflar $\hat\phi$ en la 3.1 y asomar en la dispersión de la
-[Sección 2.4](#sec-u32-dispersion). Cambiar la forma de la distribución no puede resolver un problema de dependencia;
-para eso hacen falta los **efectos aleatorios** de la [Unidad 3.4](#sec-u34).
+$\hat\phi$ sigue **inflada**: es la misma señal que ya vimos en la [Unidad 3.1](#sec-u31), y ninguna de
+las tres familias la arregla, porque no es un problema de **familia** sino de **estructura**. Sobra
+variabilidad porque las averías se **agrupan por máquina** —cada máquina aporta varias,
+correlacionadas— y el modelo no lo sabe. Cambiar la forma de la distribución no puede resolver un
+problema de dependencia; para eso hacen falta los **efectos aleatorios** de la [Unidad 3.4](#sec-u34).
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.2) · qué te llevas al estudio de caso
 Aquí has aprendido a **elegir**, no a ajustar: la relación media-varianza como criterio, el jacobiano
-para comparar escalas y el *smearing* para volver a euros.
+para comparar escalas y el *smearing* para volver a euros. Es la **pregunta 2** del
+[estudio de caso](#sec-u36-encargo): *¿qué distribución describe el coste de un parte, y en qué
+escala debemos modelarlo?*
 
-- **[Propuesta 5 · ¿Qué distribución describe el coste de un parte?](#sec-u36-p5)** *(unidad base)*.
-  Es esta unidad entera, trasladada a `coste_k`: estimar la potencia $p$ de
-  $\operatorname{Var}=\phi\mu^{p}$ agrupando por coste predicho, ajustar Gamma, inversa gaussiana y
-  log-OLS, y compararlas **con el AIC corregido**. La ampliación —modelar la dispersión— es el cabo
-  que la Sección 2.4 dejó suelto.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u36-p1)**. Antes de multiplicar frecuencia
-  por severidad conviene justificar la familia de la severidad. Este es el argumento.
+- **En clase.** Repite esta unidad sobre `coste_k`: estima la potencia $p$ de
+  $\operatorname{Var}=\phi\mu^{p}$ agrupando por coste predicho, ajusta Gamma, inversa gaussiana y
+  log-OLS, y compáralas **con el AIC corregido**.
+- **Para la pregunta 3.** El camino frecuencia × severidad multiplica por la severidad en euros: si
+  eliges log-OLS, la vuelta a euros pasa por el *smearing*. Justifica aquí la familia de la severidad
+  que usarás allí.
 
 **Aviso.** El AIC del log-OLS **no** es comparable sin el jacobiano; es el error más frecuente al
 enfrentar las tres familias, y el que un artículo científico no puede permitirse.
