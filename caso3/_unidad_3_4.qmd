@@ -6,7 +6,7 @@
      Cierra dos deudas de 3.1/3.2: la phi inflada y el falso positivo de `fabricante`.
      Datos: base <- banco$averias (creado en 3.1, con fase_proceso). -->
 
-# 3 · Efectos Aleatorios y Modelos Mixtos {#sec-u34}
+# 4 · Efectos Aleatorios y Modelos Mixtos {#sec-u34}
 
 Las dos unidades anteriores trataron cada avería como una observación **independiente**: una fila, un
 coste. Pero el banco no es así. Una misma máquina sufre **varias averías** a lo largo de su vida, y sus
@@ -24,7 +24,7 @@ Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con **intercepto** 
 cierre de la $\hat\phi$ inflada y del control `fabricante`.
 :::
 
-## 3.1 Contexto: por qué las averías de una máquina no son independientes {#sec-u34-contexto}
+## 4.1 Contexto: por qué las averías de una máquina no son independientes {#sec-u34-contexto}
 
 Seguimos con `base` (= `banco$averias`), pero ahora la mirada es otra: no la avería suelta, sino el
 **conjunto de averías de cada máquina**.
@@ -66,7 +66,7 @@ edades** y no todas envejecen igual, su coste puede además **cambiar con la eda
 efecto de cada máquina tiene por eso **dos caras** —un **nivel de partida** (unas máquinas salen caras,
 otras baratas) y un **ritmo** al que ese nivel cambia con la edad—, que se traducen en un **intercepto** y
 una **pendiente aleatorios** (en la edad). Es lo que anticipa la @fig-u34-trayectorias y lo que ajustará
-el modelo de la [Sección 3.2](#sec-u34-modelo). Lo vemos máquina a máquina, en una muestra de las que más
+el modelo de la [Sección 4.2](#sec-u34-modelo). Lo vemos máquina a máquina, en una muestra de las que más
 averías acumulan:
 
 ```{r}
@@ -91,9 +91,9 @@ Dos rasgos, dos piezas del modelo: las máquinas **parten de niveles distintos**
 **encarecen con la edad a ritmos distintos** (pendiente aleatoria en la edad) —esta última es, además, la
 señal que ya asomó en la 3.2, cuando la dispersión crecía débilmente con la antigüedad—.
 
-## 3.2 El modelo mixto Gamma {#sec-u34-modelo}
+## 4.2 El modelo mixto Gamma {#sec-u34-modelo}
 
-Mantenemos la **Gamma con enlace log** de la [Sección 3.1](#sec-u34-contexto) —el coste sigue siendo positivo y asimétrico— y le
+Mantenemos la **Gamma con enlace log** de la [Sección 4.1](#sec-u34-contexto) —el coste sigue siendo positivo y asimétrico— y le
 añadimos los efectos aleatorios de máquina. Para la avería $k$ de la máquina $i$,
 $$\log \mu_{ik} = \underbrace{x_{ik}^{\top}\beta}_{\text{efectos fijos (los de 3.1)}}
 \;+\; \underbrace{b_{0i} + b_{1i}\,\widetilde{\text{edad}}_{ik}}_{\text{máquina } i},
@@ -122,7 +122,7 @@ model*, con sus $z$ y $p$), muestra los **componentes de varianza** de los efect
 **correlación**) y los estadísticos globales (**AIC**, **dispersión**, nº de averías y de máquinas). El
 término `(1 + edad_c | id_maquina)` pide precisamente ese intercepto **y** esa pendiente aleatorios por
 máquina. Arrastramos `fabricante` desde la 3.1 —donde entró provisionalmente, bajo sospecha de ser un
-falso positivo—; lo **pondremos a prueba** en la [Sección 3.4](#sec-u34-inferencia), ahora que el
+falso positivo—; lo **pondremos a prueba** en la [Sección 4.4](#sec-u34-inferencia), ahora que el
 agrupamiento sí está modelado.
 
 ::: {.callout-tip}
@@ -152,7 +152,7 @@ en el callout siguiente.
 
 
 
-## 3.3 Interpretación {#sec-u34-interpretacion}
+## 4.3 Interpretación {#sec-u34-interpretacion}
 
 Un GLMM se lee en **dos capas**: los efectos fijos (la tendencia media de la población de máquinas) y los
 componentes de varianza (cuánta heterogeneidad hay alrededor).
@@ -173,7 +173,7 @@ componentes de varianza (cuánta heterogeneidad hay alrededor).
   a los datos los valores ajustados y los residuos.
 
 Para la familia **Gamma** se prefiere `glmmTMB` a `glmer`: es más robusto y admite extensiones —modelar
-la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.4](#sec-u33)—.
+la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.3](#sec-u33)—.
 :::
 
 
@@ -195,7 +195,7 @@ broom.mixed::tidy(m_glmm, effects = "fixed", conf.int = TRUE, exponentiate = TRU
                    p.value = signif(p.value, 3))
 ```
 
-**Componentes de varianza.** Es la parte nueva —el bloque *Random effects* del `summary` (§3.2)—, y la
+**Componentes de varianza.** Es la parte nueva —el bloque *Random effects* del `summary` (§4.2)—, y la
 que responde a «¿cuánta heterogeneidad entre máquinas?». Tres lecturas:
 
 - **Intercepto de máquina.** Su desviación típica —en torno a $0{,}36$ en escala log— mide cuánto varía
@@ -211,10 +211,10 @@ que responde a «¿cuánta heterogeneidad entre máquinas?». Tres lecturas:
   con la edad. Su magnitud solo se lee **en relación con las desviaciones típicas**: cercana a $\pm 1$,
   intercepto y pendiente serían casi **redundantes** (sabido el nivel, el ritmo queda determinado);
   cercana a 0, aportan información distinta. Ahora bien, es un número **resbaladizo**: como veremos en la
-  [Sección 3.4](#sec-u34-inferencia), la correlación entre efectos aleatorios **depende de dónde se
+  [Sección 4.4](#sec-u34-inferencia), la correlación entre efectos aleatorios **depende de dónde se
   centre la edad**, así que conviene interpretarla con mucha cautela.
 
-## 3.4 Inferencia y selección {#sec-u34-inferencia}
+## 4.4 Inferencia y selección {#sec-u34-inferencia}
 
 En un GLMM se infiere de forma **distinta según el parámetro**. Recorremos la lista, y de cada uno decimos
 **cómo** se contrasta y **qué sale** en nuestros datos:
@@ -223,7 +223,7 @@ En un GLMM se infiere de forma **distinta según el parámetro**. Recorremos la 
   anidados o AIC+BIC para **seleccionar variables**.
 - **Varianzas** de los aleatorios → **LRT con corrección de frontera** (÷2) + AIC + BIC.
 - **Correlación** intercepto–pendiente → **`anova`** $\chi^2$ ordinario.
-- **BLUP** (los efectos de cada máquina) → **predicción**, no inferencia; los usamos en la [Sección 3.5](#sec-u34-diagnostico).
+- **BLUP** (los efectos de cada máquina) → **predicción**, no inferencia; los usamos en la [Sección 4.5](#sec-u34-diagnostico).
 
 ### Efectos fijos y selección de variables
 
@@ -344,7 +344,7 @@ El contraste **sí** es muy significativo ($p<0{,}001$): en esta parametrizació
 ($\approx 0{,}56$). Pero conviene un aviso de rigor que rara vez se cuenta: **la correlación entre efectos
 aleatorios no es un número portátil** —depende de *dónde* se centre la covariable—. Al anclar la edad en
 su **media**, el nivel «a edad típica» y la pendiente salen correlacionados; anclándola en otra edad, esa
-correlación cambiaría, e incluso **cambiaría de signo**. De hecho, la validación (§3.5) confirmará que el
+correlación cambiaría, e incluso **cambiaría de signo**. De hecho, la validación (§4.5) confirmará que el
 proceso generador produce el **nivel y el ritmo de forma independiente**. Por eso —parsimonia y
 fidelidad— nos quedamos **sin** correlación: un parámetro que se mueve con la parametrización no es una
 conclusión sólida sobre el sistema. La moraleja: **una correlación entre aleatorios significativa no
@@ -358,7 +358,7 @@ El modelo final es, por tanto, `m_uncorr` —intercepto y pendiente (no correlad
 m_final <- m_uncorr
 ```
 
-## 3.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u34-diagnostico}
+## 4.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u34-diagnostico}
 
 ### Bondad de ajuste
 
@@ -376,7 +376,7 @@ unidad.
 
 La misma idea, en un solo número, es el **coeficiente de correlación intraclase (ICC)**: la fracción de la
 variabilidad —ya descontadas las covariables— que corresponde a **estar en la misma máquina**. Es la
-versión *limpia* de la descomposición cruda entre/dentro de la [Sección 3.1](#sec-u34-contexto):
+versión *limpia* de la descomposición cruda entre/dentro de la [Sección 4.1](#sec-u34-contexto):
 
 ```{r}
 #| label: u34-icc
@@ -539,7 +539,7 @@ un ~7 % más—. Para presupuestar la **flota entera**, conviene tenerlo en cuen
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.3) · qué te llevas al estudio de caso
+## Tarea del estudiante (3.4) · qué te llevas al estudio de caso
 El efecto aleatorio no es un adorno: en esta unidad ha resuelto una $\hat\phi$ inflada y un falso
 positivo. Esa es la herramienta que la cartera te va a pedir.
 

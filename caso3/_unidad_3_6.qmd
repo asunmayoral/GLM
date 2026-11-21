@@ -40,7 +40,7 @@
            la vía de la frecuencia (a diferencia del banco de averías, donde iba por las dos).
        (d) panel.csv NO trae coste anual: hay que construirlo agregando siniestros.csv. -->
 
-# 8 · Estudio de caso: la cartera vuelve, con dos preguntas nuevas {#sec-u36}
+# 6 · Estudio de caso: la cartera vuelve, con dos preguntas nuevas {#sec-u36}
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -52,7 +52,7 @@ evaluado: **comunicar y reproducir**. El entregable es un **artículo de investi
 [Unidad 2.7](../caso2/caso2_conteos.qmd#sec-u27). No el banco de averías de la teoría de este bloque.
 :::
 
-## 8.1 El banco de datos: lo que ya conoces y lo que no {#sec-u36-datos}
+## 6.1 El banco de datos: lo que ya conoces y lo que no {#sec-u36-datos}
 
 ### El contexto, en dos líneas
 
@@ -85,7 +85,7 @@ columnas que allí **no** usaste, porque son las respuestas de este caso:
 
 | Columna | Qué es | Detalle que importa |
 |:---|:---|:---|
-| `coste_total` | Suma en euros de todos los partes de esa póliza | Vale **0** en la mayoría de las pólizas (entre el 62 % y el 75 %, según el equipo): es una variable **mixta**, cero-con-masa y positiva continua. El terreno de la [Unidad 3.4](#sec-u33) |
+| `coste_total` | Suma en euros de todos los partes de esa póliza | Vale **0** en la mayoría de las pólizas (entre el 62 % y el 75 %, según el equipo): es una variable **mixta**, cero-con-masa y positiva continua. El terreno de la [Unidad 3.3](#sec-u33) |
 | `coste_medio` | `coste_total / n_siniestros` | Es **`NA`** cuando la póliza no tuvo partes. Ojo: no es el coste de *un* parte, es la media de los suyos, y promedia un número distinto de partes en cada póliza |
 | `tuvo_siniestro` | Indicador 0/1 | La lente binaria del Caso 1 sobre estos mismos datos; útil como primera parte de un modelo en dos partes |
 | `antiguedad` | Años que la póliza lleva **observada** en la cartera | Es el **tiempo de seguimiento**: la respuesta de duración |
@@ -147,7 +147,7 @@ que en el banco de averías llamábamos `seguimiento`: entre 13.800 y 14.500 fil
 ::: {.callout-tip}
 ## El panel no trae el coste: hay que construirlo
 `panel.csv` lleva el **recuento** anual, no el **euro** anual. Si tu propuesta necesita el coste por
-póliza y año —el objeto Tweedie de la [Unidad 3.4](#sec-u33)—, se obtiene agregando `siniestros.csv`
+póliza y año —el objeto Tweedie de la [Unidad 3.3](#sec-u33)—, se obtiene agregando `siniestros.csv`
 y uniéndolo al panel, cuidando de que los años sin partes queden en **cero** y no desaparezcan:
 
 ``` r
@@ -182,14 +182,14 @@ mismos ficheros, ahora mirando `coste_k`, `coste_total` y `antiguedad`/`baja`.
 </a>
 ```
 
-## 8.2 El encargo: un artículo de investigación {#sec-u36-encargo}
+## 6.2 El encargo: un artículo de investigación {#sec-u36-encargo}
 
 El entregable del Caso 3 **no** es un informe de consultoría —ese fue el Caso 2— sino un **artículo
 de investigación**: el formato con el que se comunica un resultado metodológico a una comunidad
 técnica. Cambia el destinatario y, con él, todo lo demás: el artículo **plantea una pregunta**,
 **justifica un método**, **muestra evidencia** y **discute sus límites**, en lugar de recomendar una
 acción. La estructura no la decides tú: la fijan la guía y la plantilla de artículo científico de los
-materiales de la asignatura, en `evaluacion/` ([Sección 8.4](#sec-u36-formato)).
+materiales de la asignatura, en `evaluacion/` ([Sección 6.4](#sec-u36-formato)).
 
 El trabajo tiene **dos mitades obligatorias**:
 
@@ -215,7 +215,7 @@ resolver. Un artículo que ajusta diez modelos sin justificar ninguno puntúa po
 ajusta dos y explica la elección.
 :::
 
-## 8.3 Las siete propuestas {#sec-u36-propuestas}
+## 6.3 Las siete propuestas {#sec-u36-propuestas}
 
 Siete artículos posibles. Cada uno tiene una **pregunta** que un artículo real se haría, una **unidad
 base** del curso donde vive el modelo central, una **extensión** que investigar y un **anclaje de
@@ -224,13 +224,13 @@ del bloque indica qué propuestas alimenta y con qué avisos.
 
 | # | Propuesta | Unidad base | La extensión a investigar |
 |:--:|:---------------------------------|:-----------:|:---------------------------|
-| 1 | La prima pura por tres caminos | [3.4](#sec-u33) | Modelo en **dos partes** (binomial + Gamma) |
+| 1 | La prima pura por tres caminos | [3.3](#sec-u33) | Modelo en **dos partes** (binomial + Gamma) |
 | 2 | Por dónde se cuela el sexo en la tarifa | [3.1](#sec-u31) | Mitigación de *proxies* y su coste predictivo |
 | 3 | ¿Cuánto dura un cliente? | [3.5](#sec-ELIM-u35) | Contraste de PH y **Royston–Parmar** |
-| 4 | ¿Hay agencias caras? | [3.3](#sec-u34) | BLUPs, encogimiento y predicción para una agencia nueva |
+| 4 | ¿Hay agencias caras? | [3.4](#sec-u34) | BLUPs, encogimiento y predicción para una agencia nueva |
 | 5 | ¿Qué distribución describe el coste de un parte? | [3.2](#sec-u32) | **Dispersión modelada** (`dispformula`) |
 | 6 | Del primer parte al historial completo | [3.6](#sec-ELIM-u36) | **Andersen–Gill** para eventos recurrentes |
-| 7 | El presupuesto del año que viene | [3.4](#sec-u33) | Intervalos de predicción por **simulación** |
+| 7 | El presupuesto del año que viene | [3.3](#sec-u33) | Intervalos de predicción por **simulación** |
 
 ### 1 · La prima pura por tres caminos {#sec-u36-p1}
 
@@ -412,7 +412,7 @@ $1/\theta$, y la de su logaritmo, $\psi'(\theta)$).
 **La pregunta.** ¿Cuánto tiene que reservar la aseguradora para el próximo ejercicio, y con qué
 margen de seguridad?
 
-**Por qué es interesante.** Es la traslación directa de la [Unidad 3.4](#sec-u33) a datos nuevos, y
+**Por qué es interesante.** Es la traslación directa de la [Unidad 3.3](#sec-u33) a datos nuevos, y
 la que mejor termina en una recomendación defendible. También la más segura: el camino está trillado.
 
 **El camino recomendado.**
@@ -437,7 +437,7 @@ frecuencia; `nu_gamma` para la severidad). El $\hat\sigma_u$ del efecto aleatori
 contrapartida en `theta_frail`: antes de compararlos, averigua **por qué vía** llega la fragilidad al
 coste anual en este banco.
 
-## 8.4 Formato del informe: artículo de investigación {#sec-u36-formato}
+## 6.4 Formato del informe: artículo de investigación {#sec-u36-formato}
 
 El Caso 3 se entrega como **artículo científico**, el tercero de los tres formatos del curso —informe
 técnico en el Caso 1, informe ejecutivo en el Caso 2—. No hay que inventarse la estructura: en los
@@ -460,7 +460,7 @@ texto viven en el mismo fichero, con la semilla fija y el código a la vista.
      reflexión sobre el uso ético de la IA (sin él, el informe no puede alcanzar «excelente»);
      comprobar antes su redacción exacta en la guía docente. -->
 
-## 8.5 Checklist de tareas {#sec-u36-checklist}
+## 6.5 Checklist de tareas {#sec-u36-checklist}
 
 <!-- TODO: adaptar al caso. Borrador: elección y justificación de familia y enlace; interpretación
      multiplicativa; tratamiento explícito de la censura o de los ceros según la propuesta;
@@ -468,7 +468,7 @@ texto viven en el mismo fichero, con la semilla fija y el código a la vista.
      según el modelo); una extensión investigada con su fuente original citada; validación contra
      attr("verdad"); reproducibilidad (Quarto + semilla + datos versionados). -->
 
-## 8.6 Rúbricas {#sec-u36-rubricas}
+## 6.6 Rúbricas {#sec-u36-rubricas}
 
 Las rúbricas están en la **guía docente** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se reproducen
 aquí.

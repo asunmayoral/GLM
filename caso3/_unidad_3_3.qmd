@@ -25,7 +25,7 @@
          p del mecanismo (alfa+2)/(alfa+1) = 1.143 con alfa = 1/phi_coste = 6.
        - CV agrupada (máquinas enteras fuera): máquina nueva 336.6 (ee 21.9). -->
 
-# 4 · El coste agregado: la familia Tweedie {#sec-u33}
+# 3 · El coste agregado: la familia Tweedie {#sec-u33}
 
 Las tres unidades anteriores han contestado bien a una pregunta muy concreta: **cuánto cuesta una
 avería**. Pero esa no es la pregunta que haría la dirección de la fábrica. La suya es
@@ -55,7 +55,7 @@ frecuencia y severidad** en un único modelo, y por tanto el punto donde el Caso
 juntan. En seguros, esa misma composición se llama **prima pura**.
 
 Reactiva la Gamma de la [Unidad 3.1](#sec-u31), la relación media-varianza de la
-[Unidad 3.2](#sec-u32-contexto), el GLMM de la [Unidad 3.3](#sec-u34) y la Poisson con *offset* del
+[Unidad 3.2](#sec-u32-contexto), el GLMM de la [Unidad 3.4](#sec-u34) y la Poisson con *offset* del
 [Caso 2](../caso2/caso2_conteos.qmd#sec-u21).
 
 **Los datos cambian**: dejamos `averias` —una fila por avería— y pasamos a **`banco$panel`**, con
@@ -63,7 +63,7 @@ una fila por **máquina y año** y el coste total como respuesta. El seguimiento
 usaremos para recuperar la edad de cada máquina en cada año.
 :::
 
-## 4.1 El hueco en la recta de las varianzas {#sec-u33-mapa}
+## 3.1 El hueco en la recta de las varianzas {#sec-u33-mapa}
 
 ### Un dato que no encaja en ninguna familia
 
@@ -185,7 +185,7 @@ f_S(s) \;=\; \sum_{k=1}^{\infty} \Pr(N=k)\; f_{\text{Gamma}(k\alpha)}(s), \quad 
 La suma hay que recorrerla **entera** —el dato agregado no dice cuántas averías hubo—, y ahí está
 el precio de esta familia: no es una fórmula que se cierre en dos líneas, y **la Tweedie no tiene
 densidad en forma cerrada**. La escribiremos del todo, con sus parámetros atados al predictor, al
-plantear la verosimilitud en la [Sección 4.2](#sec-u33-ajuste), que es donde importa saber
+plantear la verosimilitud en la [Sección 3.2](#sec-u33-ajuste), que es donde importa saber
 evaluarla. Retengamos aquí lo que sí cierra el argumento de esta sección: la forma de cada Gamma es
 $\alpha=(2-p)/(p-1)$, de modo que **fijar $p$ es fijar la forma de la mixtura entera**.
 
@@ -299,13 +299,13 @@ pendiente más de lo que da: es una **exploración marginal** —compara máquin
 sí—, y su papel termina en acotar el terreno. La palabra definitiva sobre $p$, condicional y por
 máxima verosimilitud, la tendrá el modelo.
 
-## 4.2 El presupuesto: la Tweedie en acción {#sec-u33-tweedie}
+## 3.2 El presupuesto: la Tweedie en acción {#sec-u33-tweedie}
 
 ### Los datos: cambiamos de tabla {#sec-u33-datos-panel}
 
-Conviene decirlo con claridad, porque cambiamos de terreno. Las [Unidades 3.1](#sec-u31)–[3.3](#sec-u34)
+Conviene decirlo con claridad, porque cambiamos de terreno. Las [Unidades 3.1](#sec-u31)–[3.4](#sec-u34)
 trabajaron sobre `averias` —una fila por **avería**, con su importe—. Desde la
-[Sección 4.1](#sec-u33-mapa) trabajamos sobre
+[Sección 3.1](#sec-u33-mapa) trabajamos sobre
 **`pn`**, el panel **anual** `banco$panel`: 1531 filas máquina-año, y la respuesta ya no es un
 evento sino un **euro** (`coste_total`). El cambio no es un capricho: la pregunta es
 presupuestaria, y un presupuesto se hace por años, no por meses.
@@ -343,7 +343,7 @@ Lo que sabemos: el coste anual es la composición de dos procesos que este caso 
 separado —o los modelará—, y disponemos de las covariables candidatas de cada uno. Del lado del
 **riesgo**, lo que el Caso 2 enseñó sobre frecuencias y lo que la ficha de la máquina permite
 anticipar: la **edad**, la **carga** y el **mantenimiento** —las mismas que las
-Unidades 3.5 y 3.6 usarán para modelar el tiempo entre fallos—. Del lado del **coste por avería** ([Unidades 3.1](#sec-u31)–[3.3](#sec-u34)): el
+Unidades 3.5 y 3.6 usarán para modelar el tiempo entre fallos—. Del lado del **coste por avería** ([Unidades 3.1](#sec-u31)–[3.4](#sec-u34)): el
 **tipo de avería**, el **proceso** y la **criticidad**. Dos de ellas —edad y carga— salieron en los
 dos. La lista de candidatas para el coste **anual** es, pues, la unión de ambas, con dos ajustes
 prácticos: `tipo_averia` **no puede entrar** (es un atributo de cada avería, no de la máquina-año:
@@ -416,7 +416,7 @@ puede separarlos.
 
 ### El modelo {#sec-u33-modelo}
 
-La [Sección 4.1](#sec-u33-mapa) identificó la familia; toca escribir el modelo. Para la máquina $i$
+La [Sección 3.1](#sec-u33-mapa) identificó la familia; toca escribir el modelo. Para la máquina $i$
 en el año $t$, con exposición $e_{it}$ (fracción de año observada), el coste anual es
 
 $$S_{it} \;\sim\; \operatorname{Tw}_p(\mu_{it},\ \phi), \qquad
@@ -430,7 +430,7 @@ parámetro**, porque no todos hacen lo mismo:
 - $\boldsymbol\beta$ (con $\beta_0$) está en la **media**: son los efectos de las covariables sobre
   el coste anual esperado, la parte que se interpreta;
 - $\phi$ y $p$ no aparecen en la media: viven en la **función de varianza** $\phi\,\mu^{p}$ —la
-  misma expresión con la que la [Sección 4.1](#sec-u33-mapa) ordenó todas las familias del curso—.
+  misma expresión con la que la [Sección 3.1](#sec-u33-mapa) ordenó todas las familias del curso—.
   $\phi$ es la **dispersión**, como en la Gamma de la [Unidad 3.1](#sec-u31); $p$ es el **índice**,
   que aquí **no se fija de antemano**, sino que se estima: dirá en qué punto del hueco $(1,2)$ cae
   el coste anual.
@@ -448,7 +448,7 @@ $$\mu \;=\; \lambda \cdot \mu_Y
 \qquad\Longrightarrow\qquad
 \log \mu \;=\; \underbrace{\log \lambda}_{\text{frecuencia}} \;+\; \underbrace{\log \mu_Y}_{\text{severidad}},$$
 
-—con $\lambda$ y $\mu_Y = \alpha\theta$ los de la mixtura de la [Sección 4.1](#sec-u33-mapa)—, de
+—con $\lambda$ y $\mu_Y = \alpha\theta$ los de la mixtura de la [Sección 3.1](#sec-u33-mapa)—, de
 modo que el coeficiente de una covariable en la Tweedie es **la suma de sus dos efectos**: el que
 tiene sobre el **riesgo de fallar** —la frecuencia, que el Caso 2 modeló con una Poisson— y el que tiene
 sobre el coste de cada avería (la Gamma de la [Unidad 3.1](#sec-u31)).
@@ -485,7 +485,7 @@ $$L(\boldsymbol\beta, \phi, p) \;=\;
 \prod_{i,t:\,S_{it}=0} \underbrace{\Pr(S_{it}=0)}_{e^{-\lambda_{it}}}
 \;\times\!\!\prod_{i,t:\,S_{it}>0}\!\! f_{S}(S_{it};\ \mu_{it}, \phi, p),$$
 
-y esa $f_S$ es la mixtura de la [Sección 4.1](#sec-u33-mapa), ahora con sus tres piezas **atadas al
+y esa $f_S$ es la mixtura de la [Sección 3.1](#sec-u33-mapa), ahora con sus tres piezas **atadas al
 predictor** a través de $\mu_{it}$:
 
 $$f_{S}(s;\ \mu,\phi,p) \;=\; \sum_{k=1}^{\infty}
@@ -579,7 +579,7 @@ c(phi = sigma(m_tw),                  # dispersión: Var = phi * mu^p
 ```
 
 $\hat p = 1.35$ cae donde la familia lo exige, **dentro de $(1,2)$**: los datos, por su cuenta, han
-situado el coste anual en el hueco que la [Sección 4.1](#sec-u33-mapa) había señalado con una
+situado el coste anual en el hueco que la [Sección 3.1](#sec-u33-mapa) había señalado con una
 exploración. Volveremos sobre su valor exacto en la validación.
 
 ### Interpretación {#sec-u33-interpretacion}
@@ -809,7 +809,7 @@ round(c(ceros_observados = mean(pn$coste_total == 0) * 100,
 **49.9 % observados frente a 50.5 % esperados.** Es un resultado notable si se piensa en lo que ha
 pasado: nadie ha modelado los ceros —no hay un submodelo de «¿hubo avería?»—, y sin embargo la
 familia los reproduce casi exactamente, porque los deduce de la frecuencia. Compárese con la
-[Sección 4.1](#sec-u33-mapa), donde una Poisson **homogénea** se quedaba en el 44.8 %: la diferencia
+[Sección 3.1](#sec-u33-mapa), donde una Poisson **homogénea** se quedaba en el 44.8 %: la diferencia
 la ponen las covariables, que reparten la propensión a fallar entre máquinas.
 
 ### Diagnóstico {#sec-u33-diagnostico}
@@ -860,14 +860,14 @@ round(c(varianza_observada = obs, esperada_si_independientes = mean(nulo),
 El veredicto es contundente: las medias por máquina varían 0.0303, frente al 0.0224 que permitiría
 la independencia —ninguna de las 200 réplicas llega a lo observado, $p < 0.005$—. Dicho sin
 tecnicismos: **hay máquinas caras y máquinas baratas** más allá de lo que explican edad, criticidad,
-proceso, carga y plan. Es la **fragilidad** —la misma que la [Unidad 3.3](#sec-u34) encontró en el
+proceso, carga y plan. Es la **fragilidad** —la misma que la [Unidad 3.4](#sec-u34) encontró en el
 coste por avería—, que aquí reaparece en el coste anual y que este modelo, de efectos fijos, no
 recoge.
 
-Dos consecuencias, y conviene no confundirlas. Los **coeficientes** apenas sufren —es la lección de la [Unidad 3.3](#sec-u34)—: el retrato del gasto sigue siendo válido. Los **errores estándar**, en cambio, son
+Dos consecuencias, y conviene no confundirlas. Los **coeficientes** apenas sufren —es la lección de la [Unidad 3.4](#sec-u34)—: el retrato del gasto sigue siendo válido. Los **errores estándar**, en cambio, son
 optimistas, porque el modelo cree tener 1531 observaciones independientes cuando tiene 400 máquinas
 seguidas cuatro años. Ahí está, muy probablemente, el `fabricante` que se cuela con $p\approx 0.02$.
-La [Sección 4.3](#sec-u33-agrupados) se ocupa de esto.
+La [Sección 3.3](#sec-u33-agrupados) se ocupa de esto.
 
 ### Predicción: el presupuesto {#sec-u33-prediccion}
 
@@ -1028,7 +1028,7 @@ del año, ese reloj deja exactamente la huella que el modelo recoge en una etiqu
 sobre él en la [Unidad 3.6](#sec-ELIM-u36), donde se modela tal cual, sin promediar.
 
 **2 · El índice $p$.** No hay parámetro que leer, pero sí que derivar: el coste anual se genera
-literalmente con la receta de la [Sección 4.1](#sec-u33-mapa) —averías Poisson y costes Gamma de
+literalmente con la receta de la [Sección 3.1](#sec-u33-mapa) —averías Poisson y costes Gamma de
 forma común $\alpha = 1/\phi_{\text{coste}}$—, y en una Poisson–Gamma compuesta el índice queda
 determinado por esa forma.
 
@@ -1050,7 +1050,7 @@ predictor no recoge —la **fragilidad** que el diagnóstico acaba de destapar�
 
 Eso deja una predicción contrastable, y conviene anotarla antes de seguir: si el exceso de $\hat p$
 sobre el mecanismo viene de heterogeneidad que el predictor no recoge, **darle a la máquina un
-parámetro propio debería bajar el índice**. La [Sección 4.3](#sec-u33-agrupados) hace justamente eso;
+parámetro propio debería bajar el índice**. La [Sección 3.3](#sec-u33-agrupados) hace justamente eso;
 allí se verá si la predicción se cumple.
 
 **3 · El reparto entre canales.** Aquí toca cobrarse la promesa de la
@@ -1131,7 +1131,7 @@ predicción exige simular de la predictiva.
 
 **8 · Recuperar los dos canales.** Con $\hat p$ y $\hat\phi$ se despejan frecuencia y severidad
 —$\lambda = \mu^{2-p}/[\phi(2-p)]$ y $\mu_Y = (2-p)\phi\mu^{p-1}$—, pero el **reparto de cada
-efecto** entre ambos lo impone $p$, no los datos ([Sección 4.2](#sec-u33-canales)).
+efecto** entre ambos lo impone $p$, no los datos ([Sección 3.2](#sec-u33-canales)).
 :::
 
 **Veredicto.** El modelo recupera el mecanismo allí donde el dato agregado lo permite: los efectos
@@ -1142,7 +1142,7 @@ agrupamiento, con `fabricante` colándose a $p\approx 0.02$ pese a ser nulo en l
 dos problemas pendientes tienen el mismo origen, **datos agrupados tratados como sueltos**, y son la
 puerta de la siguiente sección.
 
-## 4.3 Datos agrupados: modelo y validación {#sec-u33-agrupados}
+## 3.3 Datos agrupados: modelo y validación {#sec-u33-agrupados}
 
 La sección anterior terminó con dos cabos sueltos y un diagnóstico común: **tratamos como
 sueltas 1531 filas que vienen de 400 máquinas**. Los cabos eran el `fabricante`, significativo
@@ -1155,8 +1155,8 @@ los datos vienen agrupados.
 El efecto aleatorio no necesita más justificación que el **diseño del dato**: cada máquina
 aporta hasta cuatro filas, sus averías son recurrentes y comparten todo lo que la máquina tiene
 de propio y no está medido. Tratar esas filas como independientes es el supuesto que el
-diagnóstico de la [Sección 4.2](#sec-u33-diagnostico) desmintió. La herramienta la conocemos
-desde el Caso 1 y la usamos en la [Unidad 3.3](#sec-u34) sobre el coste por avería: un
+diagnóstico de la [Sección 3.2](#sec-u33-diagnostico) desmintió. La herramienta la conocemos
+desde el Caso 1 y la usamos en la [Unidad 3.4](#sec-u34) sobre el coste por avería: un
 **intercepto aleatorio** por máquina. Sobre la Tweedie se escribe igual que sobre cualquier
 otra familia, y su lectura es la de siempre —cada máquina tiene un nivel de gasto propio,
 multiplicativo, que las covariables no explican—:
@@ -1258,7 +1258,7 @@ contestado que con estos datos esa pregunta no se puede sostener. Un `anova` lle
 es un problema técnico que ocultar: es un resultado que se reporta.
 
 Con la estructura decidida —intercepto aleatorio, sin pendiente—, ponemos el modelo al lado del
-de efectos fijos de la [Sección 4.2](#sec-u33-ajuste):
+de efectos fijos de la [Sección 3.2](#sec-u33-ajuste):
 
 ```{r}
 #| label: tbl-u33-glmm
@@ -1280,14 +1280,14 @@ aleatorios**, y con él la magnitud de la heterogeneidad entre máquinas:
 summary(m_tw_re)
 ```
 
-Dos bloques nuevos respecto al `summary` de la [Sección 4.2](#sec-u33-ajuste). El de **`Random
+Dos bloques nuevos respecto al `summary` de la [Sección 3.2](#sec-u33-ajuste). El de **`Random
 effects`** da la varianza y la desviación típica del intercepto de máquina —el parámetro
 $\sigma_u$—, junto al número de grupos (400 máquinas para 1531 observaciones). Y la
 **cabecera** trae un `AIC` que ya incorpora el coste de ese parámetro extra, de modo que puede
 compararse con el del modelo de efectos fijos.
 
 La @tbl-u33-glmm deja la primera lectura. **Los coeficientes casi no se mueven; los errores
-estándar, sí**: es la lección de la [Unidad 3.3](#sec-u34), ahora sobre el coste anual —el
+estándar, sí**: es la lección de la [Unidad 3.4](#sec-u34), ahora sobre el coste anual —el
 retrato del gasto no dependía del agrupamiento, pero la **confianza** que merecía sí, y los
 errores estándar crecen entre un 30 y un 45 %—. Con ellos, la evidencia sobre el `fabricante`
 se debilita: el nivel C pasa de $p = 0.017$ a $0.123$ y el B queda en la frontera ($0.022 \to
@@ -1311,12 +1311,12 @@ entender por qué, porque confirma la predicción que dejamos anotada en la
 **toda** la variabilidad no explicada,
 incluida la que producen las máquinas crónicamente caras; su única palanca para ensanchar la
 varianza era subir el índice. Al dar a esa heterogeneidad un parámetro propio —$\sigma_u$—, el
-índice se libera de ese trabajo. El segundo cabo suelto de la [Sección 4.2](#sec-u33-validacion-tw),
+índice se libera de ese trabajo. El segundo cabo suelto de la [Sección 3.2](#sec-u33-validacion-tw),
 atado: aquel «$\hat p$ absorbe la
 diferencia sin quejarse» tenía nombre, y era la heterogeneidad entre máquinas.
 
 **Y $\sigma_u$ vale 0.749**, en escala logarítmica —en el modelo final, tras la criba de la
-[Sección 4.3](#sec-u33-re-inferencia), quedará en 0.757; usamos aquí el del ajuste que acabamos de
+[Sección 3.3](#sec-u33-re-inferencia), quedará en 0.757; usamos aquí el del ajuste que acabamos de
 leer—: una máquina situada una desviación típica por
 encima de la media gasta $e^{0.749}\approx 2.1$ veces lo que una comparable situada en la media. Es
 una heterogeneidad considerable —del mismo orden que el efecto de la criticidad—, y es justo la que
@@ -1411,7 +1411,7 @@ Dos comparaciones con la @tbl-u33-tweedie merecen atención. Los efectos que dep
 sube de $2.37$ a $2.78$, porque parte de lo que antes se les atribuía era, en realidad, nivel
 propio de cada máquina, y ahora ese nivel tiene dónde alojarse. En cambio, la **edad** —que
 varía dentro de cada máquina— apenas se inmuta ($1.147 \to 1.145$): es la misma lección de la
-[Unidad 3.3](#sec-u34). Y todos los intervalos son más anchos, como debe ser.
+[Unidad 3.4](#sec-u34). Y todos los intervalos son más anchos, como debe ser.
 
 Un matiz de lectura que el modelo mixto introduce y conviene no pasar por alto: estos factores
 son **condicionales**. El $2.16$ de la criticidad compara dos máquinas con **el mismo nivel
@@ -1422,7 +1422,7 @@ responden a preguntas distintas, y la [Sección de predicción](#sec-u33-re-pred
 que la diferencia se paga en euros.
 
 Faltan los tres parámetros que no viven en el predictor lineal. Dos de ellos tienen intervalo
-por la vía de la [Sección 4.2](#sec-u33-inferencia) —`confint` cubre dispersión y componentes
+por la vía de la [Sección 3.2](#sec-u33-inferencia) —`confint` cubre dispersión y componentes
 de varianza, pero no el parámetro de familia—:
 
 ```{r}
@@ -1478,20 +1478,20 @@ La @tbl-u33-re-aic incluye un tercer ajuste que no habíamos visto: el **gemelo 
 fijos** de nuestro
 modelo final, con su mismo predictor pero sin el efecto de máquina. Está ahí por una razón de
 método: el LRT exige modelos **anidados**, y comparar directamente el modelo final con el de la
-[Sección 4.2](#sec-u33-ajuste) no valdría, porque difieren en dos cosas a la vez —uno gana la
+[Sección 3.2](#sec-u33-ajuste) no valdría, porque difieren en dos cosas a la vez —uno gana la
 varianza de máquina, el otro pierde el
 `fabricante`, que la [subsección anterior](#sec-u33-re-inferencia) descartó—. Con el gemelo, el
 contraste aísla exactamente lo que queremos medir.
 
 Y el veredicto es rotundo por las tres vías: el AIC cae **161 puntos** entre el modelo de la
-[Sección 4.2](#sec-u33-tweedie) y el final, el BIC —más severo con los parámetros— también, y
+[Sección 3.2](#sec-u33-tweedie) y el final, el BIC —más severo con los parámetros— también, y
 el contraste del efecto aleatorio da un $p$-valor indistinguible de cero. Reconocer el
 agrupamiento no era un refinamiento opcional: era lo que faltaba.
 
 Vale la pena repetir además las dos comprobaciones que la familia se juega. La primera es la de
 los **ceros**: el modelo no los modela aparte, los deduce de la frecuencia, así que reconstruir
 su proporción es una prueba genuina. Recuperamos $\lambda$ de los parámetros ajustados —como en
-la [Sección 4.2](#sec-u33-canales)— y promediamos $e^{-\lambda}$ sobre las 1531 filas:
+la [Sección 3.2](#sec-u33-canales)— y promediamos $e^{-\lambda}$ sobre las 1531 filas:
 
 ```{r}
 #| label: u33-re-ceros
@@ -1665,7 +1665,7 @@ eso está la tabla anterior.
 
 ### Diagnóstico {#sec-u33-re-diagnostico}
 
-Repetimos sobre el modelo final la batería de la [Sección 4.2](#sec-u33-diagnostico): residuos
+Repetimos sobre el modelo final la batería de la [Sección 3.2](#sec-u33-diagnostico): residuos
 cuantil simulados y sus contrastes.
 
 ```{r}
@@ -1684,7 +1684,7 @@ DHARMa::testDispersion(res_re, plot = FALSE)
 
 La @fig-u33-re-dharma no delata desajustes de forma, pero conviene leer el contraste de dispersión
 con cuidado, porque **no dice lo que uno esperaría**: el exceso sigue ahí, y prácticamente igual que
-antes —1.36 frente al 1.39 de la [Sección 4.2](#sec-u33-diagnostico), con el mismo $p$ ínfimo—.
+antes —1.36 frente al 1.39 de la [Sección 3.2](#sec-u33-diagnostico), con el mismo $p$ ínfimo—.
 Añadir el efecto aleatorio ha mejorado el AIC en 162 puntos y ha cambiado el índice, pero **no ha
 absorbido la variabilidad sobrante**.
 
@@ -1716,7 +1716,7 @@ round(c(varianza_observada = obs_re, esperada_si_independientes = mean(nulo_re),
         p_valor = mean(nulo_re >= obs_re)), 4)
 ```
 
-La señal **ha desaparecido**: donde el modelo de la [Sección 4.2](#sec-u33-diagnostico) daba
+La señal **ha desaparecido**: donde el modelo de la [Sección 3.2](#sec-u33-diagnostico) daba
 0.0303 frente al 0.0224 de la independencia, ahora las medias por máquina varían **menos** de
 lo que variarían si las filas fueran independientes. El efecto aleatorio ha hecho su trabajo
 —y, si acaso, se ha pasado—.
@@ -1788,7 +1788,7 @@ round(c(condicional        = sum(cond),
   **532 000 €**.
 
 Y esa última cifra vale como comprobación de coherencia interna, porque **casi reproduce el
-presupuesto de la [Sección 4.2](#sec-u33-prediccion)** (538 000 €, un 1 % de diferencia). No es
+presupuesto de la [Sección 3.2](#sec-u33-prediccion)** (538 000 €, un 1 % de diferencia). No es
 casualidad: el modelo de efectos fijos estima precisamente la **media poblacional**, así que
 debe coincidir con la predicción marginal —una vez corregida— del modelo mixto. Los dos modelos
 no discrepaban sobre cuánto gasta el parque en promedio; discrepaban sobre la **precisión** de
@@ -1801,11 +1801,11 @@ marginal corregida; la de $u = 0$, para nada —es una mediana disfrazada de med
 
 #### Del valor esperado al intervalo de predicción {#sec-u33-re-predictiva}
 
-Todas esas cifras son **medias**, y en la [Sección 4.2](#sec-u33-prediccion) quedó pendiente la
+Todas esas cifras son **medias**, y en la [Sección 3.2](#sec-u33-prediccion) quedó pendiente la
 pregunta que de verdad interesa para dotar una partida: no cuánto se gastará **en promedio**,
 sino entre qué valores se moverá el gasto **real** del año que viene. Eso es un **intervalo de
 predicción**, y con esta familia se obtiene sin fórmulas nuevas: **simulando el mecanismo**. Ya
-tenemos todas las piezas de la [Sección 4.1](#sec-u33-mapa) —para cada máquina, las averías que
+tenemos todas las piezas de la [Sección 3.1](#sec-u33-mapa) —para cada máquina, las averías que
 espera y lo que cuesta cada una—, así que basta jugar el año muchas veces:
 
 ```{r}
@@ -1849,7 +1849,7 @@ round(c(prevision = cond[i], prob_cero_pct = mean(una == 0) * 100,
 
 Para el parque, la incertidumbre del resultado casi desaparece: son **400 máquinas** cuyos
 azares se compensan, y por eso la banda de predicción acaba siendo del mismo orden que la
-incertidumbre de la media que calculamos en la [Sección 4.2](#sec-u33-prediccion). Para **una**
+incertidumbre de la media que calculamos en la [Sección 3.2](#sec-u33-prediccion). Para **una**
 máquina no se compensa nada: su previsión ronda los 800 €, pero lo más probable —más de un 40 %
 de las veces— es que no gaste **nada**, y uno de cada diez años superará los 2000 €. La media,
 ahí, no describe casi ningún año concreto.
@@ -1876,7 +1876,7 @@ predict(m, newdata = nd, type = "response", allow.new.levels = TRUE)   # grupo n
   (el efecto de Jensen de la [Unidad 3.2](#sec-u32-lognormal)).
 - **Incertidumbre de la media**: `se.fit = TRUE` en la escala del enlace, volviendo con `exp()`. Para
   un **agregado**, los intervalos individuales no se suman: método delta con `vcov(m)$cond`, como en
-  la [Sección 4.2](#sec-u33-prediccion).
+  la [Sección 3.2](#sec-u33-prediccion).
 - **Intervalo de predicción**: exige simular la respuesta, no solo la media. En una Tweedie se hace
   sin paquetes adicionales, generando la mixtura a partir de $(\hat\mu, \hat\phi, \hat p)$ —`rpois`
   para las averías y `rgamma` para su coste—; comprobar que la media simulada reproduce la previsión
@@ -1887,9 +1887,9 @@ predict(m, newdata = nd, type = "response", allow.new.levels = TRUE)   # grupo n
 
 ### Validación contra el DGP {#sec-u33-validacion-re}
 
-Cerramos como en las secciones anteriores —[4.1](#sec-u33-mapa) y
-[4.2](#sec-u33-validacion-tw)—, confrontando con la verdad lo que este modelo añade. La
-@tbl-u33-validacion-re indica —como la de la [Sección 4.2](#sec-u33-validacion-tw)— **de dónde
+Cerramos como en las secciones anteriores —[3.1](#sec-u33-mapa) y
+[3.2](#sec-u33-validacion-tw)—, confrontando con la verdad lo que este modelo añade. La
+@tbl-u33-validacion-re indica —como la de la [Sección 3.2](#sec-u33-validacion-tw)— **de dónde
 sale** cada valor verdadero, porque ninguno se lee directamente del banco:
 
 ```{r}
@@ -1923,7 +1923,7 @@ eléctrica, hidráulica o electrónica, con efectos que van de 0 a 0.45 en escal
 ([Unidad 3.1](#sec-u31))—, y el tipo cambia de una avería a otra **dentro del mismo año**. Al
 agregar el gasto anual esa variabilidad desaparece de las covariables pero no de los datos, así que
 sigue habiendo dispersión que solo $\hat p$ puede absorber. Es el precio del dato agregado, y ya lo
-pagamos en la [Sección 4.2](#sec-u33-canales) al perder la descomposición en canales.
+pagamos en la [Sección 3.2](#sec-u33-canales) al perder la descomposición en canales.
 
 **Y $\sigma_u$ mide la fragilidad… por partida doble.** Aquí está la sorpresa. La desviación
 estimada, $0.757$, es **más del doble** del $0.357$ que tiene la fragilidad del DGP en escala log.
@@ -1938,7 +1938,7 @@ $$\mathbb{E}[S_i] \;=\; \underbrace{\lambda_i}_{\propto\, Z_i}\cdot
 \operatorname{sd}\big(\log Z_i^{2}\big) \;=\; 2\operatorname{sd}(\log Z_i) \;=\; 0.714 .$$
 
 Y $0.757$ frente a $0.714$ es un acuerdo excelente. Es la **segunda** vez que el mismo latente
-aparece en el caso: el GLMM Gamma de la [Unidad 3.3](#sec-u34) lo vio en el **importe** de cada
+aparece en el caso: el GLMM Gamma de la [Unidad 3.4](#sec-u34) lo vio en el **importe** de cada
 avería, y aquí reaparece en el **euro anual**, elevado al cuadrado porque este lo sufre dos veces.
 Y volverá dos veces más: la [Unidad 3.6](#sec-ELIM-u36) lo encontrará en el **riesgo**, como fragilidad
 de Cox, y la [Unidad 3.7](#sec-ELIM-u37), en el **indicador** de fallo. Un solo latente, cuatro
@@ -2101,7 +2101,7 @@ purrr::map_dbl(pliegues$splits, \(s) {
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.4) · qué te llevas al estudio de caso
+## Tarea del estudiante (3.3) · qué te llevas al estudio de caso
 Esta unidad es la que más directamente se traslada: cambia máquinas por pólizas y años de
 mantenimiento por años de póliza, y el modelo es el mismo.
 
