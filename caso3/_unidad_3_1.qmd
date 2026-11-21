@@ -195,9 +195,10 @@ Los dos momentos salen, como siempre, de derivar la cumulante
 
 $$
 \operatorname{E}(Y)=b'(\theta)=-\frac{1}{\theta}=\mu,\qquad
-\operatorname{Var}(Y)=b''(\theta)\,a(\phi)=\frac{1}{\theta^{2}}\,\phi=\phi\,\mu^{2},
-\qquad \\
-\operatorname{CV}=\frac{\sqrt{\operatorname{Var}(Y)}}{\operatorname{E}(Y)}=\sqrt{\phi}=\frac{1}{\sqrt{\alpha}} .
+\operatorname{Var}(Y)=b''(\theta)\,a(\phi)=\frac{1}{\theta^{2}}\,\phi=\phi\,\mu^{2}
+$$
+
+$$\operatorname{CV}=\frac{\sqrt{\operatorname{Var}(Y)}}{\operatorname{E}(Y)}=\sqrt{\phi}=\frac{1}{\sqrt{\alpha}} .
 $$
 
 La **función de varianza** es $V(\mu)=\mu^{2}$: la varianza crece con el **cuadrado** de la media, y el
@@ -399,19 +400,25 @@ $$
 $$
 \begin{aligned}
 \eta_i=\;&\beta_0
-+\underbrace{\beta_1\,\text{Eléctrica}_i+\beta_2\,\text{Hidráulica}_i+\beta_3\,\text{Electrónica}_i}_{\text{tipo de avería}}
-+\underbrace{\beta_4\,\text{Importante}_i+\beta_5\,\text{Crítica}_i}_{\text{criticidad}}
-+\underbrace{\beta_6\,\text{Fase2}_i}_{\text{fase}}\\
-&+\beta_7\,\text{antigüedad}_i+\beta_8\,\text{carga}_i
-+\underbrace{\beta_9\,\text{Importante}_i\cdot\text{Fase2}_i+\beta_{10}\,\text{Crítica}_i\cdot\text{Fase2}_i}_{\text{criticidad}\times\text{fase}} ,
++\sum_{ta\in\mathcal{T}}\beta^{TA}_{ta}\,I(TA_i=ta)
++\sum_{cr\in\mathcal{C}}\beta^{CR}_{cr}\,I(CR_i=cr)
++\beta^{FP}\,I(FP_i=\text{fase 2})\\
+&+\beta^{ANT}\,\text{antigüedad}_i+\beta^{CAR}\,\text{carga}_i
++\sum_{cr\in\mathcal{C}}\beta^{CR\times FP}_{cr}\,I(CR_i=cr)\,I(FP_i=\text{fase 2}),
 \end{aligned}
 $$
 
-donde cada nombre en mayúscula es una **indicadora** (1 si la avería tiene esa categoría, 0 si no),
-con las categorías de referencia **Mecánica**, **Auxiliar** y **fase 1**. Son once coeficientes —en
-el mismo orden en que los lista la @tbl-u31-coef-ee— y, aparte, la dispersión $\phi=1/\alpha$. La
-interacción hace que el efecto de la criticidad dependa de la fase: una máquina crítica multiplica el
-coste medio por $e^{\beta_5}$ en la fase 1, y por $e^{\beta_5+\beta_{10}}$ en la fase 2. Lo ajustamos:
+donde $TA$ es el tipo de avería, $CR$ la criticidad y $FP$ la fase del proceso, e $I(\cdot)$ la
+**función indicatriz**: vale 1 si la avería cumple la condición y 0 si no. Los sumatorios recorren
+los niveles de cada factor **salvo el de referencia**, para el que no se estima coeficiente:
+$\mathcal{T}=\{\text{Eléctrica},\ \text{Hidráulica},\ \text{Electrónica}\}$ (referencia:
+**Mecánica**), $\mathcal{C}=\{\text{Importante},\ \text{Crítica}\}$ (referencia: **Auxiliar**) y, en la
+fase, la referencia es la **fase 1**. Son once coeficientes —los que lista la @tbl-u31-coef-ee, donde
+R nombra cada uno uniendo el factor y el nivel: `tipo_averiaElectrica` es $\beta^{TA}_{\text{Eléctrica}}$— y,
+aparte, la dispersión $\phi=1/\alpha$. La interacción hace que el efecto de la criticidad dependa de
+la fase: una máquina crítica multiplica el coste medio por $e^{\beta^{CR}_{\text{Crítica}}}$ en la
+fase 1, y por $e^{\beta^{CR}_{\text{Crítica}}+\beta^{CR\times FP}_{\text{Crítica}}}$ en la fase 2. Lo
+ajustamos:
 
 ```{r}
 #| label: tbl-u31-coef-ee
