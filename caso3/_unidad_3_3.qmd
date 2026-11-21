@@ -1,557 +1,2121 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_3.qmd >}}. Sin YAML. Chunks u33-.
-     Unidad de MODELO ÚNICO (recorrido completo, espejo de 3.1): GLMM Gamma sobre el COSTE.
-     Reactiva el hilo de MIXTOS (espiral). Respuesta: coste_euros (varias averías por máquina).
-     Agrupamiento: SOLO la máquina (no hay plantas; el proceso es efecto fijo).
-     Efectos aleatorios: intercepto + pendiente en la edad (centrada) por id_maquina.
-     Cierra dos deudas de 3.1/3.2: la phi inflada y el falso positivo de `fabricante`.
-     Datos: base <- banco$averias (creado en 3.1, con fase_proceso). -->
+<!-- Partial · Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u33-.
+     Unidad del COSTE AGREGADO (familia Tweedie). Procede de las secciones 6.2-6.4 de la
+     antigua unidad de síntesis; ver PLAN_REORGANIZACION_CASO3.md.
+     Datos: banco$panel (máquina-año). Lee banco$seguimiento SOLO para agregar la edad.
+     AUTOSUFICIENTE: no depende de objetos de las unidades de supervivencia. Las
+     referencias a Cox y a las tres lentes son REENVÍOS HACIA DELANTE (3.6 y 3.7), en
+     texto plano hasta que esas unidades se renumeren.
 
-# 3 · Efectos Aleatorios y Modelos Mixtos {#sec-u33}
+     CIFRAS VERIFICADAS contra el render (banco_averias_20252026.rds, semilla 20252026):
+       - panel: 1531 máquina-años / 400 máquinas / 49.9% ceros / media 980 / máx 20191.
+       - lambda_anual 0.80 -> p0 Poisson homogénea 44.8% vs 49.9% observado.
+       - pendiente media-varianza por máquina: 1.45, IC (1.37, 1.54), n = 353.
+       - Tweedie efectos fijos: phi 174.58, p 1.3514, AIC 14983.3, logLik -7477.7.
+         edad 0.137 · carga 0.863 · Crítica 0.873 · Preventivo -0.617 · fabB -0.201 (p .022).
+       - canales: lambda medio 0.73 (obs 0.80) · coste/avería 1210 (obs 1257).
+         reparto impuesto por p: 0.649 a frecuencia / 0.351 a severidad.
+       - ceros esperados 50.5% vs 49.9% · calibración 205..2516 pred vs 242..2373 obs.
+       - DHARMa: dispersión 1.3872 (p < 2.2e-16); agrupamiento 0.0303 vs 0.0224 (p < 0.005).
+       - presupuesto año 5: 538077, IC95 (485007, 591148); suma ingenua (415748, 696903).
+       - GLMM: sd_máquina 0.749 (0.757 en el modelo final), p 1.266, AIC 14821.9 (-161).
+         fabricante fuera: LRT 4.575 (2 gl), p 0.1015. Ceros 50.3%. sigma 227.56.
+       - predictiva: 497138, IC90 (449435, 545719), p90 535237; una máquina 806 € con 45% de ceros.
+       - CV 5 pliegues: condicional 284.1 (ee 6.9) vs marginal 329.2 (ee 13.8).
+       - verdad: sd(logZ) 0.357, pero el coste anual es propto Z^2 -> 2*sd = 0.714.
+         p del mecanismo (alfa+2)/(alfa+1) = 1.143 con alfa = 1/phi_coste = 6.
+       - CV agrupada (máquinas enteras fuera): máquina nueva 336.6 (ee 21.9). -->
 
-Las dos unidades anteriores trataron cada avería como una observación **independiente**: una fila, un
-coste. Pero el banco no es así. Una misma máquina sufre **varias averías** a lo largo de su vida, y sus
-costes se parecen entre sí: una máquina «mala» resulta cara de reparar **una y otra vez**. Ignorar ese
-parentesco no es un pecado venial —falsea la inferencia—. Esta unidad extiende la Gamma para dar a la
-**máquina** su propio nivel en el modelo: es la reactivación del hilo de **efectos mixtos**. Y, de paso,
-salda las **dos deudas** que dejamos abiertas: aquella variabilidad **entre máquinas** que, sin sitio en
-el modelo, inflaba la dispersión $\hat\phi$ (de $\approx 0{,}17$ verdadera a $\approx 0{,}33$), y el
-**falso positivo de `fabricante`** que la 3.1 marcó para reexaminar aquí.
+# 4 · El coste agregado: la familia Tweedie {#sec-u33}
+
+Las tres unidades anteriores han contestado bien a una pregunta muy concreta: **cuánto cuesta una
+avería**. Pero esa no es la pregunta que haría la dirección de la fábrica. La suya es
+presupuestaria: **¿cuánto costará el mantenimiento el año que viene?** Y para responderla no basta
+con el importe de una reparación, porque el gasto anual de una máquina depende de dos cosas a la
+vez: **cuántas veces se avería** y **cuánto cuesta cada avería**.
+
+Esa composición cambia por completo el tipo de dato. El coste de una avería era una magnitud
+positiva y asimétrica —el terreno de la Gamma—. El **coste anual de una máquina**, en cambio, es
+cero cuando no ha fallado, y solo entonces toma valores positivos. Es una respuesta **mitad discreta
+y mitad continua**, con la mitad de las observaciones exactamente en el cero, y **ninguna de las
+familias vistas hasta ahora la genera**: la Gamma no admite el cero y la Poisson no es continua.
+
+La unidad recorre ese problema en tres movimientos. Primero identifica la familia que falta,
+completando el mapa de la [Unidad 3.2](#sec-u32-contexto) —resulta que las familias que conocemos
+ocupan puntos sueltos de una misma recta, y el coste agregado vive en el hueco—. Después la pone a
+trabajar sobre el banco y responde a la pregunta del presupuesto, con su cifra y su margen. Y por
+último reconoce lo que las tres unidades anteriores ya habían encontrado —que las máquinas no son
+intercambiables— y comprueba qué cambia al modelarlo.
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con **intercepto** y **pendiente aleatoria**
-(en la edad) por máquina; componentes de varianza; interpretación **condicional vs marginal**; y el
-cierre de la $\hat\phi$ inflada y del control `fabricante`.
+Objetivo general: modelar una **respuesta continua positiva con masa en el cero**, que es lo que
+resulta de agregar por periodos una magnitud que solo aparece cuando ocurre un evento. La familia es
+la **Tweedie** (Poisson–Gamma compuesta), y su interés no es solo técnico: es la **síntesis de
+frecuencia y severidad** en un único modelo, y por tanto el punto donde el Caso 2 y el Caso 3 se
+juntan. En seguros, esa misma composición se llama **prima pura**.
+
+Reactiva la Gamma de la [Unidad 3.1](#sec-u31), la relación media-varianza de la
+[Unidad 3.2](#sec-u32-contexto), el GLMM de la [Unidad 3.3](#sec-u34) y la Poisson con *offset* del
+[Caso 2](../caso2/caso2_conteos.qmd#sec-u21).
+
+**Los datos cambian**: dejamos `averias` —una fila por avería— y pasamos a **`banco$panel`**, con
+una fila por **máquina y año** y el coste total como respuesta. El seguimiento mensual solo lo
+usaremos para recuperar la edad de cada máquina en cada año.
 :::
 
-## 3.1 Contexto: por qué las averías de una máquina no son independientes {#sec-u33-contexto}
+## 4.1 El hueco en la recta de las varianzas {#sec-u33-mapa}
 
-Seguimos con `base` (= `banco$averias`), pero ahora la mirada es otra: no la avería suelta, sino el
-**conjunto de averías de cada máquina**.
+### Un dato que no encaja en ninguna familia
+
+La pregunta de la dirección —*¿cuánto costará el mantenimiento el año que viene?*— tiene su tabla
+natural en el banco: **`panel`**, la última de las cinco vistas, con **una fila por máquina y año**.
+Sus columnas:
+
+| Columna | Qué representa |
+|---|-------|
+| `id_maquina`, `anio` | la máquina y su año de seguimiento (1–4) |
+| `coste_total` | la **suma** de los costes de reparación de ese año (€); vale **0** si no hubo averías — la **respuesta** |
+| `n_averias` | nº de averías del año (la frecuencia que hay detrás del coste) |
+| `exposicion` | fracción del año en observación (las altas escalonadas la reducen) — el ***offset*** |
+| `proceso`, `criticidad`, `fabricante`, `carga`, `plan_mantenimiento`, `intervalo_mant` | covariables basales, unidas de `maquinas` |
 
 ```{r}
-#| label: u33-datos
-c(averias        = nrow(base),
-  maquinas       = dplyr::n_distinct(base$id_maquina),
-  media_por_maq  = round(nrow(base) / dplyr::n_distinct(base$id_maquina), 2),
-  max_por_maq    = max(table(base$id_maquina)))
+#| label: u33-panel
+pn <- banco$panel
+c(maquinas_anio = nrow(pn), maquinas = length(unique(pn$id_maquina)),
+  pct_cero = round(mean(pn$coste_total == 0) * 100, 1),
+  media = round(mean(pn$coste_total)),
+  media_positivos = round(mean(pn$coste_total[pn$coste_total > 0])),
+  maximo = round(max(pn$coste_total)))
 ```
 
-Cada máquina aporta un **puñado** de averías —unas pocas de media, hasta más de una decena las peores—,
-y esas averías comparten dueño. ¿Cuánto importa? Una medida cruda: descomponer la variabilidad del
-log-coste en la parte que hay **entre** máquinas (diferencias de nivel entre unas y otras) y la parte que
-queda **dentro** de cada máquina (@tbl-u33-icc-crudo).
+Hay 1531 máquina-años (no $400\times4 = 1600$: las máquinas de alta tardía aportan menos años), y el
+retrato de la respuesta es peculiar: **la mitad de las filas valen exactamente cero** (49.9 %) y la
+otra mitad son importes positivos y asimétricos —media de 1957 € con un máximo de 20191 €—. Una sola
+máquina lo resume:
 
 ```{r}
-#| label: tbl-u33-icc-crudo
-#| tbl-cap: "Descomposición cruda de la variabilidad de log(coste): desviación típica total, entre medias de máquina y dentro de cada máquina. Que la variación entre máquinas supere a la de dentro anticipa una fuerte correlación intra-máquina. (Es cruda: mezcla el efecto de las covariables con el intrínseco de la máquina; el modelo los separará.)"
-base |>
-  dplyr::mutate(lc = log(coste_euros)) |>
+#| label: u33-panel-head
+subset(pn, id_maquina == "M002",
+       select = c(id_maquina, anio, coste_total, n_averias, exposicion))
+```
+
+M002 alterna años **a cero** (sin averías) con años de **más de mil euros**, y su último año enseña
+la composición: dos averías, 1219 € entre ambas. Ese es el perfil típico del panel:
+
+```{r}
+#| label: fig-u33-panel
+#| fig-width: 8.5
+#| fig-height: 3.4
+#| fig-cap: "Distribución del coste anual por máquina: la mitad de los máquina-años no registran avería (coste 0) y el resto forma una cola positiva y asimétrica (derecha, eje log). Ninguna familia del curso genera esta mezcla de masa en cero y densidad continua positiva."
+p_cero <- ggplot(pn, aes(factor(coste_total > 0, levels = c(FALSE, TRUE),
+                                labels = c("cero", "positivo")))) +
+  geom_bar(fill = "steelblue") +
+  labs(x = "coste anual", y = "nº de máquina-años")
+
+p_pos <- ggplot(dplyr::filter(pn, coste_total > 0), aes(coste_total)) +
+  geom_histogram(bins = 40, fill = "steelblue") +
+  scale_x_log10() +
+  labs(x = "coste anual positivo (€, escala log)", y = NULL)
+
+p_cero + p_pos + patchwork::plot_layout(widths = c(1, 2))
+```
+
+Y aquí está el problema que plantea la @fig-u33-panel: **ninguna familia del curso genera este
+dato** —esa mezcla de una barra en el cero y una densidad continua a su derecha—. La Gamma y la
+inversa gaussiana viven en $(0,\infty)$ —su densidad ni siquiera está definida en el cero, y el log-OLS de la
+[Unidad 3.2](#sec-u32-lognormal) tropieza con $\log(0)$—. La Poisson es de **conteos**, no de
+importes continuos. Y la gaussiana no respeta ni el soporte ni la asimetría. Podríamos partir el
+problema en dos —¿hay coste? y ¿cuánto?—, pero antes conviene mirar el cero de cerca, porque **no es
+un dato aparte: es el mismo mecanismo**. Un año cuesta 0 exactamente cuando la máquina no falla,
+$\Pr(\text{coste}=0)=\Pr(N=0)$:
+
+```{r}
+#| label: u33-ceros
+lambda_anual <- sum(pn$n_averias) / sum(pn$exposicion)
+round(c(lambda_anual = lambda_anual, p0_poisson = exp(-lambda_anual) * 100,
+        p0_observado = mean(pn$coste_total == 0) * 100), 1)
+```
+
+Con la tasa media de 0.8 averías por máquina-año, una Poisson **homogénea** pondría el 44.8 % de los
+años a cero; observamos el 49.9 %. Ese **exceso de ceros** es una vieja conocida —la huella de la
+heterogeneidad entre máquinas, la misma que en el Caso 2 hinchaba los ceros de los conteos—, y el
+resto de la fila lo confirma: el cero del coste y el importe positivo son las dos caras de la pareja
+**frecuencia × severidad** que este caso lleva trabajando desde el principio.
+
+### La recta de las varianzas, completada
+
+La [Unidad 3.2](#sec-u32-contexto) nos dio la regla para estas situaciones: las familias se
+distinguen por su **función de varianza**, $\operatorname{Var}(Y)=\phi\,\mu^{p}$, y elegir familia
+es, en buena medida, **elegir la potencia $p$**. Allí la recta tenía tres paradas (1, 2 y 3) porque
+el coste por avería no necesitaba más; el curso completo da para el mapa entero:
+
+| $p$ | Familia | Dónde la usamos |
+|:--:|---|---|
+| 0 | gaussiana ($\operatorname{Var}$ constante) | el punto de partida del curso: el modelo lineal |
+| 1 | Poisson | los conteos del Caso 2 |
+| **$1<p<2$** | **¿?** | **el hueco** |
+| 2 | Gamma | el coste por avería ([Unidad 3.1](#sec-u31)) |
+| 3 | inversa gaussiana | la alternativa de cola pesada ([Unidad 3.2](#sec-u32-ig)) |
+
+(No todas las familias viven en esta recta: la binomial, $\operatorname{Var}=\mu(1-\mu)/n$, y la
+binomial negativa, $\operatorname{Var}=\mu+\mu^2/\theta$, tienen funciones de varianza propias; la
+recta ordena las de tipo **potencia**.)
+
+El hueco $1<p<2$ no está vacío. @tweedie1984 demostró que para cada $p$ fuera de $(0,1)$ existe una
+familia de dispersión exponencial con esa función de varianza —hoy se llaman **modelos Tweedie**
+[@jorgensen1987; @jorgensen1997]—, y las de $1<p<2$ son exactamente lo que buscamos: la
+**Poisson–Gamma compuesta**. Su receta es literalmente la de nuestro coste anual:
+
+$$S \;=\; \sum_{k=1}^{N} Y_k, \qquad N\sim\text{Poisson}(\lambda), \quad Y_k\sim\text{Gamma}(\alpha,\ \cdot)\ \text{i.i.d.},$$
+
+el número de averías del año por el coste de cada una. ¿Y dónde viven aquí los ceros? En un detalle
+fácil de pasar por alto: la suma **puede tener cero sumandos**, y una suma vacía vale 0. Se ve
+condicionando en $N$:
+
+- si $N = 0$ —con probabilidad $e^{-\lambda}$—, no hay nada que sumar y $S = 0$ **exactamente**: una
+  **masa puntual** en el cero, el año sin averías;
+- si $N = k \ge 1$, la suma de $k$ Gammas i.i.d. de forma $\alpha$ es otra Gamma, de forma
+  $k\alpha$: los positivos que el histograma muestra como «una densidad» son en realidad una
+  **mezcla de Gammas** ponderada por la Poisson.
+
+$$\Pr(S=0) \;=\; e^{-\lambda}, \qquad
+f_S(s) \;=\; \sum_{k=1}^{\infty} \Pr(N=k)\; f_{\text{Gamma}(k\alpha)}(s), \quad s>0.$$
+
+La suma hay que recorrerla **entera** —el dato agregado no dice cuántas averías hubo—, y ahí está
+el precio de esta familia: no es una fórmula que se cierre en dos líneas, y **la Tweedie no tiene
+densidad en forma cerrada**. La escribiremos del todo, con sus parámetros atados al predictor, al
+plantear la verosimilitud en la [Sección 4.2](#sec-u33-ajuste), que es donde importa saber
+evaluarla. Retengamos aquí lo que sí cierra el argumento de esta sección: la forma de cada Gamma es
+$\alpha=(2-p)/(p-1)$, de modo que **fijar $p$ es fijar la forma de la mixtura entera**.
+
+M002 es la mixtura en miniatura: sus dos años a 0 € son años con $N=0$, y su último año —dos
+averías, 1219 € entre ambas— es una realización de la Gamma de forma $2\alpha$. Y nótese lo que
+separa esta construcción de los modelos «con cero» del Caso 2 (hurdle, ZIP): aquí el cero y los
+positivos **no tienen parámetros separados**. Los gobierna el mismo $\lambda$: una covariable que
+sube la frecuencia reduce a la vez los ceros ($e^{-\lambda}$ baja) y sube el coste esperado, todo
+con un **único predictor lineal**. Es un solo mecanismo, no dos modelos pegados.
+
+La varianza de $S$ es $\phi\,\mu^{p}$ con
+$$p \;=\; \frac{\alpha+2}{\alpha+1}\;\in\;(1,2),$$
+más cerca de 1 cuanto más «Poisson» es la mezcla (costes poco variables) y más cerca de 2 cuanto más
+pesa la Gamma. Y como es una familia de dispersión exponencial, es un **GLM de pleno derecho**:
+enlace log, *offset* de exposición, deviance y todo el recetario del curso siguen valiendo. Es la
+síntesis hecha distribución: la **frecuencia** del Caso 2 y la **severidad** de este caso, compuestas
+en una sola respuesta —en seguros, la **prima pura** [@smythjorgensen2002]—. Su único peaje es el
+computacional que acabamos de anticipar, y lo pagará el software por nosotros.
+
+### La pendiente del panel
+
+¿Está nuestro coste anual de verdad en el hueco? La regla empírica de la
+[Unidad 3.2](#sec-u32-contexto) sale del propio enunciado de la familia: si
+$\operatorname{Var}(S)=\phi\,\mu^{p}$, al tomar logaritmos
+
+$$\log \operatorname{Var}(S) \;=\; \log\phi \;+\; p\,\log\mu,$$
+
+una **recta de pendiente $p$** en escala log-log. Para dibujarla hacen falta muchos pares
+(media, varianza), y estimar cada par exige **réplicas** de una misma unidad. El panel las trae de
+serie: cada **máquina** aporta hasta cuatro costes anuales. El plan, por tanto: un punto por máquina
+—la media y la varianza de sus máquina-años—, y sobre esa nube una regresión de
+$\log(\text{varianza})$ sobre $\log(\text{media})$, cuya **pendiente estima $p$**.
+
+```{r}
+#| label: u33-taylor
+# un punto por maquina: media y varianza de sus (hasta 4) costes anuales
+mv_panel <- pn |>
   dplyr::group_by(id_maquina) |>
-  dplyr::mutate(media_maq = mean(lc)) |>
-  dplyr::ungroup() |>
-  dplyr::summarise(sd_total  = round(sd(lc), 3),
-                   sd_entre  = round(sd(media_maq), 3),
-                   sd_dentro = round(sd(lc - media_maq), 3))
+  dplyr::summarise(media = mean(coste_total), varianza = var(coste_total), .groups = "drop") |>
+  dplyr::filter(media > 0, varianza > 0)   # sin averia en todo el seguimiento no hay
+                                           # punto: media y varianza 0 no tienen logaritmo
+
+# en log-log, la pendiente de la recta estima la potencia p de Var = phi * mu^p
+ajuste_p <- lm(log(varianza) ~ log(media), data = mv_panel)
+round(c(maquinas = nrow(mv_panel), pendiente = coef(ajuste_p)[["log(media)"]],
+        IC_inf = confint(ajuste_p)["log(media)", 1],
+        IC_sup = confint(ajuste_p)["log(media)", 2]), 2)
 ```
 
-La variación **entre** máquinas es **mayor** que la de dentro: buena parte de por qué una reparación es
-cara o barata es, sencillamente, **de qué máquina se trata**. Tratar las ~1.200 averías como
-independientes fingiría un tamaño muestral que no tenemos —son unos cientos de máquinas, no 1.200
-observaciones libres— y estrecharía los intervalos de forma engañosa (justo lo que dejó colar el falso
-positivo de `fabricante`).
-
-Ese «nivel de máquina», además, **no es un número fijo**: como cada máquina se avería a **distintas
-edades** y no todas envejecen igual, su coste puede además **cambiar con la edad a un ritmo propio**. El
-efecto de cada máquina tiene por eso **dos caras** —un **nivel de partida** (unas máquinas salen caras,
-otras baratas) y un **ritmo** al que ese nivel cambia con la edad—, que se traducen en un **intercepto** y
-una **pendiente aleatorios** (en la edad). Es lo que anticipa la @fig-u33-trayectorias y lo que ajustará
-el modelo de la [Sección 3.2](#sec-u33-modelo). Lo vemos máquina a máquina, en una muestra de las que más
-averías acumulan:
+El filtro descarta las 47 máquinas que no registraron avería alguna en los cuatro años —su media y
+su varianza son exactamente cero— y deja **353 puntos**. La @fig-u33-taylor superpone a esa nube las
+dos pendientes que delimitan el hueco —$p=1$ (Poisson) y $p=2$ (Gamma), ancladas al centroide para que
+solo se compare la **inclinación**— y la recta ajustada:
 
 ```{r}
-#| label: fig-u33-trayectorias
-#| fig-width: 8
-#| fig-height: 4.2
-#| fig-cap: "Coste de reparación (eje log) frente a la edad de la máquina, para 24 máquinas con varias averías (una línea y color por máquina). Las líneas se separan sobre todo en NIVEL —unas máquinas son caras avería tras avería, otras baratas: intercepto aleatorio— y con pendientes algo distintas —cada una encarece con la edad a su ritmo: pendiente aleatoria—."
-set.seed(1)
-frecuentes <- names(which(table(base$id_maquina) >= 5))
-muestra    <- sample(frecuentes, 24)
+#| label: fig-u33-taylor
+#| fig-width: 6.5
+#| fig-height: 4
+#| fig-cap: "Relación media-varianza del coste anual, una máquina por punto, en escala log-log, con las pendientes de referencia p = 1 (Poisson) y p = 2 (Gamma). La recta ajustada (negra) cae entre ambas: el coste anual vive en el hueco de la recta de varianzas."
+# rectas de referencia: misma pendiente p que la familia, intercepto anclado al
+# centroide de la nube (asi la comparacion visual es solo de inclinacion)
+refs <- tibble::tibble(p = c(1, 2),
+                       familia = c("p = 1 (Poisson)", "p = 2 (Gamma)"),
+                       intercepto = mean(log10(mv_panel$varianza)) - p * mean(log10(mv_panel$media)))
 
-base |>
-  dplyr::filter(id_maquina %in% muestra) |>
-  ggplot(aes(antiguedad_anios, coste_euros, group = id_maquina, colour = id_maquina)) +
-  geom_line(alpha = 0.5) + geom_point(alpha = 0.6, size = 0.9) +
-  scale_y_log10() +
-  labs(x = "edad de la máquina (años)", y = "coste de la avería (€, escala log)") +
-  theme(legend.position = "none")
+ggplot(mv_panel, aes(media, varianza)) +
+  geom_abline(data = refs, aes(slope = p, intercept = intercepto, colour = familia),
+              linetype = 2, linewidth = 0.6) +
+  geom_point(alpha = 0.45, size = 1.3) +
+  geom_smooth(method = "lm", se = FALSE, colour = "black", linewidth = 0.7) +
+  scale_x_log10() + scale_y_log10() +
+  scale_colour_manual(values = c("grey55", "firebrick")) +
+  labs(x = "media del coste anual por máquina (€, log)",
+       y = "varianza por máquina (log)", colour = NULL)
 ```
 
-Dos rasgos, dos piezas del modelo: las máquinas **parten de niveles distintos** (intercepto aleatorio) y
-**encarecen con la edad a ritmos distintos** (pendiente aleatoria en la edad) —esta última es, además, la
-señal que ya asomó en la 3.2, cuando la dispersión crecía débilmente con la antigüedad—.
-
-## 3.2 El modelo mixto Gamma {#sec-u33-modelo}
-
-Mantenemos la **Gamma con enlace log** de la [Sección 3.1](#sec-u33-contexto) —el coste sigue siendo positivo y asimétrico— y le
-añadimos los efectos aleatorios de máquina. Para la avería $k$ de la máquina $i$,
-$$\log \mu_{ik} = \underbrace{x_{ik}^{\top}\beta}_{\text{efectos fijos (los de 3.1)}}
-\;+\; \underbrace{b_{0i} + b_{1i}\,\widetilde{\text{edad}}_{ik}}_{\text{máquina } i},
-\qquad Y_{ik}\sim\text{Gamma}(\mu_{ik},\phi),$$
-donde $b_{0i}$ es el **intercepto aleatorio** (máquinas crónicamente caras o baratas) y $b_{1i}$ la
-**pendiente aleatoria** sobre la edad (cada máquina encarece a su ritmo). Usamos la edad **centrada**
-$\widetilde{\text{edad}}=\text{edad}-\overline{\text{edad}}$, para que $b_{0i}$ se lea como el nivel de la
-máquina a su **edad típica** y para estabilizar el ajuste. Lo ajustamos con `glmmTMB`, que admite la
-familia Gamma con estructura aleatoria flexible:
-
-```{r}
-#| label: u33-ajuste
-base <- dplyr::mutate(base, edad_c = antiguedad_anios - mean(antiguedad_anios))
-
-m_glmm <- glmmTMB::glmmTMB(
-  coste_euros ~ tipo_averia + criticidad * fase_proceso + edad_c + carga + fabricante +
-    (1 + edad_c | id_maquina),
-  family = Gamma(link = "log"), data = base)
-
-summary(m_glmm)
-```
-
-El `summary` de un GLMM trae más que el de un GLM. Además de los **efectos fijos** (bloque *Conditional
-model*, con sus $z$ y $p$), muestra los **componentes de varianza** de los efectos aleatorios (bloque
-*Random effects*: desviación típica del **intercepto** y de la **pendiente** de máquina, y su
-**correlación**) y los estadísticos globales (**AIC**, **dispersión**, nº de averías y de máquinas). El
-término `(1 + edad_c | id_maquina)` pide precisamente ese intercepto **y** esa pendiente aleatorios por
-máquina. Arrastramos `fabricante` desde la 3.1 —donde entró provisionalmente, bajo sospecha de ser un
-falso positivo—; lo **pondremos a prueba** en la [Sección 3.4](#sec-u33-inferencia), ahora que el
-agrupamiento sí está modelado.
+La pendiente sale **1.45**, con intervalo $(1.37,\ 1.54)$: ni la Poisson ($p=1$) ni la Gamma
+($p=2$) —en la @fig-u33-taylor, la recta negra queda visiblemente entre las dos de referencia:
+**de lleno en el hueco**—.
 
 ::: {.callout-tip}
-## 🔧 En R. Cómo ajustar un GLM mixto
-Un GLMM es un `glm()` al que se le añade **estructura aleatoria** en la fórmula. El paquete de referencia
-es **`glmmTMB`** (con la misma sintaxis, también `lme4::glmer`):
+## 🔧 En R. Estimar la potencia de la relación media-varianza
+Es la técnica de la [Unidad 3.2](#sec-u32-contexto), aquí con el agrupamiento que dan las réplicas
+del panel.
 
 ```r
-glmmTMB(y ~ efectos_fijos + (términos_aleatorios | grupo),
-        family = Gamma(link = "log"), data = ...)
+mv <- datos |>                                  # un punto por unidad con réplicas
+  dplyr::group_by(id) |>
+  dplyr::summarise(media = mean(y), varianza = var(y)) |>
+  dplyr::filter(media > 0, varianza > 0)        # sin logaritmo de cero
+
+coef(lm(log(varianza) ~ log(media), data = mv))[2]   # la pendiente estima p
 ```
 
-La clave está en la **notación de los efectos aleatorios**, `(expr | grupo)`:
-
-- `(1 | maquina)` — **intercepto aleatorio**: cada máquina tiene su propio nivel.
-- `(1 + x | maquina)` — intercepto **y pendiente** de `x`, aleatorios y **correlacionados**.
-- `(1 | maquina) + (0 + x | maquina)` — los mismos, pero **sin correlación** (independientes).
-- `(1 | a) + (1 | b)` — efectos **cruzados** (cada fila pertenece a un `a` y a un `b`).
-- `(1 | a/b)` — efectos **anidados** (`b` dentro de `a`); equivale a `(1 | a) + (1 | a:b)`.
-
-Sobre la **estimación**: la verosimilitud de un GLMM **integra** sobre los efectos aleatorios y **no
-tiene forma cerrada**; `glmmTMB` la aproxima por **Laplace** (vía el motor `TMB`) y `lme4` por Laplace o
-cuadratura de Gauss–Hermite adaptativa. La salida trae dos bloques —los **efectos fijos** (*Conditional
-model*) y los **componentes de varianza** de los aleatorios (*Random effects*)—; cómo leerlos en limpio,
-en el callout siguiente.
+- **Hacen falta réplicas**: sin varias observaciones por unidad no hay varianza que calcular. Si no
+  las hay —como en 3.2, con una fila por avería—, se agrupa por **deciles del valor ajustado**
+  (`dplyr::ntile(fitted(modelo), 10)`), que es la variante clásica [@mccullagh1989, §12.6.2].
+- **El filtro no es cosmético**: las unidades sin ningún positivo tienen media y varianza cero, y no
+  admiten logaritmo. Conviene contar cuántas se pierden y decirlo.
+- **Para dibujarlo**: `scale_x_log10() + scale_y_log10()` y rectas de referencia con
+  `geom_abline(slope = p)`, **ancladas al centroide** de la nube (`mean(log10(v)) - p*mean(log10(m))`)
+  para que la comparación sea solo de inclinación.
+- **Léase como exploración**: la pendiente es **marginal** —mezcla la varianza condicional con la
+  heterogeneidad entre unidades— y sirve para acotar el terreno, no para fijar $p$. El $p$ bueno lo
+  estima el modelo por máxima verosimilitud.
 :::
 
+En la [Unidad 3.2](#sec-u32-contexto) esta misma regla señaló la Gamma para el coste por avería;
+agregado al año, con sus ceros, el dato pide la familia que faltaba. Y no conviene pedirle a esta
+pendiente más de lo que da: es una **exploración marginal** —compara máquinas heterogéneas entre
+sí—, y su papel termina en acotar el terreno. La palabra definitiva sobre $p$, condicional y por
+máxima verosimilitud, la tendrá el modelo.
 
+## 4.2 El presupuesto: la Tweedie en acción {#sec-u33-tweedie}
 
-## 3.3 Interpretación {#sec-u33-interpretacion}
+### Los datos: cambiamos de tabla {#sec-u33-datos-panel}
 
-Un GLMM se lee en **dos capas**: los efectos fijos (la tendencia media de la población de máquinas) y los
-componentes de varianza (cuánta heterogeneidad hay alrededor).
+Conviene decirlo con claridad, porque cambiamos de terreno. Las [Unidades 3.1](#sec-u31)–[3.3](#sec-u34)
+trabajaron sobre `averias` —una fila por **avería**, con su importe—. Desde la
+[Sección 4.1](#sec-u33-mapa) trabajamos sobre
+**`pn`**, el panel **anual** `banco$panel`: 1531 filas máquina-año, y la respuesta ya no es un
+evento sino un **euro** (`coste_total`). El cambio no es un capricho: la pregunta es
+presupuestaria, y un presupuesto se hace por años, no por meses.
 
-::: {.callout-tip}
-## 🔧 En R. Salida ordenada con `broom.mixed`
-`summary()` imprime todo en bruto; para tenerlo como con `broom::tidy` en un GLM,
-`glmmTMB` no trae método propio, pero **`broom.mixed`** sí:
-
-- `broom.mixed::tidy(m)` — efectos fijos **y** componentes de varianza en un único tibble; con
-  `effects = "fixed"` o `"ran_pars"` te quedas con un bloque.
-- **Efectos fijos ordenados** (`effects = "fixed"`), con `conf.int = TRUE` y `exponentiate = TRUE` para
-  el **intervalo** y la **escala del factor** $e^{\beta}$ —así armamos la @tbl-u33-fijos, como en 3.1—.
-- **Componentes de varianza ordenados** (`effects = "ran_pars"`): las **desviaciones típicas** de los
-  efectos aleatorios y sus **correlaciones** en un tibble (es la @tbl-u33-varcomp). En formato de matriz
-  de covarianzas, `glmmTMB::VarCorr(m)`.
-- `broom.mixed::glance(m)` — una fila con `AIC`, `BIC`, `logLik` y `deviance`; y `augment(m, data)` pega
-  a los datos los valores ajustados y los residuos.
-
-Para la familia **Gamma** se prefiere `glmmTMB` a `glmer`: es más robusto y admite extensiones —modelar
-la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.4](#sec-u34)—.
-:::
-
-
-**Efectos fijos.** Se interpretan como en 3.1, de forma **multiplicativa** ($e^{\beta}$ es el factor
-sobre el coste medio), con el matiz de que ahora valen «para una máquina dada». Los de **nivel-avería**
-(el tipo) apenas se mueven respecto de 3.1; en cambio los de **nivel-máquina** se **reajustan** —la
-criticidad y la carga suben, la edad baja—, porque ahora **comparten variabilidad con el intercepto
-aleatorio**: el modelo separa lo que es de la máquina de lo que es de la avería, y de paso da intervalos
-más **anchos y honestos**. Y `fabricante`, que arrastramos, asoma con factores próximos a 1 e intervalos
-que **cruzan el 1**: primer indicio de que sobra, que la selección confirmará.
+Un detalle práctico antes de modelar: la **edad** no está entre las columnas de `pn` —que trae la
+respuesta, la exposición y las covariables **basales** de la máquina—, y sí en `sg`, como
+`antiguedad`. Pero no basta con copiarla de una tabla a otra, porque **no tienen la misma
+granularidad**: `sg` da una edad **por mes** (doce valores para cada máquina-año; en M227 iban de
+5.33 a 6.32) y aquí necesitamos **una por máquina-año**. Hay que agregar, y el resumen natural es la
+**media**: la edad a mitad del periodo que la fila representa —coherente con que los meses
+observados son los que cuenta la exposición—.
 
 ```{r}
-#| label: tbl-u33-fijos
-#| tbl-cap: "Efectos fijos del GLMM, exponenciados: factor multiplicativo sobre el coste medio, con intervalo de confianza de Wald al 95 %."
-broom.mixed::tidy(m_glmm, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::transmute(term,
-                   `exp(beta)` = round(estimate, 3),
-                   conf.low = round(conf.low, 3), conf.high = round(conf.high, 3),
-                   p.value = signif(p.value, 3))
+#| label: u33-edad
+# de granularidad mensual (sg) a anual (pn): edad media del año observado.
+# El año de calendario del estudio es el mismo en las dos tablas.
+sg <- banco$seguimiento          # panel mensual; aquí solo lo usamos para la edad
+sg$anio <- sg$tstart %/% 365 + 1
+edad_my <- aggregate(antiguedad ~ id_maquina + anio, data = sg, FUN = mean)
+names(edad_my)[3] <- "edad"
+
+pn <- merge(pn, edad_my, by = c("id_maquina", "anio"), all.x = TRUE)
+c(filas = nrow(pn), edad_NA = sum(is.na(pn$edad)))
 ```
 
-**Componentes de varianza.** Es la parte nueva —el bloque *Random effects* del `summary` (§3.2)—, y la
-que responde a «¿cuánta heterogeneidad entre máquinas?». Tres lecturas:
+Las 1531 filas se emparejan sin un solo `NA`: las dos tablas describen exactamente los mismos
+máquina-años, como debe ser —salen del mismo banco—.
 
-- **Intercepto de máquina.** Su desviación típica —en torno a $0{,}36$ en escala log— mide cuánto varía
-  el **nivel** de coste entre máquinas: una máquina «crónicamente cara», una desviación por encima, sale
-  sobre un $e^{0{,}36}\approx 1{,}43$ —un **43 % más** que la media, a igualdad de tipo, criticidad,
-  fase, edad y carga—. Es la **fragilidad** de máquina, ahora con nombre y sitio.
-- **Pendiente de máquina.** Su desviación típica dice cuánto varía el **ritmo** al que el coste crece con
-  la edad. Es pequeña, y es exactamente la heterogeneidad que en la 3.2 se colaba como una dependencia de
-  la dispersión con la antigüedad: no era un defecto de la familia, era estructura de máquina.
-- **Correlación intercepto–pendiente.** El bloque trae además un número más sutil: la **correlación**
-  entre el intercepto y la pendiente de cada máquina —aquí, **positiva y moderada ($\approx 0{,}56$)**—.
-  Diría que las máquinas más caras **a la edad típica** tienden también a **encarecer algo más rápido**
-  con la edad. Su magnitud solo se lee **en relación con las desviaciones típicas**: cercana a $\pm 1$,
-  intercepto y pendiente serían casi **redundantes** (sabido el nivel, el ritmo queda determinado);
-  cercana a 0, aportan información distinta. Ahora bien, es un número **resbaladizo**: como veremos en la
-  [Sección 3.4](#sec-u33-inferencia), la correlación entre efectos aleatorios **depende de dónde se
-  centre la edad**, así que conviene interpretarla con mucha cautela.
+### Qué predictores, y por qué {#sec-u33-eda}
 
-## 3.4 Inferencia y selección {#sec-u33-inferencia}
+¿Qué covariables tiene sentido meter en el modelo? La respuesta no se improvisa: se apoya en lo que
+**ya sabemos del caso** y en lo que **enseñan los datos** antes de ajustar nada.
 
-En un GLMM se infiere de forma **distinta según el parámetro**. Recorremos la lista, y de cada uno decimos
-**cómo** se contrasta y **qué sale** en nuestros datos:
+Lo que sabemos: el coste anual es la composición de dos procesos que este caso ya ha modelado por
+separado —o los modelará—, y disponemos de las covariables candidatas de cada uno. Del lado del
+**riesgo**, lo que el Caso 2 enseñó sobre frecuencias y lo que la ficha de la máquina permite
+anticipar: la **edad**, la **carga** y el **mantenimiento** —las mismas que las
+Unidades 3.5 y 3.6 usarán para modelar el tiempo entre fallos—. Del lado del **coste por avería** ([Unidades 3.1](#sec-u31)–[3.3](#sec-u34)): el
+**tipo de avería**, el **proceso** y la **criticidad**. Dos de ellas —edad y carga— salieron en los
+dos. La lista de candidatas para el coste **anual** es, pues, la unión de ambas, con dos ajustes
+prácticos: `tipo_averia` **no puede entrar** (es un atributo de cada avería, no de la máquina-año:
+en un año con tres averías habría tres tipos), y `fabricante` entra como **control** —el curso lo
+ha tratado así desde el Caso 1, y conviene ver qué hace aquí—.
 
-- **Efectos fijos** → el **IC de Wald** de cada coeficiente (`confint`), o **`anova`** entre modelos
-  anidados o AIC+BIC para **seleccionar variables**.
-- **Varianzas** de los aleatorios → **LRT con corrección de frontera** (÷2) + AIC + BIC.
-- **Correlación** intercepto–pendiente → **`anova`** $\chi^2$ ordinario.
-- **BLUP** (los efectos de cada máquina) → **predicción**, no inferencia; los usamos en la [Sección 3.5](#sec-u33-diagnostico).
-
-### Efectos fijos y selección de variables
-
-Tenemos dos vías para la inferencia: 
-
-1. La primera es el **IC** de cada efecto: `confint` da el intervalo de Wald de los coeficientes
-—en factor, es la @tbl-u33-fijos: un factor cuyo IC **no cruza el 1** es significativo—. 
-2. La segunda es **`anova`**, que compara modelos anidados y nos resulta útil, junto con los criterios AIC/BIC para la selección de variables. La tabla de contrastes **por término** lo resume
-(`car::Anova`, Wald tipo II, @tbl-u33-anova-fijos):
+Lo que enseñan los datos: antes de modelar, miremos cómo se mueve el coste anual con cada
+candidata. Como la exposición varía, comparamos **euros por año de exposición**, y añadimos el
+**porcentaje de años a cero**, que es la otra mitad de la historia:
 
 ```{r}
-#| label: tbl-u33-anova-fijos
-#| tbl-cap: "Contrastes de Wald por término de los efectos fijos (car::Anova, tipo II)."
-car::Anova(m_glmm)
-```
+#| label: tbl-u33-eda
+#| tbl-cap: "Exploración previa: coste por año de exposición (€) y porcentaje de máquina-años sin ninguna avería, según cada covariable candidata (las continuas, por cuartiles). Todas separan, y algunas mueven a la vez el gasto y la proporción de ceros."
+resumen <- function(v) {
+  pn |>
+    dplyr::mutate(nivel = if (is.numeric(pn[[v]]))
+                    dplyr::ntile(pn[[v]], 4) |> factor(labels = paste("Q", 1:4)) else
+                    factor(pn[[v]])) |>
+    dplyr::group_by(nivel) |>
+    dplyr::summarise(eur_por_anio = round(sum(coste_total) / sum(exposicion)),
+                     pct_cero = round(mean(coste_total == 0) * 100, 1), .groups = "drop") |>
+    dplyr::mutate(covariable = v, .before = 1)
+}
 
-Ahora todos los efectos sustantivos son significativos **salvo `fabricante`** —la cuenta pendiente de la [Unidad 3.1](#sec-u31)—. Lo confirmamos comparando los dos modelos anidados (con LRT, AIC y BIC):
+purrr::map_dfr(c("edad", "carga", "proceso", "criticidad",
+                 "plan_mantenimiento", "fabricante"), resumen)
+```
 
 ```{r}
-#| label: u33-fabricante
-m_sinfab <- update(m_glmm, . ~ . - fabricante)   # el mismo modelo, sin fabricante
-anova(m_sinfab, m_glmm)
+#| label: fig-u33-eda
+#| fig-width: 9
+#| fig-height: 3.6
+#| fig-cap: "Coste anual por euro de exposición según la edad de la máquina (izquierda) y según criticidad y plan de mantenimiento (derecha). La edad marca la tendencia más fuerte; la criticidad ordena el gasto de menor a mayor, y el plan preventivo lo reduce en los tres niveles."
+p1 <- pn |>
+  dplyr::mutate(bin = cut(edad, breaks = c(0, 2, 4, 6, 8, 12))) |>
+  dplyr::group_by(bin) |>
+  dplyr::summarise(eur = sum(coste_total) / sum(exposicion), .groups = "drop") |>
+  ggplot(aes(bin, eur)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "edad de la máquina (años)", y = "€ por año de exposición")
+
+p2 <- pn |>
+  dplyr::group_by(criticidad, plan_mantenimiento) |>
+  dplyr::summarise(eur = sum(coste_total) / sum(exposicion), .groups = "drop") |>
+  ggplot(aes(criticidad, eur, fill = plan_mantenimiento)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = c("firebrick", "steelblue")) +
+  labs(x = NULL, y = NULL, fill = NULL)
+
+p1 + p2
 ```
 
-::: {.callout-important}
-## El falso positivo de `fabricante` se disuelve (como anticipamos)
-En la [Unidad 3.1](#sec-u31), con un modelo de efectos fijos, `fabricante` salía **significativo** y hasta bajaba el AIC —un
-**espejismo de la pseudorréplica**: las averías correlacionadas de cada máquina inflaban la evidencia—.
-Aquí, con el **efecto aleatorio de máquina** absorbiendo esa correlación, quitarlo **no empeora** el
-ajuste (LRT no significativo, y **AIC y BIC bajan**). No aporta —nunca aportó—: lo **retiramos**. Es la
-misma enfermedad que inflaba $\hat\phi$, vista desde la selección de variables: **ignorar la correlación
-no solo estima mal la incertidumbre, también hace elegir mal**.
-:::
+La exploración respalda la lista y adelanta lo que el modelo tendrá que cuantificar. En la
+@tbl-u33-eda, el gasto **casi se triplica** entre las máquinas más nuevas y las más viejas (539 €
+frente a 1486 € por año, con los años sin avería cayendo del 66 % al 38 %) —la tendencia más nítida,
+y la que dibuja el panel izquierdo de la @fig-u33-eda—; la **criticidad** ordena el gasto de menos a
+más (724 / 1100 / 1512 €); el **plan preventivo** lo baja de 1204 € a 780 € y sube los años sin
+avería del 41 % al 60 %, y el panel derecho de la @fig-u33-eda muestra que esa rebaja se repite
+**dentro de cada nivel de criticidad**; y el **proceso** separa a Ensamblaje y Acabado (≈ 1300 €) de
+Lijado (646 €). La **carga** es la más floja de las candidatas: en la @tbl-u33-eda sube de 867 € a
+1094 € entre cuartiles extremos, pero sin orden monótono (el segundo cuartil es el más caro,
+1147 €). Y el `fabricante`, que no debería hacer nada, muestra diferencias pequeñas
+(912–1139 €) —téngalas presentes: volverán—.
 
-Seguimos pues la inferencia utilizando el modelo `m_sinfab`.
+Un aviso sobre cómo leer esta tabla: son comparaciones **crudas**, una covariable cada vez, y las
+covariables están **enredadas** entre sí (el plan preventivo, recordemos, se asignó a las máquinas
+viejas y críticas, [Unidad 3.1](#sec-u31)). Que el preventivo aparezca más barato pese a cubrir las
+máquinas de más riesgo ya insinúa un efecto real, pero solo el modelo, ajustando todo a la vez,
+puede separarlos.
 
-### Varianzas de los aleatorios
+### El modelo {#sec-u33-modelo}
 
-Primero, en limpio, los componentes:
+La [Sección 4.1](#sec-u33-mapa) identificó la familia; toca escribir el modelo. Para la máquina $i$
+en el año $t$, con exposición $e_{it}$ (fracción de año observada), el coste anual es
 
-```{r}
-#| label: tbl-u33-varcomp
-#| tbl-cap: "Componentes aleatorios de máquina: desviaciones típicas del intercepto y de la pendiente (escala log del predictor) y su correlación."
-broom.mixed::tidy(m_sinfab, effects = "ran_pars") |>
-  dplyr::transmute(term, estimate = round(estimate, 3))
-```
+$$S_{it} \;\sim\; \operatorname{Tw}_p(\mu_{it},\ \phi), \qquad
+\log \mu_{it} \;=\; \beta_0 + \mathbf{x}_{it}^{\top}\boldsymbol\beta \;+\; \log e_{it},
+\qquad
+\boxed{\ \operatorname{Var}(S_{it}) \;=\; \phi\,\mu_{it}^{\,p}\ },\quad 1<p<2 .$$
 
-La del **intercepto** es grande (sd $\approx 0{,}36$): la fragilidad de máquina es indudable. La de la
-**pendiente**, pequeña (sd $\approx 0{,}07$).
+Es la estructura GLM de siempre —enlace log y *offset*—, y conviene ver **dónde vive cada
+parámetro**, porque no todos hacen lo mismo:
 
-Para juzgar si la pendiente **hace falta**, puesto que la hipótesis nula $\sigma^2=0$ se
-sitúa **en la frontera** del espacio de parámetros ($\sigma^2\geq 0$), el estadístico sigue una **mezcla** de $\chi^2$ ($\tfrac12\chi^2_0+\tfrac12\chi^2_1$, según @selfliang1987 y @stramlee1994): `anova` sale
-**conservador**, y el $p$ correcto es aproximadamente **la mitad** de su valor. Para obtener un test razonable, comparamos intercepto solo frente a intercepto + pendiente (sin correlación, para aislar su varianza):
+- $\boldsymbol\beta$ (con $\beta_0$) está en la **media**: son los efectos de las covariables sobre
+  el coste anual esperado, la parte que se interpreta;
+- $\phi$ y $p$ no aparecen en la media: viven en la **función de varianza** $\phi\,\mu^{p}$ —la
+  misma expresión con la que la [Sección 4.1](#sec-u33-mapa) ordenó todas las familias del curso—.
+  $\phi$ es la **dispersión**, como en la Gamma de la [Unidad 3.1](#sec-u31); $p$ es el **índice**,
+  que aquí **no se fija de antemano**, sino que se estima: dirá en qué punto del hueco $(1,2)$ cae
+  el coste anual.
 
-```{r}
-#| label: u33-lrt-pendiente
-# partimos de m_sinfab (ya sin fabricante) y cambiamos solo la estructura aleatoria:
-m_int    <- update(m_sinfab, . ~ . - (1 + edad_c | id_maquina) + (1 | id_maquina)) # solo interceptación
-m_uncorr <- update(m_sinfab, . ~ . - (1 + edad_c | id_maquina) +
-                     (1 | id_maquina) + (0 + edad_c | id_maquina))  # interceptacion + pendiente
-anova(m_int, m_uncorr)
-```
+Que $p$ sea un parámetro tiene más alcance del que parece, porque no solo gradúa la varianza:
+**fija toda la forma de la mixtura**. La forma de la Gamma de las averías individuales es
+$\alpha = (2-p)/(p-1)$, y con ella queda determinada la partición entre el cero y los positivos.
+Estimar $p$ es, por tanto, dejar que los datos decidan **cuánto de Poisson y cuánto de Gamma** hay
+en el coste anual.
 
-El $p$ de `anova` queda **al filo** ($\approx 0.054$); con la corrección de frontera (**÷2**) baja a
-$\approx 0.03$: la **pendiente aleatoria es significativa**, aunque pequeña —coherente con el DGP y con
-la señal que ya vimos en la dispersión de la [Unidad 3.2](#sec-u32)—. Así que la mantenemos.
+Y hay un regalo escondido en la estructura compuesta. Con enlace log, el coste esperado se
+**factoriza en sus dos canales** —frecuencia por severidad—,
 
-El mismo `anova` trae además **AIC y BIC**, que aquí **discrepan** —como suele pasar en el filo—: el
-**AIC** (penalización 2 por parámetro) **baja** al añadir la pendiente y la conserva; el **BIC**
-(penalización $\log n$, más severa) **sube** y la descartaría. El LRT corregido y el diseño rompen el
-empate a favor de mantenerla.
+$$\mu \;=\; \lambda \cdot \mu_Y
+\qquad\Longrightarrow\qquad
+\log \mu \;=\; \underbrace{\log \lambda}_{\text{frecuencia}} \;+\; \underbrace{\log \mu_Y}_{\text{severidad}},$$
+
+—con $\lambda$ y $\mu_Y = \alpha\theta$ los de la mixtura de la [Sección 4.1](#sec-u33-mapa)—, de
+modo que el coeficiente de una covariable en la Tweedie es **la suma de sus dos efectos**: el que
+tiene sobre el **riesgo de fallar** —la frecuencia, que el Caso 2 modeló con una Poisson— y el que tiene
+sobre el coste de cada avería (la Gamma de la [Unidad 3.1](#sec-u31)).
+
+Eso responde a la pregunta obvia sobre el predictor —*¿uno para la frecuencia y otro para la
+severidad?*—: **no; hay un único $\mathbf{x}$**, y en él entran **todas** las candidatas de la
+subsección anterior: `edad`, `carga`, `proceso`, `criticidad`, `plan_mantenimiento` y `fabricante`.
+
+Y con ello, la pregunta que viene detrás: *¿cómo decide el modelo qué covariable actúa sobre la
+frecuencia y cuál sobre la severidad?* La respuesta es tajante y conviene decirla pronto: **no lo
+decide, y no puede decidirlo**. Él solo ve una columna de costes anuales y un predictor, y de cada
+covariable estima **su efecto total** sobre el **coste anual**, sin preguntarse por qué vía llega. La
+razón es de fondo: el dato está **agregado**. Un año con 2400 € puede ser una máquina que falla
+mucho con reparaciones baratas o una que falla poco con reparaciones caras; el `coste_total` no
+distingue, y sin esa información la descomposición no está en los datos. Cuánto cuesta esa renuncia
+lo vemos, con números, tras el ajuste.
 
 ::: {.callout-note}
-## El menú para contrastar la varianza de un efecto aleatorio
-Todas comparan el modelo **con** el efecto aleatorio frente al modelo **sin** él:
-
-- **LRT ingenuo** (`anova`): válido, pero **conservador** —la varianza cae en la frontera—.
-- **LRT + corrección de frontera (÷2)**: el $p$ correcto es la **mitad**, porque la nula es una mezcla
-  $\tfrac12\chi^2_0+\tfrac12\chi^2_1$. **Es lo que usamos.**
-- **Bootstrap paramétrico**: no depende de la asíntota. Simula bajo el modelo **sin** el efecto, reajusta
-  ambos y sitúa el LRT observado en esa distribución. Es la vía **rigurosa**, pero **costosa** (cientos de
-  reajustes).
-- **AIC / BIC**: complementan —gana el criterio menor—, pero pueden **discrepar** en el filo (como aquí).
+## ¿Y por qué no «dos modelos», uno para el cero y otro para el importe?
+Se puede: un modelo **en dos partes** (*hurdle*) ajusta un binario «¿hubo coste?» y una Gamma para
+el importe positivo —la estrategia del exceso de ceros del Caso 2—. La diferencia es de supuesto: el
+*hurdle* da a ceros y positivos **parámetros separados** (útil si el cero tiene un mecanismo propio:
+máquinas paradas, contratos sin cobertura…); la Tweedie los liga a través de $\lambda$, porque
+entiende el año a cero **no** como un fenómeno aparte, sino como el mismo proceso de averías cuando
+$N=0$. A mecanismo único, modelo único —y con la mitad de parámetros—.
 :::
 
-Así se aplicaría el **bootstrap paramétrico** de la pendiente (lo dejamos **sin ejecutar** por su coste
-—son cientos de reajustes—; basta poner `eval: true` para correrlo):
+### El ajuste: verosimilitud y estimación {#sec-u33-ajuste}
+
+La estimación es por **máxima verosimilitud**, y la verosimilitud tiene la forma que anticipa la
+mixtura: cada máquina-año contribuye con la **masa** del cero o con la **densidad** del positivo,
+
+$$L(\boldsymbol\beta, \phi, p) \;=\;
+\prod_{i,t:\,S_{it}=0} \underbrace{\Pr(S_{it}=0)}_{e^{-\lambda_{it}}}
+\;\times\!\!\prod_{i,t:\,S_{it}>0}\!\! f_{S}(S_{it};\ \mu_{it}, \phi, p),$$
+
+y esa $f_S$ es la mixtura de la [Sección 4.1](#sec-u33-mapa), ahora con sus tres piezas **atadas al
+predictor** a través de $\mu_{it}$:
+
+$$f_{S}(s;\ \mu,\phi,p) \;=\; \sum_{k=1}^{\infty}
+\underbrace{\frac{e^{-\lambda}\lambda^{k}}{k!}\cdot
+\frac{s^{\,k\alpha-1}e^{-s/\theta}}{\Gamma(k\alpha)\,\theta^{\,k\alpha}}}_{W_k},
+\qquad
+\alpha = \frac{2-p}{p-1},\quad
+\lambda = \frac{\mu^{\,2-p}}{\phi\,(2-p)},\quad
+\theta = \phi\,(p-1)\,\mu^{\,p-1}.$$
+
+Cada sumando $W_k$ es «probabilidad de que haya $k$ averías **por** densidad de que esas $k$ sumen
+$s$ euros». Y conviene detenerse en lo que significan las tres igualdades de la derecha, porque son
+la clave de todo: $\lambda$, $\alpha$ y $\theta$ **no son parámetros libres**.
+Basta mover $\boldsymbol\beta$ —y con él $\mu_{it}$— para que cambien a la vez la frecuencia
+$\lambda_{it}$ y la severidad $\theta$ de cada máquina-año; $\phi$ y $p$ son comunes a todas las
+filas. Por eso el mismo $\lambda_{it}$ aparece en los dos factores de $L$: los ceros no se descartan
+ni se modelan aparte, **entran en la verosimilitud con su propia probabilidad**, y son ellos los que
+aportan buena parte de la información sobre la frecuencia. Ese acoplamiento es lo que permite
+estimar todo a la vez.
+
+El único obstáculo es la suma infinita, que no tiene forma cerrada y hay que evaluar numéricamente
+—truncándola con cuidado, como explica el callout siguiente—. Con ella resuelta, la maximización es
+la de cualquier GLM.
+
+::: {.callout-note collapse="true"}
+## Cómo se evalúa la suma infinita: el método de Dunn y Smyth
+Una serie infinita no se puede evaluar; hay que truncarla. Pero truncar por la fuerza bruta —sumar
+los primeros $M$ términos y parar— es mala idea, porque los sumandos $W_k$ **primero crecen y luego
+decaen**: cortar pronto deja fuera justo los que más pesan, y cortar tarde es tirar tiempo de
+cálculo en cada una de las miles de evaluaciones que pide la maximización.
+
+La observación de @dunnsmyth2005 es que ese máximo **se puede localizar de antemano**. Tratando
+$\log W_k$ como función continua de $k$ y derivando, el término dominante cae en
+
+$$k^{*} \;\approx\; \frac{s^{\,2-p}}{\phi\,(2-p)},$$
+
+que es la misma expresión de $\lambda$ evaluada en el **dato** $s$ en lugar de en la media: cuanto
+más caro es el año, más averías está suponiendo la mixtura. Con los parámetros de nuestro ajuste, un
+año de 1500 € tiene su término dominante en $k^{*}\approx 1$, uno de 5000 € en $k^{*}\approx 2$ y
+uno de 20 000 € en $k^{*}\approx 5$.
+
+A partir de ahí la suma es **finita**: se recorre una ventana $k \in [k^{*}-K,\ k^{*}+K]$ y se
+descartan los términos que caen por debajo de la precisión de la máquina, lo que en la práctica deja
+unas pocas decenas de sumandos —en nuestro caso, una ventana de $\pm 10$ ya reproduce la densidad
+con diez cifras significativas—.
+
+Queda un detalle numérico. En la parametrización $(\mu,\phi,p)$ los $W_k$ no son probabilidades:
+pueden alcanzar magnitudes enormes —con $\phi = 0.01$, el mayor ronda $10^{1736}$, muy por encima
+del $10^{308}$ que admite la doble precisión—. La solución es la habitual en verosimilitudes:
+trabajar en **escala logarítmica**, sacando el término dominante como factor común,
+$$\sum_k W_k \;=\; W_{k^{*}} \sum_k \exp\!\big(\log W_k - \log W_{k^{*}}\big),$$
+de modo que todos los sumandos quedan entre 0 y 1. Con nuestros datos —$\hat\phi\approx 175$— no
+había riesgo de desbordamiento, pero el algoritmo es el mismo.
+
+Todo esto lo hace `glmmTMB` por nosotros; conviene saber que está ahí, porque explica que ajustar
+una Tweedie sea más lento que ajustar una Gamma: **cada evaluación de la log-verosimilitud lleva
+dentro una de estas sumas por observación**, y la maximización pide miles de evaluaciones.
+::: 
+
+`glmmTMB` hace las
+dos cosas y estima **$\boldsymbol\beta$, $\phi$ y $p$ conjuntamente**:
 
 ```{r}
-#| label: u33-bootstrap-pendiente
-#| eval: false
-set.seed(1)
-lrt_obs <- as.numeric(2 * (logLik(m_uncorr) - logLik(m_int)))    # LRT observado
-
-sim <- simulate(m_int, nsim = 500)             # respuestas bajo H0 (sin pendiente)
-lrt_boot <- vapply(sim, function(y) {
-  d <- transform(base, coste_euros = y)
-  as.numeric(2 * (logLik(update(m_uncorr, data = d)) -
-                  logLik(update(m_int,    data = d))))
-}, numeric(1))
-
-mean(lrt_boot >= lrt_obs, na.rm = TRUE)         # p-valor bootstrap
+#| label: u33-tweedie-fit
+m_tw <- glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                  fabricante + offset(log(exposicion)),
+                family = tweedie, data = pn)
+summary(m_tw)
 ```
 
-El $p$ que arroja ronda **0.03**, en línea con la regla del ½: aquí la corrección de frontera no engaña.
+Merece la pena recorrer la salida por partes, porque es la primera vez que vemos un `summary` de
+esta familia:
 
-### Correlación intercepto–pendiente
+- La **cabecera** confirma qué se ha ajustado (`Family: tweedie ( log )`) y sobre qué fórmula y
+  datos, con los criterios de ajuste global —`AIC`, `BIC`, `logLik`, `-2*log(L)`— que usaremos al
+  comparar modelos, y los grados de libertad residuales (1517 = 1531 filas − 14 parámetros: los 12
+  coeficientes más $\phi$ y $p$).
+- La línea **`Dispersion parameter for tweedie family`** da $\hat\phi \approx 175$.
+- La tabla **`Conditional model`** es la de siempre —`Estimate`, `Std. Error`, `z value`,
+  `Pr(>|z|)`—, con los coeficientes en escala **log** por el enlace. Cada uno es un efecto sobre el
+  coste anual esperado, y su Wald contrasta $H_0:\beta_j = 0$.
 
-Aquí 0 es un punto **interior** (una correlación vive en $[-1,1]$ y 0 no es un extremo), así que vale el **`anova`** $\chi^2$ ordinario: el modelo **con**
-correlación (`m_sinfab`) frente al que la fuerza a 0 (`m_uncorr`):
+Falta justo el parámetro más característico de la familia: **el `summary` no imprime $p$**. Hay que
+pedirlo aparte, y de paso recogemos $\phi$ con precisión —los dos parámetros de la **función de
+varianza**, estimados, no fijados—:
 
 ```{r}
-#| label: u33-lrt-correlacion
-anova(m_uncorr, m_sinfab)
+#| label: u33-tweedie-p
+c(phi = sigma(m_tw),                  # dispersión: Var = phi * mu^p
+  p   = family_params(m_tw)[[1]])     # índice de la familia (family_params no lo llama "p")
 ```
 
-El contraste **sí** es muy significativo ($p<0{,}001$): en esta parametrización, nivel y ritmo **covarían**
-($\approx 0{,}56$). Pero conviene un aviso de rigor que rara vez se cuenta: **la correlación entre efectos
-aleatorios no es un número portátil** —depende de *dónde* se centre la covariable—. Al anclar la edad en
-su **media**, el nivel «a edad típica» y la pendiente salen correlacionados; anclándola en otra edad, esa
-correlación cambiaría, e incluso **cambiaría de signo**. De hecho, la validación (§3.5) confirmará que el
-proceso generador produce el **nivel y el ritmo de forma independiente**. Por eso —parsimonia y
-fidelidad— nos quedamos **sin** correlación: un parámetro que se mueve con la parametrización no es una
-conclusión sólida sobre el sistema. La moraleja: **una correlación entre aleatorios significativa no
-siempre es un hallazgo real y portable**.
+$\hat p = 1.35$ cae donde la familia lo exige, **dentro de $(1,2)$**: los datos, por su cuenta, han
+situado el coste anual en el hueco que la [Sección 4.1](#sec-u33-mapa) había señalado con una
+exploración. Volveremos sobre su valor exacto en la validación.
 
-El modelo final es, por tanto, `m_uncorr` —intercepto y pendiente (no correlada) de máquina, sin
-`fabricante`—; lo renombramos para la sección siguiente:
+### Interpretación {#sec-u33-interpretacion}
+
+Con enlace log, la lectura es la **multiplicativa** de todo el caso, ahora sobre el **coste anual
+esperado**. De dónde sale, en una línea: deshacer el logaritmo convierte la suma del predictor en un
+**producto de factores**,
+
+$$\mu_{it} \;=\; e^{\beta_0}\;\cdot\;\prod_{j} e^{\beta_j x_{itj}}\;\cdot\; e_{it},$$
+
+de modo que subir una covariable en **una unidad** —o pasar del nivel de referencia a otro nivel de
+un factor— multiplica el coste anual esperado por una cantidad que no depende de dónde se parta:
+
+$$\frac{\mathbb{E}[S \mid x_j + 1]}{\mathbb{E}[S \mid x_j]} \;=\; e^{\beta_j}.$$
+
+Por eso $e^{\beta_j}$ se lee como «un $(e^{\beta_j}-1)\times 100$ % más (o menos) de gasto anual, a
+igualdad del resto», y por eso el *offset* $e_{it}$ entra como un factor más: duplicar la exposición
+duplica el coste esperado. Conviene verlo en euros:
 
 ```{r}
-#| label: u33-final
-m_final <- m_uncorr
+#| label: tbl-u33-tweedie
+#| tbl-cap: "Efectos multiplicativos sobre el coste anual esperado: exp(coeficiente) y su intervalo de confianza al 95 %. Un valor de 1.15 significa un 15 % más de gasto anual, a igualdad del resto."
+broom.mixed::tidy(m_tw, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::transmute(term, factor = round(estimate, 3),
+                   IC95 = sprintf("(%.2f, %.2f)", conf.low, conf.high),
+                   p_valor = round(p.value, 4))
 ```
 
-## 3.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u33-diagnostico}
+De la @tbl-u33-tweedie salen tres lecturas que la dirección entendería:
 
-### Bondad de ajuste
+- **La edad es el motor.** Cada año multiplica el gasto anual por $e^{0.137}\approx 1.15$: un 15 %
+  más por año cumplido, que compuesto sobre una década explica la diferencia que ya asomaba en la
+  exploración.
+- **La criticidad ordena el gasto.** Una máquina **Crítica** cuesta al año $e^{0.873}\approx 2.4$
+  veces lo que una **Auxiliar** comparable, y una Importante, 1.6 veces.
+- **El mantenimiento preventivo se paga solo.** Su factor es $e^{-0.617}\approx 0.54$: **casi la
+  mitad de gasto anual**, y ahora sí ajustado por edad y criticidad —recuérdese que el plan se
+  asignó precisamente a las máquinas más viejas y críticas, así que la comparación cruda de la
+  exploración lo perjudicaba—.
 
-El $R^2$ de un mixto se parte en dos [@nakagawa2017]: el **marginal** (solo los efectos fijos) y el
-**condicional** (fijos + aleatorios). La distancia entre ambos mide cuánto aporta **conocer la máquina**.
+Un matiz importante de lectura, y es el que distingue a esta familia: estos factores actúan sobre el
+**coste anual**, no sobre el riesgo ni sobre el precio de una reparación. Que una Crítica cueste 2.4
+veces más **no dice** si se avería más a menudo o si cada avería es más cara. Eso es justo lo que la
+Tweedie no puede separar —y merece su propio apartado—.
+
+### El precio del predictor único {#sec-u33-canales}
+
+Si el modelo estima el efecto **total** de cada covariable, ¿puede al menos decirnos **cómo se
+reparte** entre frecuencia y severidad? Sí y no, y la respuesta es de las que enseñan. Los dos
+canales se recuperan del ajuste —$\hat p$ y $\hat\phi$ bastan para despejarlos [@jorgensen1997]—:
+
+$$\lambda \;=\; \frac{\mu^{\,2-p}}{\phi\,(2-p)}, \qquad
+\mu_Y \;=\; (2-p)\,\phi\,\mu^{\,p-1}, \qquad\text{y en efecto}\quad \lambda\,\mu_Y=\mu .$$
 
 ```{r}
-#| label: u33-r2
-performance::r2_nakagawa(m_final)
+#| label: u33-canales
+mu     <- fitted(m_tw)
+p_hat  <- family_params(m_tw)[[1]]   # el índice p (family_params no lo llama "p")
+phi_hat <- sigma(m_tw)               # en tweedie, sigma() ES phi: Var = phi * mu^p
+lambda <- mu^(2 - p_hat) / (phi_hat * (2 - p_hat))   # averías esperadas al año
+mu_Y   <- (2 - p_hat) * phi_hat * mu^(p_hat - 1)     # coste esperado por avería
+
+# frecuencia: averías esperadas al año, frente a la tasa observada
+c(lambda_modelo = round(mean(lambda), 2),
+  observada     = round(sum(pn$n_averias) / sum(pn$exposicion), 2))
+
+# severidad: coste esperado por avería, frente al observado en la tabla de averías
+c(coste_averia_modelo = round(mean(mu_Y)),
+  observado           = round(mean(banco$averias$coste_euros)))
 ```
 
-El salto del $R^2$ marginal al condicional es **grande**: para anticipar el coste de una avería, saber *qué
-máquina es* pesa tanto como sus covariables observadas. Ese salto es, en una cifra, el argumento de la
-unidad.
+La descomposición es creíble: **0.73 averías esperadas al año** frente a 0.80 observadas, y
+**1210 € por avería** frente a 1257 € —el modelo, sin haber visto nunca una avería individual,
+reconstruye las dos piezas del mecanismo con solo el agregado anual—. Pero mírese la primera fórmula en escala log: $\log\lambda = (2-p)\log\mu +
+\text{cte}$ y $\log\mu_Y = (p-1)\log\mu + \text{cte}$. Como $\log\mu$ es el predictor lineal, **el
+reparto de cualquier coeficiente está decidido por $p$**, y por nada más:
 
-La misma idea, en un solo número, es el **coeficiente de correlación intraclase (ICC)**: la fracción de la
-variabilidad —ya descontadas las covariables— que corresponde a **estar en la misma máquina**. Es la
-versión *limpia* de la descomposición cruda entre/dentro de la [Sección 3.1](#sec-u33-contexto):
+$$\beta \;\longmapsto\; \underbrace{(2-p)\,\beta}_{\text{a la frecuencia}}
+\;+\; \underbrace{(p-1)\,\beta}_{\text{a la severidad}} .$$
 
 ```{r}
-#| label: u33-icc
-performance::icc(m_final)
+#| label: u33-reparto
+b <- fixef(m_tw)$cond[c("edad", "criticidadCritica", "plan_mantenimientoPreventivo")]
+round(cbind(total = b, a_frecuencia = (2 - p_hat) * b, a_severidad = (p_hat - 1) * b), 3)
 ```
 
-Salen **dos** ICC. El **ajustado** ($\approx 0{,}48$) mide la fracción de la variabilidad **no explicada
-por las covariables** que corresponde a la máquina —casi la **mitad**—; el **no ajustado** ($\approx
-0{,}31$) la mide sobre la variabilidad **total**, covariables incluidas. Los dos dicen lo mismo en una
-cifra: **qué máquina es** pesa muchísimo en por qué una reparación sale cara o barata. Es la versión
-limpia —ya descontadas criticidad, tipo, etc.— de la fuerte correlación intra-máquina que el modelo de
-efectos fijos ignoraba, y que por eso acababa inflando $\hat\phi$ y estrechando los intervalos. La
-distinción **ajustado/no ajustado** importa: el primero responde «de lo que las covariables *no*
-explican, ¿cuánto es de la máquina?»; el segundo, «del total, ¿cuánto?».
+Con $\hat p = 1.35$, el modelo manda el **65 %** de todo efecto a la frecuencia y el **35 %** a la
+severidad —de **cada** covariable, sin excepción—. Y ese es el precio: el reparto no lo estiman los
+datos, lo impone $p$. Si en el proceso real una covariable actuara solo sobre el coste y nada sobre
+el riesgo, el modelo seguiría partiéndole el efecto 65/35, y acertaría en el **total** mientras
+falla en la **descomposición**. Si el reparto importa —y para decidir *dónde* intervenir, importa—,
+hay que separar los datos y ajustar dos modelos: una Poisson sobre `n_averias` y una Gamma sobre el
+coste por avería. La Tweedie es el modelo del **presupuesto**, no el del diagnóstico de por qué
+sube. En la validación comprobaremos hasta qué punto el reparto impuesto se aleja del verdadero.
 
-### Diagnóstico: residuos
+### Inferencia {#sec-u33-inferencia}
 
-En un GLMM los residuos crudos son aún menos informativos que en un GLM. Recurrimos otra vez a los
-**residuos cuantil simulados** de DHARMa, que saben tratar la estructura jerárquica:
+Los Wald de la tabla anterior contrastan coeficientes **uno a uno**, lo que deja mal cubiertos a los
+factores de varios niveles: `proceso` gasta cuatro coeficientes y `criticidad` dos, y la pregunta
+relevante no es si un nivel concreto difiere de su referencia, sino si **el factor entero aporta**.
+Eso es un contraste de razón de verosimilitudes, término a término:
+
+```{r}
+#| label: tbl-u33-lrt
+#| tbl-cap: "Contraste de razón de verosimilitudes por término (cada uno frente al modelo sin él). Todos los términos aportan; el fabricante lo hace de forma marginal."
+drop1(m_tw, test = "Chisq")
+```
+
+En la @tbl-u33-lrt todos los términos aportan, pero con jerarquías muy distintas: **edad** domina
+($\chi^2\approx 105$
+con 1 g.l.), seguida de **criticidad** ($\approx 79$ con 2) y **plan** ($\approx 61$ con 1); el
+**proceso** aporta con holgura ($\approx 37$ con 4) y la **carga**, más modestamente
+($\approx 12$, $p\approx 5\times10^{-4}$) —coherente con lo poco que separaba en la exploración—.
+
+El **fabricante** también supera el 5 % ($\chi^2\approx 7.8$ con 2 g.l., $p\approx 0.02$), y no es la
+primera vez que un control sin efecto aparenta tenerlo: es el patrón que el Caso 1 y el Caso 2 ya
+mostraron, y que se repite siempre en el mismo escenario —efectos fijos sobre filas repetidas por la
+misma unidad—. Sigamos, que el diagnóstico tiene algo que decir al respecto.
+
+Queda una pregunta que en esta familia no es menor: **¿y la incertidumbre de $\phi$ y $p$?** Los dos
+son parámetros estimados como cualquier otro, así que también deberían tener intervalo —solo que
+`summary` no lo imprime—. Se los pedimos a `confint`, que con `full = TRUE` va más allá de los
+coeficientes:
+
+```{r}
+#| label: u33-ic-varianza
+ic <- confint(m_tw, full = TRUE)          # más allá de los coeficientes: dispersión y familia
+ic[!grepl("^cond\\.", rownames(ic)), , drop = FALSE]
+```
+
+La dispersión sale con su intervalo, $\hat\phi = 174.6$ con IC 95 % $(149.5,\ 203.9)$: bien
+determinada y lejos de cualquier frontera. Pero **el índice $p$ no aparece**, y no es un descuido
+nuestro: `confint` cubre coeficientes y dispersión, no el parámetro de familia. Para él, la vía
+natural es el **perfil de verosimilitud** —reajustar el modelo con $p$ fijado en una rejilla de
+valores e invertir el contraste—, que además es más fiable que un Wald para un parámetro acotado a
+$(1,2)$. No es un trámite ocioso: en la [validación](#sec-u33-validacion-tw) compararemos $\hat p$
+con el valor que dicta el mecanismo, y ahí la anchura del intervalo es justamente lo que está en
+juego.
+
+Para los **efectos**, en cambio, los intervalos ya los teníamos —exponenciados y listos para leer en
+euros— en la @tbl-u33-tweedie.
+
+### Bondad de ajuste {#sec-u33-bondad}
+
+¿Cuánto mejora este modelo sobre no saber nada? Y, más importante para un presupuesto: ¿acierta en
+las magnitudes que va a predecir? Empecemos por lo global, comparándolo con el modelo **nulo** —solo
+intercepto y exposición—:
+
+```{r}
+#| label: tbl-u33-bondad
+#| tbl-cap: "Ajuste global del modelo frente al nulo (solo intercepto y offset): caída del AIC y contraste de razón de verosimilitudes entre ambos, que están anidados."
+m_nulo <- glmmTMB(coste_total ~ 1 + offset(log(exposicion)), family = tweedie, data = pn)
+
+k0 <- length(fixef(m_nulo)$cond); k1 <- length(fixef(m_tw)$cond)
+lrt <- as.numeric(2 * (logLik(m_tw) - logLik(m_nulo)))
+
+data.frame(modelo  = c("nulo", "con covariables"),
+           k       = c(k0, k1),
+           logLik  = round(c(logLik(m_nulo), logLik(m_tw)), 1),
+           AIC     = round(c(AIC(m_nulo), AIC(m_tw)), 1),
+           LRT     = c(NA, round(lrt, 1)),
+           gl      = c(NA, k1 - k0),
+           p_valor = c(NA, signif(pchisq(lrt, k1 - k0, lower.tail = FALSE), 3)))
+```
+
+Los dos modelos están **anidados** —el nulo es este mismo con todos los coeficientes a cero— y
+ambos estiman su $\phi$ y su $p$, que por tanto se cancelan al contar parámetros: cabe, pues, un
+contraste de razón de verosimilitudes con 11 grados de libertad, además de la comparación por AIC.
+En la @tbl-u33-bondad el AIC cae unos **240 puntos** y el LRT alcanza 262 con 11 g.l.
+($p \approx 9\times10^{-50}$): las covariables aportan mucho más de lo que cuestan, y el modelo nulo
+queda descartado sin margen de duda. Con una cautela que el diagnóstico confirmará: el LRT supone **filas independientes**, y aquí
+no lo son del todo; con una diferencia de esta magnitud la conclusión no está en juego, pero
+conviene no leer el $p$-valor como si fuera exacto. Pero un
+presupuesto no se juzga por el AIC, sino por si **los euros predichos se parecen a los observados**.
+Dos comprobaciones, y las dos con una lógica de calibración: agrupamos las filas por su predicción
+y miramos qué pasó de verdad en cada grupo.
+
+```{r}
+#| label: tbl-u33-calibracion
+#| tbl-cap: "Calibración: máquina-años agrupados en deciles del coste predicho, con la media predicha y la media observada en cada decil. Un modelo bien calibrado mantiene las dos columnas próximas en todo el rango."
+pn |>
+  dplyr::mutate(ajustado = as.numeric(fitted(m_tw)),
+                decil = dplyr::ntile(ajustado, 10)) |>
+  dplyr::group_by(decil) |>
+  dplyr::summarise(predicho = round(mean(ajustado)),
+                   observado = round(mean(coste_total)), .groups = "drop")
+```
+
+La misma información se ve de un vistazo enfrentando las dos columnas: si el modelo estuviera bien
+calibrado, los diez puntos caerían sobre la diagonal.
+
+```{r}
+#| label: fig-u33-calibracion
+#| fig-width: 5
+#| fig-height: 4.6
+#| fig-cap: "Calibración del modelo: coste medio observado frente al predicho en cada decil de predicción. La diagonal marca el acuerdo perfecto; los puntos se mantienen cerca de ella en todo el rango, de los años más baratos a los más caros."
+pn |>
+  dplyr::mutate(ajustado = as.numeric(fitted(m_tw)),
+                decil = dplyr::ntile(ajustado, 10)) |>
+  dplyr::group_by(decil) |>
+  dplyr::summarise(predicho = mean(ajustado), observado = mean(coste_total),
+                   .groups = "drop") |>
+  ggplot(aes(predicho, observado)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey55") +
+  geom_point(size = 2.6, colour = "steelblue") +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "coste anual medio predicho (€, escala log)",
+       y = "coste anual medio observado (€)")
+```
+
+La correspondencia de la @tbl-u33-calibracion y la @fig-u33-calibracion es buena en todo el
+recorrido —de ~205 € en el decil más barato a ~2500 € en el más caro, con los puntos pegados a la
+diagonal—, sin el sesgo sistemático que delataría una mala especificación de la media: no hay una
+curvatura que indique que el modelo se queda corto en los caros o se pasa en los baratos. Las
+desviaciones son pequeñas y de signo alterno; la mayor, en el decil más barato, ronda el 18 % sobre
+una base de 205 €. Y la segunda comprobación es la que la familia se juega de verdad,
+porque afecta a la mitad de las filas: **¿cuántos años a cero predice el modelo?** Recuérdese que
+$\Pr(S=0)=e^{-\lambda}$, con $\lambda$ recuperable del ajuste:
+
+```{r}
+#| label: u33-ceros-ajuste
+round(c(ceros_observados = mean(pn$coste_total == 0) * 100,
+        ceros_esperados  = mean(exp(-lambda)) * 100), 1)
+```
+
+**49.9 % observados frente a 50.5 % esperados.** Es un resultado notable si se piensa en lo que ha
+pasado: nadie ha modelado los ceros —no hay un submodelo de «¿hubo avería?»—, y sin embargo la
+familia los reproduce casi exactamente, porque los deduce de la frecuencia. Compárese con la
+[Sección 4.1](#sec-u33-mapa), donde una Poisson **homogénea** se quedaba en el 44.8 %: la diferencia
+la ponen las covariables, que reparten la propensión a fallar entre máquinas.
+
+### Diagnóstico {#sec-u33-diagnostico}
+
+La bondad de ajuste dice que las medias cuadran; el diagnóstico pregunta si **los supuestos** se
+sostienen. Con una respuesta mitad discreta mitad continua, los residuos clásicos son inservibles
+—no hay forma de que se parezcan a una normal—, así que recurrimos a los **residuos cuantil
+simulados** de `DHARMa` [@dunnsmyth1996], la herramienta del curso desde el Caso 1: se simulan
+respuestas del modelo ajustado y se sitúa cada observación en su distribución simulada; si el modelo
+es correcto, los residuos resultantes son **uniformes**.
 
 ```{r}
 #| label: fig-u33-dharma
 #| fig-width: 9
 #| fig-height: 4
-#| fig-cap: "Diagnóstico DHARMa del GLMM Gamma. Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste. Derecha: residuos frente a predicho. Buscamos uniformidad y ausencia de estructura, ahora respetando el agrupamiento por máquina."
-sim <- DHARMa::simulateResiduals(m_final, n = 1000)
-plot(sim)
+#| fig-cap: "Residuos cuantil simulados (DHARMa) del modelo Tweedie: gráfico Q-Q frente a la uniforme (izquierda) y residuos frente a valor predicho (derecha)."
+res_tw <- DHARMa::simulateResiduals(m_tw, n = 250, seed = SEMILLA_CURSO)
+plot(res_tw)
 ```
-
-**Lectura del gráfico.** A la izquierda en la @fig-u33-dharma, los puntos siguen la **diagonal** del QQ uniforme y los
-contrastes que DHARMa superpone —uniformidad (KS), dispersión y valores atípicos— **no salen
-significativos**; a la derecha, la nube de residuos frente al predicho **no muestra estructura** (ni
-abanico ni curvatura). El modelo ajusta bien: ahora que respeta el agrupamiento, han desaparecido los
-patrones que un GLM de efectos fijos dejaría en los residuos de máquinas repetidas.
-
-**Comprobación explícita de la dispersión (φ).** El contraste de dispersión —el que aparece en el
-gráfico— merece sacarse aparte, porque es la forma de validar que φ está **bien capturada**, y —a
-diferencia de la validación contra el DGP de más abajo— **funciona con datos reales**, sin conocer la
-verdad:
 
 ```{r}
-#| label: u33-testdisp
-DHARMa::testDispersion(sim, plot = FALSE)
+#| label: u33-dharma-tests
+DHARMa::testDispersion(res_tw, plot = FALSE)
 ```
 
-No es significativo: **ni sobre- ni infradispersión**. Es decir, una vez que los efectos aleatorios se
-llevan la variabilidad **entre máquinas**, lo que queda en los residuos es exactamente la dispersión que
-la Gamma espera. La $\hat\phi$ que en 3.1 salía **inflada** (≈ 0.33) ha vuelto a su sitio —y lo
-confirmamos aquí sin necesitar el DGP; la validación de abajo lo rematará con la verdad en la mano—.
+La @fig-u33-dharma no delata ningún desajuste grosero de forma, pero el contraste de dispersión es
+tajante: los residuos observados se dispersan **1.39 veces** más de lo que el modelo ajustado es
+capaz de generar ($p < 2.2\times10^{-16}$). El dato varía más de lo que la
+Tweedie estimada admite —y conviene subrayar lo llamativo del hallazgo, porque las medias estaban
+bien calibradas: **acertar en la media no garantiza acertar en la varianza**, y esta familia se
+juega en la varianza buena parte de su utilidad—. ¿De dónde sale esa variabilidad sobrante? La sospecha es la de siempre en
+este caso, y se puede comprobar directamente: si las cuatro filas de una misma máquina fueran
+independientes, sus residuos no deberían parecerse entre sí más de lo que se parecen los de máquinas
+distintas.
 
-::: {.callout-tip}
-## 🔧 En R. Diagnóstico de residuos y dispersión en un GLMM
-Los **residuos cuantil de DHARMa** (introducidos en la [Unidad 3.1](#sec-u31)) valen también aquí, con una
-ventaja: sobre un modelo de `glmmTMB`, `simulateResiduals` **respeta la estructura jerárquica**.
+```{r}
+#| label: u33-agrupamiento
+u <- residuals(res_tw)                       # residuos cuantil, uniformes si el modelo es correcto
+obs <- var(tapply(u, pn$id_maquina, mean))   # ¿cuánto varían las medias por máquina?
 
-```r
-sim <- DHARMa::simulateResiduals(m, n = 1000)   # residuos simulados, respetando el agrupamiento
-plot(sim)                                        # QQ uniforme + residuos vs. predicho
+set.seed(SEMILLA_CURSO)                      # referencia: lo mismo, rompiendo el agrupamiento
+nulo <- replicate(200, var(tapply(runif(nrow(pn)), pn$id_maquina, mean)))
+
+round(c(varianza_observada = obs, esperada_si_independientes = mean(nulo),
+        p_valor = mean(nulo >= obs)), 4)
 ```
 
-Lo **nuevo del GLMM** es comprobar que los efectos aleatorios han dejado la dispersión en su sitio:
+El veredicto es contundente: las medias por máquina varían 0.0303, frente al 0.0224 que permitiría
+la independencia —ninguna de las 200 réplicas llega a lo observado, $p < 0.005$—. Dicho sin
+tecnicismos: **hay máquinas caras y máquinas baratas** más allá de lo que explican edad, criticidad,
+proceso, carga y plan. Es la **fragilidad** —la misma que la [Unidad 3.3](#sec-u34) encontró en el
+coste por avería—, que aquí reaparece en el coste anual y que este modelo, de efectos fijos, no
+recoge.
 
-```r
-sigma(m)^2                     # estimación de phi  (en la Gamma, Var = phi * mu^2)
-DHARMa::testDispersion(sim)    # contraste de sobre/infradispersión
+Dos consecuencias, y conviene no confundirlas. Los **coeficientes** apenas sufren —es la lección de la [Unidad 3.3](#sec-u34)—: el retrato del gasto sigue siendo válido. Los **errores estándar**, en cambio, son
+optimistas, porque el modelo cree tener 1531 observaciones independientes cuando tiene 400 máquinas
+seguidas cuatro años. Ahí está, muy probablemente, el `fabricante` que se cuela con $p\approx 0.02$.
+La [Sección 4.3](#sec-u33-agrupados) se ocupa de esto.
+
+### Predicción: el presupuesto {#sec-u33-prediccion}
+
+Llegamos a lo que la dirección pidió. Y merece la pena subrayar por qué **en este modelo** la
+predicción es especialmente valiosa: la respuesta ya está en euros y en la unidad de gestión
+—máquina y año—, así que la predicción **es** directamente la cifra que se lleva a la hoja de
+presupuesto. No hay que componer nada ni traducir hazards.
+
+El escenario del **año 5** se construye solo: el parque del último año observado, un año más viejo,
+y expuesto el año completo. Nótese lo que hace el *offset* aquí: fijar `exposicion = 1` es pedir el
+coste de un **año entero de servicio**, que es lo que se presupuesta.
+
+```{r}
+#| label: u33-presupuesto
+nd <- subset(pn, anio == 4)   # el parque completo en su último año observado
+nd$edad <- nd$edad + 1        # un año más viejas: así llegan al año 5
+nd$exposicion <- 1            # presupuestamos el año entero
+
+# predecimos en la escala del ENLACE y volvemos con exp(): así el intervalo
+# respeta el soporte positivo y sale asimétrico, como debe
+pr    <- predict(m_tw, newdata = nd, type = "link", se.fit = TRUE)
+pred5 <- exp(pr$fit)
+lo5   <- exp(pr$fit - 1.96 * pr$se.fit)
+hi5   <- exp(pr$fit + 1.96 * pr$se.fit)
+
+round(c(maquinas = nrow(nd), total_eur = sum(pred5), media_eur = mean(pred5),
+        historico_eur_maq_anio = sum(pn$coste_total) / sum(pn$exposicion)))
 ```
 
-Un `testDispersion` **no significativo** indica que la variabilidad entre máquinas ya la absorben los
-aleatorios y lo que queda es la de la familia. Es la comprobación válida **con datos reales**, sin conocer
-la verdad.
+La incertidumbre **del total** no se obtiene sumando los intervalos individuales: las 400
+predicciones comparten los mismos coeficientes estimados, así que sus errores están **correlados** y
+esa suma exageraría el margen. Lo correcto es propagar la incertidumbre de $\hat{\boldsymbol\beta}$ a
+la suma con el método delta: si $T=\sum_i \mu_i$, su gradiente respecto a $\boldsymbol\beta$ es
+$\sum_i \mu_i \mathbf{x}_i$, y
+
+$$\operatorname{Var}(T) \;\approx\; \Big(\textstyle\sum_i \mu_i\mathbf{x}_i\Big)^{\!\top}
+\operatorname{Var}(\hat{\boldsymbol\beta})\;\Big(\textstyle\sum_i \mu_i\mathbf{x}_i\Big).$$
+
+```{r}
+#| label: u33-presupuesto-ic
+X <- model.matrix(~ edad + carga + proceso + criticidad + plan_mantenimiento + fabricante,
+                  data = nd)                       # misma fórmula; el offset vale log(1) = 0
+g <- as.vector(t(X) %*% pred5)                      # gradiente de la suma
+se_total <- sqrt(as.numeric(t(g) %*% vcov(m_tw)$cond %*% g))
+
+round(c(total_eur = sum(pred5), SE = se_total,
+        IC_inf = sum(pred5) - 1.96 * se_total,
+        IC_sup = sum(pred5) + 1.96 * se_total,
+        suma_ingenua_inf = sum(lo5), suma_ingenua_sup = sum(hi5)))
+```
+
+**Unos 538 000 € para el parque**, 1345 € por máquina, frente a los 1009 € por máquina-año del
+histórico. Esa diferencia es la lección de la sección: el presupuesto **no es** la media del pasado,
+porque la flota **envejece** y el modelo lo incorpora —un año más son un 15 % más de gasto
+esperado—. Presupuestar con el histórico habría dejado el ejercicio corto en torno a un tercio.
+
+La cifra que se lleva a la reunión es, pues, **538 000 €, con un intervalo de confianza al 95 % de
+485 000 a 591 000 €** —un margen de $\pm 10\,\%$—. Y compárese con la suma ingenua de los
+intervalos individuales (416 000 – 697 000 €), **dos veces y media más ancha**: al agregar, los
+errores **no se acumulan**, porque todas las predicciones comparten los mismos coeficientes.
+
+La predicción también dice **dónde** se va el dinero, que es lo que permite actuar:
+
+```{r}
+#| label: tbl-u33-presupuesto-desglose
+#| tbl-cap: "Presupuesto previsto para el año 5, por criticidad: número de máquinas, coste medio por máquina y total del grupo."
+data.frame(criticidad = nd$criticidad, prevision = pred5) |>
+  dplyr::group_by(criticidad) |>
+  dplyr::summarise(maquinas = dplyr::n(), media_eur = round(mean(prevision)),
+                   total_eur = round(sum(prevision)), .groups = "drop")
+```
+
+En la @tbl-u33-presupuesto-desglose, las **Críticas** cuestan de media el doble que las Auxiliares
+(1987 € frente a 969 €), de modo que concentran una parte del presupuesto muy superior a su peso en
+número: son 78 de 400 máquinas (el 20 %) y se llevan 155 000 € de los 538 000 (el 29 %). Son las candidatas naturales a revisar la
+política de mantenimiento. Y ese es el entregable que la dirección entiende —una cifra,
+un desglose y una recomendación—, salido de **un solo modelo** que resume las dos mitades del caso.
+
+::: {.callout-warning}
+## Dos incertidumbres distintas, y solo hemos cuantificado una
+El intervalo anterior mide la incertidumbre **sobre la media**: cuánto puede desplazarse el coste
+*esperado* porque los coeficientes están estimados. No es lo mismo que preguntar **cuánto costará
+realmente** el año que viene: el gasto observado será una **realización** Tweedie alrededor de esa
+media, y su dispersión —gobernada por $\phi$ y $p$— es mucho mayor que la del propio intervalo.
+
+La distinción importa para presupuestar. Con un intervalo de la media se responde «¿dónde está el
+gasto medio?»; para dotar una partida hace falta un **intervalo de predicción** y, mejor aún, un
+**percentil alto** de la predictiva —¿cuánto reservar para que la partida se quede corta solo uno de
+cada diez años?—, que se obtiene **simulando** del modelo ajustado en vez de derivando. Y a los dos
+les falta todavía el agrupamiento que el diagnóstico reclamó: con la fragilidad reconocida, los
+márgenes se ensancharían. Buen material para el estudio de caso.
 :::
 
-### Validación contra el DGP {#sec-u33-validacion}
+### Validación contra el DGP {#sec-u33-validacion-tw}
 
-La ventaja de los datos simulados: ahora validamos también los **componentes de varianza**, no solo los
-efectos fijos (@tbl-u33-verdad).
+Este modelo tiene **tres tipos de resultado** que confrontar con la verdad, y cada uno pide su
+propio procedimiento. Conviene fijarlo antes de mirar ningún número:
+
+| Qué validamos | Dónde está la verdad | Cómo se compara |
+|---|---|---|
+| Los **efectos** $\boldsymbol\beta$ | repartidos en **dos** vectores del DGP: `beta_hazard` (riesgo) y `beta_coste` (importe) | cada coeficiente, contra la **suma** de sus dos canales |
+| El **índice** $p$ | en ningún sitio: no es un parámetro del DGP | se **deriva** de la forma de la Gamma, $p=(\alpha+2)/(\alpha+1)$ |
+| El **reparto** frecuencia/severidad | en la comparación de los dos canales, covariable a covariable | contra el reparto fijo $(2-p)/(p-1)$ que el modelo impone |
+
+**1 · Los efectos.** La regla es la de la factorización: si el coeficiente Tweedie mide el efecto
+**total** sobre el coste anual, su contraparte verdadera es la **suma** del efecto sobre el riesgo y
+del efecto sobre el importe. Ponemos las tres columnas —los dos canales y su suma— junto a lo
+estimado:
 
 ```{r}
-#| label: tbl-u33-verdad
-#| tbl-cap: "Componentes de varianza y dispersión estimados frente a la verdad del proceso generador. φ es la dispersión que estima el propio modelo (el «sigma^2» que imprime el summary)."
+#| label: tbl-u33-tweedie-dgp
+#| tbl-cap: "Validación de los efectos: los dos canales del DGP (log-hazard y log-coste), su suma —la contraparte del coeficiente Tweedie— y lo estimado con su error estándar. Para Ensamblaje, Acabado y las criticidades, la verdad omite la interacción criticidad × proceso-cuello del canal de coste, que el modelo de efectos principales reparte entre esos términos."
 verdad <- attr(banco, "verdad")
-rp     <- broom.mixed::tidy(m_final, effects = "ran_pars")
-phi_glmm <- sigma(m_final)^2   # dispersión del modelo (Var = phi * mu^2)
+bh <- verdad$beta_hazard; bc <- verdad$beta_coste
 
-tibble::tibble(
-  cantidad  = c("sd intercepto (fragilidad de máquina)", "sd pendiente (edad)", "dispersión φ"),
-  estimado  = round(c(rp$estimate[rp$term == "sd__(Intercept)"],
-                      rp$estimate[rp$term == "sd__edad_c"],
-                      phi_glmm), 3),
-  verdadero = round(c(verdad$sigma_intercepto_coste, verdad$sigma_pend, verdad$phi_coste), 3))
+tab_dgp <- tibble::tibble(
+  term      = c("edad", "carga", "procesoMecanizado", "procesoLijado", "procesoEnsamblaje",
+                "procesoAcabado", "criticidadImportante", "criticidadCritica",
+                "plan_mantenimientoPreventivo", "fabricanteB", "fabricanteC"),
+  frecuencia = c(bh[["antiguedad"]], bh[["carga"]], bh[["Mecanizado"]], bh[["Lijado"]],
+                 bh[["Ensamblaje"]], bh[["Acabado"]], 0, 0, NA, 0, 0),
+  severidad  = c(bc[["antiguedad"]], bc[["carga"]], bc[["Mecanizado"]], bc[["Lijado"]],
+                 bc[["Ensamblaje"]], bc[["Acabado"]], bc[["Importante"]], bc[["Critica"]],
+                 0, 0, 0)) |>
+  dplyr::mutate(suma_DGP = frecuencia + severidad)
+
+broom.mixed::tidy(m_tw, effects = "fixed") |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::transmute(term, estimado = round(estimate, 3), SE = round(std.error, 3)) |>
+  dplyr::left_join(tab_dgp, by = "term")
 ```
 
-Los tres se recuperan bien: el **intercepto** de máquina muy cerca de la verdad, la **pendiente**
-prácticamente en el clavo (con pocas averías por máquina esa varianza es difícil de precisar —lo que
-explica que su contraste quedara al filo—), y —lo esencial— el **parámetro de dispersión** $\hat\phi$
-**cae** de los $\approx 0.33$ inflados de la 3.1 a $\approx 0.17$, prácticamente el verdadero
-$0.167$. La razón es la que veníamos anunciando: la variabilidad **entre máquinas** ya no tiene que
-esconderse dentro de $\phi$, porque tiene su propio nivel. El círculo que abrimos en la 3.1 —$\hat\phi$
-inflada, intervalos demasiado estrechos, un control que salía «significativo» sin serlo— **se cierra
-aquí**.
+La @tbl-u33-tweedie-dgp aprueba con matices instructivos. `edad` **clava** la suma (0.137 frente a
+$0.10 + 0.03 = 0.13$): dos canales pequeños que, juntos, son el motor del presupuesto. `proceso` y
+`criticidad` caen donde deben, con el reparto de la interacción que anuncia el caption. `carga`
+vuelve a ser la de siempre: estimada 0.86 frente a una suma de 1.30, pero con SE 0.245 —el
+intervalo la cubre; es la covariable **entre-máquinas** y paga el precio de serlo—.
 
-### Predicción: marginal y condicional {#sec-u33-prediccion}
-
-Un modelo mixto predice en **dos niveles**, y conviene no confundirlos:
-
-- La predicción **marginal** usa **solo los efectos fijos** (`re.form = NA`): responde por una máquina
-  *cualquiera* del perfil dado. Es la única que da un GLM (la predicción que conseguíamos en la [Unidad 3.1](#sec-u31)): no hay máquina
-  concreta que añadir.
-- La predicción **condicional** añade los **efectos aleatorios** de una máquina concreta —sus BLUP—
-  (`re.form = NULL`): responde por *esa* máquina. La @fig-u33-cond-marg pone las dos una al lado de la otra.
+El `plan` es el único con la celda vacía, y por una razón que ya conocemos: su verdad **no es un
+número del DGP**, sino el promedio anual de una protección que **decae**.
+Se deriva a primer orden como $\beta_{\text{plan}} \approx \theta_{\text{mant}}\cdot
+\mathbb{E}[\texttt{prot\_mant}]$ en las máquinas preventivas:
 
 ```{r}
-#| label: fig-u33-cond-marg
-#| fig-width: 7.5
-#| fig-height: 4
-#| fig-cap: "Coste medio predicho frente a la edad. En negro, la predicción MARGINAL (población, re.form = NA); en color, las CONDICIONALES de seis máquinas concretas (con sus efectos aleatorios, re.form = NULL). Las condicionales se separan sobre todo en nivel —unas máquinas caras, otras baratas— y con pendientes algo distintas."
-media_edad <- mean(base$antiguedad_anios)
-rej <- tidyr::expand_grid(
-  edad_c       = seq(min(base$edad_c), max(base$edad_c), length.out = 40),
-  tipo_averia  = "Mecanica", criticidad = "Auxiliar",
-  fase_proceso = "fase1",    carga      = mean(base$carga))
+#| label: u33-plan-derivado
+# la protección decae con escala tau, y ambos valores están en la verdad del DGP
+tau  <- verdad$beta_hazard[["tau_mant"]]
+prot <- ifelse(is.na(sg$dias_desde_mant), 0, exp(-sg$dias_desde_mant / tau))
+prot_prev <- mean(prot[sg$plan_mantenimiento == "Preventivo"])
 
-marg <- rej
-marg$pred <- predict(m_final, newdata = rej, type = "response", re.form = NA)
-
-set.seed(7)
-seis <- sample(unique(base$id_maquina), 6)
-cond <- tidyr::expand_grid(rej, id_maquina = seis)
-cond$pred <- predict(m_final, newdata = cond, type = "response", re.form = NULL)
-
-ggplot(marg, aes(edad_c + media_edad, pred)) +
-  geom_line(data = cond, aes(colour = factor(id_maquina)), alpha = 0.7) +
-  geom_line(linewidth = 1.2) +
-  labs(x = "edad de la máquina (años)", y = "coste medio predicho (€)", colour = "máquina")
+round(c(tau = tau, E_prot_preventivo = prot_prev,
+        beta_plan_derivado = verdad$beta_hazard[["mant_inmediato"]] * prot_prev), 3)
 ```
 
-Añadir el efecto aleatorio **desplaza la curva** a la altura de cada máquina (y le da su pendiente): la
-marginal responde «¿cuánto cuesta reparar una máquina *cualquiera* de este perfil?»; la condicional,
-«¿cuánto costará reparar *esta* máquina?» —para decidir sobre una unidad concreta, p. ej. si conviene
-sustituirla—. Un GLM solo da la primera; el efecto aleatorio es lo que hace posible la segunda.
+Derivado $-0.63$, estimado $-0.617$. El mecanismo del DGP es un **reloj**: la revisión protege al
+máximo el día que se hace y su efecto se desvanece con escala $\tau = 60$ días. Promediado a lo largo
+del año, ese reloj deja exactamente la huella que el modelo recoge en una etiqueta fija. Volveremos
+sobre él en la [Unidad 3.6](#sec-ELIM-u36), donde se modela tal cual, sin promediar.
 
-Dos matices importan al leer estas curvas. Primero, los efectos por máquina que suma la condicional son
-**BLUP**, estimaciones **encogidas** hacia la media: una máquina con **pocas averías** se acerca al
-comportamiento medio (menos datos, menos confianza en su nivel propio), y solo las que acumulan muchas se
-despegan del promedio —por eso las condicionales son **prudentes**, no exageradas—. Segundo, y aquí
-reaparece **Jensen** (como en la retransformación de la [Unidad 3.2](#sec-u32)): con enlace log, la
-predicción marginal $e^{x^\top\hat\beta}$ es la de la máquina **típica** (efecto aleatorio nulo), que por
-la asimetría es la **mediana**, no la **media poblacional**. Promediar el coste sobre *todas* las máquinas
-da algo **mayor** —un factor $e^{\sigma^2/2}$ con $\sigma^2$ la varianza del intercepto aleatorio; aquí,
-un ~7 % más—. Para presupuestar la **flota entera**, conviene tenerlo en cuenta.
+**2 · El índice $p$.** No hay parámetro que leer, pero sí que derivar: el coste anual se genera
+literalmente con la receta de la [Sección 4.1](#sec-u33-mapa) —averías Poisson y costes Gamma de
+forma común $\alpha = 1/\phi_{\text{coste}}$—, y en una Poisson–Gamma compuesta el índice queda
+determinado por esa forma.
+
+```{r}
+#| label: u33-p-dgp
+alfa <- 1 / verdad$phi_coste          # forma de la Gamma del coste por avería
+round(c(phi_coste = verdad$phi_coste, alfa = alfa,
+        p_mecanismo = (alfa + 2) / (alfa + 1),
+        p_estimado = p_hat,
+        pendiente_marginal_6.2 = coef(ajuste_p)[["log(media)"]]), 3)
+```
+
+El mecanismo dicta $p = 8/7 \approx 1.143$ —cerca del extremo Poisson: con $\alpha = 6$, la Gamma
+del coste es poco variable— y $\hat p = 1.35$ queda **entre** ese valor y el 1.45 de la pendiente
+marginal. El triángulo se lee de un vistazo: condicionar en las covariables baja el índice desde la
+nube (1.45) pero no hasta el mecanismo (1.143), porque dentro de cada máquina queda varianza que el
+predictor no recoge —la **fragilidad** que el diagnóstico acaba de destapar—. El panel no es Tweedie
+*exacto*, y $\hat p$ absorbe la diferencia sin quejarse.
+
+Eso deja una predicción contrastable, y conviene anotarla antes de seguir: si el exceso de $\hat p$
+sobre el mecanismo viene de heterogeneidad que el predictor no recoge, **darle a la máquina un
+parámetro propio debería bajar el índice**. La [Sección 4.3](#sec-u33-agrupados) hace justamente eso;
+allí se verá si la predicción se cumple.
+
+**3 · El reparto entre canales.** Aquí toca cobrarse la promesa de la
+[Sección anterior](#sec-u33-canales): el modelo impone a **toda** covariable el mismo reparto,
+$(2-p)$ a la frecuencia y $(p-1)$ a la severidad. ¿Cuánto se aleja del verdadero? La tabla de arriba
+ya trae los dos canales; basta pasarlos a porcentaje y enfrentarlos:
+
+```{r}
+#| label: tbl-u33-reparto-dgp
+#| tbl-cap: "Validación del reparto: porcentaje del efecto total que va a la frecuencia según el DGP, frente al porcentaje fijo que el modelo impone a todas las covariables. El total es correcto; el reparto, no."
+tab_dgp |>
+  dplyr::filter(!is.na(frecuencia), suma_DGP != 0) |>
+  dplyr::transmute(term,
+                   pct_frecuencia_DGP = round(100 * frecuencia / suma_DGP),
+                   pct_frecuencia_modelo = round(100 * (2 - p_hat)))
+```
+
+El contraste de la @tbl-u33-reparto-dgp es tan claro como instructivo. Para `edad`, el DGP manda el
+77 % del efecto a la frecuencia y el modelo supone un 65 %: se equivoca poco. Para `carga` (62 %) o `Acabado` (62 %)
+acierta casi por completo, y para `Ensamblaje` (43 %) o `Mecanizado` (50 %) se queda a medio camino.
+Pero para `criticidad` el DGP manda el **0 %** —una máquina crítica **no** se avería más, solo
+cuesta más de reparar— y el modelo insiste en su 65 %: se equivoca del todo. Nótese que el acierto
+es casual: el modelo aplica el mismo 65 % a todo, así que acierta donde el reparto verdadero se
+parece a esa cifra y falla donde no. La conclusión práctica ya la habíamos anticipado y ahora está
+verificada: el coeficiente **total** es de fiar, la **descomposición** no lo es. Si un jefe de
+planta pregunta si conviene actuar sobre la frecuencia (revisar más) o sobre la severidad (repuestos
+más baratos), este modelo no puede responderle: hacen falta los dos modelos por separado.
 
 ::: {.callout-tip}
-## 🔧 En R. Predicción en un GLMM
-- **Predicción marginal** (solo efectos fijos, la máquina «típica»):
-  `predict(m, newdata, type = "response", re.form = NA)`.
-- **Predicción condicional** (añade los efectos aleatorios de cada máquina, sus BLUP):
-  `predict(m, newdata, type = "response", re.form = NULL)` —el `newdata` debe traer la columna de grupo
-  (`id_maquina`)—. Con `re.form = ~(1 | id_maquina)` se incluye **solo parte** de la estructura aleatoria.
-- **Los efectos por grupo**, si los quieres ver: `ranef(m)` (los BLUP) y `fixef(m)` (los fijos).
+## 🔧 En R. Recetario de la Tweedie con `glmmTMB`
+Todo lo que hemos hecho en esta sección, en orden y con las trampas señaladas.
+
+**1 · Ajustar.** Como cualquier GLM, cambiando la familia; el enlace log es el que da la lectura
+multiplicativa y el *offset*, la escala por unidad de exposición.
+
+```r
+m <- glmmTMB(y ~ x1 + x2 + offset(log(exposicion)), family = tweedie, data = datos)
+```
+
+**2 · Leer los parámetros de la varianza.** El `summary` muestra $\hat\phi$ pero **no** el índice
+$p$; hay que pedirlo aparte —y ojo, `family_params()` no lo llama `"p"`—:
+
+```r
+sigma(m)               # phi  (en tweedie, sigma() ES phi: Var = phi * mu^p)
+family_params(m)[[1]]  # p    (acceso posicional, robusto al nombre)
+```
+
+**3 · Interpretar.** `broom.mixed::tidy(m, effects = "fixed", conf.int = TRUE, exponentiate = TRUE)`
+da los factores multiplicativos con su intervalo, listos para leer en la escala de la respuesta.
+
+**4 · Inferir.** `drop1(m, test = "Chisq")` contrasta cada término **entero** por razón de
+verosimilitudes —lo que procede con factores de varios niveles, donde el Wald por coeficiente se
+queda corto—. Para $\phi$, `confint(m, full = TRUE)` añade la fila `sigma`; los coeficientes salen
+con prefijo `cond.` (cuidado al filtrar por nombre). El índice $p$ **no** viene en esa tabla: su
+intervalo pide un **perfil de verosimilitud**.
+
+**5 · Comparar.** `anova(m0, m1)` entre modelos **anidados** ajustados sobre las **mismas filas**;
+`AIC()`/`BIC()` entre no anidados. Recuérdese que $\phi$ y $p$ también son parámetros: si los dos
+modelos los estiman, se cancelan al contar grados de libertad.
+
+**6 · Diagnosticar.** `DHARMa::simulateResiduals(m)` y su `plot()`, más
+`DHARMa::testDispersion()`. Los residuos clásicos **no sirven** con una respuesta mitad discreta
+mitad continua. Comprobaciones propias de esta familia: la **proporción de ceros** que el modelo
+espera, $e^{-\lambda}$, frente a la observada, y la **calibración** por deciles del ajuste.
+
+**7 · Predecir.** En la escala del enlace y con `se.fit`, volviendo con `exp()` para que el intervalo
+respete el soporte positivo:
+
+```r
+pr <- predict(m, newdata = nd, type = "link", se.fit = TRUE)
+mu <- exp(pr$fit);  ic <- exp(pr$fit + c(-1.96, 1.96) * pr$se.fit)
+```
+
+Para un **agregado** (la suma sobre muchas unidades), los intervalos individuales **no se suman**:
+hay que propagar `vcov(m)$cond` por el método delta, o simular $\boldsymbol\beta$ de su distribución
+muestral. Y téngase presente que todo esto son intervalos **de la media**: un intervalo de
+predicción exige simular de la predictiva.
+
+**8 · Recuperar los dos canales.** Con $\hat p$ y $\hat\phi$ se despejan frecuencia y severidad
+—$\lambda = \mu^{2-p}/[\phi(2-p)]$ y $\mu_Y = (2-p)\phi\mu^{p-1}$—, pero el **reparto de cada
+efecto** entre ambos lo impone $p$, no los datos ([Sección 4.2](#sec-u33-canales)).
+:::
+
+**Veredicto.** El modelo recupera el mecanismo allí donde el dato agregado lo permite: los efectos
+totales, el índice de la familia dentro del rango correcto, los ceros y la calibración en euros. Y
+falla exactamente donde el diagnóstico avisó y donde la teoría predice: el **reparto** entre canales
+—que el dato agregado no identifica— y la **inferencia** —los errores estándar que ignoran el
+agrupamiento, con `fabricante` colándose a $p\approx 0.02$ pese a ser nulo en los dos canales—. Los
+dos problemas pendientes tienen el mismo origen, **datos agrupados tratados como sueltos**, y son la
+puerta de la siguiente sección.
+
+## 4.3 Datos agrupados: modelo y validación {#sec-u33-agrupados}
+
+La sección anterior terminó con dos cabos sueltos y un diagnóstico común: **tratamos como
+sueltas 1531 filas que vienen de 400 máquinas**. Los cabos eran el `fabricante`, significativo
+pese a ser nulo en el proceso generador, y el índice $\hat p = 1.35$, por encima del 1.143 que
+dicta el mecanismo. Toca recogerlos, y de paso preguntarnos cómo se **valida** un modelo cuando
+los datos vienen agrupados.
+
+### El agrupamiento, dentro del modelo {#sec-u33-glmm-tweedie}
+
+El efecto aleatorio no necesita más justificación que el **diseño del dato**: cada máquina
+aporta hasta cuatro filas, sus averías son recurrentes y comparten todo lo que la máquina tiene
+de propio y no está medido. Tratar esas filas como independientes es el supuesto que el
+diagnóstico de la [Sección 4.2](#sec-u33-diagnostico) desmintió. La herramienta la conocemos
+desde el Caso 1 y la usamos en la [Unidad 3.3](#sec-u34) sobre el coste por avería: un
+**intercepto aleatorio** por máquina. Sobre la Tweedie se escribe igual que sobre cualquier
+otra familia, y su lectura es la de siempre —cada máquina tiene un nivel de gasto propio,
+multiplicativo, que las covariables no explican—:
+
+$$\log \mu_{it} \;=\; \beta_0 + \mathbf{x}_{it}^{\top}\boldsymbol\beta \;+\; \log e_{it}
+\;+\; \underbrace{u_i}_{\text{la máquina}}, \qquad u_i \sim \mathcal{N}(0,\ \sigma_u^2).$$
+
+#### ¿Solo el intercepto? {#sec-u33-pendiente}
+
+Antes de ajustarlo conviene preguntarse si el nivel es lo único que cambia de una máquina a
+otra, o si además cambia **cómo evoluciona** su gasto: eso sería una **pendiente aleatoria**.
+La pregunta tiene una respuesta parcial antes de mirar ningún dato, y es puramente estructural:
+una pendiente aleatoria por máquina solo tiene sentido para una covariable que **varíe dentro
+de la máquina**. Si una covariable es constante para ella, su «pendiente» no se distingue de su
+nivel. Revisemos, pues, qué covariables varían dentro de cada máquina, contando cuántos valores
+distintos toman:
+
+```{r}
+#| label: u33-varia-dentro
+sapply(pn[c("edad", "carga", "proceso", "criticidad", "plan_mantenimiento")],
+       \(v) sum(tapply(v, pn$id_maquina, \(x) length(unique(x)) > 1)))   # nº de máquinas
+```
+
+El resultado deja una sola candidata: la **edad** cambia en las 400 máquinas, mientras que
+carga, proceso, criticidad y plan son atributos **fijos** de cada una —para ellas, una
+pendiente aleatoria ni siquiera está definida—. La pregunta se reduce entonces a si las
+máquinas **envejecen de forma distinta**: si el desgaste de unas se acelera más que el de
+otras.
+
+Planteada así, la pregunta es lo bastante razonable como para llevarla al modelo. Y ese es el
+punto de método: no la resolvemos con una exploración previa —ajustar una recta a los tres o
+cuatro puntos de cada máquina daría pendientes tan ruidosas que cualquier nube parecería
+heterogénea—, sino **estimándola donde corresponde**, con agrupamiento parcial y la
+verosimilitud de la familia.
+
+Planteamos, pues, el modelo mixto con interceptación **y** pendiente aleatoria en `edad`:
+$$S_{it} \;\sim\; \operatorname{Tw}_p(\mu_{it},\ \phi), \qquad
+\operatorname{Var}(S_{it}) \;=\; \phi\,\mu_{it}^{\,p},$$
+
+$$\log \mu_{it} \;=\; \underbrace{\beta_0 + \mathbf{x}_{it}^{\top}\boldsymbol\beta}_{\text{parte fija}}
+\;+\; \log e_{it}
+\;+\; \underbrace{u_{0i} \;+\; u_{1i}\,\texttt{edad}_{it}}_{\text{parte aleatoria de la máquina}},$$
+
+$$\begin{pmatrix} u_{0i} \\[2pt] u_{1i} \end{pmatrix}
+\;\sim\; \mathcal{N}\!\left(
+\begin{pmatrix} 0 \\[2pt] 0 \end{pmatrix},\;
+\boldsymbol\Sigma \right),
+\qquad
+\boldsymbol\Sigma \;=\;
+\begin{pmatrix}
+\sigma_0^{2} & \rho\,\sigma_0\sigma_1 \\[4pt]
+\rho\,\sigma_0\sigma_1 & \sigma_1^{2}
+\end{pmatrix}.$$
+
+
+Ajustamos las dos estructuras con `glmmTMB` y las comparamos:
+
+```{r}
+#| label: tbl-u33-pendiente
+#| tbl-cap: "Dos estructuras aleatorias para la misma media: solo intercepto de máquina, o intercepto y pendiente en la edad. La segunda añade dos parámetros: la varianza de la pendiente y su correlación con el intercepto."
+m_tw_re <- glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                     fabricante + (1 | id_maquina) + offset(log(exposicion)),
+                   family = tweedie, data = pn)
+
+m_tw_ris <- glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                      fabricante + (1 + edad | id_maquina) + offset(log(exposicion)),
+                    family = tweedie, data = pn)
+
+anova(m_tw_re, m_tw_ris)
+```
+
+```{r}
+#| label: u33-pendiente-sd
+VarCorr(m_tw_ris)$cond$id_maquina    # desviaciones típicas y correlación de los efectos
+```
+
+La respuesta llega antes de poder compararlos, y es contundente: la @tbl-u33-pendiente **sale
+llena de `NA`**. No hay AIC, ni verosimilitud, ni contraste. El ajuste con pendiente aleatoria
+**no ha convergido a una solución utilizable**, y el porqué está en las varianzas: la
+desviación típica de la pendiente es $0.011$ —frente a $0.68$ del intercepto—, y la
+**correlación entre ambos efectos sale $0.9997$**, es decir, prácticamente $1$.
+
+Esa correlación pegada a uno es la señal. Significa que el modelo no distingue dos efectos: lo
+que llama «pendiente» es una copia reescalada del intercepto, de modo que la matriz
+$\boldsymbol\Sigma$ es **degenerada** y la verosimilitud no tiene un máximo bien definido en
+ese borde. El modelo, con libertad para que cada máquina envejezca a su ritmo, no encuentra en
+los datos con qué sostener ese segundo efecto.
+
+Este desenlace tiene nombre propio y conviene reconocerlo, porque es de los más frecuentes al
+ajustar modelos mixtos: un **ajuste singular**. Sus dos síntomas típicos son justo los que
+vemos —una varianza que se va a cero, o una correlación que se pega a $\pm 1$— y la lección
+práctica es que **no se arregla insistiendo**: cambiar de optimizador o dar más iteraciones no
+crea información que no está. Lo que procede es **simplificar la estructura aleatoria**, que es
+lo que hacemos. Seguimos, pues, con el intercepto solo.
+
+Y conviene subrayar una cosa, porque es la que da valor didáctico al episodio: **el modelo no
+ha fallado, ha respondido**. Le preguntamos si las máquinas envejecen de forma distinta y ha
+contestado que con estos datos esa pregunta no se puede sostener. Un `anova` lleno de `NA` no
+es un problema técnico que ocultar: es un resultado que se reporta.
+
+Con la estructura decidida —intercepto aleatorio, sin pendiente—, ponemos el modelo al lado del
+de efectos fijos de la [Sección 4.2](#sec-u33-ajuste):
+
+```{r}
+#| label: tbl-u33-glmm
+#| tbl-cap: "El modelo Tweedie con y sin intercepto aleatorio de máquina: estimaciones, errores estándar y p-valores. Los coeficientes apenas se mueven; los errores estándar se ensanchan."
+comparar <- function(m, sufijo) broom.mixed::tidy(m, effects = "fixed") |>
+  dplyr::transmute(term,
+                   "estim{sufijo}" := round(estimate, 3),
+                   "SE{sufijo}"    := round(std.error, 3),
+                   "p{sufijo}"     := round(p.value, 4))
+
+comparar(m_tw, "_fijo") |> dplyr::left_join(comparar(m_tw_re, "_mixto"), by = "term")
+```
+
+El `summary` trae ahora un bloque que no habíamos visto en esta familia, el de los **efectos
+aleatorios**, y con él la magnitud de la heterogeneidad entre máquinas:
+
+```{r}
+#| label: u33-glmm-summary
+summary(m_tw_re)
+```
+
+Dos bloques nuevos respecto al `summary` de la [Sección 4.2](#sec-u33-ajuste). El de **`Random
+effects`** da la varianza y la desviación típica del intercepto de máquina —el parámetro
+$\sigma_u$—, junto al número de grupos (400 máquinas para 1531 observaciones). Y la
+**cabecera** trae un `AIC` que ya incorpora el coste de ese parámetro extra, de modo que puede
+compararse con el del modelo de efectos fijos.
+
+La @tbl-u33-glmm deja la primera lectura. **Los coeficientes casi no se mueven; los errores
+estándar, sí**: es la lección de la [Unidad 3.3](#sec-u34), ahora sobre el coste anual —el
+retrato del gasto no dependía del agrupamiento, pero la **confianza** que merecía sí, y los
+errores estándar crecen entre un 30 y un 45 %—. Con ellos, la evidencia sobre el `fabricante`
+se debilita: el nivel C pasa de $p = 0.017$ a $0.123$ y el B queda en la frontera ($0.022 \to
+0.046$). Son contrastes por nivel, así que de momento solo cabe anotarlo: la pregunta que
+importa —¿aporta el factor **entero**?— la resolveremos en la subsección siguiente.
+
+Las otras dos lecturas están en los parámetros que no salen en la tabla de coeficientes.
+Recuperamos el **índice $p$** de los dos ajustes, para ver si cambia al reconocer el
+agrupamiento, y la **desviación típica del efecto de máquina**, que es el parámetro nuevo:
+
+```{r}
+#| label: u33-glmm-varianza
+c(sd_maquina = round(sqrt(unlist(VarCorr(m_tw_re)$cond)), 3),  # el parámetro nuevo
+  p_fijo     = round(family_params(m_tw)[[1]], 3),             # índice sin efecto aleatorio
+  p_mixto    = round(family_params(m_tw_re)[[1]], 3))          # ...y con él
+```
+
+**El índice $p$ baja**, de 1.351 a 1.266. Este es el hallazgo bonito de la sección, y conviene
+entender por qué, porque confirma la predicción que dejamos anotada en la
+[validación anterior](#sec-u33-validacion-tw). Sin efecto aleatorio, $\hat p$ tenía que dar cuenta de
+**toda** la variabilidad no explicada,
+incluida la que producen las máquinas crónicamente caras; su única palanca para ensanchar la
+varianza era subir el índice. Al dar a esa heterogeneidad un parámetro propio —$\sigma_u$—, el
+índice se libera de ese trabajo. El segundo cabo suelto de la [Sección 4.2](#sec-u33-validacion-tw),
+atado: aquel «$\hat p$ absorbe la
+diferencia sin quejarse» tenía nombre, y era la heterogeneidad entre máquinas.
+
+**Y $\sigma_u$ vale 0.749**, en escala logarítmica —en el modelo final, tras la criba de la
+[Sección 4.3](#sec-u33-re-inferencia), quedará en 0.757; usamos aquí el del ajuste que acabamos de
+leer—: una máquina situada una desviación típica por
+encima de la media gasta $e^{0.749}\approx 2.1$ veces lo que una comparable situada en la media. Es
+una heterogeneidad considerable —del mismo orden que el efecto de la criticidad—, y es justo la que
+la exploración de las dos mitades nos había enseñado.
+
+::: {.callout-tip}
+## 🔧 En R. Efectos aleatorios con `glmmTMB`
+La sintaxis es la de `lme4`, y funciona igual sobre cualquier familia —Tweedie incluida—.
+
+```r
+glmmTMB(y ~ x + (1 | grupo) + offset(log(exposicion)), family = tweedie, data = datos)
+glmmTMB(y ~ x + (1 + z | grupo) + ..., family = tweedie, data = datos)  # + pendiente
+```
+
+- **`(1 | grupo)`** añade un intercepto aleatorio; **`(1 + z | grupo)`** añade además una pendiente
+  en `z` **correlacionada** con el intercepto. Para imponer correlación cero se escriben por
+  separado: `(1 | grupo) + (0 + z | grupo)`.
+- **Una pendiente aleatoria exige que la covariable varíe dentro del grupo.** Si es un atributo fijo
+  de la unidad, su «pendiente» no se distingue del intercepto y el modelo no la puede estimar.
+- **Leer las varianzas**: `VarCorr(m)$cond$grupo` da la matriz, con las desviaciones típicas y la
+  correlación como atributos. Es lo primero que hay que mirar tras ajustar.
+- **Reconocer un ajuste singular**: una desviación típica prácticamente nula, una correlación pegada
+  a $\pm 1$, o un `anova()` que devuelve `NA`. No se arregla cambiando de optimizador: **se
+  simplifica la estructura aleatoria**.
+- **Intervalos**: `confint(m, full = TRUE)` añade a los coeficientes la dispersión y la desviación
+  típica del efecto aleatorio —ojo, glmmTMB prefija con `cond.` **ambos**, así que conviene filtrar
+  por los nombres de los coeficientes, no por el prefijo—. El parámetro de familia (la $p$ de la
+  Tweedie) **no** aparece ahí.
+- **Contrastar términos**: `drop1(m, test = "Chisq")` reajusta el modelo sin cada término y da un
+  LRT válido —glmmTMB ajusta por máxima verosimilitud—. Para contrastar una **varianza**, recuérdese
+  el problema de la frontera.
+:::
+
+### Inferencia y selección {#sec-u33-re-inferencia}
+
+Con los errores estándar honestos toca rehacer **toda** la criba de la [Sección
+6.3](#sec-u33-inferencia), no solo mirar el `fabricante`: al cambiar la estructura del modelo
+puede cambiar el veredicto de cualquier término. Y el contraste por término no puede ser el
+Wald por nivel —`proceso` gasta cuatro coeficientes y `criticidad` dos—, sino el de razón de
+verosimilitudes sobre el factor entero. `drop1` lo hace reajustando el modelo sin cada término:
+
+```{r}
+#| label: tbl-u33-re-lrt
+#| tbl-cap: "Contraste de razón de verosimilitudes por término dentro del modelo con efecto aleatorio de máquina. Cada fila compara el modelo completo con el que prescinde de ese término."
+drop1(m_tw_re, test = "Chisq")
+```
+
+Como `glmmTMB` ajusta por máxima verosimilitud, los modelos que compara `drop1` están anidados,
+difieren solo en efectos **fijos** y se ajustan sobre las mismas filas —las tres condiciones
+del LRT—.
+
+La criba de la @tbl-u33-re-lrt confirma que el `fabricante` **no aporta**: $\chi^2 = 4.57$ con
+2 g.l., $p = 0.10$, y **todo lo demás se queda**: edad, carga, proceso, criticidad y plan
+siguen aportando con holgura. Reajustamos pues el modelo sin fabricante y con interceptación
+aleatoria:
+
+```{r}
+#| label: u33-re-final
+m_re <- glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                  (1 | id_maquina) + offset(log(exposicion)),
+                family = tweedie, data = pn)
+
+broom.mixed::tidy(m_re, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::filter(term != "(Intercept)") |>
+  dplyr::transmute(term, factor = round(estimate, 3),
+                   IC95 = sprintf("(%.2f, %.2f)", conf.low, conf.high))
+```
+
+Los factores se sostienen y el retrato del gasto es el mismo de la [Sección
+6.3](#sec-u33-interpretacion),
+pero conviene leerlo con detalle, porque es el modelo con el que nos quedamos:
+
+- **La edad sigue siendo el motor**: cada año multiplica el gasto anual por $1.145$ —un 14.5 %—, con
+  un intervalo estrecho, de $1.11$ a $1.18$. Es el efecto mejor determinado del modelo, y el que
+  arrastra el presupuesto cuando la flota envejece.
+- **La criticidad ordena el gasto**: una máquina Crítica cuesta $2.16$ veces lo que una Auxiliar
+  comparable, y una Importante, $1.53$ veces.
+- **El plan preventivo es la palanca**: su factor es $0.498$, con intervalo de $0.40$ a $0.62$.
+  Reduce el gasto anual **a la mitad**, y ahora ajustado por edad, criticidad y —esto es nuevo— por
+  el nivel propio de cada máquina.
+- **La carga tiene el efecto más incierto**: su factor, $2.78$, parece enorme, pero corresponde a
+  pasar de una máquina parada a una a pleno uso, un salto que nadie observa; por **décima** de carga
+  el aumento es de un 11 %. Y su intervalo, de $1.40$ a $5.52$, recuerda que es la covariable
+  entre-máquinas de siempre, la peor determinada de todas.
+- **El proceso aporta como factor, no nivel a nivel**: Ensamblaje ($1.50$) y Acabado ($1.46$)
+  encarecen respecto a Corte, Lijado ($0.92$) queda por debajo y ninguno de los intervalos es
+  espectacular. Es un buen recordatorio de que el contraste que decide si el factor se queda es el
+  del término **entero** —el de la subsección anterior—, no la lectura de sus niveles por separado.
+
+Dos comparaciones con la @tbl-u33-tweedie merecen atención. Los efectos que dependen de
+**comparar máquinas entre sí** se han movido: la criticidad baja de $2.39$ a $2.16$ y la carga
+sube de $2.37$ a $2.78$, porque parte de lo que antes se les atribuía era, en realidad, nivel
+propio de cada máquina, y ahora ese nivel tiene dónde alojarse. En cambio, la **edad** —que
+varía dentro de cada máquina— apenas se inmuta ($1.147 \to 1.145$): es la misma lección de la
+[Unidad 3.3](#sec-u34). Y todos los intervalos son más anchos, como debe ser.
+
+Un matiz de lectura que el modelo mixto introduce y conviene no pasar por alto: estos factores
+son **condicionales**. El $2.16$ de la criticidad compara dos máquinas con **el mismo nivel
+propio** $u_i$ —o, si se prefiere, describe qué le pasaría a una máquina dada si cambiara de
+criticidad—. No es exactamente el cociente entre el gasto medio de las Críticas y el de las
+Auxiliares de la población, que es lo que estimaba el modelo de efectos fijos. Los dos números
+responden a preguntas distintas, y la [Sección de predicción](#sec-u33-re-prediccion) mostrará
+que la diferencia se paga en euros.
+
+Faltan los tres parámetros que no viven en el predictor lineal. Dos de ellos tienen intervalo
+por la vía de la [Sección 4.2](#sec-u33-inferencia) —`confint` cubre dispersión y componentes
+de varianza, pero no el parámetro de familia—:
+
+```{r}
+#| label: u33-re-varianzas
+ic <- confint(m_re, full = TRUE)
+# se descartan las filas de los COEFICIENTES; el resto es lo que buscamos.
+# (ojo: glmmTMB prefija con "cond." tanto los coeficientes como la sd del efecto aleatorio)
+ic[!rownames(ic) %in% paste0("cond.", names(fixef(m_re)$cond)), , drop = FALSE]
+
+c(p = round(family_params(m_re)[[1]], 3))              # el índice, sin IC por esta vía
+```
+
+::: {.callout-note}
+## Un contraste que cae en la frontera
+Si en vez de contrastar el `fabricante` quisiéramos contrastar **el propio efecto aleatorio**
+—$H_0:\sigma_u = 0$ frente a $H_1:\sigma_u > 0$—, el LRT habitual **no vale**: bajo la hipótesis
+nula el parámetro está en el **borde** del espacio (una varianza no puede ser negativa), y la
+distribución de referencia deja de ser una $\chi^2_1$ para ser una mezcla de $\chi^2_0$ y $\chi^2_1$
+—lo que en la práctica **divide el $p$-valor por dos** [@selfliang1987]. Con una diferencia de
+verosimilitud como la de aquí la conclusión no cambia; conviene saberlo porque el problema reaparece
+siempre que se contrasta una varianza, y porque explica que muchos autores prefieran decidir la
+estructura aleatoria por **diseño** —hay agrupamiento, luego se modela— en lugar de por contraste.
+:::
+
+### Bondad de ajuste {#sec-u33-re-bondad}
+
+¿Compensa el parámetro extra? La comparación es legítima —los dos modelos se ajustan sobre las
+mismas
+1531 filas y están anidados— y el AIC ya descuenta el coste:
+
+```{r}
+#| label: tbl-u33-re-aic
+#| tbl-cap: "Ajuste global y contraste del efecto aleatorio. El LRT se calcula sobre el par que difiere ÚNICAMENTE en la varianza de máquina —los dos modelos sin fabricante—, y su p-valor se corrige por estar el parámetro en la frontera."
+# gemelo de efectos fijos de nuestro modelo final: mismo predictor, sin (1 | id_maquina)
+m_fijo_sf <- glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                       offset(log(exposicion)), family = tweedie, data = pn)
+
+lrt_re <- as.numeric(2 * (logLik(m_re) - logLik(m_fijo_sf)))   # solo difieren en sigma_u
+
+data.frame(
+  modelo = c("efectos fijos (6.3, con fabricante)", "efectos fijos, sin fabricante",
+             "+ efecto aleatorio (final)"),
+  k      = c(attr(logLik(m_tw), "df"), attr(logLik(m_fijo_sf), "df"), attr(logLik(m_re), "df")),
+  logLik = round(c(logLik(m_tw), logLik(m_fijo_sf), logLik(m_re)), 1),
+  AIC    = round(c(AIC(m_tw), AIC(m_fijo_sf), AIC(m_re)), 1),
+  BIC    = round(c(BIC(m_tw), BIC(m_fijo_sf), BIC(m_re)), 1),
+  LRT    = c(NA, NA, round(lrt_re, 1)),
+  # varianza en la frontera: la referencia es una mezcla, y el p-valor se divide por dos
+  p_valor = c(NA, NA, signif(0.5 * pchisq(lrt_re, 1, lower.tail = FALSE), 3)))
+```
+
+La @tbl-u33-re-aic incluye un tercer ajuste que no habíamos visto: el **gemelo de efectos
+fijos** de nuestro
+modelo final, con su mismo predictor pero sin el efecto de máquina. Está ahí por una razón de
+método: el LRT exige modelos **anidados**, y comparar directamente el modelo final con el de la
+[Sección 4.2](#sec-u33-ajuste) no valdría, porque difieren en dos cosas a la vez —uno gana la
+varianza de máquina, el otro pierde el
+`fabricante`, que la [subsección anterior](#sec-u33-re-inferencia) descartó—. Con el gemelo, el
+contraste aísla exactamente lo que queremos medir.
+
+Y el veredicto es rotundo por las tres vías: el AIC cae **161 puntos** entre el modelo de la
+[Sección 4.2](#sec-u33-tweedie) y el final, el BIC —más severo con los parámetros— también, y
+el contraste del efecto aleatorio da un $p$-valor indistinguible de cero. Reconocer el
+agrupamiento no era un refinamiento opcional: era lo que faltaba.
+
+Vale la pena repetir además las dos comprobaciones que la familia se juega. La primera es la de
+los **ceros**: el modelo no los modela aparte, los deduce de la frecuencia, así que reconstruir
+su proporción es una prueba genuina. Recuperamos $\lambda$ de los parámetros ajustados —como en
+la [Sección 4.2](#sec-u33-canales)— y promediamos $e^{-\lambda}$ sobre las 1531 filas:
+
+```{r}
+#| label: u33-re-ceros
+mu_re  <- fitted(m_re)
+p_re   <- family_params(m_re)[[1]]; phi_re <- sigma(m_re)
+lam_re <- mu_re^(2 - p_re) / (phi_re * (2 - p_re))   # averías esperadas en cada máquina-año
+
+round(c(ceros_observados = mean(pn$coste_total == 0) * 100,
+        ceros_esperados  = mean(exp(-lam_re)) * 100), 1)
+```
+
+::: {.callout-tip}
+## 🔧 En R. Comparar modelos y medir el ajuste
+Todo sale de tres extractores y un contraste, pero cada uno tiene su letra pequeña.
+
+```r
+logLik(m); AIC(m); BIC(m)          # ajuste global
+attr(logLik(m), "df")              # nº de parámetros: incluye phi, p y sigma_u
+anova(m0, m1)                      # LRT entre modelos ANIDADOS
+```
+
+- **`attr(logLik(m), "df")` cuenta más de lo que se ve.** En una Tweedie mixta suma los
+  coeficientes **más** la dispersión, el índice y la varianza del efecto aleatorio. Es el número
+  que hay que declarar al comparar, no el de filas de la tabla de coeficientes.
+- **El LRT exige anidamiento estricto**: mismas filas, mismo mecanismo de estimación y que un
+  modelo sea el otro con parámetros fijados a cero. Si dos ajustes difieren en **dos** cosas a la
+  vez, hay que fabricar el eslabón intermedio, como hicimos con el gemelo de efectos fijos.
+- **Si lo que se contrasta es una varianza**, el $p$-valor de `anova()` es conservador: con un solo
+  componente en la frontera, la corrección más simple es dividirlo por dos [@selfliang1987].
+- **El AIC compara modelos ajustados a los mismos datos**, aunque cada uno estime su propio índice
+  $p$. Lo que **no** es comparable entre ajustes distintos es la **devianza** evaluada con índices
+  distintos: si se usa como pérdida —en validación cruzada, por ejemplo—, hay que fijar un $p$ común.
+- **Calibración**: `dplyr::ntile(fitted(m), 10)` agrupa por predicción y permite comparar medias.
+  Agrupar por lo **observado** responde a otra pregunta —la discriminación— y arrastra regresión a
+  la media.
+- **Ceros esperados**: no hay función que los dé. Se deducen de los parámetros,
+  $\Pr(S=0)=e^{-\lambda}$ con $\lambda = \mu^{2-p}/[\phi(2-p)]$, y se promedian sobre las filas.
+:::
+
+La segunda es la **calibración**: agrupamos las filas por lo que el modelo predice y
+comprobamos si lo predicho se cumple. Cada modelo ordena las filas por *su* predicción, de modo
+que los deciles de la @tbl-u33-re-calibracion no contienen las mismas máquina-años, pero la
+pregunta que responde cada columna es la misma.
+
+```{r}
+#| label: tbl-u33-re-calibracion
+#| tbl-cap: "Calibración de los dos modelos, cada uno por deciles de su propia predicción: media predicha y media observada en cada decil. El modelo con efecto aleatorio abre mucho más el abanico de predicciones."
+calibrar <- function(ajuste, etiqueta) {
+  tibble::tibble(modelo = etiqueta, ajustado = as.numeric(ajuste),
+                 observado = pn$coste_total) |>
+    dplyr::mutate(decil = dplyr::ntile(ajustado, 10)) |>
+    dplyr::group_by(modelo, decil) |>
+    dplyr::summarise(predicho = round(mean(ajustado)),
+                     observado = round(mean(observado)), .groups = "drop")
+}
+
+calibracion <- dplyr::bind_rows(calibrar(fitted(m_tw), "efectos fijos"),
+                                calibrar(mu_re, "efecto aleatorio"))
+tidyr::pivot_wider(calibracion, names_from = modelo,
+                   values_from = c(predicho, observado))
+```
+
+```{r}
+#| label: fig-u33-re-calibracion-diag
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Calibración de los dos modelos: cada punto es un decil de la propia predicción, con lo predicho en el eje horizontal y lo observado en el vertical. La diagonal marca el acuerdo perfecto. El modelo de efectos fijos se mantiene pegado a ella pero recorre un tramo corto; el que incluye el efecto aleatorio abarca mucho más rango —hasta más de 4000 €— a costa de separarse en los extremos."
+calibracion |>
+  ggplot(aes(predicho, observado, colour = modelo)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey55") +
+  geom_path(alpha = 0.5, linewidth = 0.6) +
+  geom_point(size = 2.6) +
+  scale_x_log10() + scale_y_log10() +
+  scale_colour_manual(values = c(`efectos fijos` = "grey35",
+                                 `efecto aleatorio` = "steelblue")) +
+  labs(x = "coste medio predicho en el decil (€, escala log)",
+       y = "coste medio observado (€, escala log)", colour = NULL)
+```
+
+La @fig-u33-re-calibracion-diag resume en un gráfico lo que la @tbl-u33-re-calibracion dice en
+columnas. El modelo de **efectos fijos** apenas se despega de la diagonal —está bien calibrado—
+pero su recorrido es corto: de 205 € a 2516 €, un factor de doce entre el decil más barato y el
+más caro. El modelo con **efecto aleatorio** recorre de 138 € a 3396 € —un factor de
+veinticinco— y llega a deciles cuyo gasto real supera los 4000 €, que el otro modelo
+sencillamente no identifica.
+
+El precio de esa amplitud se ve en los extremos: sus predicciones se quedan **por encima** de
+lo observado en los deciles baratos (138 frente a 65 en el primero) y **por debajo** en los
+caros (3396 frente a 4168 en el último). Ese patrón —predicciones menos extremas que la
+realidad— es la firma del **encogimiento**: los efectos aleatorios se estiman contrayéndolos
+hacia cero, tanto más cuanto menos información hay sobre cada grupo, y aquí cada máquina aporta
+solo **tres o cuatro años**. Es una propiedad deseada, no un error —protege de tomarse al pie
+de la letra una racha de mala suerte—, pero conviene saberlo.
+
+Los ceros, por su parte, siguen bien reproducidos: **50.3 % esperados frente a 49.9 %
+observados**, tan bien como con el modelo de efectos fijos.
+
+Hay una segunda mirada, complementaria, que responde a la pregunta inversa y que a la dirección
+de la fábrica le importa más: no «cuando el modelo dice 2000 €, ¿se gastan 2000 €?», sino
+**«cuando el gasto real fue alto, ¿lo vio venir el modelo?»**. Para eso hay que agrupar por lo
+**observado** —los mismos grupos para los dos modelos— y mirar qué predijo cada uno:
+
+```{r}
+#| label: fig-u33-re-calibracion
+#| fig-width: 7.5
+#| fig-height: 4.2
+#| fig-cap: "Capacidad de anticipación: máquina-años agrupados por su gasto real —los que no tuvieron ninguna avería y los cinco quintiles de los que sí—, con el gasto medio observado en cada grupo (rojo) y el que había predicho cada modelo. El modelo con efecto aleatorio sigue mucho mejor el recorrido del gasto real; el de efectos fijos apenas se mueve."
+pn |>
+  dplyr::mutate(
+    tramo = dplyr::if_else(coste_total == 0, "sin gasto",
+                           paste0("Q", dplyr::ntile(dplyr::na_if(coste_total, 0), 5))),
+    tramo = factor(tramo, levels = c("sin gasto", paste0("Q", 1:5))),
+    `efectos fijos`    = as.numeric(fitted(m_tw)),
+    `efecto aleatorio` = as.numeric(mu_re)) |>
+  dplyr::group_by(tramo) |>
+  dplyr::summarise(observado          = mean(coste_total),
+                   `efectos fijos`    = mean(`efectos fijos`),
+                   `efecto aleatorio` = mean(`efecto aleatorio`), .groups = "drop") |>
+  tidyr::pivot_longer(-tramo, names_to = "serie", values_to = "eur") |>
+  ggplot(aes(tramo, eur, colour = serie, group = serie)) +
+  geom_line(linewidth = 0.9) + geom_point(size = 2.4) +
+  scale_colour_manual(values = c(observado = "firebrick",
+                                 `efectos fijos` = "grey55",
+                                 `efecto aleatorio` = "steelblue")) +
+  labs(x = "grupo según el gasto realmente observado", y = "coste anual medio (€)", colour = NULL)
+```
+
+La @fig-u33-re-calibracion es más elocuente que cualquier tabla. Donde el gasto real recorre de
+0 € a más de 5000 €, el modelo de **efectos fijos** apenas se mueve —de 825 € a 1593 €—: sabía
+tan poco de cada máquina que predecía casi lo mismo para todas. El modelo con **efecto
+aleatorio** recorre de 563 € a 2812 €, siguiendo la pendiente del gasto real. Resumido en un
+número, la correlación de rangos entre lo predicho y lo observado casi se **duplica**: de 0.34
+a 0.60.
+
+::: {.callout-note}
+## Calibración y discriminación: dos preguntas, dos herramientas
+Las dos miradas anteriores —la @tbl-u33-re-calibracion y la @fig-u33-re-calibracion— parecen lo
+mismo y no lo son. La diferencia está en **por qué se agrupa**,
+y de ahí salen las dos propiedades que se le piden a un modelo predictivo —independientes entre sí—:
+
+|  | **Calibración** | **Discriminación** |
+|---|---|---|
+| Pregunta | ¿se cumple lo que el modelo anuncia? | ¿separa lo caro de lo barato? |
+| Cómo se mira | agrupando por la **predicción** | agrupando por lo **observado** |
+| Falla si… | predice 2000 € donde se gastan 800 € | predice lo mismo para todos |
+
+Que sean independientes se ve con un caso extremo: un modelo que prediga **siempre la media
+general** está perfectamente calibrado —en promedio acierta— y no discrimina nada. Es casi lo
+que le ocurre a nuestro modelo de efectos fijos, cuyas predicciones apenas se separan de esa
+media.
+
+**Cómo se cuantifica cada una.** La calibración se resume en lo cerca que quedan las dos columnas
+—o, más formalmente, ajustando `observado ~ predicho` y comprobando que la pendiente vale 1—. La
+discriminación necesita una medida de **orden**, y el curso ha usado una distinta en cada tipo de
+respuesta, aunque todas midan lo mismo:
+
+- **binaria** ([Sección 2.7](../caso1/caso1_binaria.qmd#sec-u12-evaluacion)): el **AUC** de la curva
+  ROC —la probabilidad de puntuar más alto a un caso que a un control—;
+- **tiempo a evento** (lo veremos en la [Unidad 3.6](#sec-ELIM-u36)): el **índice de concordancia**, que es la misma
+  idea sobre pares de máquinas ordenadas por riesgo;
+- **respuesta continua**, como aquí: la **correlación de rangos** entre predicho y observado, que
+  vuelve a ser la probabilidad de ordenar bien dos observaciones.
+
+**Y una advertencia sobre la @fig-u33-re-calibracion**: al agrupar por el resultado, cada grupo
+recoge
+—además de su nivel real— una parte de **azar**, así que ningún modelo alcanza los extremos. Es
+**regresión a la media**, no un defecto: un modelo predice la media, no la suerte. Por eso este
+gráfico sirve para comparar modelos entre sí, pero no para juzgar si uno está bien calibrado; para
+eso está la tabla anterior.
+:::
+
+### Diagnóstico {#sec-u33-re-diagnostico}
+
+Repetimos sobre el modelo final la batería de la [Sección 4.2](#sec-u33-diagnostico): residuos
+cuantil simulados y sus contrastes.
+
+```{r}
+#| label: fig-u33-re-dharma
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Residuos cuantil simulados (DHARMa) del modelo con efecto aleatorio de máquina: gráfico Q-Q frente a la uniforme (izquierda) y residuos frente al valor predicho (derecha)."
+res_re <- DHARMa::simulateResiduals(m_re, n = 250, seed = SEMILLA_CURSO)
+plot(res_re)
+```
+
+```{r}
+#| label: u33-re-dharma-tests
+DHARMa::testDispersion(res_re, plot = FALSE)
+```
+
+La @fig-u33-re-dharma no delata desajustes de forma, pero conviene leer el contraste de dispersión
+con cuidado, porque **no dice lo que uno esperaría**: el exceso sigue ahí, y prácticamente igual que
+antes —1.36 frente al 1.39 de la [Sección 4.2](#sec-u33-diagnostico), con el mismo $p$ ínfimo—.
+Añadir el efecto aleatorio ha mejorado el AIC en 162 puntos y ha cambiado el índice, pero **no ha
+absorbido la variabilidad sobrante**.
+
+Merece la pena detenerse, porque el resultado desmonta una expectativa razonable. Cabía pensar que el
+exceso de dispersión *era* la heterogeneidad entre máquinas y que, al darle su propio parámetro,
+desaparecería. No es así, y el motivo está en **qué mide cada contraste**. `DHARMa` simula estos
+residuos **condicionando** en los efectos aleatorios estimados —volveremos sobre ello enseguida—, de
+modo que el $u_i$ de cada máquina ya está dentro tanto de lo observado como de lo simulado: lo que
+`testDispersion` mide es la variabilidad que queda **dentro de cada máquina-año**, y esa el efecto
+aleatorio no la toca. Su origen lo señalará la [validación](#sec-u33-validacion-re): al agregar por
+año desaparece de las covariables el **tipo de avería** —que cambia de una avería a otra y mueve el
+importe en un factor apreciable—, y esa varianza sigue en el dato aunque ya no esté en el predictor.
+Parte de ella la absorbe $\hat p$; el resto aparece aquí.
+
+Así que el efecto aleatorio no ha venido a arreglar la dispersión. Ha venido a arreglar otra cosa, y
+esa es la prueba que suspendió el modelo anterior: ¿queda **dependencia** dentro de cada
+máquina? Repetimos el mismo contraste, comparando cuánto varían las medias de residuos por
+máquina con lo que permitiría la independencia:
+
+```{r}
+#| label: u33-re-diagnostico
+u_re <- residuals(res_re)
+obs_re <- var(tapply(u_re, pn$id_maquina, mean))
+
+set.seed(SEMILLA_CURSO)
+nulo_re <- replicate(200, var(tapply(runif(nrow(pn)), pn$id_maquina, mean)))
+
+round(c(varianza_observada = obs_re, esperada_si_independientes = mean(nulo_re),
+        p_valor = mean(nulo_re >= obs_re)), 4)
+```
+
+La señal **ha desaparecido**: donde el modelo de la [Sección 4.2](#sec-u33-diagnostico) daba
+0.0303 frente al 0.0224 de la independencia, ahora las medias por máquina varían **menos** de
+lo que variarían si las filas fueran independientes. El efecto aleatorio ha hecho su trabajo
+—y, si acaso, se ha pasado—.
+
+Ese «pasarse» no es casual y conviene entenderlo, porque afecta a cómo se leen **todos** estos
+residuos: `DHARMa` simula, por defecto, **condicionando** en los efectos aleatorios estimados,
+es decir, usando el $u_i$ de cada máquina. Como ese $u_i$ se ha ajustado con los datos de esa
+misma máquina, la parte del diagnóstico que mira **entre** máquinas sale algo **mejor de lo que
+corresponde** —de ahí que la dependencia no solo desaparezca, sino que se pase de largo—, mientras
+que la que mira **dentro** de cada máquina-año no obtiene ninguna ventaja: por eso el contraste de
+dispersión seguía siendo tajante dos chunks más arriba. No es un error del
+diagnóstico, es su alcance: lo que evalúa es si el modelo describe bien **la historia de cada
+máquina**, que es justamente la pregunta que importa para nuestro presupuesto. Para juzgar en
+cambio el ajuste a una **máquina nueva** habría que simular re-sorteando los efectos aleatorios
+(`re.form = NA`), un diagnóstico distinto para una pregunta distinta.
+
+::: {.callout-tip}
+## 🔧 En R. Diagnóstico de un modelo mixto con `DHARMa`
+Los residuos clásicos no sirven con una respuesta mitad discreta mitad continua; `DHARMa` los
+sustituye por **residuos cuantil simulados**, que bajo un modelo correcto son uniformes.
+
+```r
+res <- DHARMa::simulateResiduals(m, n = 250, seed = SEMILLA_CURSO)
+plot(res)                                   # Q-Q uniforme + residuos frente a predicho
+DHARMa::testUniformity(res)                 # ¿son uniformes? (Kolmogorov-Smirnov)
+DHARMa::testDispersion(res)                 # ¿sobra o falta variabilidad?
+DHARMa::testZeroInflation(res)              # ¿hay más ceros de los que el modelo genera?
+```
+
+- **`residuals(res)`** devuelve el vector de residuos escalados, que sirve para construir
+  contrastes propios —como el de agrupamiento que usamos aquí—.
+- **La simulación es condicional por defecto** (`re.form = NULL`) y por eso los residuos salen
+  optimistas, como acabamos de ver; `re.form = NA` da la versión **marginal**, que es la que
+  corresponde si el modelo va a predecir unidades nuevas.
+- **`recalculateResiduals(res, group = id)`** agrega observaciones y residuos por grupo y devuelve
+  un objeto `DHARMa` nuevo: es la vía estándar para diagnosticar **al nivel del grupo** en lugar de
+  al de la fila.
+- **Un contraste que no salta no siempre es buena noticia.** Tras añadir un efecto aleatorio es
+  normal que la señal de agrupamiento desaparezca «con creces» y que la dispersión se quede corta:
+  conviene leerlo como el alcance del diagnóstico, no como una virtud del modelo.
+:::
+
+### Predicción: el presupuesto revisado {#sec-u33-re-prediccion}
+
+Y aquí el agrupamiento deja de ser una cuestión técnica para convertirse en euros. Con efectos
+aleatorios hay **dos predicciones posibles**, y no dan lo mismo:
+
+```{r}
+#| label: u33-re-presupuesto
+nd_re <- subset(pn, anio == 4); nd_re$edad <- nd_re$edad + 1; nd_re$exposicion <- 1
+
+cond <- predict(m_re, newdata = nd_re, type = "response")                   # con su u_i
+marg <- predict(m_re, newdata = nd_re, type = "response", re.form = NA)     # con u = 0
+sd_u <- unname(sqrt(unlist(VarCorr(m_re)$cond)))
+
+round(c(condicional        = sum(cond),
+        marginal_u_cero    = sum(marg),
+        marginal_corregida = sum(marg) * exp(sd_u^2 / 2),   # corrección de Jensen
+        efectos_fijos_6.3  = sum(pred5)))
+```
+
+- La **condicional** (497 000 €) usa el historial de cada máquina: es la que corresponde a nuestro
+  presupuesto, porque las 400 máquinas ya están en la fábrica y sabemos cuáles han salido caras.
+- La **marginal con $u = 0$** (399 000 €) describe una máquina «de nivel medio»… pero **no es el
+  gasto medio de la población**, y por eso sale casi 100 000 € más baja. Aquí reaparece el efecto de
+  Jensen de la [Unidad 3.2](#sec-u32-lognormal): como el enlace es log,
+  $\mathbb{E}[e^{u}] = e^{\sigma_u^2/2} > 1$, y poner $u = 0$ devuelve algo parecido a la
+  **mediana**, no a la media. Multiplicar por $e^{\sigma_u^2/2}$ la lleva a la escala correcta:
+  **532 000 €**.
+
+Y esa última cifra vale como comprobación de coherencia interna, porque **casi reproduce el
+presupuesto de la [Sección 4.2](#sec-u33-prediccion)** (538 000 €, un 1 % de diferencia). No es
+casualidad: el modelo de efectos fijos estima precisamente la **media poblacional**, así que
+debe coincidir con la predicción marginal —una vez corregida— del modelo mixto. Los dos modelos
+no discrepaban sobre cuánto gasta el parque en promedio; discrepaban sobre la **precisión** de
+esa cifra y sobre el gasto de **cada** máquina.
+
+La moraleja presupuestaria es concreta: **cuál de las tres se lleva a la reunión depende de
+para qué máquinas se presupuesta**, y confundirlas cuesta decenas de miles de euros. Para el
+parque actual, la condicional; para valorar una ampliación con máquinas que aún no existen, la
+marginal corregida; la de $u = 0$, para nada —es una mediana disfrazada de media—.
+
+#### Del valor esperado al intervalo de predicción {#sec-u33-re-predictiva}
+
+Todas esas cifras son **medias**, y en la [Sección 4.2](#sec-u33-prediccion) quedó pendiente la
+pregunta que de verdad interesa para dotar una partida: no cuánto se gastará **en promedio**,
+sino entre qué valores se moverá el gasto **real** del año que viene. Eso es un **intervalo de
+predicción**, y con esta familia se obtiene sin fórmulas nuevas: **simulando el mecanismo**. Ya
+tenemos todas las piezas de la [Sección 4.1](#sec-u33-mapa) —para cada máquina, las averías que
+espera y lo que cuesta cada una—, así que basta jugar el año muchas veces:
+
+```{r}
+#| label: u33-re-predictiva
+alfa_re  <- (2 - p_re) / (p_re - 1)                     # forma de la Gamma de cada avería
+lambda_i <- cond^(2 - p_re) / (phi_re * (2 - p_re))     # averías esperadas de cada máquina
+theta_i  <- phi_re * (p_re - 1) * cond^(p_re - 1)       # escala de su coste
+
+set.seed(SEMILLA_CURSO)
+totales <- replicate(4000, {
+  N <- rpois(length(cond), lambda_i)                    # ¿cuántas averías tiene cada máquina?
+  sum(rgamma(length(cond), shape = N * alfa_re, scale = theta_i))   # ...y cuánto cuestan
+})
+
+round(c(prevision      = sum(cond),
+        media_simulada = mean(totales),
+        IC90_inf       = unname(quantile(totales, 0.05)),
+        IC90_sup       = unname(quantile(totales, 0.95)),
+        percentil90    = unname(quantile(totales, 0.90))))
+```
+
+Que la media simulada reproduzca la previsión es la comprobación de que la simulación es fiel
+al modelo. Lo nuevo es lo demás: el gasto real del parque caerá, con un 90 % de confianza, en
+una banda de algo menos del **±10 %** alrededor de la previsión. Y si la dirección quiere una
+partida que se quede corta solo uno de cada diez años, la cifra a dotar no es la previsión sino
+el **percentil 90**.
+
+Conviene ver ahora la misma cuenta para **una sola máquina**, porque el contraste es la lección
+de todo el apartado:
+
+```{r}
+#| label: u33-re-predictiva-maquina
+i <- order(cond)[length(cond) %/% 2]                    # una máquina de previsión mediana
+
+set.seed(SEMILLA_CURSO)
+una <- rgamma(4000, shape = rpois(4000, lambda_i[i]) * alfa_re, scale = theta_i[i])
+
+round(c(prevision = cond[i], prob_cero_pct = mean(una == 0) * 100,
+        mediana = median(una), percentil90 = unname(quantile(una, 0.90))))
+```
+
+Para el parque, la incertidumbre del resultado casi desaparece: son **400 máquinas** cuyos
+azares se compensan, y por eso la banda de predicción acaba siendo del mismo orden que la
+incertidumbre de la media que calculamos en la [Sección 4.2](#sec-u33-prediccion). Para **una**
+máquina no se compensa nada: su previsión ronda los 800 €, pero lo más probable —más de un 40 %
+de las veces— es que no gaste **nada**, y uno de cada diez años superará los 2000 €. La media,
+ahí, no describe casi ningún año concreto.
+
+De ahí una regla práctica que excede al ejemplo: **las medias se agregan bien y la
+incertidumbre no**. Presupuestar el parque con la suma de las previsiones es razonable;
+prometer esa cifra para una máquina concreta, no.
+
+::: {.callout-tip}
+## 🔧 En R. Predecir con efectos aleatorios, y con incertidumbre
+Con un modelo mixto, `predict()` admite **dos** predicciones distintas, y hay que elegir a
+conciencia:
+
+```r
+predict(m, newdata = nd, type = "response")                    # CONDICIONAL: usa el u_i del grupo
+predict(m, newdata = nd, type = "response", re.form = NA)      # MARGINAL: pone u = 0
+predict(m, newdata = nd, type = "response", allow.new.levels = TRUE)   # grupo nunca visto
+```
+
+- **La condicional** requiere que el grupo esté en los datos de ajuste; es la que corresponde cuando
+  se predice sobre las mismas unidades observadas.
+- **La marginal con `re.form = NA`** no es el promedio de la población: con enlace log devuelve algo
+  parecido a la **mediana**, y hay que multiplicar por $e^{\sigma_u^2/2}$ para llevarla a la media
+  (el efecto de Jensen de la [Unidad 3.2](#sec-u32-lognormal)).
+- **Incertidumbre de la media**: `se.fit = TRUE` en la escala del enlace, volviendo con `exp()`. Para
+  un **agregado**, los intervalos individuales no se suman: método delta con `vcov(m)$cond`, como en
+  la [Sección 4.2](#sec-u33-prediccion).
+- **Intervalo de predicción**: exige simular la respuesta, no solo la media. En una Tweedie se hace
+  sin paquetes adicionales, generando la mixtura a partir de $(\hat\mu, \hat\phi, \hat p)$ —`rpois`
+  para las averías y `rgamma` para su coste—; comprobar que la media simulada reproduce la previsión
+  es la validación de que la simulación es fiel.
+- **Un percentil alto de esa predictiva** es lo que se dota cuando la partida no puede quedarse
+  corta; la media, por definición, se queda corta la mitad de los años.
+:::
+
+### Validación contra el DGP {#sec-u33-validacion-re}
+
+Cerramos como en las secciones anteriores —[4.1](#sec-u33-mapa) y
+[4.2](#sec-u33-validacion-tw)—, confrontando con la verdad lo que este modelo añade. La
+@tbl-u33-validacion-re indica —como la de la [Sección 4.2](#sec-u33-validacion-tw)— **de dónde
+sale** cada valor verdadero, porque ninguno se lee directamente del banco:
+
+```{r}
+#| label: tbl-u33-validacion-re
+#| tbl-cap: "Validación del modelo final: los dos parámetros que el efecto aleatorio pone en juego, con el valor estimado y la procedencia del valor verdadero. Ninguno se lee directamente del DGP: los dos se derivan de él."
+sd_logZ <- sqrt(trigamma(1 / verdad$theta_frail))   # sd(log Z) de la fragilidad del DGP
+
+tibble::tibble(
+  cantidad = c("sd del efecto de máquina", "índice p"),
+  estimado = c(round(sqrt(unlist(VarCorr(m_re)$cond)), 3),
+               round(family_params(m_re)[[1]], 3)),
+  verdad   = c(round(2 * sd_logZ, 3),
+               round((1/verdad$phi_coste + 2) / (1/verdad$phi_coste + 1), 3)),
+  de_donde = c("2 × sd(log Z): la fragilidad entra dos veces",
+               "(alfa+2)/(alfa+1), con alfa = 1/phi del coste"))
+```
+
+**Primero, lo que el modelo ha sabido descartar.** El `fabricante` es, por diseño, un control **sin
+efecto**: su verdad es cero en los dos canales del DGP. En efectos fijos salía significativo; al
+reconocer el agrupamiento, el contraste conjunto lo ha expulsado. Es la lección que el curso repite
+desde el Caso 1, ahora en su versión más cara: **el ruido se disfraza de señal cuando se ignora la
+estructura de los datos**, y la cura no es un contraste más exigente, sino un modelo que represente
+esa estructura.
+
+**El índice se acerca a su valor.** De 1.351 en efectos fijos a 1.266 con el efecto aleatorio,
+frente al 1.143 del mecanismo: recorre buena parte del camino, que es justo lo que la explicación de
+la subsección anterior predecía. Que no lo agote también tiene sentido, y por una razón que ningún
+modelo anual puede remediar: en el proceso generador, **cada avería cuesta según su tipo**
+—mecánica,
+eléctrica, hidráulica o electrónica, con efectos que van de 0 a 0.45 en escala log
+([Unidad 3.1](#sec-u31))—, y el tipo cambia de una avería a otra **dentro del mismo año**. Al
+agregar el gasto anual esa variabilidad desaparece de las covariables pero no de los datos, así que
+sigue habiendo dispersión que solo $\hat p$ puede absorber. Es el precio del dato agregado, y ya lo
+pagamos en la [Sección 4.2](#sec-u33-canales) al perder la descomposición en canales.
+
+**Y $\sigma_u$ mide la fragilidad… por partida doble.** Aquí está la sorpresa. La desviación
+estimada, $0.757$, es **más del doble** del $0.357$ que tiene la fragilidad del DGP en escala log.
+¿Falla la estimación? No: fallaría la comparación ingenua, y el motivo es la composición que
+vertebra toda la unidad. En el proceso generador, la **misma** $Z_i$ multiplica el riesgo de fallar
+*y* el coste de cada avería; como el coste anual es el producto de ambos, la máquina entra en él
+**dos veces**:
+
+$$\mathbb{E}[S_i] \;=\; \underbrace{\lambda_i}_{\propto\, Z_i}\cdot
+\underbrace{\mu_{Y,i}}_{\propto\, Z_i} \;\propto\; Z_i^{2}
+\qquad\Longrightarrow\qquad
+\operatorname{sd}\big(\log Z_i^{2}\big) \;=\; 2\operatorname{sd}(\log Z_i) \;=\; 0.714 .$$
+
+Y $0.757$ frente a $0.714$ es un acuerdo excelente. Es la **segunda** vez que el mismo latente
+aparece en el caso: el GLMM Gamma de la [Unidad 3.3](#sec-u34) lo vio en el **importe** de cada
+avería, y aquí reaparece en el **euro anual**, elevado al cuadrado porque este lo sufre dos veces.
+Y volverá dos veces más: la [Unidad 3.6](#sec-ELIM-u36) lo encontrará en el **riesgo**, como fragilidad
+de Cox, y la [Unidad 3.7](#sec-ELIM-u37), en el **indicador** de fallo. Un solo latente, cuatro
+respuestas.
+
+### ¿El efecto de máquina predice, o solo describe? {#sec-u33-cv}
+
+Queda una duda razonable sobre el modelo que hemos elegido. Su parámetro estrella, $\sigma_u =
+0.76$, se ha estimado **con los mismos datos** que luego explica: cada $u_i$ se ajusta al
+historial de su máquina, así que no sorprende que el ajuste mejore. La pregunta que importa
+para presupuestar es otra: ese historial, ¿sirve para anticipar **el año que viene**, o solo
+para describir los años ya vistos?
+
+Eso solo lo responde salir de la muestra. El experimento es sencillo y aísla exactamente esa
+pregunta: **el mismo modelo y la misma partición**, cambiando únicamente si al predecir una
+fila retenida se usa el $u_i$ de su máquina —estimado con sus **otros** años— o se ignora.
+
+Conviene detallar qué hace el cálculo, porque la tabla resume varias operaciones encadenadas:
+
+1. Se parte el panel en **cinco pliegues de filas** y, en cada vuelta, se **reajusta el modelo
+   completo** con las otras cuatro quintas partes. Nada de lo que se evalúa ha intervenido en el
+   ajuste.
+2. Para las máquina-años retenidas se calculan **dos predicciones**: la **condicional**, que usa el
+   $\hat u_i$ de esa máquina —disponible porque sus otros años sí estaban en el entrenamiento—, y la
+   **marginal**, que lo ignora y predice como si fuera una máquina cualquiera con esas covariables.
+3. Cada predicción se puntúa con la **devianza Tweedie** media sobre las filas retenidas, la pérdida
+   propia de la familia: cuanto menor, mejor predicción. Se evalúa siempre con el **mismo** $p$
+   —el del modelo final—, porque cada reajuste estima el suyo y con índices distintos las devianzas
+   no serían promediables.
+4. La tabla da la **media** de esa devianza sobre los cinco pliegues y su **error estándar entre
+   pliegues**, que es la escala con la que hay que leer la diferencia.
+
+```{r}
+#| label: tbl-u33-cv
+#| tbl-cap: "Validación cruzada de cinco pliegues sobre el modelo final: error de predicción fuera de muestra usando el historial de cada máquina (condicional) o prescindiendo de él (marginal). Solo cambia la predicción; el modelo y la partición son los mismos."
+# la devianza se evalúa con un p COMÚN: cada ajuste del bucle estima el suyo y,
+# con índices distintos, las devianzas no serían promediables
+p_cv <- family_params(m_re)[[1]]
+dev_tw <- function(y, mu, p = p_cv) {
+  mean(2 * (y^(2-p)/((1-p)*(2-p)) - y*mu^(1-p)/(1-p) + mu^(2-p)/(2-p)))
+}
+
+set.seed(SEMILLA_CURSO)
+pliegues <- rsample::vfold_cv(pn, v = 5)
+
+purrr::map_dfr(pliegues$splits, function(s) {
+  ent <- rsample::analysis(s); pru <- rsample::assessment(s)
+  m   <- glmmTMB(formula(m_re), family = tweedie, data = ent)
+  c(condicional = dev_tw(pru$coste_total,
+                         predict(m, pru, type = "response", allow.new.levels = TRUE)),
+    marginal    = dev_tw(pru$coste_total,
+                         predict(m, pru, type = "response", re.form = NA)))
+}) |>
+  dplyr::summarise(dplyr::across(dplyr::everything(),
+                                 list(media = mean, ee = \(x) sd(x) / sqrt(length(x))))) |>
+  round(1)
+```
+
+La respuesta es afirmativa y con margen: usar el historial reduce el error de predicción en
+torno a un **13 %**, muy por encima de la variabilidad entre pliegues. El efecto aleatorio no
+es un adorno descriptivo —**se gana el sitio prediciendo**—, y esta es la contrapartida fuera
+de muestra de lo que la [subsección anterior](#sec-u33-re-prediccion) mostraba en euros: los
+497 000 € de la previsión condicional no son una cifra más precisa por casualidad, sino porque
+esa información funciona.
+
+#### Y si la máquina fuera nueva: la partición por grupos {#sec-u33-cv-grupos}
+
+Hay un matiz en lo anterior que conviene no pasar por alto, porque es la fuente de confusión
+más habitual al validar modelos mixtos. La columna «marginal» de la tabla **no** dice cuánto
+erraríamos con una máquina **nueva**. Y no lo dice por un detalle del montaje: en esa columna
+la máquina retenida **sí estaba en el entrenamiento** —solo hemos decidido ignorar su $u_i$ al
+predecir—, de modo que sus otros años han contribuido a estimar los coeficientes comunes, el
+$\hat\sigma_u$ y el $\hat p$. La comparación con la columna condicional es impecable, porque
+ambas comparten exactamente el mismo ajuste; pero como estimación del error ante una máquina
+desconocida, esa cifra es **optimista**.
+
+Para responder a esa otra pregunta hay que cambiar **la partición**, no la predicción: dejar
+fuera **máquinas enteras**, de modo que ninguna fila de la máquina evaluada haya intervenido en
+el ajuste. El cálculo es el mismo de antes con dos cambios:
+
+1. Los pliegues se forman **por máquina** (`group_vfold_cv`) en vez de por fila: si una máquina cae
+   en el pliegue de prueba, van sus cuatro años.
+2. Solo cabe la predicción **marginal**: la máquina no existía al ajustar, así que no hay $\hat u_i$
+   que usar. `re.form = NA` es aquí obligatorio, no una opción.
+
+```{r}
+#| label: tbl-u33-cv-grupos
+#| tbl-cap: "Validación cruzada dejando fuera máquinas enteras: error de predicción ante una máquina nunca vista, necesariamente marginal. Se lee junto a las dos predicciones sobre máquinas conocidas de la tabla anterior."
+set.seed(SEMILLA_CURSO)
+pliegues_maq <- rsample::group_vfold_cv(pn, group = id_maquina, v = 5)
+
+d_nuevas <- purrr::map_dbl(pliegues_maq$splits, function(s) {
+  ent <- rsample::analysis(s); pru <- rsample::assessment(s)
+  m   <- glmmTMB(formula(m_re), family = tweedie, data = ent)
+  dev_tw(pru$coste_total, predict(m, pru, type = "response", re.form = NA))
+})
+
+# data.frame de una fila, como la tabla anterior: un vector con nombres se imprime
+# por consola y Quarto no puede numerarlo ni referenciarlo como tabla
+tibble::tibble(maquina_nueva_media = round(mean(d_nuevas), 1),
+               maquina_nueva_ee    = round(sd(d_nuevas) / sqrt(length(d_nuevas)), 1))
+```
+
+Puesta junto a las dos de la @tbl-u33-cv, la cifra de la @tbl-u33-cv-grupos completa un cuadro de
+tres que ordena el problema de menor a mayor dificultad, y esa es la lectura que conviene llevarse:
+
+- **Máquina conocida, usando su historial** (≈ 284): la situación de nuestro presupuesto. Es la más
+  fácil, porque el modelo sabe *quién* es cada máquina.
+- **Máquina conocida, ignorando su historial** (≈ 329): peor, y la diferencia con la anterior mide
+  lo que vale ese conocimiento.
+- **Máquina nueva** (≈ 337): predecir a ciegas sobre una unidad jamás vista. Es la peor de las tres,
+  y queda en la misma zona que la anterior —en ambas se predice sin $u_i$—. La diferencia entre las
+  dos, unos 7 puntos, va en la dirección que anticipábamos —el optimismo de la segunda, cuyos
+  parámetros comunes sí se estimaron con años de esa misma máquina—, pero es **pequeña frente a sus
+  errores típicos** (13.8 y 21.9): confirma el signo, no da para cuantificar el sesgo.
+
+De ahí la regla, que no es «usa siempre la partición agrupada» sino: **la partición debe imitar
+el uso real del modelo**. Para presupuestar el parque actual, la validación por filas con
+predicción condicional es la honesta, porque en producción también conoceremos el historial de
+cada máquina. Para decidir la compra de una máquina que aún no existe, la honesta es la
+agrupada. Dar la primera cifra cuando la pregunta es la segunda sería prometer una precisión
+que no se tendrá.
+
+Un apunte antes de seguir, porque enlaza con lo que viene. Con **1531 filas y trece
+parámetros**, ninguno de estos modelos tiene margen real para sobreajustar. Esa holgura —muchos
+datos, pocos parámetros— es justamente la que hace innecesaria la **regularización**, una
+herramienta que el Caso 2 sí necesitó y cuyos límites en este terreno veremos en la Unidad 3.7.
+
+::: {.callout-tip}
+## 🔧 En R. Validación cruzada con datos agrupados
+`rsample` construye los pliegues; el bucle de ajuste y evaluación es el mismo en los dos casos.
+
+```r
+rsample::vfold_cv(datos, v = 10)                          # reparte FILAS
+rsample::group_vfold_cv(datos, group = id, v = 10)        # reparte GRUPOS enteros
+
+# de cada split: analysis() es el entrenamiento, assessment() la prueba
+purrr::map_dbl(pliegues$splits, \(s) {
+  m <- glmmTMB(formula, family = tweedie, data = rsample::analysis(s))
+  perdida(rsample::assessment(s)$y, predict(m, rsample::assessment(s), type = "response"))
+})
+```
+
+- **La pérdida debe ser comparable entre ajustes.** Si se usa la devianza Tweedie, hay que evaluarla
+  con un **$p$ común** —el de un ajuste de referencia—: cada modelo del bucle estima el suyo, y con
+  índices distintos las devianzas no se pueden promediar.
+- **Lee el error estándar entre pliegues** antes de interpretar diferencias: la variabilidad de la
+  partición suele ser mayor que el efecto que se quiere medir.
+- **La predicción debe ser coherente con la partición.** Con `vfold_cv` el grupo está en el
+  entrenamiento y cabe predecir de forma **condicional**; con `group_vfold_cv` el grupo es nuevo y
+  solo cabe la **marginal** (`re.form = NA`), que ahí no es una opción sino la única posible.
+  Mezclarlas —evaluar predicciones condicionales y presentarlas como estimación del error ante
+  unidades nuevas— es el error clásico de este montaje.
+- **Ignorar el efecto aleatorio no equivale a no haber visto el grupo.** Predecir con
+  `re.form = NA` sobre una unidad que **sí** estaba en el entrenamiento sigue siendo optimista: sus
+  filas han contribuido a estimar los coeficientes comunes y las varianzas. Para el error ante una
+  unidad realmente nueva hay que cambiar **la partición**, no solo la predicción.
+- **El grupo del `group_vfold_cv` debe ser el de la dependencia real** —aquí la máquina—, no
+  cualquier factor a mano.
 :::
 
 ::: {.callout-important}
-## Tarea del estudiante (3.3) · qué te llevas al estudio de caso
-El efecto aleatorio no es un adorno: en esta unidad ha resuelto una $\hat\phi$ inflada y un falso
-positivo. Esa es la herramienta que la cartera te va a pedir.
+## Tarea del estudiante (3.4) · qué te llevas al estudio de caso
+Esta unidad es la que más directamente se traslada: cambia máquinas por pólizas y años de
+mantenimiento por años de póliza, y el modelo es el mismo.
 
-- **[Propuesta 4 · ¿Hay agencias caras?](#sec-u38-p4)** *(unidad base)*. Un GLMM Gamma sobre
-  `coste_k` con `(1 | id_agencia)`, la misma estructura que aquí con `(1 | id_maquina)`. Ensaya aquí
-  las tres lecturas que allí necesitarás: el **contraste de frontera** para $\sigma_u$, los **BLUP**
-  con su *caterpillar*, y la diferencia entre predicción **condicional** y **marginal**.
-- **[Propuesta 1](#sec-u38-p1) y [Propuesta 7](#sec-u38-p7)**. En ambas los datos vienen agrupados
-  —varios partes por póliza, varios años por póliza—; ignorarlo produce los errores estándar
-  optimistas que esta unidad ha diagnosticado.
+- **[Propuesta 7 · El presupuesto del año que viene](#sec-u36-p7)** *(unidad base)*. Tweedie sobre el
+  coste anual con `offset = log(expo_anual)`, índice $p$ estimado, efecto aleatorio de póliza y
+  predicción agregada con su incertidumbre. La ampliación —el **intervalo de predicción por
+  simulación**— retoma lo que la Sección 4.3 dejó planteado.
+- **[Propuesta 1 · La prima pura por tres caminos](#sec-u36-p1)**. La «vía B» es una Tweedie directa
+  sobre `coste_total`; el interés está en enfrentarla con la vía A y ver **dónde discrepan**. El
+  reparto $(2-p)$ / $(p-1)$ entre frecuencia y severidad que estudiamos en la Sección 4.2 es
+  justamente el precio que paga la vía B.
 
-**Aviso.** Antes de dar por hecho que un agrupamiento actúa sobre una respuesta, compruébalo: que
-`n_gestiones` tenga efecto de agencia no obliga a que `coste_k` lo tenga. Esa comprobación **es** la
-propuesta 4.
+**Dos avisos.** El primero: `panel.csv` de la cartera trae el **recuento** anual, no el euro; hay que
+construirlo agregando `siniestros.csv` y **conservando los ceros**. El segundo: la proporción de
+ceros cambia mucho con la granularidad —póliza-año frente a póliza completa—, y con ella el $\hat p$
+que estimarás. Elige una y justifícala.
 :::

@@ -22,7 +22,7 @@ elegir y justificar la elección.
 
 Partimos del modelo **tal como quedó** al cerrar la unidad anterior, con `fabricante` incluido
 provisionalmente (su reexamen, sabiendo que probablemente es un falso positivo del agrupamiento, queda
-para la [Unidad 3.3](#sec-u33)). Para elegir familia da igual: es una cuestión sobre la **función de
+para la [Unidad 3.3](#sec-u34)). Para elegir familia da igual: es una cuestión sobre la **función de
 varianza**, y `fabricante` apenas mueve las predicciones.
 
 ```{r}
@@ -111,7 +111,7 @@ que quieres fijar.
 
 - **Tweedie** —familia con $\operatorname{Var}=\phi\,\mu^{p}$ y **potencia $p$ libre** (`statmod::tweedie`)—.
   Para $1<p<2$ es una mezcla **Poisson–Gamma** que genera **ceros y positivos a la vez**: exactamente el
-  `coste_total` por máquina-año que modelaremos en la [Unidad 3.4](#sec-u34).
+  `coste_total` por máquina-año que modelaremos en la [Unidad 3.4](#sec-u33).
 - **Objeto `family()` a medida.** R deja definir una familia propia (`linkfun`, `linkinv`, `variance`,
   `dev.resids`, `aic`…) si necesitas una combinación media-varianza-enlace que no viene de serie.
 
@@ -246,7 +246,7 @@ dispersión. Pero asoma **un matiz**: la dispersión crece **débilmente con la 
 pequeño). No es motivo para cambiar de familia —la función de varianza sigue diciendo $p\approx 2$—, y
 tampoco es ruido: es un **indicio de estructura**. Las máquinas no son intercambiables; su coste se
 dispersa de forma distinta según la edad, algo que un modelo de **efectos fijos** no puede capturar. Lo
-retendremos: reaparecerá, ya explicado, en la [Unidad 3.3](#sec-u33), donde el efecto aleatorio de
+retendremos: reaparecerá, ya explicado, en la [Unidad 3.3](#sec-u34), donde el efecto aleatorio de
 máquina —con una **pendiente aleatoria en la edad**— absorbe justamente esta heterogeneidad. Cambiar la
 distribución no arregla un problema de **dependencia**.
 
@@ -358,19 +358,19 @@ arregla eso, porque no es un problema de **familia** sino de **estructura**. Sob
 averías se **agrupan por máquina** —cada máquina aporta varias, correlacionadas— y el modelo no lo sabe.
 Es la misma señal que ya vimos inflar $\hat\phi$ en la 3.1 y asomar en la dispersión de la
 [Sección 2.4](#sec-u32-dispersion). Cambiar la forma de la distribución no puede resolver un problema de dependencia;
-para eso hacen falta los **efectos aleatorios** de la [Unidad 3.3](#sec-u33).
+para eso hacen falta los **efectos aleatorios** de la [Unidad 3.3](#sec-u34).
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.2) · qué te llevas al estudio de caso
 Aquí has aprendido a **elegir**, no a ajustar: la relación media-varianza como criterio, el jacobiano
 para comparar escalas y el *smearing* para volver a euros.
 
-- **[Propuesta 5 · ¿Qué distribución describe el coste de un parte?](#sec-u38-p5)** *(unidad base)*.
+- **[Propuesta 5 · ¿Qué distribución describe el coste de un parte?](#sec-u36-p5)** *(unidad base)*.
   Es esta unidad entera, trasladada a `coste_k`: estimar la potencia $p$ de
   $\operatorname{Var}=\phi\mu^{p}$ agrupando por coste predicho, ajustar Gamma, inversa gaussiana y
   log-OLS, y compararlas **con el AIC corregido**. La ampliación —modelar la dispersión— es el cabo
   que la Sección 2.4 dejó suelto.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u38-p1)**. Antes de multiplicar frecuencia
+- **[Propuesta 1 · La prima pura por tres caminos](#sec-u36-p1)**. Antes de multiplicar frecuencia
   por severidad conviene justificar la familia de la severidad. Este es el argumento.
 
 **Aviso.** El AIC del log-OLS **no** es comparable sin el jacobiano; es el error más frecuente al

@@ -168,7 +168,7 @@ puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al a
 ([Sección 1.4](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
-otra mitad del caso, que modelaremos en la [Unidad 3.5](#sec-u35).
+otra mitad del caso, que modelaremos en la [Unidad 3.5](#sec-ELIM-u35).
 
 Por último, condicionamos el coste por proceso **y** criticidad a la vez, que es donde el banco esconde
 su estructura más rica (@fig-u31-interaccion-eda):
@@ -298,7 +298,7 @@ independientes. Aquí las tratamos como si lo fueran —un modelo de efectos fij
 averías—. Esa simplificación tiene un precio visible: el $\hat\phi$ que acabamos de estimar sale
 **inflado** respecto de la dispersión «pura» de la Gamma, porque absorbe la variabilidad **entre
 máquinas** que el modelo no incluye. Lo confirmaremos al validar contra el DGP ([Sección 1.5](#sec-u31-diagnostico)) y
-lo resolveremos con el **efecto aleatorio de máquina** de la [Unidad 3.3](#sec-u33).
+lo resolveremos con el **efecto aleatorio de máquina** de la [Unidad 3.3](#sec-u34).
 :::
 
 ## 1.3 Interpretación {#sec-u31-interpretacion}
@@ -364,7 +364,7 @@ moderada; en la **fase 2**, el sobrecoste se dispara —porque ahí la avería n
 sino que **para la línea**—. Señala **dónde una avería sale más cara** —las máquinas críticas de
 Ensamblaje y Acabado— y, por tanto, dónde conviene concentrar repuestos y capacidad de respuesta; si
 además compensa **prevenirla** dependerá de con qué frecuencia falle, que es ya otra pregunta (la
-[Unidad 3.5](#sec-u35)). Lo vemos también en euros predichos frente a la antigüedad (@fig-u31-prediccion):
+[Unidad 3.5](#sec-ELIM-u35)). Lo vemos también en euros predichos frente a la antigüedad (@fig-u31-prediccion):
 
 ```{r}
 #| label: fig-u31-prediccion
@@ -557,8 +557,8 @@ y redundancia empieza ahí.
 Conviene, eso sí, **no pedirle al modelo más de lo que dice**. Todo lo anterior es una lectura de
 **severidad** —*cuánto* cuesta una avería **si ocurre**—; no hemos modelado la **frecuencia** (cada
 cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo y el efecto del mantenimiento son el
-objeto de la [Unidad 3.5](#sec-u35); y el **presupuesto esperado = frecuencia × severidad** —donde la
-prevención se paga o no— se cierra con el enfoque Tweedie de la [Unidad 3.4](#sec-u34).
+objeto de la [Unidad 3.5](#sec-ELIM-u35); y el **presupuesto esperado = frecuencia × severidad** —donde la
+prevención se paga o no— se cierra con el enfoque Tweedie de la [Unidad 3.4](#sec-u33).
 
 Lo tercero es un matiz que evita una decisión equivocada, y que la interacción hace explícito: la fase del
 proceso **no** encarece las reparaciones «en general». Concentrar esfuerzo en las máquinas *auxiliares*
@@ -571,7 +571,7 @@ Por último, un aviso que el propio ajuste desliza y que el caso irá a explotar
 del coste **no** la explican estas variables, sino la **máquina** en sí —algunas son crónicamente caras—.
 Es la fragilidad que infla el $\hat\phi$ y que, bien modelada, permite señalar máquinas concretas para
 sustitución o vigilancia reforzada. De cómo estimarla —y de por qué mejora tanto la precisión— se ocupa
-la [Unidad 3.3](#sec-u33).
+la [Unidad 3.3](#sec-u34).
 
 ## 1.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u31-diagnostico}
 
@@ -608,7 +608,7 @@ DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
 - **Panel derecho:** residuos frente a valor predicho; buscamos una nube **sin estructura** (ni abanico ni
   curvatura).
 
-Volveremos a DHARMa en la [Unidad 3.3](#sec-u33), donde `simulateResiduals` sabe además respetar el
+Volveremos a DHARMa en la [Unidad 3.3](#sec-u34), donde `simulateResiduals` sabe además respetar el
 **agrupamiento por máquina** del modelo mixto.
 :::
 
@@ -702,7 +702,7 @@ Dos cosas se cumplen y una avisa:
 
 Los intervalos anchos y la $\hat\phi$ inflada son **la misma señal**: la **fragilidad** de máquina que
 el modelo no ve. Es exactamente el problema que resuelven —y con más precisión estiman— los modelos
-mixtos de la [Unidad 3.3](#sec-u33).
+mixtos de la [Unidad 3.3](#sec-u34).
 :::
 
 Y queda la cuenta pendiente que dejamos «en cuarentena»: el **`fabricante`** que la selección hizo entrar
@@ -731,7 +731,7 @@ evidencia hasta convertirla en significación. No es un fallo del test, sino del
 independencia** que le damos.
 
 La prueba de que es un espejismo: con inferencia que respeta el agrupamiento —errores estándar por
-máquina, o el **efecto aleatorio** de la [Unidad 3.3](#sec-u33)— el efecto **se desvanecerá**. La moraleja va más allá de la incertidumbre: un modelo que
+máquina, o el **efecto aleatorio** de la [Unidad 3.3](#sec-u34)— el efecto **se desvanecerá**. La moraleja va más allá de la incertidumbre: un modelo que
 ignora la correlación no solo estima mal los errores típicos, **también selecciona mal** (elige incluir
 lo que no debería). Cuando reajustemos con el agrupamiento y volvamos a testar `fabricante`, lo esperable
 es que **salga del modelo**.
@@ -764,21 +764,21 @@ marginaleffects::predictions(
 
 Es una predicción **marginal**: vale para una máquina *cualquiera* de ese perfil —la media de la
 población—. Es la única que un GLM puede dar, porque no distingue entre máquinas. En la [Unidad
-3.3](#sec-u33), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda predicción, la
+3.3](#sec-u34), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda predicción, la
 **condicional**: cuánto costará reparar *esta* máquina en concreto. La diferencia entre ambas es, en una
 frase, lo que aportan los modelos mixtos.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.1) · qué te llevas al estudio de caso
 Esta unidad te da la pieza central de la **severidad**: un GLM Gamma con enlace log sobre un importe
-individual. En la cartera de la [Unidad 3.8](#sec-u38) ese importe es `coste_k` de `siniestros.csv`
+individual. En la cartera de la [Unidad 3.8](#sec-u36) ese importe es `coste_k` de `siniestros.csv`
 —una fila por parte—, no `coste_medio` de la póliza.
 
-- **[Propuesta 2 · Por dónde se cuela el sexo en la tarifa](#sec-u38-p2)** *(unidad base)*. El
+- **[Propuesta 2 · Por dónde se cuela el sexo en la tarifa](#sec-u36-p2)** *(unidad base)*. El
   modelo de severidad con y sin el *proxy* es exactamente el ajuste de esta unidad, repetido dos
   veces. Ensáyalo aquí: quita `fabricante` del modelo del coste de una avería y comprueba cuánto se
   mueven los demás coeficientes. Si no se mueve nada, no hay canal; si se mueve, lo hay.
-- **[Propuesta 1 · La prima pura por tres caminos](#sec-u38-p1)**. La «vía A» necesita una
+- **[Propuesta 1 · La prima pura por tres caminos](#sec-u36-p1)**. La «vía A» necesita una
   predicción de **coste medio por siniestro** en la escala del euro, no del log. Practica aquí la
   lectura multiplicativa y el paso de $\hat\eta$ a euros.
 
