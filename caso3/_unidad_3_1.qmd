@@ -4,7 +4,7 @@
      fase_proceso (2 niveles: fase1=Corte/Mecanizado/Lijado, fase2=Ensamblaje/Acabado) resume el
      proceso; su interacción con criticidad recupera la estructura del DGP (criticidad x cuello).
      Caso 3 resumido (21-11-2026): sin validación contra el DGP (salió la antigua subsección de
-     §1.5 con tbl-u31-verdad, tbl-u31-verdad-crit, tbl-u31-verdad-fab y sus dos callouts). La
+     §1.7 (diagnóstico) con tbl-u31-verdad, tbl-u31-verdad-crit, tbl-u31-verdad-fab y sus dos callouts). La
      duda sobre `fabricante` y la phi inflada se resuelven en la 3.4 (efectos aleatorios).
      Sesión 1 · pregunta P1 del estudio de caso. -->
 
@@ -60,7 +60,9 @@ p1 + p2
 ```
 
 **¿Por qué no vale el modelo lineal gaussiano?** No es una objeción estética: falla en tres frentes
-que podemos comprobar. El primero es de principio: el gaussiano tiene soporte en **toda la recta real**,
+que podemos comprobar. 
+
+- El primero es de principio: el gaussiano tiene soporte en **toda la recta real**,
 de modo que reparte probabilidad sobre lo imposible —importes **negativos**—. Lo ajustamos y lo miramos
 de cerca.
 
@@ -76,12 +78,9 @@ c(prediccion_minima    = round(min(fitted(ols))),
 ```
 
 La **media** ajustada nunca se vuelve negativa (el mínimo ronda los 111 €), pero eso no salva al modelo:
-al asumir una Normal, **reparte probabilidad por debajo de cero**. El límite inferior del intervalo de
-predicción al 95 % cae bajo cero en el **80 %** de las averías (hasta unos −1.570 €), y la probabilidad
-media que el gaussiano pone en «coste < 0» es del **11 %**. No es un problema de puntería, sino de
-**dominio**: el coste vive en $(0,\infty)$ y el gaussiano insiste en habitar toda la recta. El segundo
-frente es la **heterocedasticidad**: la dispersión no es constante, sino que crece con el nivel del
-coste, como muestra la @fig-u31-heterocedasticidad.
+al asumir una Normal, **reparte probabilidad por debajo de cero**, pero en nuestro caso el coste vive en $(0,\infty)$ y el gaussiano insiste en habitar toda la recta: es un problema de **dominio**. 
+
+- El segundo frente es la **heterocedasticidad**: la dispersión no es constante, sino que crece con el nivel del coste, como muestra la @fig-u31-heterocedasticidad, donde ajustamos un modelo lineal normal y apreciamos un crecimiento de la varianza en los residuos (forma de embudo), además de la violación de normalidad al confrontar los cuantiles teóricos y muestrales.
 
 ```{r}
 #| label: fig-u31-heterocedasticidad
@@ -103,7 +102,7 @@ q2 <- ggplot(d_ols, aes(sample = residuo)) +
 q1 + q2
 ```
 
-El tercer frente es el que da nombre a la familia que usaremos: en datos de importes, lo que suele
+- El tercer frente es el que da nombre a la familia que usaremos: en datos de importes, lo que suele
 mantenerse aproximadamente **constante no es la varianza sino el coeficiente de variación** —la
 dispersión *relativa*—. Una reparación de 5.000 € varía en cientos de euros; una de 500 €, en decenas.
 Lo comprobamos por tramos del coste ajustado:
@@ -125,7 +124,143 @@ en una banda estrecha**. Esa es exactamente la estructura que codifica la **Gamm
 $\operatorname{Var}(Y)\propto\mu^2$ —desviación típica proporcional a la media y **CV constante**
 [@mccullagh1989, cap. 8]—.
 
-### ¿De qué depende el coste?
+## 1.2 Gamma en la familia exponencial {#sec-u31-gamma}
+
+Se ve en cuanto se escribe la distribución como miembro de la **familia exponencial de dispersión**,
+según la forma genérica que mostramos en la [Unidad 1.2](../caso1/caso1_binaria.qmd#sec-u12-familia):
+
+$$
+f(y;\theta,\phi)=\exp\!\left\{\frac{y\theta-b(\theta)}{a(\phi)}+c(y,\phi)\right\}.
+$$
+
+La Gamma se describe habitualmente con una **forma** $\alpha>0$ y una escala; para un GLM conviene
+escribirla directamente en función de su **media** $\mu>0$ (la escala es $\mu/\alpha$). Una
+$Y\sim\text{Gamma}(\mu,\alpha)$ encaja en esa forma así:
+
+$$
+f(y;\theta,\phi)=\exp\!\left\{\frac{y\theta+\log(-\theta)}{\phi}+c(y,\phi)\right\},
+\qquad \theta=-\frac{1}{\mu},\quad \phi=\frac{1}{\alpha},
+$$
+
+con las cuatro piezas de la @tbl-u31-gamma-canonica. El **parámetro natural** es $\theta=-1/\mu$: el
+**inverso** de la media, cambiado de signo. Como el logit en la Bernoulli, no lo elegimos nosotros; lo
+produce el álgebra. Y la **dispersión** es $\phi=1/\alpha$, la inversa de la forma.
+
+| Pieza | Gamma |
+|:--|:--|
+| Parámetro natural $\theta$ | $-\dfrac{1}{\mu}$  (el **inverso** de la media, con signo) |
+| Cumulante $b(\theta)$ | $-\log(-\theta)\;=\;\log\mu$ |
+| Dispersión $a(\phi)$ | $\phi=\dfrac{1}{\alpha}$ |
+| Término $c(y,\phi)$ | $\dfrac{1}{\phi}\log\dfrac{1}{\phi}+\Big(\dfrac{1}{\phi}-1\Big)\log y-\log\Gamma\!\Big(\dfrac{1}{\phi}\Big)$ |
+
+: Piezas de la forma canónica para la Gamma. A diferencia de la Bernoulli, aquí $a(\phi)=\phi$ no vale 1: la Gamma tiene un parámetro de dispersión libre, que habrá que estimar. {#tbl-u31-gamma-canonica}
+
+::: {.callout-note collapse="true"}
+## Desarrollo: de la densidad de la Gamma a la forma canónica
+Escrita en función de su media $\mu$ y su forma $\alpha$, la densidad de la Gamma es
+
+$$
+f(y;\mu,\alpha)=\frac{1}{\Gamma(\alpha)}\left(\frac{\alpha}{\mu}\right)^{\alpha}y^{\alpha-1}
+e^{-\alpha y/\mu},\qquad y>0 .
+$$
+
+El camino hasta la forma canónica es el mismo de la Bernoulli, en tres pasos.
+
+**Paso 1. Pasar a la escala exponencial.** Tomando logaritmos dentro de la exponencial:
+
+$$
+f(y;\mu,\alpha)=\exp\Big\{-\frac{\alpha y}{\mu}-\alpha\log\mu+\alpha\log\alpha+(\alpha-1)\log y
+-\log\Gamma(\alpha)\Big\}.
+$$
+
+**Paso 2. Aislar el término lineal en $y$.** Sacando $\alpha$ factor común de los dos términos que
+contienen $\mu$:
+
+$$
+f(y;\mu,\alpha)=\exp\left\{\frac{y\,\big(-\tfrac{1}{\mu}\big)-\log\mu}{1/\alpha}
++\alpha\log\alpha+(\alpha-1)\log y-\log\Gamma(\alpha)\right\}.
+$$
+
+Lo que multiplica a $y$ es el parámetro natural, $\theta=-1/\mu$, y el denominador es la dispersión,
+$\phi=1/\alpha$.
+
+**Paso 3. Reescribir el resto en términos de $\theta$ y $\phi$.** De $\theta=-1/\mu$ se sigue
+$\log\mu=-\log(-\theta)$, de modo que el numerador es $y\theta+\log(-\theta)$ y la cumulante es
+$b(\theta)=-\log(-\theta)$. Lo que queda fuera de la fracción, escrito con $\alpha=1/\phi$, es
+$c(y,\phi)$. Son las cuatro piezas de la @tbl-u31-gamma-canonica.
+:::
+
+Los dos momentos salen, como siempre, de derivar la cumulante
+[@mccullagh1989, cap. 8]:
+
+$$
+\operatorname{E}(Y)=b'(\theta)=-\frac{1}{\theta}=\mu,\qquad
+\operatorname{Var}(Y)=b''(\theta)\,a(\phi)=\frac{1}{\theta^{2}}\,\phi=\phi\,\mu^{2},
+\qquad \\
+\operatorname{CV}=\frac{\sqrt{\operatorname{Var}(Y)}}{\operatorname{E}(Y)}=\sqrt{\phi}=\frac{1}{\sqrt{\alpha}} .
+$$
+
+La **función de varianza** es $V(\mu)=\mu^{2}$: la varianza crece con el **cuadrado** de la media, y el
+CV depende solo de la forma $\alpha$, no de la media. Si todas las averías comparten la misma forma y
+difieren solo en su media —que es lo que hará el modelo, al dejar que $\mu$ dependa de las
+covariables—, el CV es el mismo en todos los tramos: lo que muestra la @tbl-u31-cv. Y el parámetro
+natural deja anunciado el **enlace canónico** de la Gamma, el inverso, al que volveremos en la
+[Sección 1.4](#sec-u31-modelizacion) para elegir otro.
+
+Fijada la media, la forma $\alpha$ es la que decide **cuánta cola** tiene la distribución. Lo vemos
+superponiendo al coste observado varias Gammas con su **misma media** y formas distintas: la
+exponencial ($\alpha=1$), la que reproduce el CV observado ($\alpha=1/\text{CV}^2$, por momentos) y dos
+más concentradas (@fig-u31-gammas).
+
+```{r}
+#| label: fig-u31-gammas
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Gammas con la misma media que el coste observado y formas distintas. Izquierda: densidades sobre el histograma del coste (eje cortado en el percentil 99). Derecha: la cola, como probabilidad de superar cada coste, P(Y > y), en escala log; los puntos son la proporción observada. Con la media fija, una forma mayor concentra la distribución y adelgaza la cola. Ninguna forma sirve a la vez para el cuerpo y para la cola: las concentradas (α = 4, α = 10) dibujan mejor la zona central del histograma, pero hacen casi imposibles los costes altos que sí ocurren; las bajas (momentos, exponencial) acompañan la cola, a costa de poner demasiada masa junto a cero."
+media_c <- mean(base$coste_euros)
+cv_c    <- sd(base$coste_euros) / media_c
+alfas   <- c(1, 1 / cv_c^2, 4, 10)      # misma media: la escala de cada una es media / alfa
+etiq    <- paste0("α = ", round(alfas, 2), c(" (exponencial)", " (momentos)", "", ""))
+rejilla <- seq(1, max(base$coste_euros), length.out = 400)
+
+curvas <- purrr::map2_dfr(alfas, etiq, \(a, e) tibble::tibble(
+  y = rejilla, forma = e,
+  densidad = dgamma(rejilla, shape = a, scale = media_c / a),
+  cola     = pgamma(rejilla, shape = a, scale = media_c / a, lower.tail = FALSE)))
+curvas$forma <- factor(curvas$forma, levels = etiq)
+
+# Cola observada: proporción de averías que superan cada coste
+obs <- tibble::tibble(y = sort(base$coste_euros),
+                      cola = 1 - (seq_along(y) - 0.5) / length(y))
+p99 <- quantile(base$coste_euros, 0.99)
+
+p_dens <- ggplot() +
+  geom_histogram(data = subset(base, coste_euros <= p99),
+                 aes(coste_euros, after_stat(density)), bins = 50, fill = "grey85") +
+  geom_line(data = subset(curvas, y <= p99), aes(y, densidad, colour = forma), linewidth = 0.8) +
+  labs(x = "coste de la avería (€)", y = "densidad", colour = NULL)
+
+p_cola <- ggplot() +
+  geom_point(data = obs, aes(y, cola), size = 0.6, colour = "grey40") +
+  geom_line(data = curvas, aes(y, cola, colour = forma), linewidth = 0.8) +
+  scale_y_log10(limits = c(1e-4, 1)) +
+  labs(x = "coste de la avería (€)", y = "P(Y > y), escala log", colour = NULL)
+
+(p_dens + p_cola) + patchwork::plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+Ninguna de las cuatro sirve para todo. Las formas concentradas dibujan bien el **cuerpo** del
+histograma, pero su cola cae tan deprisa que los costes altos observados serían casi imposibles. Las
+formas bajas acompañan la **cola**, a cambio de poner demasiada masa cerca de cero. No es un fallo de
+la Gamma: estamos ajustando **una sola** Gamma a todas las averías juntas, que mezclan medias muy
+distintas —una avería electrónica en una máquina crítica no se parece a una mecánica en una
+auxiliar—, y una mezcla de Gammas con medias distintas tiene más cola que cualquiera de ellas. Cuando
+el modelo deje que la media dependa del tipo de avería, la criticidad o la edad, cada avería se
+comparará con **su propia media**, y la dispersión $\phi$ que estime saldrá **menor** que la $1/\alpha$
+por momentos de esta figura: más cerca de las formas concentradas.
+
+## 1.3 ¿De qué depende el coste?  {#sec-u31-exploracion}
 
 El modelo debe responder a una pregunta industrial. Antes de ajustarlo, miramos la relación del coste
 con los **cinco predictores candidatos**. Primero los **categóricos** (@fig-u31-cat):
@@ -169,7 +304,7 @@ Conviene ser honestos con este gráfico: coloreando por criticidad se ven **band
 separa las nubes—, pero las **pendientes marginales son suaves**, y la de la carga casi plana. Cuidado
 con concluir de ahí que no importan: es la vista *marginal*, que mezcla máquinas de toda criticidad y
 puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al ajustar el modelo
-([Sección 1.4](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
+([Sección 1.6](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
 otra mitad del caso, que entrará con la Tweedie de la [Unidad 3.3](#sec-u33).
@@ -204,28 +339,31 @@ base <- base |>
     levels = c("fase1", "fase2")))
 ```
 
-## 1.2 Modelización y estimación {#sec-u31-modelizacion}
+## 1.4 Modelización y estimación {#sec-u31-modelizacion}
 
 ### El modelo genérico
 
 Una respuesta continua y positiva pide una distribución con soporte en $(0,\infty)$. La de referencia
 es la **Gamma**, y el modelo reúne los tres ingredientes de todo GLM [@nelder1972]:
 
-- **Componente aleatoria:** $Y_i \sim \text{Gamma}(\mu_i,\phi)$, con la relación media-varianza
-  $\operatorname{Var}(Y_i)=\phi\,\mu_i^{2}$, de donde el **coeficiente de variación**
-  $\sqrt{\operatorname{Var}(Y_i)}/\mu_i=\sqrt{\phi}$ **no depende de $\mu_i$**: es constante (el supuesto
-  que acabamos de ver plausible en la @tbl-u31-cv).
+- **Componente aleatoria:** $Y_i \sim \text{Gamma}(\mu_i,\alpha)$, con una **media** $\mu_i$ propia de
+  cada avería y una **forma $\alpha$ común** a todas. Es lo que anticipamos en la
+  [Sección 1.2](#sec-u31-gamma): lo que cambia de una avería a otra es la media, no la forma. Con
+  $\phi=1/\alpha$, la relación media-varianza es $\operatorname{Var}(Y_i)=\phi\,\mu_i^{2}$, de donde el
+  **coeficiente de variación** $\sqrt{\operatorname{Var}(Y_i)}/\mu_i=\sqrt{\phi}$ **no depende de
+  $\mu_i$**: es constante (el supuesto que acabamos de ver plausible en la @tbl-u31-cv).
 - **Enlace log:** $\log\mu_i=\eta_i$, de modo que $\mu_i=e^{\eta_i}>0$ —garantiza una media positiva y
   hace que los efectos sean **multiplicativos**—.
 - **Predictor lineal:** $\eta_i=\beta_0+\beta_1x_{i1}+\dots+\beta_px_{ip}$.
 
-La Gamma pertenece a la familia exponencial, con $\phi$ como parámetro de dispersión
-[@dobson2018, cap. 3], así que hereda toda la maquinaria del marco: IWLS, deviance e inferencia.
+Como la Gamma pertenece a la familia exponencial (@tbl-u31-gamma-canonica), con $\phi$ como parámetro
+de dispersión [@dobson2018, cap. 3], hereda toda la maquinaria del marco: IWLS, deviance e inferencia.
 
 ### Enlace log frente a enlace inverso
 
-El enlace **canónico** de la Gamma no es el log sino el **inverso**, $\eta=1/\mu$
-[@mccullagh1989, §8.3.3]. Que el canónico exista no obliga a usarlo: para importes trabajaremos con el
+El enlace **canónico** de la Gamma no es el log sino el **inverso**: el parámetro natural que
+obtuvimos en la [Sección 1.2](#sec-u31-gamma) es $\theta=-1/\mu$, y salvo el signo —que no cambia
+nada— el enlace canónico es $\eta=1/\mu$ [@mccullagh1989, §8.3.3]. Que el canónico exista no obliga a usarlo: para importes trabajaremos con el
 **log**, que da la lectura multiplicativa que necesitamos ($e^{\beta}$ es un factor) y evita
 predicciones inadmisibles (el inverso **no** garantiza $\mu>0$ para todo $\eta$).
 
@@ -252,7 +390,28 @@ Tres detalles prácticos:
 
 Con el tipo de avería, la antigüedad y la carga como efectos principales, y la **criticidad en
 interacción con la fase del proceso** (`criticidad * fase_proceso` incluye ambos efectos principales y
-su interacción):
+su interacción). Para la avería $i$, el modelo es
+
+$$
+Y_i\sim\text{Gamma}(\mu_i,\alpha),\qquad \log\mu_i=\eta_i,
+$$
+
+$$
+\begin{aligned}
+\eta_i=\;&\beta_0
++\underbrace{\beta_1\,\text{Eléctrica}_i+\beta_2\,\text{Hidráulica}_i+\beta_3\,\text{Electrónica}_i}_{\text{tipo de avería}}
++\underbrace{\beta_4\,\text{Importante}_i+\beta_5\,\text{Crítica}_i}_{\text{criticidad}}
++\underbrace{\beta_6\,\text{Fase2}_i}_{\text{fase}}\\
+&+\beta_7\,\text{antigüedad}_i+\beta_8\,\text{carga}_i
++\underbrace{\beta_9\,\text{Importante}_i\cdot\text{Fase2}_i+\beta_{10}\,\text{Crítica}_i\cdot\text{Fase2}_i}_{\text{criticidad}\times\text{fase}} ,
+\end{aligned}
+$$
+
+donde cada nombre en mayúscula es una **indicadora** (1 si la avería tiene esa categoría, 0 si no),
+con las categorías de referencia **Mecánica**, **Auxiliar** y **fase 1**. Son once coeficientes —en
+el mismo orden en que los lista la @tbl-u31-coef-ee— y, aparte, la dispersión $\phi=1/\alpha$. La
+interacción hace que el efecto de la criticidad dependa de la fase: una máquina crítica multiplica el
+coste medio por $e^{\beta_5}$ en la fase 1, y por $e^{\beta_5+\beta_{10}}$ en la fase 2. Lo ajustamos:
 
 ```{r}
 #| label: tbl-u31-coef-ee
@@ -273,7 +432,7 @@ más recomendable que la basada en la deviance cuando la forma de la Gamma es pe
 
 La @tbl-u31-coef-ee muestra **solo** estimación: coeficiente y error estándar. La **significación** de
 cada uno —su estadístico de Wald, su intervalo de confianza y su $p$-valor— la reservamos para la
-[Sección 1.4](#sec-u31-inferencia), donde reunimos todo el aparato inferencial bajo una sola idea. Aquí
+[Sección 1.6](#sec-u31-inferencia), donde reunimos todo el aparato inferencial bajo una sola idea. Aquí
 nos quedamos con las estimaciones para pasar a **interpretarlas**.
 
 Antes de interpretar los coeficientes conviene mirar ese $\hat\phi$, porque **fija la escala de la
@@ -304,7 +463,7 @@ máquinas** que el modelo no incluye. Lo resolveremos con el **efecto aleatorio 
 [Unidad 3.4](#sec-u34).
 :::
 
-## 1.3 Interpretación {#sec-u31-interpretacion}
+## 1.5 Interpretación {#sec-u31-interpretacion}
 
 Con enlace log, $\log\mu = \beta_0 + \beta_1 x_1 + \dots + \beta_p x_p$, así que la media es un
 **producto de factores**:
@@ -389,7 +548,7 @@ Hemos usado tres piezas del ecosistema, cada una para una tarea distinta de inte
   **factor**. Encima, `dplyr::transmute()` **crea las columnas que queremos y descarta el resto** (a
   diferencia de `mutate()`, que las añade): aquí, quedarnos solo con `term` y `exp(beta)`. La misma
   función, añadiendo `conf.int = TRUE` y el estadístico de Wald, arma la **tabla integral** de la
-  [Sección 1.4](#sec-u31-inferencia).
+  [Sección 1.6](#sec-u31-inferencia).
 - **`emmeans::emmeans(m_gamma, ~ criticidad | fase_proceso, type = "response")`** calcula **medias
   marginales estimadas**: el coste predicho para cada nivel de criticidad *dentro de* cada fase (la barra
   `|` fija la fase). Hace por nosotros la suma «principal + interacción» y, con `type = "response"`,
@@ -404,7 +563,7 @@ La idea de fondo: `tidy` sirve para leer **coeficientes** (efectos en escala del
 términos). Con interacciones, casi siempre es más honesto interpretar sobre predicciones.
 :::
 
-## 1.4 Inferencia y selección {#sec-u31-inferencia}
+## 1.6 Inferencia y selección {#sec-u31-inferencia}
 
 Toda la inferencia de este modelo comparte una **raíz común**: $\phi$ es **desconocida y se estima de
 los datos**. Eso desplaza las distribuciones de referencia respecto de Poisson o binomial —donde
@@ -576,7 +735,7 @@ Es la fragilidad que infla el $\hat\phi$ y que, bien modelada, permite señalar 
 sustitución o vigilancia reforzada. De cómo estimarla —y de por qué mejora tanto la precisión— se ocupa
 la [Unidad 3.4](#sec-u34).
 
-## 1.5 Bondad de ajuste, diagnóstico y predicción {#sec-u31-diagnostico}
+## 1.7 Bondad de ajuste, diagnóstico y predicción {#sec-u31-diagnostico}
 
 ### Residuos: cuáles usar
 
