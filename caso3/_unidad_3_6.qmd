@@ -1,46 +1,42 @@
-<!-- Partial · Incluir con {{< include _unidad_3_8.qmd >}}. Sin YAML. Sin chunks de código:
+<!-- Partial · Incluir con {{< include _unidad_3_6.qmd >}}. Sin YAML. Sin chunks de código:
      es unidad de ENCARGO y EVALUACIÓN. Espejo de 1.6 y 2.7.
      Tipología de informe del Caso 3 (guía docente): ARTÍCULO DE INVESTIGACIÓN.
 
+     ENCUADRE (Caso 3 resumido, 21-11-2026): un único encargo del comité, cinco preguntas, una por
+     sesión (P1 Gamma · P2 familia y escala · P3 tres caminos/Tweedie · P4 coeficientes del
+     bonus-malus y efectos aleatorios · P5 presupuesto). Sin supervivencia, sin propuestas a elegir,
+     sin extensión no vista en clase y SIN validación contra el DGP (como la 2.7).
+
      DATOS: NO son los del banco de averías de la teoría del Caso 3, sino la CARTERA DE AUTO del
      Caso 2 (caso2/R/dgp_auto.R), ya repartida por equipos en caso2/datos_equipos_auto/.
-     La 2.7 la usó para FRECUENCIA; aquí se usan las lentes que allí quedaron reservadas:
-     COSTE (Gamma/IG/Tweedie) y DURACIÓN de la póliza (AFT/Cox).
 
      CIFRAS VERIFICADAS sobre caso2/datos_equipos_auto (20 equipos, septiembre 2026):
        - 20 carpetas equipo_01..equipo_20; cada una con cartera.csv, panel.csv, siniestros.csv
          y cartera.rds (esta última CONSERVA attr "verdad"/"siniestros"/"panel"; los .csv NO).
-         Los equipos 01-10 son los mismos de agosto 2026 (semillas y parámetros sin tocar).
        - cartera.csv: 2924-3099 pólizas (40 columnas) · 30 agencias · 6 regiones ·
          antiguedad observada 0.1-10.0 años · exposicion 0.01-1.
        - siniestros.csv: 1158-2393 filas · mediana de coste_k por equipo 1314-2268 EUR.
-       - panel.csv: 13705-14583 filas (9 columnas) · en_riesgo siempre 1 · expo_anual 0.001-1,
-         redondeada a 3 decimales y con suelo de 0.001 años en el último tramo (dgp_auto.R,
-         bloque 8) para que offset(log(expo_anual)) nunca sea -Inf; antes de ese suelo, 30 filas
-         de 283554 valían exactamente 0. La identidad expo_anual = tstop - tstart se cumple en
-         las 283554 filas. La trampa persiste: 586 filas por debajo de 0.01 años, 89 de ellas en
-         el propio suelo (log(0.001) = -6.91 frente a log(1) = 0), es decir, exposición casi nula
-         con un apalancamiento enorme en el offset.
-       - coste_total = 0 en el 62.2-75.3 % de las pólizas; a nivel PÓLIZA-AÑO (n_partes_anual = 0),
-         86.4-92.8 % (el 90.5-92.8 % que figuraba aquí en agosto era incorrecto: sobre los mismos
-         10 equipos el rango ya era 86.4-92.8, mínimo en equipo_02).
-       - baja observada en el 38.0-41.4 % de las pólizas.
-       - agregar siniestros por (id_poliza, anio) casa con panel sin filas huérfanas (verificado).
+       - panel.csv: 13705-14583 filas (9 columnas) · en_riesgo siempre 1 · expo_anual 0.001-1
+         (suelo de 0.001 años en el último tramo; 586 filas por debajo de 0.01 años).
+       - coste_total = 0 en el 62.2-75.3 % de las pólizas; a nivel PÓLIZA-AÑO, 86.4-92.8 %.
+       - agregar siniestros por (id_poliza, anio) casa con panel sin filas huérfanas.
+     Verificado el 21-11-2026 sobre equipo_01: 14524 póliza-años, 92.8 % con coste anual 0;
+       n_partes_anual coincide con el recuento de siniestros.csv; 1858 de 3093 pólizas vivas
+       (baja == 0); el último anio del panel de cada póliza es ceiling(antiguedad); 127 pólizas
+       de un solo año, en todas bonus_malus_prev == bonus_malus_act.
 
-     TRAMPAS REALES DEL BANCO, comprobadas en el código y en los datos (no son erratas del texto):
-       (a) t_baja es el instante LATENTE de baja (pmin(T_baja, T_max)), no el observado: para las
-           1858/3093 pólizas censuradas del equipo_01, t_baja > antiguedad en el 100 % de los casos.
-           El par correcto es Surv(antiguedad, baja). Ver callout de aviso en 8.1.
-       (b) u_ag y u_reg entran SOLO en n_gestiones (línea 175 de dgp_auto.R). Ni la intensidad de
-           siniestros ni la severidad llevan efecto de agencia: la propuesta 4 es, por diseño, un
-           CONTROL NEGATIVO. No revelarlo en el enunciado.
-       (c) La fragilidad Z (rgamma(N, shape=theta, rate=theta)) entra en la INTENSIDAD, no en la
-           severidad: coste_k ~ Gamma(nu_gamma, mu_sev) con mu_sev función solo de covariables.
-           Por tanto Var(log Z) = trigamma(theta_frail) y el latente llega al coste anual SOLO por
-           la vía de la frecuencia (a diferencia del banco de averías, donde iba por las dos).
+     TRAMPAS REALES DEL BANCO, comprobadas en el código y en los datos (no revelar):
+       (a) Bonus-malus (dgp_auto.R, bloque 6): clase inicial ALEATORIA (1-5), sube 1 por parte,
+           baja 1 con prob. 1 - persistencia en cada año sin partes. bonus_malus_act = clase tras
+           el último año observado; bonus_malus_prev = la del penúltimo (o la misma si Y = 1).
+           Usar _prev para el coste del último año no tiene fuga salvo en las pólizas de 1 año.
+       (b) La fragilidad Z entra en la INTENSIDAD, no en la severidad: el efecto aleatorio de
+           póliza pertenece a la frecuencia (P4, «en qué pieza va»).
+       (c) u_ag y u_reg entran SOLO en n_gestiones: no hay efecto de agencia en coste ni en
+           frecuencia.
        (d) panel.csv NO trae coste anual: hay que construirlo agregando siniestros.csv. -->
 
-# 6 · Estudio de caso: la cartera vuelve, con dos preguntas nuevas {#sec-u36}
+# 6 · Estudio de caso: la tarifa completa y el presupuesto del año próximo {#sec-u36}
 
 ::: {.callout-note}
 ## Sobre esta unidad
@@ -61,22 +57,21 @@ agencias** repartidas en **6 regiones**. Cada póliza se sigue desde que entra e
 se da de baja o hasta que termina la ventana de estudio: de ahí que la **antigüedad** observada vaya
 desde poco más de un mes hasta casi diez años, y que la **exposición** sea muy desigual entre pólizas.
 
-En el Caso 2 miraste esa cartera con una sola lente: **¿cuántos partes, y a qué ritmo?**. La 2.7 te
-avisó de que la cartera llevaba dentro otras dos preguntas, reservadas para este bloque:
+En el Caso 2 renovaste la **tarifa de frecuencia**: *¿cuántos partes, y a qué ritmo?*. Pero una
+tarifa no cobra partes, cobra **euros**. Lo que la aseguradora necesita para el año próximo es lo
+que cuesta cada cliente:
 
-> **¿Cuánto cuesta un siniestro?** — la severidad, en euros. Y su agregado: **¿cuánto costará el año
-> que viene?**
->
-> **¿Cuánto dura un cliente?** — el tiempo hasta la baja, con censura.
+> **coste anual de un cliente = cuántos partes da × cuánto cuesta cada uno**
 
-Son exactamente las dos preguntas del Caso 3. La cartera no cambia; cambia la respuesta que miras.
+La primera mitad la construiste en el Caso 2; la segunda es la respuesta **positiva y asimétrica**
+de este bloque. La cartera no cambia; cambia la respuesta que miras.
 
 ### Las tres tablas
 
-Cada equipo recibe una carpeta con **tres ficheros `.csv`** —los datos «a ciegas»— y un **`.rds`**
-que, además de la cartera, guarda la **verdad del proceso generador**. La regla de trabajo es la
-misma que en el Caso 2: **ajusta con los `.csv`, y abre el `.rds` solo al final**, para el control de
-calidad.
+Cada equipo recibe una carpeta con **tres ficheros `.csv`** y un **`.rds`**. Se trabaja con los
+`.csv`. <!-- [DECIDIR] La 3.8 anterior abría el .rds al final para validar contra la verdad del
+DGP. Como las unidades resumidas ya no validan contra el DGP (y la 2.7 tampoco lo hacía), aquí se
+quita. Si se quiere conservar, recuperar el párrafo de la 3.8. -->
 
 **`cartera.csv` — una fila por póliza.** Es la tabla que ya conoces: la
 [Unidad 2.7](../caso2/caso2_conteos.qmd#sec-u27) describe su estructura, sus predictores de riesgo,
@@ -87,32 +82,8 @@ columnas que allí **no** usaste, porque son las respuestas de este caso:
 |:---|:---|:---|
 | `coste_total` | Suma en euros de todos los partes de esa póliza | Vale **0** en la mayoría de las pólizas (entre el 62 % y el 75 %, según el equipo): es una variable **mixta**, cero-con-masa y positiva continua. El terreno de la [Unidad 3.3](#sec-u33) |
 | `coste_medio` | `coste_total / n_siniestros` | Es **`NA`** cuando la póliza no tuvo partes. Ojo: no es el coste de *un* parte, es la media de los suyos, y promedia un número distinto de partes en cada póliza |
-| `tuvo_siniestro` | Indicador 0/1 | La lente binaria del Caso 1 sobre estos mismos datos; útil como primera parte de un modelo en dos partes |
-| `antiguedad` | Años que la póliza lleva **observada** en la cartera | Es el **tiempo de seguimiento**: la respuesta de duración |
-| `baja` | 1 si la póliza se dio de baja; 0 si seguía viva al cerrar el estudio | Es el **indicador de evento**; el 0 es **censura por la derecha** |
-| `t_baja` | Instante de baja **según el proceso generador** | **No lo uses como respuesta.** Ver el aviso de abajo |
-| `motivo_fin` | `baja` / `fin_estudio` | Redundante con `baja`; sirve para verificar que has entendido la censura |
+| `tuvo_siniestro` | Indicador 0/1 | La lente binaria del Caso 1 sobre estos mismos datos; la primera parte de un modelo en dos partes |
 | `exposicion` | Antigüedad reescalada a $(0,1]$ | El *offset* del Caso 2. Sigue siéndolo aquí para el coste **anualizado** |
-
-::: {.callout-warning}
-## Un aviso sobre `t_baja`: el dato que sabe demasiado
-`t_baja` es el instante en que la póliza **se daría de baja** según el proceso generador, y está
-registrado también para las pólizas que **seguían vivas** al cerrar el estudio —es decir, para las
-censuradas contiene información del **futuro**, que en una cartera real nadie tendría—. Comprobación
-inmediata sobre tus datos: para las pólizas con `baja == 0`, `t_baja` es **siempre mayor** que
-`antiguedad`.
-
-El par correcto para modelar la duración es, por tanto:
-
-``` r
-Surv(antiguedad, baja)      # tiempo observado + indicador de evento
-```
-
-Ajustar sobre `Surv(t_baja, baja)` produce un modelo que parece excelente y no vale nada. Si tu
-propuesta trabaja la duración, **dilo explícitamente en el artículo**: qué variable es el tiempo
-observado, cuál el indicador y por qué descartas `t_baja`. Es exactamente el tipo de decisión que
-distingue un análisis de supervivencia bien planteado de uno que solo ejecuta funciones.
-:::
 
 **`siniestros.csv` — una fila por parte.** Esta tabla es **nueva**: en el Caso 2 existía como
 `attr(cartera, "siniestros")` pero no se abría. Es la resolución más fina del banco —el suceso
@@ -127,13 +98,11 @@ el equipo.
 | `coste_k` | **Coste de ese parte, en euros.** La respuesta positiva y asimétrica del caso: la Gamma de la [Unidad 3.1](#sec-u31) |
 | `anio` | Año de póliza en que cae el parte ($1, 2, \dots$); es la clave de agregación hacia `panel.csv` |
 
-Dos consecuencias de que esta tabla exista. La primera: `coste_k` da un **coste por parte** limpio,
-sin promediar, que es lo que pide un modelo de severidad. La segunda: `k` y `t_k` convierten la
-cartera en un **proceso de eventos recurrentes**, con el historial completo de cada póliza y no solo
-el primer siniestro que trabajaste en la 2.5.
+`coste_k` da un **coste por parte** limpio, sin promediar, que es lo que pide un modelo de
+severidad. Las covariables del cliente no están en esta tabla: se traen de `cartera.csv` por
+`id_poliza`.
 
-**`panel.csv` — una fila por póliza y año.** También es nueva. Es la estructura *counting process*
-que en el banco de averías llamábamos `seguimiento`: entre 13.800 y 14.500 filas.
+**`panel.csv` — una fila por póliza y año.** También es nueva: entre 13.800 y 14.500 filas.
 
 | Columna | Qué es |
 |:---|:---|
@@ -141,14 +110,14 @@ que en el banco de averías llamábamos `seguimiento`: entre 13.800 y 14.500 fil
 | `tstart`, `tstop` | Extremos del tramo en años de antigüedad. `tstop − tstart` es el tiempo realmente expuesto: el **último** tramo de cada póliza suele estar cortado |
 | `expo_anual` | Precisamente `tstop − tstart`. Es el **offset** natural de cualquier modelo anual: `offset = log(expo_anual)` |
 | `n_partes_anual` | Número de partes de esa póliza en ese año |
-| `edad_t`, `antig_veh_t` | Edad del conductor y del vehículo **actualizadas** año a año: covariables **dependientes del tiempo**, el formato del Cox extendido de la [Sección 6.8](#sec-ELIM-u36-extcox) |
+| `edad_t`, `antig_veh_t` | Edad del conductor y del vehículo **actualizadas** año a año |
 | `en_riesgo` | Vale 1 en todas las filas: solo se listan tramos en riesgo |
 
-::: {.callout-tip}
+::: {.callout-warning}
 ## El panel no trae el coste: hay que construirlo
-`panel.csv` lleva el **recuento** anual, no el **euro** anual. Si tu propuesta necesita el coste por
-póliza y año —el objeto Tweedie de la [Unidad 3.3](#sec-u33)—, se obtiene agregando `siniestros.csv`
-y uniéndolo al panel, cuidando de que los años sin partes queden en **cero** y no desaparezcan:
+`panel.csv` lleva el **recuento** anual, no el **euro** anual. El coste por póliza y año se obtiene
+agregando `siniestros.csv` y uniéndolo al panel, cuidando de que los años sin partes queden en
+**cero** y no desaparezcan:
 
 ``` r
 coste_anual <- siniestros |>
@@ -164,15 +133,15 @@ Los ceros no son un detalle menor: a nivel **póliza-año** rondan el 90 %, fren
 que estimarás y la estabilidad del ajuste. Justifica cuál eliges.
 :::
 
+::: {.callout-tip}
 ### Cada equipo, su cartera
 
 Como en el Caso 2, cada equipo trabaja con una **cartera propia**, generada con otra semilla y otros
-valores de algunos parámetros —la tasa base, el tamaño de la fragilidad, la forma del hazard, la
-dispersión de la severidad, el efecto de agencia—. La estructura es idéntica; **las cifras no**. No
-copies conclusiones numéricas de otro equipo: no serán las tuyas.
+valores de algunos parámetros. La estructura es idéntica; **las cifras no**. No copies conclusiones
+numéricas de otro equipo: no serán las tuyas.
 
 Es **la misma carpeta del Caso 2**: si ya la descargaste entonces, tu equipo trabaja aquí sobre esos
-mismos ficheros, ahora mirando `coste_k`, `coste_total` y `antiguedad`/`baja`.
+mismos ficheros, ahora mirando `coste_k` y el coste anual.
 
 ```{=html}
 <a class="boton-datos"
@@ -181,261 +150,145 @@ mismos ficheros, ahora mirando `coste_k`, `coste_total` y `antiguedad`/`baja`.
   📂 Descarga aquí los datos de tu equipo · <code>caso2/datos_equipos_auto</code>
 </a>
 ```
+:::
 
-## 6.2 El encargo: un artículo de investigación {#sec-u36-encargo}
+## 6.2 El encargo {#sec-u36-encargo}
 
-El entregable del Caso 3 **no** es un informe de consultoría —ese fue el Caso 2— sino un **artículo
-de investigación**: el formato con el que se comunica un resultado metodológico a una comunidad
-técnica. Cambia el destinatario y, con él, todo lo demás: el artículo **plantea una pregunta**,
-**justifica un método**, **muestra evidencia** y **discute sus límites**, en lugar de recomendar una
-acción. La estructura no la decides tú: la fijan la guía y la plantilla de artículo científico de los
-materiales de la asignatura, en `evaluacion/` ([Sección 6.4](#sec-u36-formato)).
+Con la tarifa de frecuencia del Caso 2 aprobada, el **comité de dirección** quiere cerrar la
+**tarifa completa** del año próximo —en euros, no en partes— y, con ella, el **presupuesto de
+siniestralidad** de la cartera. Esta vez el destinatario no es solo el comité: el trabajo se
+entrega como **artículo de investigación** ([Sección 6.4](#sec-u36-formato)), porque una de las
+preguntas es metodológica y merece contarse a una comunidad técnica.
 
-El trabajo tiene **dos mitades obligatorias**:
+> **Lo que nos plantea el comité**
+>
+> **Dirección de siniestros.** *«Sabemos cuántos partes da cada cliente. Ahora necesitamos saber
+> cuánto nos cuesta cada parte.»*
+>
+> 1. ¿Cuánto cuesta un parte, y de qué características del cliente y del vehículo depende? ¿Cuánto
+>    encarece cada una?
+>
+> **Dirección técnica.** *«Los partes caros son pocos pero se llevan buena parte del gasto. No
+> queremos una tarifa que se equivoque precisamente en ellos.»*
+>
+> 2. ¿Qué distribución describe el coste de un parte, y en qué escala debemos modelarlo? Si
+>    trabajamos en logaritmos, ¿cómo volvemos a euros sin equivocarnos en la media?
+>
+> **Dirección actuarial.** *«Hay dos escuelas en el departamento: unos tarifican multiplicando
+> frecuencia por severidad, otros modelan directamente el coste anual. Y hay quien prefiere separar
+> "¿da algún parte?" de "¿cuánto cuesta si lo da?".»*
+>
+> 3. ¿Cuánto cuesta asegurar un cliente durante un año? Calculadlo por los **tres caminos** y decidnos
+>    si da lo mismo: ¿en qué clientes discrepan, y cuál recomendáis?
+>
+> **Dirección comercial.** *«Nuestra tarifa final es la prima de la ficha multiplicada por el
+> coeficiente del nivel de bonus-malus del cliente. Los coeficientes los fijamos hace años y nadie
+> los ha revisado.»*
+>
+> 4. ¿Qué **coeficiente** debe aplicar cada nivel de bonus-malus el año próximo, teniendo en cuenta
+>    lo que ya cobra la prima de la ficha? ¿Penalizamos dos veces a algún cliente? Y si el
+>    historial de cada cliente se usara directamente, sin pasar por los niveles, ¿cuánto debería
+>    pesar?
+>
+> **Dirección financiera.** *«Necesitamos cifrar la siniestralidad del año que viene, y con qué
+> margen.»*
+>
+> 5. ¿Cuánto nos costará la cartera **viva** el año próximo? ¿Entre qué valores puede moverse? ¿Y
+>    cuánto debemos cobrar a cada uno de los cinco **clientes tipo** del Caso 2
+>    (los de la [Unidad 2.7](../caso2/caso2_conteos.qmd#tbl-u27-perfil))?
 
-1. **Aplicar** al menos dos de los modelos estudiados en el curso, con el ciclo completo que has
-   repetido en las siete unidades anteriores: pregunta → datos → exploración → modelo →
-   interpretación → inferencia → bondad de ajuste → diagnóstico → predicción → validación.
-2. **Investigar y aplicar una extensión** que **no** se ha desarrollado en clase. Cada propuesta
-   sugiere la suya, y todas aparecen en el mapa de fronteras de la
-   [Sección 7.2](#sec-ELIM-u37-fronteras). Investigar significa: localizar la **fuente original** que la
-   define, entender qué problema resuelve, ajustarla, y explicar **qué añade** respecto del modelo
-   base. Una extensión que se ajusta pero no se compara con nada no cuenta.
+<!-- [DECIDIR] Pregunta 5: ¿se mantiene el supuesto de crecimiento del 10 % con entrada en el nivel 3
+     de la P4 del Caso 2? Enlazaría los dos presupuestos (clientes por nivel × coste por cliente),
+     pero alarga el encargo. Por defecto, fuera. -->
 
-A esto se añade el **control de calidad contra la verdad**: el fichero `cartera.rds` conserva
-`attr(cartera, "verdad")` con los parámetros generadores. Se abre **al final**, cuando el modelo ya
-está cerrado, y da una sección de validación que ningún dato real permite escribir. Cada propuesta
-indica contra qué elementos concretos validar.
+Como en el Caso 2, `sexo` es un factor **prohibido** en la tarifa: puedes usarlo para diagnosticar,
+nunca para tarificar. Y el bonus-malus exige cuidado con el **orden temporal**: se calcula a partir
+de los siniestros, así que usarlo para explicar esos mismos siniestros es **fuga de información**
+(por eso la 2.7 lo prohibía como predictor). Sí es legítimo para el **año siguiente** al que
+resume: la pregunta 4 lo usa exactamente así ([Sección 6.3](#sec-u36-ruta)).
 
 ::: {.callout-important}
 ## Qué se evalúa, en una frase
 Que el artículo demuestre **criterio**: por qué **esa** familia y no otra, por qué **ese** enlace, por
-qué **esa** estructura aleatoria, cómo se ha tratado la **censura** o los **ceros**, y qué queda sin
-resolver. Un artículo que ajusta diez modelos sin justificar ninguno puntúa por debajo de uno que
+qué **esa** estructura aleatoria, cómo se han tratado los **ceros** y la **exposición**, y qué queda
+sin resolver. Un artículo que ajusta diez modelos sin justificar ninguno puntúa por debajo de uno que
 ajusta dos y explica la elección.
 :::
 
-## 6.3 Las siete propuestas {#sec-u36-propuestas}
+## 6.3 Hoja de ruta: dónde se trabaja cada pregunta {#sec-u36-ruta}
 
-Siete artículos posibles. Cada uno tiene una **pregunta** que un artículo real se haría, una **unidad
-base** del curso donde vive el modelo central, una **extensión** que investigar y un **anclaje de
-validación** contra la verdad del DGP. El recorrido está preparado: el callout final de cada unidad
-del bloque indica qué propuestas alimenta y con qué avisos.
+Cada pregunta tiene **su sesión**: en ella se ve la teoría sobre el banco de averías y se **arranca
+la pregunta en clase** sobre tu cartera. El callout final de cada unidad («Tarea del estudiante»)
+recoge la parte que le toca, con avisos.
 
-| # | Propuesta | Unidad base | La extensión a investigar |
-|:--:|:---------------------------------|:-----------:|:---------------------------|
-| 1 | La prima pura por tres caminos | [3.3](#sec-u33) | Modelo en **dos partes** (binomial + Gamma) |
-| 2 | Por dónde se cuela el sexo en la tarifa | [3.1](#sec-u31) | Mitigación de *proxies* y su coste predictivo |
-| 3 | ¿Cuánto dura un cliente? | [3.5](#sec-ELIM-u35) | Contraste de PH y **Royston–Parmar** |
-| 4 | ¿Hay agencias caras? | [3.4](#sec-u34) | BLUPs, encogimiento y predicción para una agencia nueva |
-| 5 | ¿Qué distribución describe el coste de un parte? | [3.2](#sec-u32) | **Dispersión modelada** (`dispformula`) |
-| 6 | Del primer parte al historial completo | [3.6](#sec-ELIM-u36) | **Andersen–Gill** para eventos recurrentes |
-| 7 | El presupuesto del año que viene | [3.3](#sec-u33) | Intervalos de predicción por **simulación** |
+<!-- DECIDIDO (21-11-2026): numeración de unidades según el orden de las sesiones. 3.3 = Tweedie,
+     3.4 = efectos aleatorios (hoy es al revés en los ficheros): hay que intercambiar
+     _unidad_3_3 ↔ _unidad_3_4 y sus prefijos u33 ↔ u34. La 3.5 (el presupuesto) se monta con la
+     parte de predicción de la Tweedie actual. -->
 
-### 1 · La prima pura por tres caminos {#sec-u36-p1}
+| Sesión | Pregunta | Datos | Teoría | Lo que se repasa |
+|:--:|:---|:---|:---|:---|
+| **1** | **P1** · Coste de un parte | `siniestros.csv` + `cartera.csv` | [3.1](#sec-u31) GLM Gamma | — |
+| **2** | **P2** · Familia y escala | `siniestros.csv` | [3.2](#sec-u32) Elegir familia y escala | — |
+| **3** | **P3** · Los tres caminos | `panel.csv` + coste anual | [3.3](#sec-u33) Tweedie | Poisson y binomial negativa con *offset* (Caso 2) · logística (Caso 1) |
+| **4** | **P4** · Los coeficientes del bonus-malus | último año de `panel.csv` + coste anual + `bonus_malus_prev`/`_act` | [3.4](#sec-u34) Efectos aleatorios y credibilidad | Efectos aleatorios en conteos ([2.5](../caso2/caso2_conteos.qmd#sec-u25)) · bonus-malus ([2.7](../caso2/caso2_conteos.qmd#sec-u27)) |
+| **5** | **P5** · El presupuesto | cartera viva | [3.5](#sec-u35) Del modelo al presupuesto | Predicción con intervalo (Casos 1 y 2) |
 
-**La pregunta.** ¿Cuánto cuesta asegurar una póliza durante un año? Y sobre todo: ¿da lo mismo
-calcularlo **multiplicando** frecuencia por severidad que **modelando el coste total directamente**?
+- **P1 · Dirección de siniestros.**
+  - *Variables:* `coste_k` como respuesta; las covariables del cliente, traídas de `cartera.csv`.
+  - *Se trabaja en:* [Unidad 3.1](#sec-u31) · sesión 1.
 
-**Por qué es interesante.** Es la pregunta central de la tarificación, y tiene dos respuestas
-legítimas que el curso ha construido por separado. La comparación es el artículo.
+  >Una Gamma con enlace log da efectos **multiplicativos**: cada coeficiente, exponenciado, es el
+  >factor por el que se multiplica el coste medio de un parte.
 
-**El camino recomendado.**
+- **P2 · Dirección técnica.**
+  - *Variables:* `coste_k`.
+  - *Se trabaja en:* [Unidad 3.2](#sec-u32) · sesión 2.
 
-1. **Vía A, en dos piezas.** Modela la **frecuencia** con lo que ya sabes del Caso 2 (Poisson o
-   binomial negativa sobre `n_siniestros`, con `offset = log(exposicion)`) y la **severidad** con una
-   **Gamma** sobre `coste_k` de `siniestros.csv` (Unidad 3.1). La prima pura es el producto de las dos
-   predicciones. Cuida la escala: una es por unidad de exposición y la otra por parte.
-2. **Vía B, de una pieza.** Ajusta una **Tweedie** sobre `coste_total` con
-   `offset = log(exposicion)` (Unidad 3.4). Estima el índice $p$ y comprueba dónde cae en $(1,2)$.
-3. **Compara** las dos primas póliza a póliza: correlación, sesgo agregado, y en qué segmentos
-   discrepan. Aquí es donde la Tweedie enseña su precio —impone el **mismo** coeficiente repartido
-   entre frecuencia y severidad, mientras que la vía A los deja libres—.
-4. **La extensión: el modelo en dos partes.** Una **binomial** para «¿hubo algún parte?»
-   (`tuvo_siniestro`) y una **Gamma** para el importe **condicionado** a que lo hubiera. Es la tercera
-   vía, y la que trata el cero como un suceso con mecanismo propio. Compárala con las otras dos.
-   Punto de partida: `pscl::hurdle()` y la formulación en dos partes de la literatura actuarial.
+  >Compara Gamma, inversa gaussiana y lognormal (log-OLS) con la relación media-varianza como
+  >criterio. Si comparas por AIC, recuerda que la lognormal necesita el jacobiano. Si eliges log-OLS,
+  >la vuelta a euros pasa por el *smearing* de Duan.
 
-**Validación.** `coste_base` y `betas$sev` (la severidad), `betas$claim` y `lambda0` (la frecuencia),
-`nu_gamma` (la dispersión de la Gamma). Comprueba si la vía B recupera los efectos que las dos piezas
-de la vía A estiman por separado.
+- **P3 · Dirección actuarial.**
+  - *Variables:* coste anual por póliza-año (construido, ver la [Sección 6.1](#sec-u36-datos)), `n_partes_anual`, `expo_anual`.
+  - *Se trabaja en:* [Unidad 3.3](#sec-u33) · sesión 3. La única teoría nueva es la Tweedie: los
+    otros dos caminos combinan piezas que ya tienes.
 
-### 2 · Por dónde se cuela el sexo en la tarifa {#sec-u36-p2}
+  >Los tres caminos: **(a)** frecuencia × severidad —la tarifa de frecuencia del Caso 2 por la Gamma
+  >de P1; cuida la escala: una es por unidad de exposición y la otra por parte—; **(b)** dos partes
+  >—una binomial para «¿hubo algún parte en el año?» y una Gamma para el coste anual **positivo**—;
+  >**(c)** una Tweedie sobre el coste anual con `offset = log(expo_anual)`: estima el índice $p$ y
+  >sitúalo en $(1,2)$. Compara las primas cliente a cliente y en agregado.
 
-**La pregunta.** La ley prohíbe tarificar con el sexo (*Test-Achats*, TJUE C-236/09). ¿Basta con
-quitarlo del modelo?
+- **P4 · Dirección comercial.**
+  - *Variables:* coste anual del **último año observado** de cada póliza; `bonus_malus_prev` (el
+    nivel con el que la póliza **empezó** ese año) para estimar; `bonus_malus_act` (el nivel con el
+    que empezará el año próximo) para aplicar.
+  - *Se trabaja en:* [Unidad 3.4](#sec-u34) · sesión 4. Los coeficientes son un factor más en el
+    GLM; la teoría de la sesión es la de los efectos aleatorios, que da la corrección cliente a
+    cliente.
 
-**Por qué es interesante.** En el Caso 2 dejaste `sexo` fuera de la tarifa, pero no comprobaste si su
-información se colaba a través de otra variable permitida. Aquí lo compruebas en los dos canales de la
-prima, **frecuencia** y **severidad**: nada garantiza que la fuga sea del mismo tamaño en ambos.
+  >Es la tarificación en dos etapas de las aseguradoras: una prima **a priori** con la ficha y una
+  >corrección **a posteriori** con el historial. Para estimar los coeficientes, añade el nivel de
+  >`bonus_malus_prev` a tu modelo del coste del último año: así el coeficiente de cada nivel mide lo
+  >que el historial añade **por encima** de la ficha, y no lo que la ficha ya explica. Ojo con las
+  >pólizas de un solo año: en ellas `bonus_malus_prev` coincide con `bonus_malus_act` y ya incluye
+  >los partes de ese año, así que reintroducen la fuga; decide qué haces con ellas y justifícalo.
+  >Para la última pregunta, añade un efecto aleatorio de póliza, sobre todo el panel, al camino
+  >que recomendaste en P3: su predicción (el BLUP) es la corrección **cliente a cliente**, y el
+  >encogimiento dice cuánto pesa el historial según cuántos años lo respaldan. Compárala con el
+  >nivel de bonus-malus asignado. Si tu camino tiene dos piezas (frecuencia y coste, o «¿hubo
+  >parte?» y coste), decide **en cuál** va el efecto —o en las dos— y justifícalo con tus datos.
 
-**El camino recomendado.**
+- **P5 · Dirección financiera.**
+  - *Variables:* las pólizas con `baja == 0` (la cartera viva) y las fichas de los clientes tipo.
+  - *Se trabaja en:* [Unidad 3.5](#sec-u35) · sesión 5.
 
-1. Cuantifica primero la **asociación** entre `sexo` y las demás covariables. Una de ellas es un
-   *proxy*: transporta información del factor prohibido aunque el factor no esté en el modelo. Las
-   demás son **controles negativos** y deberían salir limpias. La herramienta es el contraste de
-   **independencia condicional** en una tabla de tres vías de la
-   [Unidad 2.2](../caso2/caso2_conteos.qmd#sec-u22-tresvias); como harás un contraste por covariable,
-   alguno saldrá significativo por azar, así que mira el **tamaño** de la asociación y no solo el $p$.
-2. Ajusta la **Gamma de severidad** sobre `coste_k` en dos versiones —con y sin el *proxy*— y mide
-   cuánto se mueve el efecto **marginal** del sexo entre una y otra. Repite el ejercicio en
-   **frecuencia** y en **prima pura** (propuesta 1, vía A) y compara los tres tamaños de fuga.
-3. **La extensión: mitigar.** Investiga y aplica al menos una estrategia —eliminar el *proxy*,
-   residualizarlo respecto del sexo, o reponderar— y mide su **coste predictivo**: cuánta capacidad
-   de tarificar se pierde a cambio de cerrar el canal. Es la pregunta que la literatura de
-   *fairness* en seguros discute y no tiene respuesta única.
-4. Discute la implicación: una tarifa formalmente neutra puede no serlo materialmente.
-
-**Validación.** `attr(...)$proxy` documenta cuál es el canal, el nivel implicado y la razón de
-momios que lo genera, además de la lista de controles negativos. `betas$sev["sexo_h"]` y
-`betas$claim["sexo_h"]` dan el efecto **ajustado** verdadero: la diferencia con el marginal que
-estimes **es** la fuga.
-
-### 3 · ¿Cuánto dura un cliente? {#sec-u36-p3}
-
-**La pregunta.** ¿Qué explica que una póliza se dé de baja, y a qué ritmo se van los clientes?
-
-**Por qué es interesante.** Porque este banco esconde una lección que el material de clase no puede
-dar con datos reales: **un contraste de proporcionalidad que no rechaza no demuestra que el modelo
-sea de riesgos proporcionales**.
-
-**El camino recomendado.**
-
-1. **Describe primero.** Kaplan–Meier de la duración por grupos, y log-rank. Recuerda: el par es
-   `Surv(antiguedad, baja)`, nunca `t_baja`.
-2. **Ajusta un AFT** (Unidad 3.5) probando varias distribuciones del error —Weibull, log-normal,
-   log-logística— y elige por AIC y por diagnóstico, no por defecto. Interpreta en **factores de
-   aceleración**: cuánto alarga o acorta cada covariable la vida del cliente.
-3. **Ajusta un Cox** sobre los mismos datos (Unidad 3.6) y aplica `cox.zph`. Contrasta lo que el
-   diagnóstico dice con lo que el AFT ha elegido. Si las dos lecturas no encajan, **esa tensión es el
-   artículo**: explícala en lugar de resolverla a favor del modelo que más te guste.
-4. **La extensión: paramétricos flexibles.** Los modelos de **Royston–Parmar** modelan el log-hazard
-   acumulado con *splines* y permiten no proporcionalidad explícita
-   (`flexsurv::flexsurvspline()`). Ajusta uno y compáralo con el AFT y con el Cox.
-
-**Validación.** `lapse_median` y `sigma_lapse` (la escala y la dispersión de la duración) y
-`betas$lapse` (los efectos sobre la log-duración: positivo = permanece **más**). Comprueba si el AFT
-que elegiste recupera la familia correcta.
-
-### 4 · ¿Hay agencias caras? {#sec-u36-p4}
-
-**La pregunta.** ¿Tramitan más caro unas agencias que otras, o lo que parece un efecto de agencia es
-solo la composición de su cartera?
-
-**Por qué es interesante.** Es la pregunta que el Caso 2 respondió con **conteos** (las gestiones por
-agencia), ahora planteada sobre **dinero**. La respuesta no tiene por qué ser la misma, y averiguarlo
-es el trabajo.
-
-**El camino recomendado.**
-
-1. **Explora antes de modelar.** Coste medio por agencia frente al número de partes que tramita: si
-   las agencias pequeñas se disparan en las dos direcciones, estás viendo ruido, no señal.
-2. **Ajusta un GLMM Gamma** sobre `coste_k` con `(1 | id_agencia)` (Unidad 3.3), controlando las
-   covariables de la póliza. La pregunta operativa es si $\hat\sigma_{\text{agencia}}$ se despega de
-   cero, y con qué ajuste: usa un contraste de frontera, no un Wald ingenuo.
-3. **Contrasta con el caso conocido.** Repite el mismo ejercicio sobre `n_gestiones`, donde el Caso 2
-   ya encontró efecto de agencia. Que un mismo agrupamiento **sí** actúe sobre una respuesta y **no**
-   sobre otra es un resultado, no un fracaso: significa que el efecto está en la gestión y no en el
-   siniestro. Argumenta cuál de los dos casos es el tuyo.
-4. **La extensión: del efecto aleatorio a la decisión.** Extrae los **BLUPs**, dibuja el gráfico
-   *caterpillar* con sus intervalos y explica el **encogimiento**: por qué una agencia con veinte
-   partes no puede desviarse tanto como una con doscientos. Cierra prediciendo para una **agencia
-   nueva**, y explica por qué esa predicción no usa ningún BLUP.
-
-**Validación.** `sigma_ag`, `sigma_reg`, `u_ag` y `u_reg` de la verdad. Antes de compararlos con tus
-estimaciones, verifica **sobre qué respuesta** actúan esos efectos en el proceso generador: no des por
-supuesto que gobiernan todas.
-
-### 5 · ¿Qué distribución describe el coste de un parte? {#sec-u36-p5}
-
-**La pregunta.** El coste de un siniestro es positivo y asimétrico. ¿Gamma, inversa gaussiana o
-lognormal? ¿Y cómo se decide, más allá de mirar un histograma?
-
-**Por qué es interesante.** Es la más metodológica de las siete, y la que mejor se presta a un
-artículo de método: la pregunta no es qué modelo ajusta mejor, sino **con qué criterio** se compara
-algo que vive en escalas distintas.
-
-**El camino recomendado.**
-
-1. **La relación media-varianza como criterio** (Unidad 3.2). Agrupa las pólizas por coste medio
-   predicho, estima la varianza dentro de cada grupo y ajusta la potencia $p$ de
-   $\operatorname{Var} = \phi\,\mu^{p}$. Gamma dice $p = 2$; inversa gaussiana, $p = 3$. Deja que el
-   dato hable antes de elegir.
-2. **Ajusta las tres** —Gamma log, inversa gaussiana log y **log-OLS**— y compáralas. Cuidado con la
-   comparación por AIC del log-OLS: modela $\log Y$, no $Y$, y necesita el **jacobiano** para ser
-   comparable.
-3. **La retransformación.** Si usas log-OLS, $\exp(\widehat{\log y})$ **no** estima la media: aplica
-   el *smearing* de Duan y cuantifica el sesgo que corriges.
-4. **La extensión: modelar la dispersión.** ¿Es $\phi$ constante, o los siniestros caros son también
-   más erráticos? Ajusta una Gamma con `dispformula` en `glmmTMB` —o el equivalente por
-   cuasi-verosimilitud— y contrasta la mejora. Es lo que la Unidad 3.2 dejó apuntado y no desarrolló.
-
-**Validación.** `coste_base` (el coste medio de referencia), `nu_gamma` (la forma de la Gamma, de la
-que se deduce $\phi$ y el coeficiente de variación condicional) y `betas$sev`. Si tu criterio
-media-varianza acierta la familia, el DGP te lo confirmará.
-
-### 6 · Del primer parte al historial completo {#sec-u36-p6}
-
-**La pregunta.** El Caso 2 modeló el **primer** siniestro de cada póliza. ¿Se comporta el riesgo de
-los **siguientes** igual que el del primero, o hay pólizas que, una vez empiezan, siguen?
-
-**Por qué es interesante.** Porque `siniestros.csv` da, por primera vez en el curso sobre estos datos,
-el **historial completo**: `k` y `t_k`. La 2.5 tuvo que conformarse con el primero.
-
-**El camino recomendado.**
-
-1. **Construye la estructura.** A partir de `panel.csv` y `siniestros.csv`, monta el formato
-   *start-stop* que la [Sección 6.8](#sec-ELIM-u36-extcox) usó en el banco de averías, con `edad_t` y
-   `antig_veh_t` como covariables que cambian de tramo a tramo.
-2. **Riesgos a trozos**: Poisson sobre `n_partes_anual` con `offset = log(expo_anual)` y el año de
-   póliza como factor. El perfil de esos coeficientes **es** el hazard de base: mira si crece.
-3. **Cox extendido** sobre la misma estructura, y comparación con la lente anterior. Debe darte lo
-   mismo; si no, averigua por qué antes de escribir nada.
-4. **La extensión: Andersen–Gill.** Es el modelo de eventos recurrentes que trata cada parte como un
-   evento del mismo proceso, con errores robustos por póliza
-   (`coxph(Surv(tstart, tstop, evento) ~ x + cluster(id_poliza))`). Compáralo con la alternativa de
-   **fragilidad** y explica qué supone cada uno sobre la dependencia entre partes de una misma póliza.
-
-::: {.callout-caution}
-## Cuidado con el solapamiento
-Esta propuesta roza lo que el Caso 2 ya hizo con la frecuencia. Para que sea un trabajo del Caso 3 y
-no una repetición, la respuesta de interés debe ser el **coste acumulado** —cuánto se lleva gastado
-una póliza a lo largo de su vida—, no solo el recuento de partes.
-:::
-
-**Validación.** `weib_shape` (la forma del hazard de siniestros: $>1$ significa que el riesgo crece
-con la antigüedad), `lambda0` (la tasa base) y `theta_frail` (la fragilidad: su varianza es
-$1/\theta$, y la de su logaritmo, $\psi'(\theta)$).
-
-### 7 · El presupuesto del año que viene {#sec-u36-p7}
-
-**La pregunta.** ¿Cuánto tiene que reservar la aseguradora para el próximo ejercicio, y con qué
-margen de seguridad?
-
-**Por qué es interesante.** Es la traslación directa de la [Unidad 3.3](#sec-u33) a datos nuevos, y
-la que mejor termina en una recomendación defendible. También la más segura: el camino está trillado.
-
-**El camino recomendado.**
-
-1. **Construye el coste anual** por póliza uniendo `siniestros.csv` al panel, con los ceros bien
-   puestos (ver el aviso de 8.1). Decide y **justifica** la granularidad: póliza-año (≈ 90 % de
-   ceros) o póliza completa (62–75 %).
-2. **Ajusta una Tweedie** con `offset = log(expo_anual)`, estima el índice $p$ y sitúala en la recta
-   $\operatorname{Var} = \phi\,\mu^{p}$ frente a las familias del curso.
-3. **Añade el efecto aleatorio de póliza** —hay varios años por póliza— y compara: qué cambia en los
-   coeficientes, qué cambia en los errores estándar y por qué lo segundo cambia más que lo primero.
-4. **Predice el agregado** y, sobre todo, **su incertidumbre**.
-5. **La extensión: el intervalo de predicción por simulación.** El error estándar de la media no
-   responde a «¿cuánto puede costarme como máximo?». Simula la predictiva —para cada póliza, el
-   número de partes y el coste de cada uno— y da el **percentil** que la dirección necesita para
-   fijar la reserva. Explica en qué se diferencia ese intervalo del de la media, y qué fuentes de
-   incertidumbre sigue **sin** recoger.
-
-**Validación.** Compara la predicción agregada con el coste realmente observado en la cartera, y el
-$\hat p$ estimado con el que se deduce de la mezcla verdadera (`lambda0`, `weib_shape` para la
-frecuencia; `nu_gamma` para la severidad). El $\hat\sigma_u$ del efecto aleatorio tiene su
-contrapartida en `theta_frail`: antes de compararlos, averigua **por qué vía** llega la fragilidad al
-coste anual en este banco.
+  >El año próximo es un año **completo** para cada póliza viva (`expo_anual = 1`), con la edad del
+  >conductor y del vehículo un año mayores, y con el coeficiente de su nivel de `bonus_malus_act`
+  >(P4). Los clientes tipo son nuevos: entran en el nivel 3, el de entrada ([Unidad 2.7](../caso2/caso2_conteos.qmd#sec-u27)). Distingue
+  >la incertidumbre de la **media** del presupuesto de la variabilidad del **coste** que finalmente
+  >se producirá: no son lo mismo.
 
 ## 6.4 Formato del informe: artículo de investigación {#sec-u36-formato}
 
@@ -453,22 +306,13 @@ materiales de la asignatura tienes, en `evaluacion/`, la guía y la plantilla qu
   **checklist final** antes de entregar.
 - **Exposición oral:** `Guia_presentaciones_eficaces_datos_tres_formatos.docx`.
 
+La pregunta de investigación natural del artículo es la de P3 —*¿da lo mismo tarificar por
+frecuencia × severidad, en dos partes o con una Tweedie?*—; P1, P2 y P4 justifican sus piezas y P5
+es su aplicación.
+
 Trabajar sobre la plantilla `.qmd` resuelve de paso la mitad de la reproducibilidad: el análisis y el
 texto viven en el mismo fichero, con la semilla fija y el código a la vista.
 
-<!-- TODO: fijar extensión, plazos y modalidad de entrega. Recordar el apartado obligatorio de
-     reflexión sobre el uso ético de la IA (sin él, el informe no puede alcanzar «excelente»);
-     comprobar antes su redacción exacta en la guía docente. -->
-
-## 6.5 Checklist de tareas {#sec-u36-checklist}
-
-<!-- TODO: adaptar al caso. Borrador: elección y justificación de familia y enlace; interpretación
-     multiplicativa; tratamiento explícito de la censura o de los ceros según la propuesta;
-     estructura aleatoria justificada con contraste de frontera; diagnóstico (DHARMa o Schoenfeld
-     según el modelo); una extensión investigada con su fuente original citada; validación contra
-     attr("verdad"); reproducibilidad (Quarto + semilla + datos versionados). -->
-
-## 6.6 Rúbricas {#sec-u36-rubricas}
-
-Las rúbricas están en la **guía docente** y en `evaluacion/Rubricas_evaluacion.xlsx`; no se reproducen
-aquí.
+<!-- TODO (heredado de la 3.8): fijar extensión, plazos y modalidad de entrega. Recordar el apartado
+     obligatorio de reflexión sobre el uso ético de la IA; comprobar antes su redacción exacta en la
+     guía docente. Checklist y rúbricas: fuera de alcance por ahora (como en la 2.7). -->
