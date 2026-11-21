@@ -158,29 +158,74 @@ La empresa opera **400 máquinas** repartidas por esos procesos y las sigue dura
 largo de su vida, las máquinas sufren **averías**; de cada avería se registra **cuándo** ocurre, **de
 qué tipo** es y **cuánto cuesta** repararla.
 
-Al ser un banco **simulado** conocemos su proceso generador (la «verdad»), lo que nos permitirá
-**validar** los ajustes —como en los Casos 1 y 2—. Todo el bloque gira sobre la avería y se organiza en
-dos preguntas, que corresponden a las dos mitades del caso:
+Todo el bloque gira sobre una sola magnitud: el **euro** que cuesta una avería, y su suma a lo largo
+del año. Es una respuesta **positiva y asimétrica**, y cuando se suma por máquina y año aparece además
+el **cero** de los años sin averías.
 
-- **¿Cuánto cuesta una avería?** → `coste_euros`, una magnitud positiva y asimétrica → **GLM Gamma**.
-- **¿Cada cuánto se avería?** → el **tiempo entre fallos** → **supervivencia** (AFT, Cox).
+## Lo que nos plantea la dirección de la fábrica {#sec-preguntas3}
 
-Las dos mitades no son independientes: las une un **efecto latente de máquina** (una «fragilidad»). Hay
+La dirección prepara el **presupuesto de mantenimiento** del año próximo y, antes de cerrarlo, quiere
+respuestas a lo que cada área ve desde la suya:
+
+> **Mantenimiento.** *«Sabemos cuántas averías tenemos. Ahora necesitamos saber cuánto nos cuesta cada
+> una.»*
+>
+> 1. ¿Cuánto cuesta reparar una avería, y de qué depende: del tipo de fallo, de la máquina, de su
+>    edad, de su carga? ¿Cuánto encarece cada factor?
+>
+> **Ingeniería.** *«Unas pocas reparaciones se disparan y se llevan buena parte del gasto. No
+> queremos una previsión que se equivoque precisamente en ellas.»*
+>
+> 2. ¿Qué distribución describe el coste de una avería, y en qué escala debemos modelarlo? Si
+>    trabajamos en logaritmos, ¿cómo volvemos a euros sin equivocarnos en la media?
+>
+> **Control de gestión.** *«Para presupuestar no nos sirve el coste de una avería: necesitamos lo
+> que gasta cada máquina en un año, y muchas no se averían ninguna vez.»*
+>
+> 3. ¿Cuánto cuesta mantener una máquina durante un año? ¿Da lo mismo calcularlo como **número de
+>    averías × coste por avería**, separar *«¿se averió?»* de *«¿cuánto costó?»*, o modelar el
+>    **gasto anual** directamente?
+>
+> **Jefatura de planta.** *«Hay máquinas que siempre salen caras.»*
+>
+> 4. ¿Hay máquinas **crónicamente caras**, más allá de lo que explica su ficha? Al prever lo que
+>    gastará una máquina, ¿cuánto debe pesar su **historial**?
+>
+> **Dirección financiera.** *«Necesitamos la partida de reparaciones del año que viene, y con qué
+> margen.»*
+>
+> 5. ¿Cuánto gastaremos en reparaciones el año próximo? ¿Entre qué valores puede moverse?
+
+Cada pregunta ocupa **una sesión** y una unidad. Y cada una tiene su **gemela** en el
+[estudio de caso](#sec-u36-encargo): la misma pregunta, planteada por una aseguradora sobre la cartera
+de automóvil del Caso 2. En clase la resolvemos sobre la fábrica; en el estudio de caso la resuelves
+sobre la cartera de tu equipo (@tbl-paralelo3).
+
+| Sesión | La fábrica (en clase) | La aseguradora (estudio de caso) | Unidad |
+|:--:|:---|:---|:--:|
+| 1 | ¿Cuánto cuesta una **avería**? | ¿Cuánto cuesta un **parte**? | [3.1](#sec-u31) |
+| 2 | ¿Qué distribución y qué escala para el coste de una avería? | ¿Qué distribución y qué escala para el coste de un parte? | [3.2](#sec-u32) |
+| 3 | ¿Cuánto cuesta una máquina al año? Tres caminos | ¿Cuánto cuesta un cliente al año? Tres caminos | [3.3](#sec-u33) |
+| 4 | ¿Cuánto debe pesar el historial de una máquina? | ¿Qué coeficiente debe aplicar cada nivel de bonus-malus? ¿Cuánto debe pesar el historial? | [3.4](#sec-u34) |
+| 5 | La partida de reparaciones del año próximo | La siniestralidad de la cartera viva y la tarifa de los clientes tipo | [3.5](#sec-u35) |
+
+: Las cinco preguntas del caso, en la fábrica y en la aseguradora. Las dos columnas comparten la misma estructura: avería ↔ parte, máquina ↔ póliza, máquina-año ↔ póliza-año, ficha de la máquina ↔ ficha del cliente. {#tbl-paralelo3}
+
+Las preguntas no son independientes: las une un **efecto latente de máquina** (una «fragilidad»). Hay
 máquinas «malas» que **fallan más a menudo y además cuestan más de reparar**. Esa pieza es el **efecto
-aleatorio** del GLMM (Unidad 3.3) y la **fragilidad** de la supervivencia (Unidad 3.6), y es lo que
-hace del caso un todo coherente.
+aleatorio** de la [Unidad 3.4](#sec-u34), y es la que responde a la pregunta 4.
 
-### Las cinco tablas del banco
+### Las tablas del banco
 
 Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 
 | Tabla | Una fila es… | Respuesta principal | Da soporte a |
 |---|---|---|---|
-| `maquinas` | una **máquina** (ficha basal) | — | contexto y covariables |
-| `averias` (= `costes`) | una **avería** | `coste_euros` | 3.1 GLM Gamma · 3.2 familia/escala · 3.3 GLMM Gamma |
-| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | 3.5 AFT · 3.6 Cox |
-| `seguimiento` | una **máquina-mes** (*start-stop*) | `fallo` (+ `offset`) | Cox con covariable temporal (3.6); lentes discreta/a-trozos (3.7) |
-| `panel` | una **máquina-año** | `coste_total` (con ceros) | Tweedie (3.4) |
+| `maquinas` | una **máquina** (ficha basal) | — | covariables de todas las unidades |
+| `averias` (= `costes`) | una **avería** | `coste_euros` | 3.1 GLM Gamma · 3.2 familia y escala · 3.4 efectos aleatorios |
+| `panel` | una **máquina-año** | `coste_total` (con ceros) y `n_averias` | 3.3 Tweedie · 3.4 efectos aleatorios · 3.5 presupuesto |
+| `seguimiento` | una **máquina-mes** | — | solo para obtener la edad por año en la 3.3 |
+| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | no se usa en esta versión del caso |
 
 ### Descripción detallada de las variables
 
@@ -198,9 +243,9 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 | `potencia_kw` | Potencia de la máquina (kW). | Continua |
 | `carga` | Nivel medio de **uso** de la máquina (fracción, 0–1). | Continua · predictor |
 | `plan_mantenimiento` | **Correctivo** (solo se repara al fallar) o **Preventivo** (mantenimiento programado). Asignado de forma **no aleatoria** (máquinas viejas y críticas → más preventivo) → **confusión**. | Factor (2) · predictor |
-| `intervalo_mant` | Días entre mantenimientos programados (constante por máquina: 60/90/120). **`NA` en las máquinas de plan correctivo**, que no tienen calendario preventivo. Es la **palanca de decisión** de 3.4–3.5. | Continua · predictor |
+| `intervalo_mant` | Días entre mantenimientos programados (constante por máquina: 60/90/120). **`NA` en las máquinas de plan correctivo**, que no tienen calendario preventivo. | Continua · predictor |
 
-**Registro de la avería (`averias`, la tabla estrella).**
+**Registro de la avería (`averias`, la tabla de la severidad).**
 
 | Variable | Descripción | Tipo / papel |
 |---|---|---|
@@ -210,7 +255,7 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 | `antiguedad_anios` | **Edad de la máquina** en el momento de la avería (crece con el tiempo → desgaste). | Continua · predictor |
 | `tiempo_desde_anterior` | Días transcurridos **desde la avería previa** (desde el alta si es la 1.ª). | Continua |
 | `tipo_averia` | Naturaleza del fallo: Mecánica / Eléctrica / Hidráulica / Electrónica. | Factor (4) · predictor del coste |
-| `dias_desde_mant` | Días desde el **último mantenimiento preventivo** (NA si plan correctivo). Covariable **dependiente del tiempo**. | Continua · predictor (3.5) |
+| `dias_desde_mant` | Días desde el **último mantenimiento preventivo** (NA si plan correctivo). | Continua |
 | `turno` | Turno en que ocurre la avería (Mañana/Tarde/Noche). Sin efecto → **control interno**. | Factor (3) · control |
 | `tiempo_parada` | **Horas** que la línea se detiene por la avería (crece con la criticidad). Etiqueta descriptiva del impacto operativo; **no** es la exposición ni se modela. | Continua · etiqueta |
 | `coste_euros` | **Coste de la reparación (€)**. La **respuesta continua positiva** del caso. | Continua · **respuesta** |
@@ -218,21 +263,22 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 *(`averias` incluye además, unidas de la ficha, `proceso`, `criticidad`, `fabricante`, `carga`,
 `plan_mantenimiento` e `intervalo_mant`.)*
 
-**Supervivencia (`intervalos`) y sus derivadas.**
+**El gasto anual (`panel`, la tabla del presupuesto).**
 
 | Variable | Descripción | Tipo / papel |
 |---|---|---|
-| `tiempo_entre` | Duración del intervalo **entre dos fallos** (o entre el último fallo y el cierre). | Continua · **respuesta** (tiempo) |
-| `evento` | 1 = el intervalo termina en **avería**; 0 = **censura** (llega al cierre sin fallar). | Binaria · indicador |
-| `antiguedad_ini` | Edad de la máquina al **empezar** el intervalo. | Continua · predictor |
-| `seguimiento`: <br> `tstart`,`tstop`,`exposicion`,`n_fallos`,<br>`fallo`,`dias_desde_mant`,`mant_reciente` | Formato **start-stop** por mes: tramo observado, exposición (offset), nº de fallos del mes, y el estado del mantenimiento en el tramo (covariable temporal). | Counting process |
-| `panel`:<br> `coste_total`,`n_averias`,`exposicion` | Por **máquina-año**: coste total de averías (**0** si no hubo ninguna), nº de averías y fracción de año observada (offset). | Tweedie (3.4) |
+| `id_maquina`, `anio` | Máquina y año de seguimiento (1–4). | ID / estructura |
+| `coste_total` | Gasto en reparaciones de esa máquina ese año (€): la **suma** de sus averías, y **0** si no tuvo ninguna. | Continua con ceros · **respuesta** (3.3–3.5) |
+| `n_averias` | Número de averías de esa máquina ese año. | Conteo · **frecuencia** |
+| `exposicion` | Fracción del año en que la máquina estuvo observada. | Continua · **offset** |
+
+*(`panel` incluye además, de la ficha, `proceso`, `criticidad`, `fabricante`, `carga`,
+`plan_mantenimiento` e `intervalo_mant`.)*
 
 El banco incorpora, a propósito, mecanismos que se irán destapando unidad a unidad: coste **Gamma**,
-**fragilidad** de máquina que liga coste y frecuencia, **riesgo creciente con la edad**, **interacción**
-criticidad × proceso, **confusión** en la asignación del plan, mantenimiento preventivo con **efecto
-protector que decae**, y **censura** por ventana de observación. La «verdad» de cada mecanismo queda en
-`attr(banco, "verdad")`.
+**fragilidad** de máquina que liga coste y frecuencia, **interacción** criticidad × proceso,
+**confusión** en la asignación del plan de mantenimiento y **años sin averías** que dejan el gasto
+anual en cero.
 
 ### Un primer vistazo
 
@@ -264,47 +310,46 @@ tibble::tibble(
 La media supera a la mediana y el máximo queda muy lejos de ambas: el coste es **positivo y asimétrico
 a la derecha**, el terreno del GLM Gamma (lo desarrollamos en la [Unidad 3.1](#sec-u31)).
 
-**¿Cada cuánto se avería?** El número de averías por máquina y el desenlace de supervivencia
-(@tbl-averias-frecuencia):
+**¿Cuánto cuesta una máquina al año?** El número de averías por máquina y el gasto anual por
+máquina-año (@tbl-averias-anual):
 
 ```{r}
-#| label: tbl-averias-frecuencia
-#| tbl-cap: "Averías por máquina (media, varianza y cociente varianza/media, que anticipa sobredispersión) e intervalos entre fallos (nº, eventos, censura y duración mediana)."
+#| label: tbl-averias-anual
+#| tbl-cap: "Averías por máquina (media, varianza y cociente varianza/media, que anticipa sobredispersión) y gasto anual por máquina-año (nº de filas, porcentaje de años sin ninguna avería y coste mediano de los años con averías)."
 n_por_maq <- as.integer(table(factor(banco$averias$id_maquina,
                                       levels = banco$maquinas$id_maquina)))
 tibble::tibble(
-  averias_media    = round(mean(n_por_maq), 2),
-  averias_var      = round(var(n_por_maq), 2),
-  var_media        = round(var(n_por_maq) / mean(n_por_maq), 2),
-  intervalos       = nrow(banco$intervalos),
-  eventos          = sum(banco$intervalos$evento),
-  censura_pct      = round(mean(banco$intervalos$evento == 0) * 100),
-  gap_mediano_dias = round(median(banco$intervalos$tiempo_entre)))
+  averias_media      = round(mean(n_por_maq), 2),
+  averias_var        = round(var(n_por_maq), 2),
+  var_media          = round(var(n_por_maq) / mean(n_por_maq), 2),
+  maquina_anios      = nrow(banco$panel),
+  anios_cero_pct     = round(mean(banco$panel$coste_total == 0) * 100),
+  coste_anual_mediano = round(median(banco$panel$coste_total[banco$panel$coste_total > 0])))
 ```
 
 El cociente **varianza/media claramente > 1** delata que el conteo de averías está **sobredispersado**:
 es la huella de la **fragilidad** de máquina (unas fallan mucho más que otras), y el mismo fenómeno que
-en el Caso 2 llevaba a la binomial negativa. Y en torno a una cuarta parte de los intervalos quedan
-**censurados** (la máquina llega al cierre del estudio sin volver a fallar).
+en el Caso 2 llevaba a la binomial negativa. Y en torno a la mitad de los máquina-años **no tienen
+ninguna avería**: el gasto anual es cero, y ese cero no es un dato que falte, sino un año barato.
 
-Y su aspecto —el coste (izquierda) y los tiempos entre fallos (derecha), ambos con su asimetría
-característica— en la @fig-averias-eda:
+Y su aspecto —el coste de una avería (izquierda) y el gasto anual de una máquina (derecha), con su
+masa en el cero— en la @fig-averias-eda:
 
 ```{r}
 #| label: fig-averias-eda
 #| fig-width: 9
 #| fig-height: 4
-#| fig-cap: "Distribución del coste de reparación (izquierda, eje log) y de los tiempos entre fallos observados (derecha). Ambas magnitudes son positivas y asimétricas a la derecha."
+#| fig-cap: "Distribución del coste de reparación de una avería (izquierda, eje log) y del gasto anual por máquina-año (derecha). La primera es positiva y asimétrica; la segunda añade una barra alta en el cero, la de los años sin averías."
 p_coste <- ggplot(banco$averias, aes(coste_euros)) +
   geom_histogram(bins = 40, fill = "steelblue") +
   scale_x_log10() +
   labs(x = "coste de la avería (€, escala log)", y = "nº de averías")
 
-p_gap <- ggplot(subset(banco$intervalos, evento == 1), aes(tiempo_entre)) +
+p_anual <- ggplot(banco$panel, aes(coste_total)) +
   geom_histogram(bins = 40, fill = "darkorange") +
-  labs(x = "tiempo entre fallos (días)", y = "nº de intervalos")
+  labs(x = "gasto anual de la máquina (€)", y = "nº de máquina-años")
 
-p_coste + p_gap
+p_coste + p_anual
 ```
 
 # Reproducibilidad {#sec-repro3}
