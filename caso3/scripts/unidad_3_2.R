@@ -38,10 +38,10 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
   broom.mixed = "0.2.9.7", car = "3.1.5", dplyr = "1.2.1", emmeans = "2.0.3",
-  flexsurv = "2.3.2", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  rsample = "1.3.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  survminer = "0.5.2", tibble = "3.3.1", tidyverse = "2.0.0")
+  rsample = "1.3.2", sessioninfo = "1.2.4", tibble = "3.3.1",
+  tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -58,11 +58,10 @@ if (length(.otra))
 rm(.falta, .instalada, .otra)
 
 # --- Preámbulo del caso (librerías y datos, como en el documento) ------------
-# Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
+# Núcleo del Caso 3 (respuestas continuas positivas + mixtos).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
-library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom)           # resultados ordenados de glm
 library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
@@ -76,10 +75,6 @@ library(lme4)            # lmer y glmer (mixtos)
 library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
 library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
-
-library(survival)        # Kaplan-Meier, Cox y datos start-stop
-library(survminer)       # representación gráfica de supervivencia
-library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
@@ -161,22 +156,44 @@ tibble::tibble(
   dplyr::mutate(sesgo_pct = round(100 * (coste_medio / mean(y_obs) - 1), 1))
 
 # -----------------------------------------------------------------------------
-# [tbl-u32-dispersion]
-#   2 · Elegir familia y escala > 2.4 Modelar la dispersión
+# [tbl-u32-duan-ic]
+#   2 · Elegir familia y escala
+#     > 2.3 Lognormal y log-OLS
+#       > El intervalo de la media corregida
 # -----------------------------------------------------------------------------
-base_disp <- base |>
-  dplyr::mutate(pearson2 = residuals(m_gam, type = "pearson")^2)
+X_perf <- model.matrix(delete.response(terms(m_ln)), perfiles, xlev = m_ln$xlevels)
+eta_ln <- drop(X_perf %*% coef(m_ln))                     # x0' beta del log-OLS
 
-m_disp <- glm(pearson2 ~ tipo_averia + criticidad + fase_proceso + antiguedad_anios + carga,
-              family = Gamma(link = "log"), data = base_disp)
+# Método delta: varianza de x0' beta más la de log(s)
+var_log_duan <- rowSums((X_perf %*% vcov(m_ln)) * X_perf) +
+                var(exp(resid(m_ln))) / (nobs(m_ln) * smearing^2)
+ee_log_duan  <- sqrt(var_log_duan)
 
-broom::tidy(m_disp) |>
-  dplyr::filter(term != "(Intercept)") |>
-  dplyr::transmute(term, estimate = round(estimate, 3), p.value = round(p.value, 3))
+# Bootstrap: remuestrear filas, reajustar, recalcular s y la predicción
+set.seed(20252026)
+boot_duan <- replicate(1000, {
+  i <- sample(nrow(base), replace = TRUE)
+  m <- lm(formula(m_ln), data = base[i, ])
+  exp(drop(X_perf %*% coef(m))) * mean(exp(resid(m)))
+})
+
+pg <- predict(m_gam, newdata = perfiles, type = "link", se.fit = TRUE)
+tg <- qt(0.975, df.residual(m_gam))
+ic <- function(inf, sup) paste0("[", round(inf), ", ", round(sup), "]")
+
+duan_ic <- perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   duan       = exp(eta_ln) * smearing,
+                   ic_delta   = ic(duan * exp(-1.96 * ee_log_duan), duan * exp(1.96 * ee_log_duan)),
+                   ic_boot    = ic(apply(boot_duan, 1, quantile, 0.025),
+                                   apply(boot_duan, 1, quantile, 0.975)),
+                   gamma      = exp(pg$fit),
+                   ic_gamma   = ic(exp(pg$fit - tg * pg$se.fit), exp(pg$fit + tg * pg$se.fit)))
+duan_ic |> dplyr::mutate(duan = round(duan), gamma = round(gamma))
 
 # -----------------------------------------------------------------------------
 # [tbl-u32-aic]
-#   2 · Elegir familia y escala > 2.5 Elegir, comparar y conectar
+#   2 · Elegir familia y escala > 2.4 Elegir, comparar y conectar
 # -----------------------------------------------------------------------------
 ll_ln <- as.numeric(logLik(m_ln)) - sum(log(base$coste_euros))   # + jacobiano
 gl_ln <- attr(logLik(m_ln), "df")
@@ -186,21 +203,6 @@ tibble::tibble(
               "Lognormal SIN jacobiano [no comparable]"),
   AIC = round(c(AIC(m_gam), AIC(m_ig), -2 * ll_ln + 2 * gl_ln, AIC(m_ln)), 1)) |>
   dplyr::mutate(delta = ifelse(dplyr::row_number() <= 3, round(AIC - min(AIC[1:3]), 1), NA))
-
-# -----------------------------------------------------------------------------
-# [tbl-u32-verdad]
-#   2 · Elegir familia y escala
-#     > 2.5 Elegir, comparar y conectar
-#       > Validación contra el DGP
-# -----------------------------------------------------------------------------
-verdad <- attr(banco, "verdad")
-
-tibble::tibble(
-  cantidad  = c("familia del coste", "potencia p de Var(Y) ∝ μ^p", "dispersión φ"),
-  verdadero = c("Gamma con enlace log", "2", as.character(round(verdad$phi_coste, 3))),
-  estimado  = c("Gamma (AIC más bajo de las tres)",
-                as.character(round(p_hat, 2)),
-                as.character(round(summary(m_gam)$dispersion, 3))))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

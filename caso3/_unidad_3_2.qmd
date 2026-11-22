@@ -54,17 +54,20 @@ datos**, agrupando por valor ajustado y viendo cómo escala la varianza con la m
 [@mccullagh1989, §12.6.2]. Es el diagnóstico más informativo de toda la unidad, así que lo hacemos antes
 que nada.
 
-En la [Unidad 3.1](#sec-u31) ya usamos este gráfico para *comprobar* el supuesto de la Gamma; ahora lo
-usamos para *elegir*, añadiendo las tres pendientes teóricas como referencia visual. Recuérdese la forma
-analítica: como $\operatorname{Var}(Y)=\phi\,\mu^{p}$, en escala log–log es una recta,
-$\log\operatorname{Var}=\log\phi+p\,\log\mu$, de **pendiente $p$**. Es lo que dibuja la
-@fig-u32-potencia.
+La relación $\operatorname{Var}(Y)=\phi\,\mu^{p}$ es una potencia, incómoda de juzgar a ojo; pero
+**tomando logaritmos se vuelve una recta**:
+$$\log\operatorname{Var}(Y)=\log\phi + p\,\log\mu .$$
+Agrupamos pues los datos en cuantiles según su media ajustada, y calculamos por trozos la media y la
+varianza, representándolas en escala logarítmica (en los dos ejes). Si la varianza crece con el
+cuadrado de la media —en esos ejes, una recta de pendiente 2—, respaldamos la Gamma; una relación
+lineal —pendiente 1— respaldaría la quasi-Poisson (o la binomial negativa de tipo I), y una cúbica
+—pendiente 3— abogaría a favor de una inversa gaussiana para la respuesta. La @fig-u32-potencia dibuja esa nube, la recta ajustada y, como referencia, las tres pendientes teóricas.
 
 ```{r}
 #| label: fig-u32-potencia
 #| fig-width: 6.5
 #| fig-height: 4
-#| fig-cap: "Relación media-varianza empírica del coste, en escala log-log, con las tres pendientes teóricas de referencia (p = 1, 2, 3). La recta negra ajustada estima la potencia p de Var(Y) ∝ μ^p."
+#| fig-cap: "Relación media-varianza empírica del coste, en escala logarítmica en los dos ejes, con las tres pendientes teóricas de referencia (p = 1, 2, 3). La recta negra ajustada estima la potencia p de Var(Y) ∝ μ^p."
 mv <- base |>
   dplyr::mutate(grupo = dplyr::ntile(fitted(m_gam), 14)) |>
   dplyr::group_by(grupo) |>
@@ -191,6 +194,18 @@ Es **no paramétrico**: usa la distribución *empírica* de los residuos, no una
 errores fueran normales y homocedásticos, $\hat s$ tendería a $e^{\hat\sigma^{2}/2}$ —la corrección
 paramétrica clásica—, pero el *smearing* no lo exige y sigue siendo consistente cuando esa hipótesis
 falla. El GLM-log, en cambio, **no necesita nada de esto**: modela la media directamente.
+
+**Su error de estimación.** La media corregida tiene **dos** piezas estimadas, $\hat\beta$ y $\hat s$,
+y las dos aportan incertidumbre [@ainorton2000]. En escala log,
+$\log\widehat{\operatorname{E}}[Y_0\mid x_0]=x_0^{\top}\hat\beta+\log\hat s$, y por el método delta
+$$\operatorname{Var}\big(\log\widehat{\operatorname{E}}[Y_0\mid x_0]\big)\;\approx\;
+  \underbrace{x_0^{\top}\,\widehat{\operatorname{Var}}(\hat\beta)\,x_0}_{\text{la del OLS}}
+  \;+\;\underbrace{\frac{\widehat{\operatorname{Var}}(e^{\hat\varepsilon})}{n\,\hat s^{2}}}_{\text{la de }\hat s},$$
+porque $\hat s$ es una media de $n$ términos y su varianza es la de $e^{\hat\varepsilon}$ dividida por
+$n$. La fórmula ignora la covarianza entre $\hat\beta$ y $\hat s$. La alternativa que no supone nada
+es el ***bootstrap***: remuestrear las filas, reajustar el OLS, recalcular $\hat s$ y la predicción, y
+tomar los percentiles 2.5 y 97.5. En los dos casos, el intervalo se construye en escala log y se
+exponencia, como en la [Sección 1.7](#sec-u31-prediccion).
 :::
 
 La consecuencia práctica aparece al volver a euros. Si uno exponencia sin más los valores ajustados,
@@ -222,6 +237,61 @@ anual de mantenimiento, es dinero real mal planificado —y **siempre a la baja*
 para una previsión de gasto—. Además el error es **silencioso**: el modelo log-OLS tiene un $F$ contundente,
 residuos de aspecto impecable y nada advierte de que sus predicciones en euros están sesgadas.
 :::
+
+### El intervalo de la media corregida {#sec-u32-duan-ic}
+
+El *smearing* corrige la media, pero una media sin su error está a medias. La @tbl-u32-duan-ic calcula
+el intervalo al 95 % del coste medio en los ocho perfiles de la @tbl-u31-pred-perfiles, por las dos vías
+del callout, y lo compara con el del GLM Gamma.
+
+```{r}
+#| label: tbl-u32-duan-ic
+#| tbl-cap: "Coste medio por perfil de máquina (€) según el log-OLS con la corrección de Duan, con su intervalo al 95 % por el método delta y por bootstrap (1000 remuestras), frente al GLM Gamma con su intervalo de Wald. Mismos predictores en los dos modelos; edad y carga en sus valores medios, fabricante A."
+X_perf <- model.matrix(delete.response(terms(m_ln)), perfiles, xlev = m_ln$xlevels)
+eta_ln <- drop(X_perf %*% coef(m_ln))                     # x0' beta del log-OLS
+
+# Método delta: varianza de x0' beta más la de log(s)
+var_log_duan <- rowSums((X_perf %*% vcov(m_ln)) * X_perf) +
+                var(exp(resid(m_ln))) / (nobs(m_ln) * smearing^2)
+ee_log_duan  <- sqrt(var_log_duan)
+
+# Bootstrap: remuestrear filas, reajustar, recalcular s y la predicción
+set.seed(20252026)
+boot_duan <- replicate(1000, {
+  i <- sample(nrow(base), replace = TRUE)
+  m <- lm(formula(m_ln), data = base[i, ])
+  exp(drop(X_perf %*% coef(m))) * mean(exp(resid(m)))
+})
+
+pg <- predict(m_gam, newdata = perfiles, type = "link", se.fit = TRUE)
+tg <- qt(0.975, df.residual(m_gam))
+ic <- function(inf, sup) paste0("[", round(inf), ", ", round(sup), "]")
+
+duan_ic <- perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   duan       = exp(eta_ln) * smearing,
+                   ic_delta   = ic(duan * exp(-1.96 * ee_log_duan), duan * exp(1.96 * ee_log_duan)),
+                   ic_boot    = ic(apply(boot_duan, 1, quantile, 0.025),
+                                   apply(boot_duan, 1, quantile, 0.975)),
+                   gamma      = exp(pg$fit),
+                   ic_gamma   = ic(exp(pg$fit - tg * pg$se.fit), exp(pg$fit + tg * pg$se.fit)))
+duan_ic |> dplyr::mutate(duan = round(duan), gamma = round(gamma))
+```
+
+Tres lecturas. El **método delta y el bootstrap coinciden**: con `r nrow(base)` averías, la
+aproximación es buena y la covarianza que la fórmula ignora no pesa. De las dos piezas, la que más
+aporta es la de $\hat\beta$: el error estándar de $\log\hat s$ es de
+`r round(sqrt(var(exp(resid(m_ln))) / nobs(m_ln)) / smearing, 3)`, frente a valores entre
+`r round(min(sqrt(rowSums((X_perf %*% vcov(m_ln)) * X_perf))), 3)` y
+`r round(max(sqrt(rowSums((X_perf %*% vcov(m_ln)) * X_perf))), 3)` para $x_0^{\top}\hat\beta$. Y una
+vez corregido, el log-OLS da **medias e intervalos muy parecidos** a los de la Gamma: el *smearing* no
+solo endereza el sesgo, también deja una estimación de precisión comparable. La diferencia es de
+procedimiento: la Gamma da la media y su error en un solo paso; el log-OLS necesita dos piezas y
+combinarlas.
+
+Un último aviso, común a los dos modelos: ambos tratan las averías como independientes, y las de una
+misma máquina no lo son. Un bootstrap que remuestree **máquinas** en lugar de filas daría intervalos
+más anchos, para el log-OLS y para la Gamma. Lo resolveremos en la [Unidad 3.4](#sec-u34).
 
 ## 2.4 Elegir, comparar y conectar {#sec-u32-elegir}
 
