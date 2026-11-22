@@ -203,7 +203,7 @@ $\operatorname{Var}(S)=\phi\,\mu^{p}$, al tomar logaritmos
 
 $$\log \operatorname{Var}(S) \;=\; \log\phi \;+\; p\,\log\mu,$$
 
-una **recta de pendiente $p$** en escala log-log. Para dibujarla hacen falta muchos pares
+una **recta de pendiente $p$** en escala logarítmica en los dos ejes. Para dibujarla hacen falta muchos pares
 (media, varianza), y estimar cada par exige **réplicas** de una misma unidad. El panel las trae de
 serie: cada **máquina** aporta hasta cuatro costes anuales. El plan, por tanto: un punto por máquina
 —la media y la varianza de sus máquina-años—, y sobre esa nube una regresión de
@@ -218,7 +218,7 @@ mv_panel <- pn |>
   dplyr::filter(media > 0, varianza > 0)   # sin averia en todo el seguimiento no hay
                                            # punto: media y varianza 0 no tienen logaritmo
 
-# en log-log, la pendiente de la recta estima la potencia p de Var = phi * mu^p
+# con logaritmo en los dos ejes, la pendiente de la recta estima la potencia p de Var = phi * mu^p
 ajuste_p <- lm(log(varianza) ~ log(media), data = mv_panel)
 round(c(maquinas = nrow(mv_panel), pendiente = coef(ajuste_p)[["log(media)"]],
         IC_inf = confint(ajuste_p)["log(media)", 1],
@@ -234,7 +234,7 @@ solo se compare la **inclinación**— y la recta ajustada:
 #| label: fig-u33-taylor
 #| fig-width: 6.5
 #| fig-height: 4
-#| fig-cap: "Relación media-varianza del coste anual, una máquina por punto, en escala log-log, con las pendientes de referencia p = 1 (Poisson) y p = 2 (Gamma). La recta ajustada (negra) cae entre ambas: el coste anual vive en el hueco de la recta de varianzas."
+#| fig-cap: "Relación media-varianza del coste anual, una máquina por punto, en escala logarítmica en los dos ejes, con las pendientes de referencia p = 1 (Poisson) y p = 2 (Gamma). La recta ajustada (negra) cae entre ambas: el coste anual vive en el hueco de la recta de varianzas."
 # rectas de referencia: misma pendiente p que la familia, intercepto anclado al
 # centroide de la nube (asi la comparacion visual es solo de inclinacion)
 refs <- tibble::tibble(p = c(1, 2),

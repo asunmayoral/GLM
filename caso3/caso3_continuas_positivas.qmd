@@ -126,7 +126,7 @@ del Caso 2.
 |:--:|:-----------------------------------------------------------------------|
 | **3.1** | ajuste: [`glm(Gamma(link = "log"))`](#sec-u31-modelizacion) · interpretación: [`broom::tidy` · `emmeans::emmeans` · `marginaleffects::plot_predictions`](#sec-u31-interpretacion) · selección: [`drop1(..., test = "F")` · `anova(..., test = "F")` · `AIC`](#sec-u31-f) · bondad de ajuste: [`deviance` · `df.residual`](#sec-u31-deviance) · predicción: [`predict(type = "link", se.fit = TRUE)` · `qgamma`](#sec-u31-prediccion) · diagnóstico: [`DHARMa::simulateResiduals`](#sec-u31-deviance) |
 | **3.2** | familias positivas: [`glm(inverse.gaussian)` · `quasi(variance = "mu^2")`](#sec-u32-contexto) · log-OLS: [`lm(log(y))` y el **smearing** de Duan](#sec-u32-lognormal) · comparar: [`AIC`/`logLik` con jacobiano](#sec-u32-elegir) |
-| **3.3** | la potencia $p$: [`dplyr::ntile` · la nube media-varianza en log-log](#sec-u33-mapa) · Tweedie: [`glmmTMB(family = tweedie)` · `family_params` ($p$) · `sigma` ($\phi$)](#sec-u33-ajuste) · los canales: [frecuencia y severidad a partir de $\hat p$ y $\hat\phi$](#sec-u33-canales) · los otros caminos: `glm(poisson)`/`MASS::glm.nb` con *offset* · `glm(binomial)` · `glm(Gamma)` |
+| **3.3** | la potencia $p$: [`dplyr::ntile` · la nube media-varianza con logaritmo en los dos ejes](#sec-u33-mapa) · Tweedie: [`glmmTMB(family = tweedie)` · `family_params` ($p$) · `sigma` ($\phi$)](#sec-u33-ajuste) · los canales: [frecuencia y severidad a partir de $\hat p$ y $\hat\phi$](#sec-u33-canales) · los otros caminos: `glm(poisson)`/`MASS::glm.nb` con *offset* · `glm(binomial)` · `glm(Gamma)` |
 | **3.4** | ajuste: [`glmmTMB(... + (1 \| id_maquina))`](#sec-u34-modelo) · salida: [`broom.mixed::tidy`/`glance` · `glmmTMB::VarCorr`](#sec-u34-interpretacion) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::icc`](#sec-u34-diagnostico) · predicción: [`predict(re.form = NA \| NULL)` · `ranef`/`fixef`](#sec-u34-prediccion) |
 | **3.5** | predicción: `predict` con `vcov` para el intervalo de la media · la predictiva: simular averías y costes para el intervalo de predicción |
 | **3.6** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
@@ -368,6 +368,8 @@ p_coste + p_anual
 {{< include _unidad_3_3.qmd >}}
 
 {{< include _unidad_3_4.qmd >}}
+
+{{< include _unidad_3_5.qmd >}}
 
 {{< include _unidad_3_6.qmd >}}
 

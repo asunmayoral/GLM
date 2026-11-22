@@ -37,10 +37,10 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
   broom.mixed = "0.2.9.7", car = "3.1.5", emmeans = "2.0.3",
-  flexsurv = "2.3.2", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  rsample = "1.3.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  survminer = "0.5.2", tibble = "3.3.1", tidyverse = "2.0.0")
+  rsample = "1.3.2", sessioninfo = "1.2.4", tibble = "3.3.1",
+  tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -60,11 +60,10 @@ rm(.falta, .instalada, .otra)
 # [setup]
 #   (sin sección)
 # -----------------------------------------------------------------------------
-# Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
+# Núcleo del Caso 3 (respuestas continuas positivas + mixtos).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
-library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom)           # resultados ordenados de glm
 library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
@@ -79,17 +78,15 @@ library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
 library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
 
-library(survival)        # Kaplan-Meier, Cox y datos start-stop
-library(survminer)       # representación gráfica de supervivencia
-library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
-
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
 theme_set(theme_minimal(base_size = 12))
 
 # -----------------------------------------------------------------------------
 # [banco-averias]
-#   Presentación del caso > El contexto y los datos > Un primer vistazo
+#   Presentación del caso
+#     > Lo que nos plantea la dirección de la fábrica
+#       > Un primer vistazo
 # -----------------------------------------------------------------------------
 source(url_glm("caso3/R/dgp_averias.R"))   # funciones del proceso generador
 banco <- leer_datos_glm("caso3/datos/banco_averias_20252026.rds")   # banco de averías del curso
@@ -98,7 +95,9 @@ glimpse(banco$averias)
 
 # -----------------------------------------------------------------------------
 # [tbl-averias-coste]
-#   Presentación del caso > El contexto y los datos > Un primer vistazo
+#   Presentación del caso
+#     > Lo que nos plantea la dirección de la fábrica
+#       > Un primer vistazo
 # -----------------------------------------------------------------------------
 tibble::tibble(
   n       = nrow(banco$averias),
@@ -109,34 +108,37 @@ tibble::tibble(
   cv      = round(sd(banco$averias$coste_euros) / mean(banco$averias$coste_euros), 2))
 
 # -----------------------------------------------------------------------------
-# [tbl-averias-frecuencia]
-#   Presentación del caso > El contexto y los datos > Un primer vistazo
+# [tbl-averias-anual]
+#   Presentación del caso
+#     > Lo que nos plantea la dirección de la fábrica
+#       > Un primer vistazo
 # -----------------------------------------------------------------------------
 n_por_maq <- as.integer(table(factor(banco$averias$id_maquina,
                                       levels = banco$maquinas$id_maquina)))
 tibble::tibble(
-  averias_media    = round(mean(n_por_maq), 2),
-  averias_var      = round(var(n_por_maq), 2),
-  var_media        = round(var(n_por_maq) / mean(n_por_maq), 2),
-  intervalos       = nrow(banco$intervalos),
-  eventos          = sum(banco$intervalos$evento),
-  censura_pct      = round(mean(banco$intervalos$evento == 0) * 100),
-  gap_mediano_dias = round(median(banco$intervalos$tiempo_entre)))
+  averias_media      = round(mean(n_por_maq), 2),
+  averias_var        = round(var(n_por_maq), 2),
+  var_media          = round(var(n_por_maq) / mean(n_por_maq), 2),
+  maquina_anios      = nrow(banco$panel),
+  anios_cero_pct     = round(mean(banco$panel$coste_total == 0) * 100),
+  coste_anual_mediano = round(median(banco$panel$coste_total[banco$panel$coste_total > 0])))
 
 # -----------------------------------------------------------------------------
 # [fig-averias-eda]
-#   Presentación del caso > El contexto y los datos > Un primer vistazo
+#   Presentación del caso
+#     > Lo que nos plantea la dirección de la fábrica
+#       > Un primer vistazo
 # -----------------------------------------------------------------------------
 p_coste <- ggplot(banco$averias, aes(coste_euros)) +
   geom_histogram(bins = 40, fill = "steelblue") +
   scale_x_log10() +
   labs(x = "coste de la avería (€, escala log)", y = "nº de averías")
 
-p_gap <- ggplot(subset(banco$intervalos, evento == 1), aes(tiempo_entre)) +
+p_anual <- ggplot(banco$panel, aes(coste_total)) +
   geom_histogram(bins = 40, fill = "darkorange") +
-  labs(x = "tiempo entre fallos (días)", y = "nº de intervalos")
+  labs(x = "gasto anual de la máquina (€)", y = "nº de máquina-años")
 
-p_coste + p_gap
+p_coste + p_anual
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

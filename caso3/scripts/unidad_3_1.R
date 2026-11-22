@@ -38,10 +38,10 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
   broom.mixed = "0.2.9.7", car = "3.1.5", dplyr = "1.2.1", emmeans = "2.0.3",
-  flexsurv = "2.3.2", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  rsample = "1.3.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  survminer = "0.5.2", tibble = "3.3.1", tidyr = "1.3.2", tidyverse = "2.0.0")
+  purrr = "1.2.2", rsample = "1.3.2", sessioninfo = "1.2.4", tibble = "3.3.1",
+  tidyr = "1.3.2", tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -58,11 +58,10 @@ if (length(.otra))
 rm(.falta, .instalada, .otra)
 
 # --- Preámbulo del caso (librerías y datos, como en el documento) ------------
-# Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
+# Núcleo del Caso 3 (respuestas continuas positivas + mixtos).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
-library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom)           # resultados ordenados de glm
 library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
@@ -76,10 +75,6 @@ library(lme4)            # lmer y glmer (mixtos)
 library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
 library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
-
-library(survival)        # Kaplan-Meier, Cox y datos start-stop
-library(survminer)       # representación gráfica de supervivencia
-library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
@@ -151,17 +146,54 @@ q1 + q2
 # [tbl-u31-cv]
 #   1 · GLM Gamma > 1.1 Contexto: qué modela
 # -----------------------------------------------------------------------------
-base |>
+cv_tramos <- base |>   # se guarda: la §1.2 cita su rango de CV
   dplyr::mutate(tramo = dplyr::ntile(fitted(ols), 5)) |>
   dplyr::group_by(tramo) |>
   dplyr::summarise(n = dplyr::n(),
                    media = mean(coste_euros), sd = sd(coste_euros),
                    cv = sd / media, .groups = "drop") |>
   dplyr::mutate(dplyr::across(c(media, sd), \(x) round(x, 1)), cv = round(cv, 3))
+cv_tramos
+
+# -----------------------------------------------------------------------------
+# [fig-u31-gammas]
+#   1 · GLM Gamma > 1.2 Gamma en la familia exponencial
+# -----------------------------------------------------------------------------
+media_c <- mean(base$coste_euros)
+cv_c    <- sd(base$coste_euros) / media_c
+alfas   <- c(1, 1 / cv_c^2, 4, 10)      # misma media: la escala de cada una es media / alfa
+etiq    <- paste0("α = ", round(alfas, 2), c(" (exponencial)", " (momentos)", "", ""))
+rejilla <- seq(1, max(base$coste_euros), length.out = 400)
+
+curvas <- purrr::map2_dfr(alfas, etiq, \(a, e) tibble::tibble(
+  y = rejilla, forma = e,
+  densidad = dgamma(rejilla, shape = a, scale = media_c / a),
+  cola     = pgamma(rejilla, shape = a, scale = media_c / a, lower.tail = FALSE)))
+curvas$forma <- factor(curvas$forma, levels = etiq)
+
+# Cola observada: proporción de averías que superan cada coste
+obs <- tibble::tibble(y = sort(base$coste_euros),
+                      cola = 1 - (seq_along(y) - 0.5) / length(y))
+p99 <- quantile(base$coste_euros, 0.99)
+
+p_dens <- ggplot() +
+  geom_histogram(data = subset(base, coste_euros <= p99),
+                 aes(coste_euros, after_stat(density)), bins = 50, fill = "grey85") +
+  geom_line(data = subset(curvas, y <= p99), aes(y, densidad, colour = forma), linewidth = 0.8) +
+  labs(x = "coste de la avería (€)", y = "densidad", colour = NULL)
+
+p_cola <- ggplot() +
+  geom_point(data = obs, aes(y, cola), size = 0.6, colour = "grey40") +
+  geom_line(data = curvas, aes(y, cola, colour = forma), linewidth = 0.8) +
+  scale_y_log10(limits = c(1e-4, 1)) +
+  labs(x = "coste de la avería (€)", y = "P(Y > y), escala log", colour = NULL)
+
+(p_dens + p_cola) + patchwork::plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
 
 # -----------------------------------------------------------------------------
 # [fig-u31-cat]
-#   1 · GLM Gamma > 1.1 Contexto: qué modela > ¿De qué depende el coste?
+#   1 · GLM Gamma > 1.3 ¿De qué depende el coste?
 # -----------------------------------------------------------------------------
 base |>
   dplyr::select(coste_euros, tipo_averia, proceso, criticidad) |>
@@ -175,7 +207,7 @@ base |>
 
 # -----------------------------------------------------------------------------
 # [fig-u31-cont]
-#   1 · GLM Gamma > 1.1 Contexto: qué modela > ¿De qué depende el coste?
+#   1 · GLM Gamma > 1.3 ¿De qué depende el coste?
 # -----------------------------------------------------------------------------
 base |>
   dplyr::select(coste_euros, criticidad, antiguedad_anios, carga) |>
@@ -190,7 +222,7 @@ base |>
 
 # -----------------------------------------------------------------------------
 # [fig-u31-interaccion-eda]
-#   1 · GLM Gamma > 1.1 Contexto: qué modela > ¿De qué depende el coste?
+#   1 · GLM Gamma > 1.3 ¿De qué depende el coste?
 # -----------------------------------------------------------------------------
 ggplot(base, aes(proceso, coste_euros, fill = criticidad)) +
   geom_boxplot(alpha = 0.7) +
@@ -200,7 +232,7 @@ ggplot(base, aes(proceso, coste_euros, fill = criticidad)) +
 
 # -----------------------------------------------------------------------------
 # [u31-fase]
-#   1 · GLM Gamma > 1.1 Contexto: qué modela > ¿De qué depende el coste?
+#   1 · GLM Gamma > 1.3 ¿De qué depende el coste?
 # -----------------------------------------------------------------------------
 base <- base |>
   dplyr::mutate(fase_proceso = factor(
@@ -208,50 +240,31 @@ base <- base |>
     levels = c("fase1", "fase2")))
 
 # -----------------------------------------------------------------------------
-# [tbl-u31-coef-ee]
-#   1 · GLM Gamma > 1.2 Modelización y estimación > El modelo del caso
+# [u31-ajuste]
+#   1 · GLM Gamma > 1.4 Modelización y estimación > El modelo del caso
 # -----------------------------------------------------------------------------
 m_gamma <- glm(coste_euros ~ tipo_averia + criticidad * fase_proceso + antiguedad_anios + carga,
                family = Gamma(link = "log"), data = base)
 
-broom::tidy(m_gamma) |>
-  dplyr::transmute(term, estimate = round(estimate, 3), std.error = round(std.error, 3))
-
 # -----------------------------------------------------------------------------
 # [u31-dispersion]
-#   1 · GLM Gamma > 1.2 Modelización y estimación > El modelo del caso
+#   1 · GLM Gamma > 1.5 Interpretación > La dispersión $\phi$
 # -----------------------------------------------------------------------------
 c(phi_pearson  = summary(m_gamma)$dispersion,
   cv_implicado = sqrt(summary(m_gamma)$dispersion)) |> round(3)
 
 # -----------------------------------------------------------------------------
-# [tbl-u31-coeficientes]
-#   1 · GLM Gamma > 1.3 Interpretación
+# [u31-cifras-efectos]
+#   1 · GLM Gamma > 1.5 Interpretación > Los efectos de las variables
 # -----------------------------------------------------------------------------
-broom::tidy(m_gamma, exponentiate = TRUE) |>
-  dplyr::transmute(term, `exp(beta)` = round(estimate, 3))
-
-# -----------------------------------------------------------------------------
-# [tbl-u31-interaccion]
-#   1 · GLM Gamma > 1.3 Interpretación
-# -----------------------------------------------------------------------------
-emmeans::emmeans(m_gamma, ~ criticidad | fase_proceso, type = "response") |>
-  as.data.frame() |>
-  dplyr::transmute(fase_proceso, criticidad, coste_predicho = round(response)) |>
-  tidyr::pivot_wider(names_from = criticidad, values_from = coste_predicho)
-
-# -----------------------------------------------------------------------------
-# [fig-u31-prediccion]
-#   1 · GLM Gamma > 1.3 Interpretación
-# -----------------------------------------------------------------------------
-marginaleffects::plot_predictions(m_gamma,
-    condition = c("antiguedad_anios", "criticidad", "fase_proceso")) +
-  labs(x = "antigüedad de la máquina (años)", y = "coste medio predicho (€)",
-       colour = NULL, fill = NULL)
+# Coeficientes, su lectura en % y sus contrastes de Wald: alimentan las cifras en línea de esta sección
+bg  <- coef(m_gamma)
+pct <- function(b) round(100 * (exp(b) - 1))   # incremento exacto de la media, en %
+wald <- summary(m_gamma)$coefficients   # contrastes de Wald: el texto cita sus valores
 
 # -----------------------------------------------------------------------------
 # [tbl-u31-inferencia]
-#   1 · GLM Gamma > 1.4 Inferencia y selección
+#   1 · GLM Gamma > 1.5 Interpretación > Los efectos de las variables
 # -----------------------------------------------------------------------------
 broom::tidy(m_gamma, conf.int = TRUE) |>
   dplyr::transmute(term,
@@ -261,128 +274,232 @@ broom::tidy(m_gamma, conf.int = TRUE) |>
                    ic95 = paste0("[", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), "]"))
 
 # -----------------------------------------------------------------------------
-# [u31-anova-f]
-#   1 · GLM Gamma > 1.4 Inferencia y selección
+# [tbl-u31-interaccion]
+#   1 · GLM Gamma > 1.5 Interpretación > Interacciones y efecto marginal
 # -----------------------------------------------------------------------------
-anova(m_gamma, test = "F")
+emmeans::emmeans(m_gamma, ~ criticidad | fase_proceso, type = "response") |>
+  as.data.frame() |>
+  dplyr::transmute(fase_proceso, criticidad, coste_predicho = round(response)) |>
+  tidyr::pivot_wider(names_from = criticidad, values_from = coste_predicho)
 
 # -----------------------------------------------------------------------------
-# [u31-lrt-interaccion]
-#   1 · GLM Gamma > 1.4 Inferencia y selección
+# [fig-u31-prediccion]
+#   1 · GLM Gamma > 1.5 Interpretación > Interacciones y efecto marginal
 # -----------------------------------------------------------------------------
-m_sin_int <- glm(coste_euros ~ tipo_averia + criticidad + fase_proceso + antiguedad_anios + carga,
-                 family = Gamma(link = "log"), data = base)
-anova(m_sin_int, m_gamma, test = "F")
+marginaleffects::plot_predictions(m_gamma,
+    condition = c("antiguedad_anios", "criticidad", "fase_proceso")) +
+  labs(x = "antigüedad de la máquina (años)", y = "coste medio predicho (€)",
+       colour = NULL, fill = NULL)
 
 # -----------------------------------------------------------------------------
-# [u31-control]
-#   1 · GLM Gamma > 1.4 Inferencia y selección
+# [tbl-u31-deviance]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-m_fab <- update(m_gamma, . ~ . + fabricante)
-anova(m_gamma, m_fab, test = "F")
-
-# -----------------------------------------------------------------------------
-# [tbl-u31-aic]
-#   1 · GLM Gamma > 1.4 Inferencia y selección
-# -----------------------------------------------------------------------------
-AIC(m_sin_int, m_gamma, m_fab) |> round(1)
+y_obs  <- base$coste_euros
+mu_hat <- fitted(m_gamma)
+bondad <- c(deviance_formula = 2 * sum(-log(y_obs / mu_hat) + (y_obs - mu_hat) / mu_hat),
+            deviance_R       = deviance(m_gamma),
+            gl               = df.residual(m_gamma),
+            phi_deviance     = deviance(m_gamma) / df.residual(m_gamma),
+            phi_pearson      = summary(m_gamma)$dispersion)
+tibble::enframe(round(bondad, 3), name = "cantidad", value = "valor")
 
 # -----------------------------------------------------------------------------
 # [fig-u31-dharma]
 #   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
-#       > Residuos: cuáles usar
+#     > 1.6 Bondad de ajuste y selección
+#       > Bondad de ajuste y diagnóstico
 # -----------------------------------------------------------------------------
-DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
+sim_g <- DHARMa::simulateResiduals(m_gamma, n = 1000)   # se guarda: lo usan el texto y la figura por fabricante
+plot(sim_g)
 
 # -----------------------------------------------------------------------------
-# [fig-u31-varianza]
+# [tbl-u31-anova]
 #   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
-#       > ¿Es correcta la función de varianza?
+#     > 1.6 Bondad de ajuste y selección
+#       > Selección de variables: el contraste $F$
 # -----------------------------------------------------------------------------
-mv <- base |>
-  dplyr::mutate(grupo = dplyr::ntile(fitted(m_fab), 12)) |>
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(media = mean(coste_euros), varianza = var(coste_euros), .groups = "drop")
+f_t2 <- car::Anova(m_gamma, type = "II", test.statistic = "F")
 
-pendiente <- coef(lm(log(varianza) ~ log(media), data = mv))[2]
-
-ggplot(mv, aes(media, varianza)) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = FALSE, colour = "firebrick") +
-  scale_x_log10() + scale_y_log10() +
-  labs(x = "media del grupo (€, log)", y = "varianza del grupo (log)",
-       subtitle = paste0("pendiente estimada p = ", round(pendiente, 2)))
+tibble::tibble(term = rownames(f_t2)[-nrow(f_t2)],      # la última fila es el residuo
+               gl   = f_t2$Df[-nrow(f_t2)],
+               F    = round(f_t2$`F value`[-nrow(f_t2)], 1),
+               p    = signif(f_t2$`Pr(>F)`[-nrow(f_t2)], 3))
 
 # -----------------------------------------------------------------------------
-# [tbl-u31-verdad]
+# [fig-u31-res-fabricante]
 #   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
-#       > Validación contra el DGP
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
 # -----------------------------------------------------------------------------
-verdad <- attr(banco, "verdad")$beta_coste
+tibble::tibble(residuo = residuals(sim_g), fabricante = base$fabricante) |>
+  ggplot(aes(fabricante, residuo)) +
+  geom_boxplot(fill = "grey90", outlier.shape = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, colour = "firebrick") +
+  geom_hline(yintercept = 0.5, linetype = 2) +
+  labs(x = "fabricante", y = "residuo cuantil (DHARMa)")
 
-comparacion <- tibble::tibble(
-  term = c("tipo_averiaElectrica", "tipo_averiaHidraulica", "tipo_averiaElectronica",
-           "antiguedad_anios", "carga"),
-  verdadero = c(verdad[["Electrica"]], verdad[["Hidraulica"]], verdad[["Electronica"]],
-                verdad[["antiguedad"]], verdad[["carga"]]))
+# -----------------------------------------------------------------------------
+# [u31-control]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+m_fab <- update(m_gamma, . ~ . + fabricante)
+f_fab <- anova(m_gamma, m_fab, test = "F")
+f_fab
 
-broom::tidy(m_fab, conf.int = TRUE) |>
-  dplyr::inner_join(comparacion, by = "term") |>
+# -----------------------------------------------------------------------------
+# [tbl-u31-aic]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+AIC(m_gamma, m_fab) |> round(1)
+
+# -----------------------------------------------------------------------------
+# [fig-u31-spline]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+rejilla_c <- seq(min(base$carga), max(base$carga), length.out = 200)
+base_ns   <- predict(splines::ns(base$carga, df = 4), rejilla_c)
+
+tibble::tibble(carga   = rep(rejilla_c, 4),
+               valor   = as.vector(base_ns),
+               funcion = rep(paste0("B", 1:4), each = length(rejilla_c))) |>
+  ggplot(aes(carga, valor, colour = funcion)) +
+  geom_line(linewidth = 0.8) +
+  labs(x = "carga", y = "valor de la función base", colour = NULL)
+
+# -----------------------------------------------------------------------------
+# [tbl-u31-falta-ajuste]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+m_spl_edad  <- update(m_fab, . ~ . - antiguedad_anios + splines::ns(antiguedad_anios, 4))
+m_spl_carga <- update(m_fab, . ~ . - carga + splines::ns(carga, 4))
+m_int_extra <- update(m_fab, . ~ . + tipo_averia:criticidad + tipo_averia:fase_proceso)
+
+falta <- purrr::map_dfr(
+  list(`antigüedad no lineal` = m_spl_edad, `carga no lineal` = m_spl_carga,
+       `interacciones del tipo de avería` = m_int_extra),
+  \(m1) { a <- anova(m_fab, m1, test = "F")
+          tibble::tibble(gl = a$Df[2], F = round(a$F[2], 2), p = signif(a$`Pr(>F)`[2], 2)) },
+  .id = "ampliacion")
+falta
+
+# -----------------------------------------------------------------------------
+# [u31-carga-cuad]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+m_final <- update(m_fab, . ~ . + I(carga^2))
+f_cuad  <- anova(m_fab, m_final, test = "F")
+f_cuad
+
+# -----------------------------------------------------------------------------
+# [fig-u31-carga-formas]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+perfil_c <- data.frame(tipo_averia = "Mecanica", criticidad = "Auxiliar", fase_proceso = "fase1",
+                       antiguedad_anios = mean(base$antiguedad_anios), fabricante = "A",
+                       carga = rejilla_c)
+purrr::map_dfr(list(lineal = m_fab, spline = m_spl_carga, `cuadrática` = m_final),
+               \(m) tibble::tibble(carga = rejilla_c,
+                                   coste = predict(m, perfil_c, type = "response")),
+               .id = "forma") |>
+  ggplot(aes(carga, coste, colour = forma)) +
+  geom_line(linewidth = 0.9) +
+  geom_rug(data = base, aes(x = carga), inherit.aes = FALSE, alpha = 0.2) +
+  labs(x = "carga", y = "coste medio predicho (€)", colour = NULL)
+
+# -----------------------------------------------------------------------------
+# [tbl-u31-deviance-final]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+bondad_fin <- c(deviance     = deviance(m_final),
+                gl           = df.residual(m_final),
+                phi_deviance = deviance(m_final) / df.residual(m_final),
+                phi_pearson  = summary(m_final)$dispersion)
+tibble::enframe(round(bondad_fin, 3), name = "cantidad", value = "valor")
+
+# -----------------------------------------------------------------------------
+# [fig-u31-dharma-final]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+sim_f <- DHARMa::simulateResiduals(m_final, n = 1000)
+plot(sim_f)
+
+# -----------------------------------------------------------------------------
+# [tbl-u31-dharma-tests]
+#   1 · GLM Gamma
+#     > 1.6 Bondad de ajuste y selección
+#       > ¿Le falta algo al modelo?
+# -----------------------------------------------------------------------------
+tests_f <- tibble::tibble(
+  contraste = c("uniformidad (KS)", "dispersión", "atípicos"),
+  p         = c(DHARMa::testUniformity(sim_f, plot = FALSE)$p.value,
+                DHARMa::testDispersion(sim_f, plot = FALSE)$p.value,
+                DHARMa::testOutliers(sim_f, plot = FALSE)$p.value))
+tests_f |> dplyr::mutate(p = signif(p, 2))
+
+# -----------------------------------------------------------------------------
+# [tbl-u31-final]
+#   1 · GLM Gamma > 1.7 Modelo validado y predicción > El modelo final
+# -----------------------------------------------------------------------------
+bf <- coef(m_final)                                 # coeficientes del modelo final (cifras en línea)
+wf <- summary(m_final)$coefficients
+
+broom::tidy(m_final, conf.int = TRUE) |>
   dplyr::transmute(term,
-                   estimado = round(estimate, 3), verdadero = round(verdadero, 3),
-                   ic = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]"),
-                   cubre = ifelse(conf.low <= verdadero & verdadero <= conf.high, "sí", "NO"))
+                   `exp(beta)` = round(exp(estimate), 3),
+                   ic95        = paste0("[", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), "]"),
+                   p           = signif(p.value, 3))
 
 # -----------------------------------------------------------------------------
-# [tbl-u31-verdad-crit]
+# [tbl-u31-pred-perfiles]
 #   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
-#       > Validación contra el DGP
-# -----------------------------------------------------------------------------
-co <- coef(m_fab)
-crit_log <- c(fase1 = co[["criticidadCritica"]],
-              fase2 = co[["criticidadCritica"]] + co[["criticidadCritica:fase_procesofase2"]])
-verd_log <- c(fase1 = verdad[["Critica"]],
-              fase2 = verdad[["Critica"]] + verdad[["critxcuello.Critica"]])
-
-tibble::tibble(
-  fase             = c("fase 1", "fase 2"),
-  log_estimado     = round(crit_log, 2),      log_verdadero    = round(verd_log, 2),
-  factor_estimado  = round(exp(crit_log), 2), factor_verdadero = round(exp(verd_log), 2))
-
-# -----------------------------------------------------------------------------
-# [tbl-u31-verdad-fab]
-#   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
-#       > Validación contra el DGP
-# -----------------------------------------------------------------------------
-broom::tidy(m_fab) |>
-  dplyr::filter(grepl("fabricante", term)) |>
-  dplyr::transmute(term,
-                   estimado = round(estimate, 3), verdadero = 0,
-                   p_value = signif(p.value, 3),
-                   veredicto = ifelse(p.value < 0.05, "«significativo» (falso +)", "no signif."))
-
-# -----------------------------------------------------------------------------
-# [tbl-u31-pred-marginal]
-#   1 · GLM Gamma
-#     > 1.5 Bondad de ajuste, diagnóstico, validación y predicción
+#     > 1.7 Modelo validado y predicción
 #       > Predicción
+#         > Predicciones para distintos perfiles de máquina
 # -----------------------------------------------------------------------------
-marginaleffects::predictions(
-  m_fab,
-  newdata = tidyr::expand_grid(
-    tipo_averia      = c("Mecanica", "Electronica"),
-    criticidad       = "Critica", fase_proceso = "fase2",
-    antiguedad_anios = mean(base$antiguedad_anios),
-    carga            = mean(base$carga), fabricante = "A")) |>
-  as.data.frame() |>          # predictions() devuelve una subclase sobre la que transmute() vacía el objeto
-  dplyr::transmute(tipo_averia,
-                   coste_predicho = round(estimate),
-                   ic95 = paste0("[", round(conf.low), ", ", round(conf.high), "]"))
+perfiles <- tidyr::expand_grid(
+  tipo_averia  = c("Mecanica", "Electronica"),
+  criticidad   = c("Auxiliar", "Critica"),
+  fase_proceso = c("fase1", "fase2"),
+  antiguedad_anios = mean(base$antiguedad_anios),
+  carga        = mean(base$carga),
+  fabricante   = "A")
+
+pr    <- predict(m_final, newdata = perfiles, type = "link", se.fit = TRUE)  # eta y su ee
+t_975 <- qt(0.975, df.residual(m_final))
+alfa  <- 1 / summary(m_final)$dispersion                                  # forma: alfa = 1/phi
+
+pred_perfiles <- perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   media    = exp(pr$fit),
+                   ic_inf   = exp(pr$fit - t_975 * pr$se.fit),
+                   ic_sup   = exp(pr$fit + t_975 * pr$se.fit),
+                   ip_inf   = qgamma(0.025, shape = alfa, scale = media / alfa),
+                   ip_sup   = qgamma(0.975, shape = alfa, scale = media / alfa))
+
+pred_perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   coste_medio = round(media),
+                   ic95_media  = paste0("[", round(ic_inf), ", ", round(ic_sup), "]"),
+                   ip95_averia = paste0("[", round(ip_inf), ", ", round(ip_sup), "]"))
 
 
 # --- Entorno de ejecución (index.qmd §10.3) ---------------------------------

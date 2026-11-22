@@ -235,11 +235,16 @@ recoge la parte que le toca, con avisos.
 | **5** | **P5** · El presupuesto | cartera viva | [3.5](#sec-u35) Del modelo al presupuesto | Predicción con intervalo (Casos 1 y 2) |
 
 - **P1 · Dirección de siniestros.**
-  - *Variables:* `coste_k` como respuesta; las covariables del cliente, traídas de `cartera.csv`.
+  - *Variables:* `coste_k` como respuesta; las covariables del cliente y del vehículo, traídas de
+    `cartera.csv` por `id_poliza`. Fuera: `sexo`, el bonus-malus y las variables de coste agregado
+    (`coste_total`, `coste_medio`, `n_siniestros`).
   - *Se trabaja en:* [Unidad 3.1](#sec-u31) · sesión 1.
 
   >Una Gamma con enlace log da efectos **multiplicativos**: cada coeficiente, exponenciado, es el
-  >factor por el que se multiplica el coste medio de un parte.
+  >factor por el que se multiplica el coste medio de un parte. Recorre los pasos de la unidad:
+  >justificar la Gamma (asimetría, CV por tramos), ajustar, interpretar los factores y su Wald,
+  >seleccionar con el contraste $F$ (`car::Anova`, tipo II), diagnosticar (DHARMa, media-varianza) y predecir el
+  >coste medio por parte de los clientes tipo con su intervalo, que necesitarás en P3 y P5.
 
 - **P2 · Dirección técnica.**
   - *Variables:* `coste_k`.

@@ -1,0 +1,524 @@
+<!-- Partial · Incluir con {{< include _unidad_3_5.qmd >}}. Sin YAML. Chunks u35-.
+     Unidad DEL MODELO AL PRESUPUESTO (Caso 3 resumido, sesión 5, pregunta P5).
+     Escrita el 22-11-2026 con la estructura de la 3.1: contexto · el escenario · la media del
+     presupuesto · el intervalo de predicción · validación hacia atrás · escenarios de mantenimiento ·
+     implicaciones. Sin validación contra el DGP. Recupera, reescrito, el presupuesto del caso
+     completo (_archivo/caso3_completo/_unidad_3_4.qmd).
+     Datos: pn (3.3) y t_mix2, caras (3.4). DEPENDE de la 3.1 (pct), la 3.3 y la 3.4: incluirlas en
+     cualquier render.
+     Cifras verificadas al redactar (semilla 20252026): condicional 497138; marginal sin corregir
+       399440, corregida 532043 (Jensen 1.33); delta se 38520; sd proceso 29484, sd total 49263,
+       p90 total ~568000. Validación 1–3 -> 4: previsto 437047, observado 450983, dentro del 90 %;
+       11 % de máquinas por encima de su p90. Intervalo: LRT p 0.0014; factores 0.67/0.50/0.30;
+       todas a 60: ahorro ~71000, 330 visitas, umbral ~216 €/visita; las 15 caras preventivas a 60:
+       ~27500, 43 visitas, ~650 €/visita. Plan ligado a criticidad (p 0.048) y edad (p 0.0008);
+       intervalo no (p 0.55, 0.56, 0.84, 0.12). -->
+
+# 5 · Del modelo al presupuesto {#sec-u35}
+
+Las cuatro unidades anteriores construyeron un modelo del coste: de una avería, en la
+[Unidad 3.1](#sec-u31); del año entero, con sus ceros, en la [Unidad 3.3](#sec-u33); y con el
+historial de cada máquina, en la [Unidad 3.4](#sec-u34). Esta unidad lo **usa**. La dirección
+financiera no necesita coeficientes: necesita una **cifra** para la partida de reparaciones del año
+próximo, un **margen** razonable sobre ella y saber **qué pasaría** si se cambia el mantenimiento.
+
+Responde a la **pregunta 5** de la dirección: *¿cuánto gastaremos en reparaciones el año próximo, con
+qué margen, y cuánto ahorraríamos acortando el intervalo de mantenimiento?*
+
+::: {.callout-note}
+## Sobre esta unidad
+Objetivo general: **predicción** (espiral) — del coste esperado de cada máquina al **total** de la
+planta; la incertidumbre de la **media** (método delta) frente a la **variabilidad** del gasto
+(simulación de la predictiva); la predicción **condicional** frente a la **marginal**; la
+**validación hacia atrás**; y los **escenarios**, con la condición que los hace creíbles: que la
+variable que se cambia se haya asignado al azar.
+:::
+
+## 5.1 Contexto: qué pide la dirección financiera {#sec-u35-contexto}
+
+El estudio cubre cuatro años de las `r length(unique(pn$id_maquina))` máquinas de la planta. La
+partida que hay que presupuestar es la del **año 5**, y la dirección financiera plantea tres
+preguntas distintas, aunque las tres hablen de euros:
+
+1. **¿Cuánto esperamos gastar?** Una cifra central, la que va a la partida.
+2. **¿Con qué margen?** Cuánto se puede desviar el gasto real de esa cifra. La respuesta habitual es
+   un **percentil alto** —el 90 %—: el gasto que solo se superará uno de cada diez años.
+3. **¿Y si cambiamos el mantenimiento?** Cuánto bajaría la partida si se acortara el intervalo de
+   las revisiones preventivas, para el conjunto de la planta o solo para las máquinas crónicamente
+   caras de la [Sección 4.6](#sec-u34-caras).
+
+La primera es una **predicción de la media**; la segunda, una **predicción del dato**; la tercera,
+un **escenario**. Las tres salen del mismo modelo, pero cada una pide algo distinto de él.
+
+## 5.2 El escenario del año próximo {#sec-u35-escenario}
+
+Predecir el año 5 exige decir **cómo será** el año 5. Partimos del último año observado de cada
+máquina y le aplicamos tres supuestos:
+
+- la planta **no cambia**: las mismas máquinas, con la misma ficha (proceso, criticidad, carga y
+  plan de mantenimiento);
+- cada máquina trabaja el **año completo**: exposición 1;
+- cada máquina es **un año más vieja**.
+
+```{r}
+#| label: u35-escenario
+nd5 <- subset(pn, anio == max(anio))   # el último año observado: una fila por máquina
+nd5$edad       <- nd5$edad + 1         # un año más vieja
+nd5$exposicion <- 1                    # el año completo
+nrow(nd5)
+```
+
+Son supuestos, y conviene escribirlos en el informe: si el año 5 entran máquinas nuevas o se retira
+alguna, la partida cambia, y no por el modelo.
+
+## 5.3 La media del presupuesto {#sec-u35-media}
+
+### Condicional o marginal
+
+El modelo del coste anual de la [Sección 4.5](#sec-u34-anual), `t_mix2`, es una Tweedie con un
+intercepto aleatorio de máquina. Su predicción para el año 5 se puede pedir de dos formas, como vimos
+en la [Sección 4.6](#sec-u34-prediccion):
+
+- **condicional** (`re.form = NULL`): con el efecto propio de cada máquina, su BLUP. Es la predicción
+  para **esa** máquina, con su historial;
+- **marginal** (`re.form = NA`): con el efecto aleatorio a cero. Es la predicción para una máquina
+  **típica** con esa ficha… pero no para su media.
+
+```{r}
+#| label: u35-media
+sd_u5  <- sqrt(glmmTMB::VarCorr(t_mix2)$cond$id_maquina[1, 1])   # sigma_u del coste anual
+mu_c   <- predict(t_mix2, newdata = nd5, type = "response")                  # condicional
+mu_m   <- predict(t_mix2, newdata = nd5, type = "response", re.form = NA)    # marginal (b = 0)
+jensen <- exp(sd_u5^2 / 2)                                                   # corrección
+
+pres_media <- tibble::tibble(
+  prediccion = c("condicional (con el BLUP de cada máquina)", "marginal, b = 0",
+                 "marginal corregida, × exp(σ²/2)"),
+  total = round(c(sum(mu_c), sum(mu_m), sum(mu_m) * jensen)))
+```
+
+```{r}
+#| label: tbl-u35-media
+#| tbl-cap: "Gasto total esperado en reparaciones el año 5 (€) según cómo se trate el efecto de máquina."
+pres_media
+```
+
+Las tres cifras de la @tbl-u35-media difieren en mucho más que el redondeo, y la razón es la
+**desigualdad de Jensen**. Con enlace log, la media de una máquina es $e^{x^\top\beta+b_i}$, y la
+media de $e^{b}$ sobre la población no es $e^{0}=1$, sino
+$\operatorname{E}(e^{b})=e^{\sigma_u^2/2}=$ `r round(jensen, 2)`. Con $b=0$, la predicción marginal
+es la **mediana** de las máquinas con esa ficha, no su media, y se queda un
+`r round(100 * (1 - 1 / jensen))` % corta. Corregida, sí estima la media de la población.
+
+¿Cuál va a la partida? La **condicional**. No presupuestamos para una planta cualquiera con estas
+fichas, sino para **esta** planta, cuyas máquinas conocemos desde hace cuatro años: las caras seguirán
+siéndolo, y las baratas también. La marginal corregida es la que usaríamos para una máquina **nueva**,
+sin historial —o para una planta nueva—. Es el mismo razonamiento que el de la aseguradora con un
+cliente nuevo frente a uno con años de póliza.
+
+La partida es, por tanto, de `r sprintf("%.0f", sum(mu_c))` €. Como referencia, el año 4 se gastaron
+`r sprintf("%.0f", sum(subset(pn, anio == 4)$coste_total))` €: la diferencia es, sobre todo, el
+envejecimiento, porque cada año de edad multiplica el coste esperado por
+`r round(exp(glmmTMB::fixef(t_mix2)$cond[["edad"]]), 2)`.
+
+### La incertidumbre de la media: el método delta {#sec-u35-delta}
+
+Esa cifra es una **estimación**: con otros cuatro años de datos, los coeficientes $\hat\beta$ habrían
+salido algo distintos, y la partida también. Su error estándar sale del de los coeficientes por el
+**método delta**. El total es $T(\beta)=\sum_i \mu_i=\sum_i e^{x_i^\top\beta+\hat b_i}$, y su
+gradiente respecto de $\beta$ es
+
+$$
+\nabla T \;=\; \sum_i \mu_i\, x_i \;=\; X^\top\hat\mu
+\qquad\Longrightarrow\qquad
+\operatorname{Var}(\hat T)\;\approx\;(X^\top\hat\mu)^\top\,\widehat{\operatorname{Var}}(\hat\beta)\,(X^\top\hat\mu).
+$$
+
+```{r}
+#| label: u35-delta
+X5 <- model.matrix(~ edad + carga + proceso + criticidad + plan_mantenimiento, data = nd5)
+V5 <- vcov(t_mix2)$cond                    # varianza de los efectos fijos
+g5 <- as.vector(t(X5) %*% mu_c)            # gradiente del total: X' mu
+ee_total <- sqrt(drop(t(g5) %*% V5 %*% g5))
+ic_media <- sum(mu_c) * exp(c(-1, 1) * 1.96 * ee_total / sum(mu_c))   # IC en escala log
+round(c(total = sum(mu_c), ee = ee_total, inf = ic_media[1], sup = ic_media[2]))
+```
+
+El intervalo se construye en escala log y se devuelve a euros, por la misma razón que en la
+[Sección 1.7](#sec-u31-prediccion): así no puede salir negativo y respeta la asimetría. La partida
+**media** está, con un 95 % de confianza, entre `r sprintf("%.0f", ic_media[1])` y
+`r sprintf("%.0f", ic_media[2])` €. Un detalle: el método delta trata los BLUP como fijos, y su
+propia incertidumbre queda fuera. Con cuatro años por máquina es poca, pero existe.
+
+## 5.4 Lo que se gastará: el intervalo de predicción {#sec-u35-prediccion}
+
+### Dos incertidumbres distintas
+
+El intervalo de la [Sección 5.3](#sec-u35-delta) **no** es un margen para el gasto. Responde a otra
+pregunta: dónde está la **media** del gasto. Pero aunque conociéramos los coeficientes sin error, el
+gasto real del año 5 no sería la media: cada máquina tendrá las averías que tenga, y cada una costará
+lo que cueste. Son dos fuentes de incertidumbre, y se suman:
+
+$$
+\operatorname{Var}(T_5)\;=\;\underbrace{\operatorname{Var}\big(\operatorname{E}(T_5\mid\beta)\big)}_{\text{la media: estimación}}
+\;+\;\underbrace{\operatorname{E}\big(\operatorname{Var}(T_5\mid\beta)\big)}_{\text{el dato: azar}} .
+$$
+
+La primera es la del método delta. La segunda es la variabilidad **del propio coste**, la de la
+Tweedie, y no tiene fórmula cerrada para un percentil del total. Se obtiene **simulando**.
+
+### Simular la predictiva
+
+La Tweedie es una suma de Gammas en número de Poisson ([Sección 3.1](#sec-u33-mapa)), y así se simula:
+para cada máquina, un número de averías $N_i\sim\text{Poisson}(\lambda_i)$ y, dado $N_i$, un coste
+$S_i\sim\text{Gamma}(N_i\alpha,\ \theta_i)$, con
+
+$$
+\lambda_i=\frac{\mu_i^{\,2-p}}{\phi\,(2-p)},\qquad
+\alpha=\frac{2-p}{p-1},\qquad
+\theta_i=\phi\,(p-1)\,\mu_i^{\,p-1}.
+$$
+
+Sumando las `r nrow(nd5)` máquinas sale un gasto total posible del año 5. Para recoger también la
+primera incertidumbre, en cada repetición sacamos antes unos coeficientes $\beta^{*}$ de su
+distribución aproximada, $\mathcal{N}(\hat\beta,\widehat{\operatorname{Var}}(\hat\beta))$, y con
+ellos las medias $\mu_i^{*}$.
+
+```{r}
+#| label: u35-simulacion
+set.seed(20252026)
+p5   <- glmmTMB::family_params(t_mix2)[[1]]       # índice de potencia
+phi5 <- sigma(t_mix2)                             # dispersión
+alfa5 <- (2 - p5) / (p5 - 1)
+
+rtweedie_pg <- function(mu) {                     # una realización Tweedie por máquina
+  n <- rpois(length(mu), mu^(2 - p5) / (phi5 * (2 - p5)))
+  rgamma(length(mu), shape = n * alfa5, scale = phi5 * (p5 - 1) * mu^(p5 - 1))
+}                                                 # con n = 0, rgamma devuelve 0
+
+b5    <- log(mu_c) - drop(X5 %*% glmmTMB::fixef(t_mix2)$cond)   # el BLUP de cada máquina
+beta5 <- MASS::mvrnorm(4000, glmmTMB::fixef(t_mix2)$cond, V5)  # coeficientes posibles
+
+sim5 <- tibble::tibble(
+  solo_azar = replicate(4000, sum(rtweedie_pg(mu_c))),                       # beta fijo
+  total     = apply(beta5, 1, \(b) sum(rtweedie_pg(exp(X5 %*% b + b5)))))     # beta y azar
+```
+
+```{r}
+#| label: tbl-u35-margenes
+#| tbl-cap: "La partida del año 5 (€): la media con su intervalo de confianza, y la distribución simulada del gasto real, solo con el azar de las averías y con el azar y la incertidumbre de los coeficientes."
+margenes <- tibble::tibble(
+  cifra = c("media estimada", "IC 95 % de la media (delta)",
+            "gasto, solo azar: percentil 90", "gasto, azar + estimación: percentil 90",
+            "gasto, azar + estimación: intervalo 90 %"),
+  euros = c(sprintf("%.0f", sum(mu_c)),
+            paste0("[", sprintf("%.0f", ic_media[1]), ", ", sprintf("%.0f", ic_media[2]), "]"),
+            sprintf("%.0f", quantile(sim5$solo_azar, 0.9)),
+            sprintf("%.0f", quantile(sim5$total, 0.9)),
+            paste0("[", sprintf("%.0f", quantile(sim5$total, 0.05)), ", ",
+                   sprintf("%.0f", quantile(sim5$total, 0.95)), "]")))
+margenes
+```
+
+```{r}
+#| label: fig-u35-predictiva
+#| fig-width: 7.5
+#| fig-height: 3.8
+#| fig-cap: "Distribución simulada del gasto total del año 5: solo con el azar de las averías (gris claro) y con el azar más la incertidumbre de los coeficientes (gris oscuro). La línea continua es la media estimada; la discontinua, el percentil 90 de la distribución completa."
+sim5 |>
+  tidyr::pivot_longer(dplyr::everything(), names_to = "fuente", values_to = "gasto") |>
+  dplyr::mutate(fuente = factor(fuente, levels = c("solo_azar", "total"),
+                                labels = c("solo azar", "azar + estimación"))) |>
+  ggplot(aes(gasto / 1000, fill = fuente)) +
+  geom_density(alpha = 0.5, colour = NA) +
+  geom_vline(xintercept = sum(mu_c) / 1000) +
+  geom_vline(xintercept = quantile(sim5$total, 0.9) / 1000, linetype = 2) +
+  scale_fill_manual(values = c("grey75", "grey30")) +
+  labs(x = "gasto total del año 5 (miles de €)", y = "densidad", fill = NULL) +
+  theme(legend.position = "top")
+```
+
+La @tbl-u35-margenes y la @fig-u35-predictiva dicen algo que sorprende la primera vez. En la planta
+entera, el **azar** de las averías pesa **menos** que la incertidumbre de la **estimación**: su
+desviación típica es de `r sprintf("%.0f", sd(sim5$solo_azar))` €, frente a los
+`r sprintf("%.0f", ee_total)` € del método delta. Al sumar `r nrow(nd5)` máquinas, los años buenos de
+unas compensan los malos de otras, y el azar se diluye; el error de los coeficientes, en cambio, afecta
+a todas en la misma dirección y no se compensa. Por eso el percentil 90 que solo mira el azar,
+`r sprintf("%.0f", quantile(sim5$solo_azar, 0.9))` €, se queda corto: el margen honesto es el de la
+distribución completa, `r sprintf("%.0f", quantile(sim5$total, 0.9))` €.
+
+### Una máquina no es la planta
+
+La relación se invierte para **una sola** máquina. Tomamos una de gasto esperado mediano y la más
+cara de la planta:
+
+```{r}
+#| label: tbl-u35-una
+#| tbl-cap: "Distribución simulada del gasto del año 5 de dos máquinas: una de gasto esperado mediano y la de mayor gasto esperado (€)."
+set.seed(20252026)
+dos <- c(mediana = which.min(abs(mu_c - median(mu_c))), mas_cara = which.max(mu_c))
+purrr::map_dfr(dos, \(i) {
+  s <- replicate(20000, rtweedie_pg(mu_c[i]))
+  tibble::tibble(id_maquina = nd5$id_maquina[i], media = round(mu_c[i]),
+                 prob_cero = round(mean(s == 0), 2), mediana = round(median(s)),
+                 p90 = round(quantile(s, 0.9)))
+}, .id = "maquina")
+```
+
+En una máquina típica, el gasto del año 5 puede ser **cero** con una probabilidad próxima a la mitad,
+y su percentil 90 es casi el triple de su media. Ahí manda el azar, y ningún modelo lo reduce. Por eso se
+presupuesta la **planta** y no la máquina: lo que es imprevisible una a una se vuelve previsible en el
+agregado.
+
+## 5.5 ¿Nos fiamos? Validación hacia atrás {#sec-u35-validacion}
+
+Un presupuesto se juzga cuando acaba el año. No podemos esperar al año 5, pero sí repetir el ejercicio
+con un año que ya conocemos: ajustar el modelo con los años **1 a 3**, presupuestar el **4** con el
+mismo procedimiento, y compararlo con lo que se gastó.
+
+```{r}
+#| label: u35-validacion
+set.seed(20252026)
+t_val <- update(t_mix2, data = subset(pn, anio <= 3))        # el modelo, sin el año 4
+nd4   <- subset(pn, anio == 3)
+nd4$edad <- nd4$edad + 1; nd4$exposicion <- 1                 # el escenario del año 4
+obs4  <- subset(pn, anio == 4)[match(nd4$id_maquina, subset(pn, anio == 4)$id_maquina), ]
+
+mu4  <- predict(t_val, newdata = nd4, type = "response")
+X4   <- model.matrix(~ edad + carga + proceso + criticidad + plan_mantenimiento, data = nd4)
+b4   <- log(mu4) - drop(X4 %*% glmmTMB::fixef(t_val)$cond)
+p5 <- glmmTMB::family_params(t_val)[[1]]; phi5 <- sigma(t_val); alfa5 <- (2 - p5) / (p5 - 1)
+beta4 <- MASS::mvrnorm(4000, glmmTMB::fixef(t_val)$cond, vcov(t_val)$cond)
+sim4  <- apply(beta4, 1, \(b) sum(rtweedie_pg(exp(X4 %*% b + b4))))
+
+# Máquina a máquina: ¿cuántas superan su propio percentil 90?
+p90_maq <- apply(replicate(4000, rtweedie_pg(mu4)), 1, quantile, 0.9)
+
+validacion <- c(previsto = sum(mu4), observado = sum(obs4$coste_total),
+                inf90 = quantile(sim4, 0.05), sup90 = quantile(sim4, 0.95),
+                maquinas_sobre_p90 = 100 * mean(obs4$coste_total > p90_maq))
+round(validacion)
+
+# Restaurar los parámetros del modelo completo para lo que sigue
+p5 <- glmmTMB::family_params(t_mix2)[[1]]; phi5 <- sigma(t_mix2); alfa5 <- (2 - p5) / (p5 - 1)
+```
+
+Con tres años de datos, el modelo habría presupuestado `r sprintf("%.0f", validacion[["previsto"]])` €
+para el año 4. Se gastaron `r sprintf("%.0f", validacion[["observado"]])` €, dentro de su intervalo de
+predicción al 90 %, [`r sprintf("%.0f", validacion[["inf90.5%"]])`,
+`r sprintf("%.0f", validacion[["sup90.95%"]])`]. Y máquina a máquina, el
+`r round(validacion[["maquinas_sobre_p90"]])` % de ellas gastó más que su percentil 90, muy cerca del 10 % que
+corresponde. El modelo no solo acierta la media: también acierta **cuánto se desvía** el gasto de
+ella, que es lo que necesita un margen.
+
+Es la mejor prueba que tenemos sin esperar al año siguiente, y es la que convence a una dirección
+financiera: *«este procedimiento, aplicado el año pasado, habría acertado»*. La advertencia de la
+[Sección 4.5](#sec-u34-anual) sobre la dispersión dentro de cada máquina-año no se ha traducido en
+márgenes demasiado estrechos.
+
+## 5.6 Escenarios: el intervalo de mantenimiento {#sec-u35-escenarios}
+
+### Qué se puede cambiar, y qué se puede creer
+
+Un escenario cambia una variable del escenario base y vuelve a predecir. La cuenta es fácil; lo
+difícil es que el resultado sea **creíble**. El modelo estima asociaciones: el coeficiente del plan
+preventivo dice cuánto menos gastan las máquinas preventivas **que tenemos**, a igualdad de ficha. Si
+la planta eligió qué máquinas pasaban a preventivo mirando algo que no está en los datos —su estado,
+la opinión del jefe de turno—, ese coeficiente mezcla el efecto del mantenimiento con el de esa
+elección, y el escenario «pasar a preventivo» hereda la mezcla.
+
+El **intervalo** entre revisiones es otra cosa: entre las máquinas preventivas, se **sorteó**. Los
+datos lo confirman (@tbl-u35-asignacion): el plan está ligado a la ficha, el intervalo no.
+
+```{r}
+#| label: tbl-u35-asignacion
+#| tbl-cap: "¿Depende de la ficha la asignación del mantenimiento? Valor p de la asociación entre la ficha de la máquina y su plan (todas las máquinas) o su intervalo (solo las preventivas): chi-cuadrado para los factores, F para la carga y la edad."
+maq  <- banco$maquinas
+prev <- subset(maq, plan_mantenimiento == "Preventivo")
+p_asoc <- function(d, grupo) c(
+  proceso    = chisq.test(table(d$proceso, d[[grupo]]))$p.value,
+  criticidad = chisq.test(table(d$criticidad, d[[grupo]]))$p.value,
+  carga      = summary(aov(d$carga ~ factor(d[[grupo]])))[[1]][1, 5],
+  edad_alta  = summary(aov(d$edad_alta ~ factor(d[[grupo]])))[[1]][1, 5])
+asignacion <- tibble::tibble(variable = names(p_asoc(maq, "plan_mantenimiento")),
+                             plan = p_asoc(maq, "plan_mantenimiento"),
+                             intervalo = p_asoc(prev, "intervalo_mant"))
+asignacion |> dplyr::mutate(dplyr::across(plan:intervalo,
+                                          \(x) format(signif(x, 2), scientific = FALSE, drop0trailing = TRUE)))
+```
+
+Las máquinas preventivas son más a menudo críticas y más viejas que las correctivas: la planta las
+eligió. Entre las preventivas, en cambio, ningún rasgo de la ficha distingue a las de 60, 90 o 120
+días. Eso convierte el intervalo en un **experimento**: si las de 60 días gastan menos, es por el
+intervalo, porque es lo único que las distingue de las demás —salvo el azar—. El escenario «acortar el
+intervalo» es creíble; el escenario «pasar a preventivo» lo es mucho menos.
+
+### El modelo con el intervalo
+
+Sustituimos en `t_mix2` el plan por una variable de cuatro niveles: correctivo, y preventivo cada 120,
+90 o 60 días.
+
+```{r}
+#| label: u35-mant
+nivel_mant <- function(x) factor(ifelse(is.na(x), "Correctivo", paste("cada", x, "días")),
+                                 levels = c("Correctivo", "cada 120 días", "cada 90 días",
+                                            "cada 60 días"))
+pn$mantenimiento  <- nivel_mant(pn$intervalo_mant)
+nd5$mantenimiento <- nivel_mant(nd5$intervalo_mant)
+
+t_mant <- update(t_mix2, . ~ . - plan_mantenimiento + mantenimiento)
+lrt_mant <- anova(t_mix2, t_mant)
+lrt_mant
+```
+
+```{r}
+#| label: tbl-u35-mant
+#| tbl-cap: "Factor de gasto anual de cada régimen de mantenimiento frente al correctivo, con su intervalo de confianza al 95 %, en el modelo con efecto de máquina."
+broom.mixed::tidy(t_mant, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::filter(grepl("^mantenimiento", term)) |>
+  dplyr::transmute(regimen = sub("mantenimiento", "", term), factor = round(estimate, 2),
+                   ic95 = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]"))
+```
+
+Distinguir los intervalos mejora el modelo ($p=`r signif(lrt_mant$"Pr(>Chisq)"[2], 2)`$): el
+efecto preventivo no es uno solo, sino que crece al acortar el intervalo (@tbl-u35-mant). Frente a una
+máquina en correctivo, una revisada cada 120 días gasta un
+`r -pct(glmmTMB::fixef(t_mant)$cond[["mantenimientocada 120 días"]])` % menos; cada 60 días, un
+`r -pct(glmmTMB::fixef(t_mant)$cond[["mantenimientocada 60 días"]])` % menos. Las comparaciones que
+nos interesan son **entre** intervalos, que son las del experimento; la de cada intervalo con el
+correctivo arrastra la duda del plan.
+
+### Los escenarios
+
+Comparamos el escenario base con tres alternativas, todas con revisiones cada 60 días:
+
+- **todas las preventivas** a 60 días;
+- solo las **preventivas crónicamente caras** de la @tbl-u34-caras;
+- las **correctivas crónicamente caras**, pasadas a preventivo cada 60 días. Este es el escenario
+  dudoso: su ahorro descansa en el coeficiente del plan.
+
+El modelo da el ahorro en reparaciones, pero no el **coste de las revisiones**, que no está en los
+datos. Lo que sí podemos dar es el número de **revisiones adicionales** al año y el **umbral**: lo
+máximo que podría costar cada revisión para que el cambio compense.
+
+```{r}
+#| label: u35-escenarios
+set.seed(20252026)
+f_mant <- ~ edad + carga + proceso + criticidad + mantenimiento
+Xb    <- model.matrix(f_mant, nd5)
+bm    <- log(predict(t_mant, nd5, type = "response")) - drop(Xb %*% glmmTMB::fixef(t_mant)$cond)
+betam <- MASS::mvrnorm(4000, glmmTMB::fixef(t_mant)$cond, vcov(t_mant)$cond)
+total_esc <- function(nd) {                                   # gasto medio, para cada beta simulado
+  X <- model.matrix(f_mant, nd)
+  apply(betam, 1, \(b) sum(exp(X %*% b + bm)))
+}
+visitas <- function(intervalo) ifelse(is.na(intervalo), 0, 365 / intervalo)   # revisiones al año
+
+es_prev <- nd5$mantenimiento != "Correctivo"
+es_cara <- nd5$id_maquina %in% caras$id_maquina
+cambios <- list(`todas las preventivas`    = es_prev,
+                `preventivas caras`        = es_prev & es_cara,
+                `correctivas caras (dudoso)` = !es_prev & es_cara)
+
+base_esc <- total_esc(nd5)
+escenarios <- purrr::imap_dfr(cambios, \(cambia, nombre) {
+  nd <- nd5; nd$mantenimiento[cambia] <- "cada 60 días"
+  ahorro <- base_esc - total_esc(nd)
+  extra  <- sum(365 / 60 - visitas(nd5$intervalo_mant[cambia]))
+  tibble::tibble(escenario = nombre,
+                 maquinas = sum(cambia & nd5$intervalo_mant %in% c(NA, 90, 120)),
+                 ic95 = paste0("[", round(quantile(ahorro, 0.025)), ", ",
+                               round(quantile(ahorro, 0.975)), "]"),
+                 ahorro = round(median(ahorro)),
+                 revisiones_extra = round(extra),
+                 umbral_por_revision = round(median(ahorro) / extra))
+})
+```
+
+```{r}
+#| label: tbl-u35-escenarios
+#| tbl-cap: "Escenarios de mantenimiento para el año 5: máquinas que cambian de régimen, ahorro esperado en reparaciones (€) con su intervalo al 95 %, revisiones adicionales al año y umbral (€): lo máximo que puede costar cada revisión adicional para que el cambio compense."
+escenarios
+```
+
+Llevar **todas** las preventivas a 60 días ahorraría unos
+`r sprintf("%.0f", escenarios$ahorro[1])` € en reparaciones, a cambio de
+`r escenarios$revisiones_extra[1]` revisiones más al año: compensa si cada revisión cuesta menos de
+`r escenarios$umbral_por_revision[1]` €. Hacerlo **solo** con las preventivas caras ahorra menos en
+total, `r sprintf("%.0f", escenarios$ahorro[2])` €, pero con muchas menos revisiones, y su umbral sube
+a `r escenarios$umbral_por_revision[2]` € por revisión: cada revisión rinde unas
+`r round(escenarios$umbral_por_revision[2] / escenarios$umbral_por_revision[1])` veces más. La razón
+está en el modelo: el intervalo multiplica el gasto por un factor, y el mismo factor ahorra más euros
+donde el gasto de partida es mayor. Es la respuesta, en euros, a la pregunta que dejó abierta la
+[Sección 4.6](#sec-u34-caras).
+
+El tercer escenario promete un ahorro grande, `r sprintf("%.0f", escenarios$ahorro[3])` €, pero es el
+que menos se sostiene: si las correctivas caras lo son en parte por algo que también decidió su
+plan, pasarlas a preventivo no tiene por qué ahorrar lo que el coeficiente sugiere. Para saberlo
+habría que hacer con el plan lo que se hizo con el intervalo: **sortearlo**, por ejemplo entre las
+correctivas caras, y medir.
+
+Dos supuestos más, comunes a los tres escenarios. El efecto del intervalo es el **mismo** factor para
+todas las máquinas —el modelo no tiene interacción con el BLUP—; y acortar el intervalo a 60 días es
+lo más que podemos evaluar, porque es el más corto observado. Un escenario de 45 días sería una
+**extrapolación**.
+
+## 5.7 Implicaciones para la dirección financiera {#sec-u35-implicaciones}
+
+- **La partida.** Para las máquinas actuales, el gasto esperado en reparaciones el año 5 es de unos
+  `r sprintf("%.0f", round(sum(mu_c), -3))` €. Debe calcularse con la predicción **condicional**: la
+  marginal sin corregir lo infravalora en un `r round(100 * (1 - sum(mu_m) / sum(mu_c)))` %.
+- **El margen.** Con un 90 % de probabilidad el gasto no superará los
+  `r sprintf("%.0f", round(quantile(sim5$total, 0.9), -3))` €. En la planta entera, ese margen lo
+  marca sobre todo la incertidumbre de los coeficientes, no el azar de las averías: más años de datos
+  lo estrecharían.
+- **La confianza.** Aplicado al año 4 con los tres anteriores, el procedimiento habría acertado la
+  partida y el margen.
+- **El mantenimiento.** Acortar el intervalo a 60 días en las preventivas caras es la medida más
+  rentable por revisión. Generalizarlo a todas las preventivas solo compensa si una revisión cuesta
+  menos de unos `r round(escenarios$umbral_por_revision[1], -1)` €. Pasar a preventivo las correctivas
+  caras merece una **prueba** antes que un presupuesto.
+
+::: {.callout-tip}
+## 🔧 En R. Del modelo al presupuesto
+Con un modelo `m` del coste por unidad y periodo (`glmmTMB`, enlace log) y un escenario `nd` con una
+fila por unidad:
+
+- **La media del total**: `sum(predict(m, nd, type = "response"))`, condicional; para unidades nuevas,
+  `re.form = NA` y el factor `exp(sigma_u^2 / 2)`.
+- **Su error, por el método delta**: `X <- model.matrix(~ ..., nd)`, `g <- t(X) %*% mu` y
+  `sqrt(t(g) %*% vcov(m)$cond %*% g)`; el intervalo, en escala log.
+- **La predictiva de una Tweedie**: `n <- rpois(k, mu^(2-p) / (phi*(2-p)))` y
+  `rgamma(k, shape = n*(2-p)/(p-1), scale = phi*(p-1)*mu^(p-1))`, con
+  `p <- glmmTMB::family_params(m)` y `phi <- sigma(m)`. Para añadir la incertidumbre de los
+  coeficientes, `MASS::mvrnorm(R, fixef(m)$cond, vcov(m)$cond)` antes de cada repetición.
+- **Validación hacia atrás**: `update(m, data = subset(d, periodo < ultimo))` y comparar con el último
+  periodo observado.
+- **Escenarios**: copiar `nd`, cambiar la variable y repetir; el ahorro, con su intervalo, con los
+  mismos coeficientes simulados en los dos escenarios.
+:::
+
+::: {.callout-important}
+## Tarea del estudiante (3.5) · qué te llevas al estudio de caso
+Esta unidad resuelve la **pregunta 5** del [estudio de caso](#sec-u36-encargo): *¿cuánto debemos
+presupuestar para la siniestralidad del año próximo, y con qué margen?* Es la misma pregunta que aquí
+nos hemos hecho para la planta: cambia máquinas por pólizas.
+
+- **El escenario.** La cartera viva (`baja == 0`), con un año **completo** (`expo_anual = 1`) y la
+  edad del conductor y del vehículo **un año mayores** ([Sección 5.2](#sec-u35-escenario)). Cada póliza
+  lleva el coeficiente de su nivel de `bonus_malus_act`, el de la pregunta 4.
+- **La media.** Con el camino que recomendaste en la pregunta 3 y el efecto de póliza de la pregunta 4:
+  predicción **condicional** para la cartera viva; para los **clientes tipo**, que son nuevos y entran
+  en el nivel 3, la **marginal corregida** ([Sección 5.3](#sec-u35-media)). Su intervalo, por el
+  método delta.
+- **El margen.** El percentil 90 del gasto total, simulando la predictiva con y sin la incertidumbre
+  de los coeficientes ([Sección 5.4](#sec-u35-prediccion)). ¿Qué pesa más en tu cartera, el azar o la
+  estimación? Con muchas más pólizas que máquinas, la respuesta puede cambiar.
+- **La validación.** Presupuesta el último año observado con los anteriores y compáralo con lo
+  ocurrido ([Sección 5.5](#sec-u35-validacion)).
+- **Un cliente tipo.** Su prima media y la distribución de su coste: la probabilidad de no dar ningún
+  parte y su percentil 90.
+
+**Aviso.** Si tu camino es frecuencia × severidad, la simulación tiene dos piezas: el número de partes
+de tu modelo de frecuencia y, para cada parte, un coste de tu Gamma de la pregunta 1.
+:::

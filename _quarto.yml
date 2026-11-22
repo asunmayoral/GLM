@@ -93,18 +93,14 @@ website:
             href: caso3/caso3_continuas_positivas.qmd#sec-u31
           - text: "3.2 · Elegir familia y escala"
             href: caso3/caso3_continuas_positivas.qmd#sec-u32
-          - text: "3.3 · GLMM Gamma"
+          - text: "3.3 · Tweedie y los tres caminos"
             href: caso3/caso3_continuas_positivas.qmd#sec-u33
-          - text: "3.4 · Tweedie: el coste agregado"
+          - text: "3.4 · Efectos aleatorios y credibilidad"
             href: caso3/caso3_continuas_positivas.qmd#sec-u34
-          - text: "3.5 · AFT: del coste al tiempo"
+          - text: "3.5 · Del modelo al presupuesto"
             href: caso3/caso3_continuas_positivas.qmd#sec-u35
-          - text: "3.6 · Cox: del tiempo al riesgo"
+          - text: "3.6 · Estudio de caso"
             href: caso3/caso3_continuas_positivas.qmd#sec-u36
-          - text: "3.7 · Las tres lentes"
-            href: caso3/caso3_continuas_positivas.qmd#sec-u37
-          - text: "3.8 · Estudio de caso"
-            href: caso3/caso3_continuas_positivas.qmd#sec-u38
       - href: recursos.qmd
         text: "Recursos"
       - href: referencias.qmd

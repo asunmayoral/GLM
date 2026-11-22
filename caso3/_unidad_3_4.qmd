@@ -1,27 +1,40 @@
-<!-- Partial · DRAFT. Incluir con {{< include _unidad_3_3.qmd >}}. Sin YAML. Chunks u34-.
-     Unidad de MODELO ÚNICO (recorrido completo, espejo de 3.1): GLMM Gamma sobre el COSTE.
-     Reactiva el hilo de MIXTOS (espiral). Respuesta: coste_euros (varias averías por máquina).
-     Agrupamiento: SOLO la máquina (no hay plantas; el proceso es efecto fijo).
-     Efectos aleatorios: intercepto + pendiente en la edad (centrada) por id_maquina.
-     Cierra dos deudas de 3.1/3.2: la phi inflada y el falso positivo de `fabricante`.
-     Datos: base <- banco$averias (creado en 3.1, con fase_proceso). -->
+<!-- Partial · Incluir con {{< include _unidad_3_4.qmd >}}. Sin YAML. Chunks u34-.
+     Unidad de EFECTOS ALEATORIOS Y CREDIBILIDAD (Caso 3 resumido, sesión 4, pregunta P4).
+     Reconstruida el 22-11-2026 con la estructura de la 3.1: contexto · modelo · interpretación ·
+     bondad de ajuste, diagnóstico y selección · el historial en el coste anual · modelo validado y
+     predicción. Sin validación contra el DGP. La versión anterior está en git (commit 10c9274) y la
+     del caso completo, en _archivo/caso3_completo.
+     Datos: base <- banco$averias (3.1, con fase_proceso); pn y m_tw de la 3.3 (panel máquina-año
+     con edad). DEPENDE de la 3.1 y de la 3.3: incluirlas en cualquier render.
+     Cuentas pendientes que salda: de la 3.1, la phi inflada, `fabricante` y la carga cuadrática; de
+     la 3.3, la dependencia entre los años de una máquina y `fabricante` en el coste anual.
+     Cifras verificadas al redactar (semilla 20252026): severidad con (1|maq): fabricante p 0.43,
+       carga^2 p 0.37, phi 0.335 -> 0.176, sd_u 0.41, ICC ajustado 0.51; pendiente (no correlada)
+       LRT p/2 0.027; DHARMa KS significativo (p ~0.004–0.015) pero con desviación pequeña.
+       Tweedie con (1|maq): LRT p/2 ~1e-38, sd_u 0.75, p 1.27, fabricante p 0.10.
+       Clase de historial (averías del año anterior 0/1/2+): factores 1.46 y 1.84. -->
 
-# 4 · Efectos Aleatorios y Modelos Mixtos {#sec-u34}
+# 4 · Efectos aleatorios y credibilidad {#sec-u34}
 
-Las dos unidades anteriores trataron cada avería como una observación **independiente**: una fila, un
-coste. Pero el banco no es así. Una misma máquina sufre **varias averías** a lo largo de su vida, y sus
-costes se parecen entre sí: una máquina «mala» resulta cara de reparar **una y otra vez**. Ignorar ese
-parentesco no es un pecado venial —falsea la inferencia—. Esta unidad extiende la Gamma para dar a la
-**máquina** su propio nivel en el modelo: es la reactivación del hilo de **efectos mixtos**. Y, de paso,
-salda las **dos deudas** que dejamos abiertas: aquella variabilidad **entre máquinas** que, sin sitio en
-el modelo, inflaba la dispersión $\hat\phi$ (de $\approx 0{,}17$ verdadera a $\approx 0{,}33$), y el
-**falso positivo de `fabricante`** que la 3.1 marcó para reexaminar aquí.
+Las unidades anteriores trataron cada avería, y cada año de cada máquina, como una observación
+**independiente**. Pero el banco no es así. Una misma máquina sufre **varias averías** a lo largo de
+su vida, y sus costes se parecen entre sí: una máquina «mala» resulta cara de reparar **una y otra
+vez**, y cara de mantener **año tras año**. Ignorar ese parentesco no es un pecado venial: falsea la
+inferencia. Esta unidad da a la **máquina** su propio nivel en el modelo, y es la reactivación del
+hilo de **efectos mixtos**.
+
+De paso salda las cuentas que dejamos abiertas. De la [Unidad 3.1](#sec-u31), una dispersión
+$\hat\phi$ inflada y dos efectos en cuarentena, el `fabricante` y la curvatura de la carga. De la
+[Unidad 3.3](#sec-u33), la dependencia entre los años de una máquina que el diagnóstico de la Tweedie
+detectó. Y responde a la **pregunta 4** de la dirección: *¿hay máquinas crónicamente caras? ¿Cuánto
+debe pesar su historial al prever lo que gastarán?*
 
 ::: {.callout-note}
 ## Sobre esta unidad
-Objetivo general: **mixtos** (espiral) — el **GLMM Gamma** con **intercepto** y **pendiente aleatoria**
-(en la edad) por máquina; componentes de varianza; interpretación **condicional vs marginal**; y el
-cierre de la $\hat\phi$ inflada y del control `fabricante`.
+Objetivo general: **mixtos** (espiral) — el **GLMM** con **intercepto aleatorio** por máquina, sobre
+el coste de una avería (Gamma) y sobre el coste anual (Tweedie); componentes de varianza e ICC; los
+**BLUP** y el **encogimiento**, leídos como **credibilidad**; predicción **condicional** frente a
+**marginal**; y el historial convertido en tarifa.
 :::
 
 ## 4.1 Contexto: por qué las averías de una máquina no son independientes {#sec-u34-contexto}
@@ -37,14 +50,14 @@ c(averias        = nrow(base),
   max_por_maq    = max(table(base$id_maquina)))
 ```
 
-Cada máquina aporta un **puñado** de averías —unas pocas de media, hasta más de una decena las peores—,
-y esas averías comparten dueño. ¿Cuánto importa? Una medida cruda: descomponer la variabilidad del
-log-coste en la parte que hay **entre** máquinas (diferencias de nivel entre unas y otras) y la parte que
-queda **dentro** de cada máquina (@tbl-u34-icc-crudo).
+Cada máquina aporta un **puñado** de averías —unas pocas de media, hasta más de una decena las
+peores—, y esas averías comparten dueño. ¿Cuánto importa? Una medida cruda: descomponer la
+variabilidad del log-coste en la parte que hay **entre** máquinas (diferencias de nivel entre unas y
+otras) y la parte que queda **dentro** de cada máquina (@tbl-u34-icc-crudo).
 
 ```{r}
 #| label: tbl-u34-icc-crudo
-#| tbl-cap: "Descomposición cruda de la variabilidad de log(coste): desviación típica total, entre medias de máquina y dentro de cada máquina. Que la variación entre máquinas supere a la de dentro anticipa una fuerte correlación intra-máquina. (Es cruda: mezcla el efecto de las covariables con el intrínseco de la máquina; el modelo los separará.)"
+#| tbl-cap: "Descomposición cruda de la variabilidad de log(coste): desviación típica total, entre medias de máquina y dentro de cada máquina. Que la variación entre máquinas sea comparable a la de dentro anticipa una fuerte correlación intra-máquina. (Es cruda: mezcla el efecto de las covariables con el intrínseco de la máquina; el modelo los separará.)"
 base |>
   dplyr::mutate(lc = log(coste_euros)) |>
   dplyr::group_by(id_maquina) |>
@@ -55,25 +68,18 @@ base |>
                    sd_dentro = round(sd(lc - media_maq), 3))
 ```
 
-La variación **entre** máquinas es **mayor** que la de dentro: buena parte de por qué una reparación es
-cara o barata es, sencillamente, **de qué máquina se trata**. Tratar las ~1.200 averías como
-independientes fingiría un tamaño muestral que no tenemos —son unos cientos de máquinas, no 1.200
-observaciones libres— y estrecharía los intervalos de forma engañosa (justo lo que dejó colar el falso
-positivo de `fabricante`).
-
-Ese «nivel de máquina», además, **no es un número fijo**: como cada máquina se avería a **distintas
-edades** y no todas envejecen igual, su coste puede además **cambiar con la edad a un ritmo propio**. El
-efecto de cada máquina tiene por eso **dos caras** —un **nivel de partida** (unas máquinas salen caras,
-otras baratas) y un **ritmo** al que ese nivel cambia con la edad—, que se traducen en un **intercepto** y
-una **pendiente aleatorios** (en la edad). Es lo que anticipa la @fig-u34-trayectorias y lo que ajustará
-el modelo de la [Sección 4.2](#sec-u34-modelo). Lo vemos máquina a máquina, en una muestra de las que más
-averías acumulan:
+Buena parte de por qué una reparación es cara o barata es, sencillamente, **de qué máquina se trata**.
+Tratar las `r nrow(base)` averías como independientes fingiría un tamaño muestral que no tenemos —son
+`r dplyr::n_distinct(base$id_maquina)` máquinas, no `r nrow(base)` observaciones libres— y estrecharía
+los intervalos de forma engañosa: es lo que dejó entrar al `fabricante` y a la curvatura de la carga en
+la [Unidad 3.1](#sec-u31). Lo vemos máquina a máquina, en una muestra de las que más averías acumulan
+(@fig-u34-trayectorias).
 
 ```{r}
 #| label: fig-u34-trayectorias
 #| fig-width: 8
 #| fig-height: 4.2
-#| fig-cap: "Coste de reparación (eje log) frente a la edad de la máquina, para 24 máquinas con varias averías (una línea y color por máquina). Las líneas se separan sobre todo en NIVEL —unas máquinas son caras avería tras avería, otras baratas: intercepto aleatorio— y con pendientes algo distintas —cada una encarece con la edad a su ritmo: pendiente aleatoria—."
+#| fig-cap: "Coste de reparación (eje log) frente a la edad de la máquina, para 24 máquinas con varias averías (una línea y color por máquina). Las líneas se separan sobre todo en NIVEL: unas máquinas son caras avería tras avería, otras baratas."
 set.seed(1)
 frecuentes <- names(which(table(base$id_maquina) >= 5))
 muestra    <- sample(frecuentes, 24)
@@ -87,48 +93,50 @@ base |>
   theme(legend.position = "none")
 ```
 
-Dos rasgos, dos piezas del modelo: las máquinas **parten de niveles distintos** (intercepto aleatorio) y
-**encarecen con la edad a ritmos distintos** (pendiente aleatoria en la edad) —esta última es, además, la
-señal que ya asomó en la 3.2, cuando la dispersión crecía débilmente con la antigüedad—.
+Las máquinas **parten de niveles distintos**: es lo que recoge un **intercepto aleatorio**. Si
+además encarecen con la edad a ritmos distintos —una **pendiente aleatoria**—, lo dirá el diagnóstico.
 
-## 4.2 El modelo mixto Gamma {#sec-u34-modelo}
+## 4.2 El modelo mixto {#sec-u34-modelo}
 
-Mantenemos la **Gamma con enlace log** de la [Sección 4.1](#sec-u34-contexto) —el coste sigue siendo positivo y asimétrico— y le
-añadimos los efectos aleatorios de máquina. Para la avería $k$ de la máquina $i$,
-$$\log \mu_{ik} = \underbrace{x_{ik}^{\top}\beta}_{\text{efectos fijos (los de 3.1)}}
-\;+\; \underbrace{b_{0i} + b_{1i}\,\widetilde{\text{edad}}_{ik}}_{\text{máquina } i},
-\qquad Y_{ik}\sim\text{Gamma}(\mu_{ik},\phi),$$
-donde $b_{0i}$ es el **intercepto aleatorio** (máquinas crónicamente caras o baratas) y $b_{1i}$ la
-**pendiente aleatoria** sobre la edad (cada máquina encarece a su ritmo). Usamos la edad **centrada**
-$\widetilde{\text{edad}}=\text{edad}-\overline{\text{edad}}$, para que $b_{0i}$ se lea como el nivel de la
-máquina a su **edad típica** y para estabilizar el ajuste. Lo ajustamos con `glmmTMB`, que admite la
-familia Gamma con estructura aleatoria flexible:
+Mantenemos la **Gamma con enlace log** de la [Unidad 3.1](#sec-u31) y le añadimos un efecto aleatorio
+de máquina. Para la avería $k$ de la máquina $i$,
+
+$$
+Y_{ik}\sim\text{Gamma}(\mu_{ik},\alpha),\qquad
+\log \mu_{ik} = \underbrace{x_{ik}^{\top}\beta}_{\text{efectos fijos}} \;+\; \underbrace{b_{i}}_{\text{máquina } i},
+\qquad b_i\sim\mathcal{N}(0,\ \sigma_u^{2}),
+$$
+
+donde $b_i$ es el **intercepto aleatorio**: lo que la máquina $i$ tiene de propio y sus covariables no
+explican. No se estima un coeficiente por máquina —serían `r dplyr::n_distinct(base$id_maquina)`
+parámetros—, sino **uno solo**, $\sigma_u$, que mide cuánto varían las máquinas entre sí. Para la
+edad usamos su versión **centrada**, $\widetilde{\text{edad}}=\text{edad}-\overline{\text{edad}}$,
+que estabiliza el ajuste.
+
+Los efectos fijos son los del modelo final de la 3.1, con el `fabricante` y la carga cuadrática que
+dejamos en cuarentena: ahora que el agrupamiento está en el modelo, podemos juzgarlos de nuevo.
 
 ```{r}
 #| label: u34-ajuste
 base <- dplyr::mutate(base, edad_c = antiguedad_anios - mean(antiguedad_anios))
 
-m_glmm <- glmmTMB::glmmTMB(
-  coste_euros ~ tipo_averia + criticidad * fase_proceso + edad_c + carga + fabricante +
-    (1 + edad_c | id_maquina),
+g_int <- glmmTMB::glmmTMB(
+  coste_euros ~ tipo_averia + criticidad * fase_proceso + edad_c + carga + I(carga^2) +
+    fabricante + (1 | id_maquina),
   family = Gamma(link = "log"), data = base)
 
-summary(m_glmm)
+summary(g_int)
 ```
 
-El `summary` de un GLMM trae más que el de un GLM. Además de los **efectos fijos** (bloque *Conditional
-model*, con sus $z$ y $p$), muestra los **componentes de varianza** de los efectos aleatorios (bloque
-*Random effects*: desviación típica del **intercepto** y de la **pendiente** de máquina, y su
-**correlación**) y los estadísticos globales (**AIC**, **dispersión**, nº de averías y de máquinas). El
-término `(1 + edad_c | id_maquina)` pide precisamente ese intercepto **y** esa pendiente aleatorios por
-máquina. Arrastramos `fabricante` desde la 3.1 —donde entró provisionalmente, bajo sospecha de ser un
-falso positivo—; lo **pondremos a prueba** en la [Sección 4.4](#sec-u34-inferencia), ahora que el
-agrupamiento sí está modelado.
+El `summary` de un GLMM trae más que el de un GLM. Además de los **efectos fijos** (bloque
+*Conditional model*, con sus $z$ y $p$), muestra el **componente de varianza** del efecto aleatorio
+(bloque *Random effects*: la varianza y la desviación típica del intercepto de máquina) y los
+estadísticos globales (**AIC**, **dispersión**, número de averías y de máquinas).
 
 ::: {.callout-tip}
 ## 🔧 En R. Cómo ajustar un GLM mixto
-Un GLMM es un `glm()` al que se le añade **estructura aleatoria** en la fórmula. El paquete de referencia
-es **`glmmTMB`** (con la misma sintaxis, también `lme4::glmer`):
+Un GLMM es un `glm()` al que se le añade **estructura aleatoria** en la fórmula. El paquete de
+referencia es **`glmmTMB`** (con la misma sintaxis, también `lme4::glmer`):
 
 ```r
 glmmTMB(y ~ efectos_fijos + (términos_aleatorios | grupo),
@@ -144,368 +152,352 @@ La clave está en la **notación de los efectos aleatorios**, `(expr | grupo)`:
 - `(1 | a/b)` — efectos **anidados** (`b` dentro de `a`); equivale a `(1 | a) + (1 | a:b)`.
 
 Sobre la **estimación**: la verosimilitud de un GLMM **integra** sobre los efectos aleatorios y **no
-tiene forma cerrada**; `glmmTMB` la aproxima por **Laplace** (vía el motor `TMB`) y `lme4` por Laplace o
-cuadratura de Gauss–Hermite adaptativa. La salida trae dos bloques —los **efectos fijos** (*Conditional
-model*) y los **componentes de varianza** de los aleatorios (*Random effects*)—; cómo leerlos en limpio,
-en el callout siguiente.
+tiene forma cerrada**; `glmmTMB` la aproxima por **Laplace** (vía el motor `TMB`) y `lme4` por Laplace
+o cuadratura de Gauss–Hermite adaptativa.
 :::
-
-
 
 ## 4.3 Interpretación {#sec-u34-interpretacion}
 
-Un GLMM se lee en **dos capas**: los efectos fijos (la tendencia media de la población de máquinas) y los
-componentes de varianza (cuánta heterogeneidad hay alrededor).
+Un GLMM se lee en **tres capas**: los efectos fijos (la tendencia de la población de máquinas), el
+componente de varianza (cuánta heterogeneidad hay alrededor) y los efectos de cada máquina.
 
-::: {.callout-tip}
-## 🔧 En R. Salida ordenada con `broom.mixed`
-`summary()` imprime todo en bruto; para tenerlo como con `broom::tidy` en un GLM,
-`glmmTMB` no trae método propio, pero **`broom.mixed`** sí:
+```{r}
+#| label: u34-cifras
+#| include: false
+# Componentes del modelo y cifras en línea de esta sección
+sd_u_int <- sqrt(glmmTMB::VarCorr(g_int)$cond$id_maquina[1, 1])
+icc_int  <- performance::icc(g_int)
+```
 
-- `broom.mixed::tidy(m)` — efectos fijos **y** componentes de varianza en un único tibble; con
-  `effects = "fixed"` o `"ran_pars"` te quedas con un bloque.
-- **Efectos fijos ordenados** (`effects = "fixed"`), con `conf.int = TRUE` y `exponentiate = TRUE` para
-  el **intervalo** y la **escala del factor** $e^{\beta}$ —así armamos la @tbl-u34-fijos, como en 3.1—.
-- **Componentes de varianza ordenados** (`effects = "ran_pars"`): las **desviaciones típicas** de los
-  efectos aleatorios y sus **correlaciones** en un tibble (es la @tbl-u34-varcomp). En formato de matriz
-  de covarianzas, `glmmTMB::VarCorr(m)`.
-- `broom.mixed::glance(m)` — una fila con `AIC`, `BIC`, `logLik` y `deviance`; y `augment(m, data)` pega
-  a los datos los valores ajustados y los residuos.
+### Los efectos fijos
 
-Para la familia **Gamma** se prefiere `glmmTMB` a `glmer`: es más robusto y admite extensiones —modelar
-la dispersión, inflación de ceros, o la familia **Tweedie** de la [Unidad 3.3](#sec-u33)—.
-:::
-
-
-**Efectos fijos.** Se interpretan como en 3.1, de forma **multiplicativa** ($e^{\beta}$ es el factor
-sobre el coste medio), con el matiz de que ahora valen «para una máquina dada». Los de **nivel-avería**
-(el tipo) apenas se mueven respecto de 3.1; en cambio los de **nivel-máquina** se **reajustan** —la
-criticidad y la carga suben, la edad baja—, porque ahora **comparten variabilidad con el intercepto
-aleatorio**: el modelo separa lo que es de la máquina de lo que es de la avería, y de paso da intervalos
-más **anchos y honestos**. Y `fabricante`, que arrastramos, asoma con factores próximos a 1 e intervalos
-que **cruzan el 1**: primer indicio de que sobra, que la selección confirmará.
+Se interpretan como en la 3.1, de forma **multiplicativa**: $e^{\beta}$ es el factor sobre el coste
+medio, con el matiz de que ahora vale «para una máquina dada» (@tbl-u34-fijos).
 
 ```{r}
 #| label: tbl-u34-fijos
-#| tbl-cap: "Efectos fijos del GLMM, exponenciados: factor multiplicativo sobre el coste medio, con intervalo de confianza de Wald al 95 %."
-broom.mixed::tidy(m_glmm, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+#| tbl-cap: "Efectos fijos del modelo con intercepto aleatorio de máquina, exponenciados: factor multiplicativo sobre el coste medio, con intervalo de confianza de Wald al 95 %."
+broom.mixed::tidy(g_int, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::transmute(term,
                    `exp(beta)` = round(estimate, 3),
-                   conf.low = round(conf.low, 3), conf.high = round(conf.high, 3),
-                   p.value = signif(p.value, 3))
+                   ic95 = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]"),
+                   p = signif(p.value, 3))
 ```
 
-**Componentes de varianza.** Es la parte nueva —el bloque *Random effects* del `summary` (§4.2)—, y la
-que responde a «¿cuánta heterogeneidad entre máquinas?». Tres lecturas:
+Los efectos de **nivel-avería**, como el tipo, apenas se mueven respecto de la 3.1. Los de
+**nivel-máquina** —criticidad, fase, carga— se **reajustan**, porque ahora comparten variabilidad con
+el intercepto aleatorio: el modelo separa lo que es de la máquina de lo que es de la avería, y de
+paso da intervalos más **anchos y honestos**. El `fabricante` y la carga cuadrática asoman con
+intervalos que **cruzan el 1**: primer indicio de que sobran, que la [Sección 4.4](#sec-u34-inferencia)
+confirmará.
 
-- **Intercepto de máquina.** Su desviación típica —en torno a $0{,}36$ en escala log— mide cuánto varía
-  el **nivel** de coste entre máquinas: una máquina «crónicamente cara», una desviación por encima, sale
-  sobre un $e^{0{,}36}\approx 1{,}43$ —un **43 % más** que la media, a igualdad de tipo, criticidad,
-  fase, edad y carga—. Es la **fragilidad** de máquina, ahora con nombre y sitio.
-- **Pendiente de máquina.** Su desviación típica dice cuánto varía el **ritmo** al que el coste crece con
-  la edad. Es pequeña, y es exactamente la heterogeneidad que en la 3.2 se colaba como una dependencia de
-  la dispersión con la antigüedad: no era un defecto de la familia, era estructura de máquina.
-- **Correlación intercepto–pendiente.** El bloque trae además un número más sutil: la **correlación**
-  entre el intercepto y la pendiente de cada máquina —aquí, **positiva y moderada ($\approx 0{,}56$)**—.
-  Diría que las máquinas más caras **a la edad típica** tienden también a **encarecer algo más rápido**
-  con la edad. Su magnitud solo se lee **en relación con las desviaciones típicas**: cercana a $\pm 1$,
-  intercepto y pendiente serían casi **redundantes** (sabido el nivel, el ritmo queda determinado);
-  cercana a 0, aportan información distinta. Ahora bien, es un número **resbaladizo**: como veremos en la
-  [Sección 4.4](#sec-u34-inferencia), la correlación entre efectos aleatorios **depende de dónde se
-  centre la edad**, así que conviene interpretarla con mucha cautela.
+### El componente de varianza
 
-## 4.4 Inferencia y selección {#sec-u34-inferencia}
+Es la parte nueva, y la que responde a «¿cuánta heterogeneidad entre máquinas?». La desviación típica
+del intercepto es $\hat\sigma_u=$ `r round(sd_u_int, 2)` en escala log. Una máquina «crónicamente
+cara», una desviación típica por encima de la media, sale un `r pct(sd_u_int)` % más cara de reparar
+que una máquina típica del mismo perfil. Es la **fragilidad** de máquina, ahora con nombre y sitio.
 
-En un GLMM se infiere de forma **distinta según el parámetro**. Recorremos la lista, y de cada uno decimos
-**cómo** se contrasta y **qué sale** en nuestros datos:
-
-- **Efectos fijos** → el **IC de Wald** de cada coeficiente (`confint`), o **`anova`** entre modelos
-  anidados o AIC+BIC para **seleccionar variables**.
-- **Varianzas** de los aleatorios → **LRT con corrección de frontera** (÷2) + AIC + BIC.
-- **Correlación** intercepto–pendiente → **`anova`** $\chi^2$ ordinario.
-- **BLUP** (los efectos de cada máquina) → **predicción**, no inferencia; los usamos en la [Sección 4.5](#sec-u34-diagnostico).
-
-### Efectos fijos y selección de variables
-
-Tenemos dos vías para la inferencia: 
-
-1. La primera es el **IC** de cada efecto: `confint` da el intervalo de Wald de los coeficientes
-—en factor, es la @tbl-u34-fijos: un factor cuyo IC **no cruza el 1** es significativo—. 
-2. La segunda es **`anova`**, que compara modelos anidados y nos resulta útil, junto con los criterios AIC/BIC para la selección de variables. La tabla de contrastes **por término** lo resume
-(`car::Anova`, Wald tipo II, @tbl-u34-anova-fijos):
+La misma idea, en un solo número, es el **coeficiente de correlación intraclase (ICC)**: la fracción
+de la variabilidad —ya descontadas las covariables— que corresponde a **estar en la misma máquina**
+[@nakagawa2017]. Es la versión limpia de la descomposición cruda de la @tbl-u34-icc-crudo.
 
 ```{r}
-#| label: tbl-u34-anova-fijos
-#| tbl-cap: "Contrastes de Wald por término de los efectos fijos (car::Anova, tipo II)."
-car::Anova(m_glmm)
+#| label: u34-icc
+icc_int
 ```
 
-Ahora todos los efectos sustantivos son significativos **salvo `fabricante`** —la cuenta pendiente de la [Unidad 3.1](#sec-u31)—. Lo confirmamos comparando los dos modelos anidados (con LRT, AIC y BIC):
+El ICC **ajustado**, `r round(icc_int$ICC_adjusted, 2)`, dice que de la variabilidad que las
+covariables **no** explican, esa fracción es de la máquina. El **no ajustado**,
+`r round(icc_int$ICC_unadjusted, 2)`, mide lo mismo sobre la variabilidad **total**, covariables
+incluidas. Los dos dicen que **qué máquina es** pesa muchísimo en por qué una reparación sale cara o
+barata.
+
+### Los efectos de cada máquina: encogimiento y credibilidad {#sec-u34-blup}
+
+El modelo no estima $b_i$ como un parámetro más, pero sí lo **predice** para cada máquina a partir de
+sus datos: es el **BLUP** (*best linear unbiased predictor*). Y lo predice con una cautela que es la
+clave de toda la unidad: lo **encoge** hacia cero, tanto más cuanto menos datos tiene la máquina. En
+un modelo lineal mixto con un intercepto aleatorio la fórmula es exacta [@gelmanhill2007, cap. 12]:
+
+$$
+\hat b_i \;=\; \underbrace{\frac{n_i\,\sigma_u^{2}}{n_i\,\sigma_u^{2}+\sigma^{2}}}_{Z_i\ \in\ (0,1)}
+\;\times\;\big(\text{desviación media observada de la máquina } i\big),
+$$
+
+con $n_i$ el número de observaciones de la máquina y $\sigma^{2}$ la variabilidad de cada una alrededor
+de su nivel. En un GLMM la expresión es aproximada, pero la idea es la misma. El peso $Z_i$ es lo que
+los actuarios llaman **credibilidad**: cuánto creemos el historial propio de la máquina frente al
+promedio de las de su perfil.
+
+- Con **pocas averías**, $Z_i$ es pequeño y el BLUP se queda cerca de cero: la máquina se parece a la
+  media, porque una avería cara puede ser mala suerte.
+- Con **muchas**, $Z_i$ se acerca a 1 y el BLUP sigue a sus datos: ya no es mala suerte, es la
+  máquina.
+
+La @fig-u34-encogimiento lo muestra con los datos.
 
 ```{r}
-#| label: u34-fabricante
-m_sinfab <- update(m_glmm, . ~ . - fabricante)   # el mismo modelo, sin fabricante
-anova(m_sinfab, m_glmm)
+#| label: fig-u34-encogimiento
+#| fig-width: 7.5
+#| fig-height: 4
+#| fig-cap: "Encogimiento. Cada punto es una máquina: en horizontal, la desviación media de sus averías respecto de lo que predicen los efectos fijos (escala log); en vertical, su BLUP. La diagonal es «creer del todo el historial». Las máquinas con pocas averías (claras) quedan aplastadas hacia cero; las que tienen muchas (oscuras) se acercan a la diagonal."
+eta_fijo <- predict(g_int, type = "link", re.form = NA)
+desv <- base |>
+  dplyr::mutate(r = log(coste_euros) - eta_fijo) |>
+  dplyr::group_by(id_maquina) |>
+  dplyr::summarise(desv_media = mean(r), n = dplyr::n(), .groups = "drop")
+blup_sev <- glmmTMB::ranef(g_int)$cond$id_maquina
+desv$blup <- blup_sev[desv$id_maquina, "(Intercept)"]
+
+ggplot(desv, aes(desv_media, blup, colour = n)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  geom_hline(yintercept = 0, colour = "grey60") +
+  geom_point(alpha = 0.7) +
+  scale_colour_gradient(low = "grey80", high = "navy") +
+  labs(x = "desviación media observada de la máquina (log)", y = "BLUP de la máquina",
+       colour = "nº de averías")
 ```
 
-::: {.callout-important}
-## El falso positivo de `fabricante` se disuelve (como anticipamos)
-En la [Unidad 3.1](#sec-u31), con un modelo de efectos fijos, `fabricante` salía **significativo** y hasta bajaba el AIC —un
-**espejismo de la pseudorréplica**: las averías correlacionadas de cada máquina inflaban la evidencia—.
-Aquí, con el **efecto aleatorio de máquina** absorbiendo esa correlación, quitarlo **no empeora** el
-ajuste (LRT no significativo, y **AIC y BIC bajan**). No aporta —nunca aportó—: lo **retiramos**. Es la
-misma enfermedad que inflaba $\hat\phi$, vista desde la selección de variables: **ignorar la correlación
-no solo estima mal la incertidumbre, también hace elegir mal**.
-:::
+Ninguna máquina queda sobre la diagonal: el modelo nunca cree del todo un historial, porque parte de
+él es ruido. Esa prudencia es la que convierte el BLUP en una herramienta de decisión: señala como
+caras a las máquinas que lo son de forma **sostenida**, no a las que tuvieron un mal año.
 
-Seguimos pues la inferencia utilizando el modelo `m_sinfab`.
+## 4.4 Bondad de ajuste, diagnóstico y selección {#sec-u34-inferencia}
 
-### Varianzas de los aleatorios
+En un GLMM se infiere de forma distinta según el parámetro:
 
-Primero, en limpio, los componentes:
+- **Varianza** del efecto aleatorio → **LRT con corrección de frontera**, y AIC/BIC.
+- **Efectos fijos** → contraste de razón de verosimilitudes entre modelos anidados (`anova`), igual
+  que la $F$ de la 3.1 pero con la $\chi^2$, porque `glmmTMB` estima por máxima verosimilitud.
+- **BLUP** → **predicción**, no inferencia: los usamos en la
+  [Sección 4.6](#sec-u34-prediccion).
+
+### ¿Hace falta el efecto aleatorio?
+
+Comparamos el modelo con el intercepto aleatorio frente al mismo sin él. La hipótesis nula
+$\sigma_u^{2}=0$ está **en la frontera** del espacio de parámetros ($\sigma_u^{2}\geq 0$), así que el
+estadístico sigue una **mezcla** $\tfrac12\chi^2_0+\tfrac12\chi^2_1$ [@selfliang1987; @stramlee1994],
+y el $p$ correcto es **la mitad** del que da `anova`.
 
 ```{r}
-#| label: tbl-u34-varcomp
-#| tbl-cap: "Componentes aleatorios de máquina: desviaciones típicas del intercepto y de la pendiente (escala log del predictor) y su correlación."
-broom.mixed::tidy(m_sinfab, effects = "ran_pars") |>
-  dplyr::transmute(term, estimate = round(estimate, 3))
+#| label: u34-lrt-re
+g_sinre <- update(g_int, . ~ . - (1 | id_maquina))
+lrt_re  <- anova(g_sinre, g_int)
+lrt_re
 ```
 
-La del **intercepto** es grande (sd $\approx 0{,}36$): la fragilidad de máquina es indudable. La de la
-**pendiente**, pequeña (sd $\approx 0{,}07$).
+El $p$ corregido es $`r signif(lrt_re$"Pr(>Chisq)"[2] / 2, 2)`$, y el AIC baja en
+`r round(AIC(g_sinre) - AIC(g_int))` puntos: el efecto de máquina es indudable.
 
-Para juzgar si la pendiente **hace falta**, puesto que la hipótesis nula $\sigma^2=0$ se
-sitúa **en la frontera** del espacio de parámetros ($\sigma^2\geq 0$), el estadístico sigue una **mezcla** de $\chi^2$ ($\tfrac12\chi^2_0+\tfrac12\chi^2_1$, según @selfliang1987 y @stramlee1994): `anova` sale
-**conservador**, y el $p$ correcto es aproximadamente **la mitad** de su valor. Para obtener un test razonable, comparamos intercepto solo frente a intercepto + pendiente (sin correlación, para aislar su varianza):
-
-```{r}
-#| label: u34-lrt-pendiente
-# partimos de m_sinfab (ya sin fabricante) y cambiamos solo la estructura aleatoria:
-m_int    <- update(m_sinfab, . ~ . - (1 + edad_c | id_maquina) + (1 | id_maquina)) # solo interceptación
-m_uncorr <- update(m_sinfab, . ~ . - (1 + edad_c | id_maquina) +
-                     (1 | id_maquina) + (0 + edad_c | id_maquina))  # interceptacion + pendiente
-anova(m_int, m_uncorr)
-```
-
-El $p$ de `anova` queda **al filo** ($\approx 0.054$); con la corrección de frontera (**÷2**) baja a
-$\approx 0.03$: la **pendiente aleatoria es significativa**, aunque pequeña —coherente con el DGP y con
-la señal que ya vimos en la dispersión de la [Unidad 3.2](#sec-u32)—. Así que la mantenemos.
-
-El mismo `anova` trae además **AIC y BIC**, que aquí **discrepan** —como suele pasar en el filo—: el
-**AIC** (penalización 2 por parámetro) **baja** al añadir la pendiente y la conserva; el **BIC**
-(penalización $\log n$, más severa) **sube** y la descartaría. El LRT corregido y el diseño rompen el
-empate a favor de mantenerla.
-
-::: {.callout-note}
+::: {.callout-note collapse="true"}
 ## El menú para contrastar la varianza de un efecto aleatorio
 Todas comparan el modelo **con** el efecto aleatorio frente al modelo **sin** él:
 
 - **LRT ingenuo** (`anova`): válido, pero **conservador** —la varianza cae en la frontera—.
 - **LRT + corrección de frontera (÷2)**: el $p$ correcto es la **mitad**, porque la nula es una mezcla
   $\tfrac12\chi^2_0+\tfrac12\chi^2_1$. **Es lo que usamos.**
-- **Bootstrap paramétrico**: no depende de la asíntota. Simula bajo el modelo **sin** el efecto, reajusta
-  ambos y sitúa el LRT observado en esa distribución. Es la vía **rigurosa**, pero **costosa** (cientos de
-  reajustes).
-- **AIC / BIC**: complementan —gana el criterio menor—, pero pueden **discrepar** en el filo (como aquí).
+- **Bootstrap paramétrico**: no depende de la asíntota. Simula bajo el modelo **sin** el efecto,
+  reajusta ambos y sitúa el LRT observado en esa distribución. Es la vía **rigurosa**, pero
+  **costosa** (cientos de reajustes).
+- **AIC / BIC**: complementan —gana el criterio menor—, pero pueden **discrepar** en el filo.
 :::
 
-Así se aplicaría el **bootstrap paramétrico** de la pendiente (lo dejamos **sin ejecutar** por su coste
-—son cientos de reajustes—; basta poner `eval: true` para correrlo):
+### Las cuentas pendientes de la 3.1
+
+Con el agrupamiento en el modelo, volvemos a juzgar los dos efectos que dejamos en cuarentena:
 
 ```{r}
-#| label: u34-bootstrap-pendiente
-#| eval: false
-set.seed(1)
-lrt_obs <- as.numeric(2 * (logLik(m_uncorr) - logLik(m_int)))    # LRT observado
-
-sim <- simulate(m_int, nsim = 500)             # respuestas bajo H0 (sin pendiente)
-lrt_boot <- vapply(sim, function(y) {
-  d <- transform(base, coste_euros = y)
-  as.numeric(2 * (logLik(update(m_uncorr, data = d)) -
-                  logLik(update(m_int,    data = d))))
-}, numeric(1))
-
-mean(lrt_boot >= lrt_obs, na.rm = TRUE)         # p-valor bootstrap
+#| label: tbl-u34-cuarentena
+#| tbl-cap: "Contrastes de razón de verosimilitudes de los dos efectos en cuarentena, ahora con el intercepto aleatorio de máquina: cada uno frente al modelo sin él."
+g_sinfab   <- update(g_int, . ~ . - fabricante)
+g_sincarga <- update(g_sinfab, . ~ . - I(carga^2))
+cuarentena <- tibble::tibble(
+  termino = c("fabricante", "carga^2"),
+  gl      = c(anova(g_sinfab, g_int)$"Chi Df"[2], anova(g_sincarga, g_sinfab)$"Chi Df"[2]),
+  p       = c(anova(g_sinfab, g_int)$"Pr(>Chisq)"[2], anova(g_sincarga, g_sinfab)$"Pr(>Chisq)"[2]))
+cuarentena |> dplyr::mutate(p = signif(p, 2))
 ```
 
-El $p$ que arroja ronda **0.03**, en línea con la regla del ½: aquí la corrección de frontera no engaña.
+Los dos **dejan de ser significativos** (@tbl-u34-cuarentena): el `fabricante`
+($p=`r signif(cuarentena$p[1], 2)`$) y la curvatura de la carga ($p=`r signif(cuarentena$p[2], 2)`$).
 
-### Correlación intercepto–pendiente
+::: {.callout-important}
+## Los dos espejismos de la 3.1 se disuelven
+En la [Unidad 3.1](#sec-u31), con un modelo de efectos fijos, el `fabricante` y la carga cuadrática
+salían **significativos**. Los dos son características **de la máquina**, constantes en todas sus
+averías, y el modelo de efectos fijos contaba la misma máquina varias veces: la **pseudorréplica**
+inflaba la evidencia. Con el efecto aleatorio absorbiendo esa correlación, quitarlos **no empeora** el
+ajuste. Los **retiramos**. La moraleja va más allá de la incertidumbre: **ignorar la correlación no
+solo estima mal los errores típicos, también hace elegir mal las variables**.
+:::
 
-Aquí 0 es un punto **interior** (una correlación vive en $[-1,1]$ y 0 no es un extremo), así que vale el **`anova`** $\chi^2$ ordinario: el modelo **con**
-correlación (`m_sinfab`) frente al que la fuerza a 0 (`m_uncorr`):
+Y la dispersión vuelve a su sitio. En la 3.1, $\hat\phi$ absorbía la variabilidad entre máquinas;
+ahora tiene su propio nivel:
 
 ```{r}
-#| label: u34-lrt-correlacion
-anova(m_uncorr, m_sinfab)
+#| label: u34-phi
+c(phi_glm_3.1 = summary(m_gamma)$dispersion,
+  phi_glmm    = sigma(g_sincarga)^2)       # en la Gamma de glmmTMB, sigma^2 = phi
 ```
 
-El contraste **sí** es muy significativo ($p<0{,}001$): en esta parametrización, nivel y ritmo **covarían**
-($\approx 0{,}56$). Pero conviene un aviso de rigor que rara vez se cuenta: **la correlación entre efectos
-aleatorios no es un número portátil** —depende de *dónde* se centre la covariable—. Al anclar la edad en
-su **media**, el nivel «a edad típica» y la pendiente salen correlacionados; anclándola en otra edad, esa
-correlación cambiaría, e incluso **cambiaría de signo**. De hecho, la validación (§4.5) confirmará que el
-proceso generador produce el **nivel y el ritmo de forma independiente**. Por eso —parsimonia y
-fidelidad— nos quedamos **sin** correlación: un parámetro que se mueve con la parametrización no es una
-conclusión sólida sobre el sistema. La moraleja: **una correlación entre aleatorios significativa no
-siempre es un hallazgo real y portable**.
+### El diagnóstico, y la pendiente aleatoria
 
-El modelo final es, por tanto, `m_uncorr` —intercepto y pendiente (no correlada) de máquina, sin
-`fabricante`—; lo renombramos para la sección siguiente:
+Los residuos cuantil de DHARMa sirven también para un GLMM. Sobre el modelo sin los dos efectos:
 
 ```{r}
-#| label: u34-final
-m_final <- m_uncorr
+#| label: u34-dharma-int
+sim_int <- DHARMa::simulateResiduals(g_sincarga, n = 1000)
+c(uniformidad = DHARMa::testUniformity(sim_int, plot = FALSE)$p.value,
+  dispersion  = DHARMa::testDispersion(sim_int, plot = FALSE)$p.value) |> signif(2)
 ```
 
-## 4.5 Bondad de ajuste, diagnóstico, validación y predicción {#sec-u34-diagnostico}
-
-### Bondad de ajuste
-
-El $R^2$ de un mixto se parte en dos [@nakagawa2017]: el **marginal** (solo los efectos fijos) y el
-**condicional** (fijos + aleatorios). La distancia entre ambos mide cuánto aporta **conocer la máquina**.
+La dispersión está bien, pero la **uniformidad** sale significativa: algo de la forma de los datos no
+lo recoge el modelo. La @fig-u34-trayectorias sugería un candidato: que las máquinas no solo partan
+de niveles distintos, sino que **encarezcan con la edad a ritmos distintos**. Es una **pendiente
+aleatoria** en la edad, y la añadimos sin correlación con el intercepto para aislar su varianza:
 
 ```{r}
-#| label: u34-r2
-performance::r2_nakagawa(m_final)
+#| label: u34-lrt-pendiente
+g_pend   <- update(g_sincarga, . ~ . - (1 | id_maquina) + (1 | id_maquina) + (0 + edad_c | id_maquina))
+lrt_pend <- anova(g_sincarga, g_pend)
+lrt_pend
 ```
 
-El salto del $R^2$ marginal al condicional es **grande**: para anticipar el coste de una avería, saber *qué
-máquina es* pesa tanto como sus covariables observadas. Ese salto es, en una cifra, el argumento de la
-unidad.
-
-La misma idea, en un solo número, es el **coeficiente de correlación intraclase (ICC)**: la fracción de la
-variabilidad —ya descontadas las covariables— que corresponde a **estar en la misma máquina**. Es la
-versión *limpia* de la descomposición cruda entre/dentro de la [Sección 4.1](#sec-u34-contexto):
-
-```{r}
-#| label: u34-icc
-performance::icc(m_final)
-```
-
-Salen **dos** ICC. El **ajustado** ($\approx 0{,}48$) mide la fracción de la variabilidad **no explicada
-por las covariables** que corresponde a la máquina —casi la **mitad**—; el **no ajustado** ($\approx
-0{,}31$) la mide sobre la variabilidad **total**, covariables incluidas. Los dos dicen lo mismo en una
-cifra: **qué máquina es** pesa muchísimo en por qué una reparación sale cara o barata. Es la versión
-limpia —ya descontadas criticidad, tipo, etc.— de la fuerte correlación intra-máquina que el modelo de
-efectos fijos ignoraba, y que por eso acababa inflando $\hat\phi$ y estrechando los intervalos. La
-distinción **ajustado/no ajustado** importa: el primero responde «de lo que las covariables *no*
-explican, ¿cuánto es de la máquina?»; el segundo, «del total, ¿cuánto?».
-
-### Diagnóstico: residuos
-
-En un GLMM los residuos crudos son aún menos informativos que en un GLM. Recurrimos otra vez a los
-**residuos cuantil simulados** de DHARMa, que saben tratar la estructura jerárquica:
+Con la corrección de frontera, el $p$ es `r signif(lrt_pend$"Pr(>Chisq)"[2] / 2, 2)`: la pendiente
+aleatoria es **significativa**, aunque pequeña
+($\hat\sigma_{\text{pend}}=$ `r round(sqrt(glmmTMB::VarCorr(g_pend)$cond$id_maquina.1[1, 1]), 3)` por
+año, frente a $\hat\sigma_u=$ `r round(sqrt(glmmTMB::VarCorr(g_pend)$cond$id_maquina[1, 1]), 2)` del
+intercepto). La mantenemos. Repetimos el diagnóstico (@fig-u34-dharma):
 
 ```{r}
 #| label: fig-u34-dharma
 #| fig-width: 9
 #| fig-height: 4
-#| fig-cap: "Diagnóstico DHARMa del GLMM Gamma. Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste. Derecha: residuos frente a predicho. Buscamos uniformidad y ausencia de estructura, ahora respetando el agrupamiento por máquina."
-sim <- DHARMa::simulateResiduals(m_final, n = 1000)
-plot(sim)
+#| fig-cap: "Diagnóstico DHARMa del modelo mixto final (intercepto y pendiente aleatorios). Izquierda: QQ-plot uniforme. Derecha: residuos frente al predicho."
+sim_pend <- DHARMa::simulateResiduals(g_pend, n = 1000)
+plot(sim_pend)
 ```
-
-**Lectura del gráfico.** A la izquierda en la @fig-u34-dharma, los puntos siguen la **diagonal** del QQ uniforme y los
-contrastes que DHARMa superpone —uniformidad (KS), dispersión y valores atípicos— **no salen
-significativos**; a la derecha, la nube de residuos frente al predicho **no muestra estructura** (ni
-abanico ni curvatura). El modelo ajusta bien: ahora que respeta el agrupamiento, han desaparecido los
-patrones que un GLM de efectos fijos dejaría en los residuos de máquinas repetidas.
-
-**Comprobación explícita de la dispersión (φ).** El contraste de dispersión —el que aparece en el
-gráfico— merece sacarse aparte, porque es la forma de validar que φ está **bien capturada**, y —a
-diferencia de la validación contra el DGP de más abajo— **funciona con datos reales**, sin conocer la
-verdad:
 
 ```{r}
-#| label: u34-testdisp
-DHARMa::testDispersion(sim, plot = FALSE)
+#| label: tbl-u34-dharma
+#| tbl-cap: "Contrastes de DHARMa sobre el modelo mixto final, y cuantiles de sus residuos frente a los de la uniforme."
+tests_pend <- c(uniformidad = DHARMa::testUniformity(sim_pend, plot = FALSE)$p.value,
+                dispersion  = DHARMa::testDispersion(sim_pend, plot = FALSE)$p.value,
+                atipicos    = DHARMa::testOutliers(sim_pend, plot = FALSE)$p.value)
+cuant_pend <- quantile(residuals(sim_pend), c(0.05, 0.25, 0.5, 0.75, 0.95))
+tibble::tibble(contraste = names(tests_pend), p = signif(tests_pend, 2))
+round(rbind(residuos = cuant_pend, uniforme = c(0.05, 0.25, 0.5, 0.75, 0.95)), 3)
 ```
 
-No es significativo: **ni sobre- ni infradispersión**. Es decir, una vez que los efectos aleatorios se
-llevan la variabilidad **entre máquinas**, lo que queda en los residuos es exactamente la dispersión que
-la Gamma espera. La $\hat\phi$ que en 3.1 salía **inflada** (≈ 0.33) ha vuelto a su sitio —y lo
-confirmamos aquí sin necesitar el DGP; la validación de abajo lo rematará con la verdad en la mano—.
+La dispersión y los atípicos están bien, y la uniformidad **sigue saliendo significativa**
+($p=`r signif(tests_pend[["uniformidad"]], 2)`$). Conviene mirar **cuánto** se desvía, no solo si se
+desvía: los cuantiles de los residuos se apartan de los de la uniforme como mucho en
+`r round(max(abs(cuant_pend - c(0.05, 0.25, 0.5, 0.75, 0.95))), 3)`, y el QQ-plot apenas se separa de
+la diagonal. Con `r nrow(base)` residuos, el contraste de Kolmogorov–Smirnov detecta desviaciones muy
+pequeñas. La que hay aquí es leve: los residuos se concentran un poco hacia el centro, como si el
+modelo esperara algo más de variabilidad de la que hay. Es compatible con que el supuesto de un efecto
+aleatorio **normal** sea solo aproximado, y no afecta a las conclusiones sobre los efectos. Lo damos
+por bueno, sabiendo que es una aproximación.
 
-::: {.callout-tip}
-## 🔧 En R. Diagnóstico de residuos y dispersión en un GLMM
-Los **residuos cuantil de DHARMa** (introducidos en la [Unidad 3.1](#sec-u31)) valen también aquí, con una
-ventaja: sobre un modelo de `glmmTMB`, `simulateResiduals` **respeta la estructura jerárquica**.
-
-```r
-sim <- DHARMa::simulateResiduals(m, n = 1000)   # residuos simulados, respetando el agrupamiento
-plot(sim)                                        # QQ uniforme + residuos vs. predicho
-```
-
-Lo **nuevo del GLMM** es comprobar que los efectos aleatorios han dejado la dispersión en su sitio:
-
-```r
-sigma(m)^2                     # estimación de phi  (en la Gamma, Var = phi * mu^2)
-DHARMa::testDispersion(sim)    # contraste de sobre/infradispersión
-```
-
-Un `testDispersion` **no significativo** indica que la variabilidad entre máquinas ya la absorben los
-aleatorios y lo que queda es la de la familia. Es la comprobación válida **con datos reales**, sin conocer
-la verdad.
+::: {.callout-note collapse="true"}
+## ¿Y la correlación entre intercepto y pendiente?
+El modelo con `(1 + edad_c | id_maquina)` estima además la **correlación** entre el nivel y el ritmo
+de cada máquina. Aquí 0 es un punto **interior** (una correlación vive en $[-1,1]$), así que vale el
+`anova` ordinario frente al modelo sin correlación. Pero conviene un aviso que rara vez se cuenta:
+**la correlación entre efectos aleatorios no es un número portátil**. Depende de dónde se centre la
+covariable: con la edad centrada en su media, el nivel «a edad típica» y la pendiente pueden salir
+correlacionados; anclándola en otra edad, esa correlación cambiaría, e incluso de signo. Por eso, por
+parsimonia, nos quedamos **sin** correlación: un parámetro que se mueve con la parametrización no es
+una conclusión sólida sobre el sistema.
 :::
 
-### Validación contra el DGP {#sec-u34-validacion}
-
-La ventaja de los datos simulados: ahora validamos también los **componentes de varianza**, no solo los
-efectos fijos (@tbl-u34-verdad).
+El modelo final de la severidad es `g_pend`: intercepto y pendiente aleatorios (no correlacionados),
+sin `fabricante` ni carga cuadrática. El $R^2$ de un mixto se parte en dos [@nakagawa2017], el
+**marginal** (solo efectos fijos) y el **condicional** (fijos y aleatorios):
 
 ```{r}
-#| label: tbl-u34-verdad
-#| tbl-cap: "Componentes de varianza y dispersión estimados frente a la verdad del proceso generador. φ es la dispersión que estima el propio modelo (el «sigma^2» que imprime el summary)."
-verdad <- attr(banco, "verdad")
-rp     <- broom.mixed::tidy(m_final, effects = "ran_pars")
-phi_glmm <- sigma(m_final)^2   # dispersión del modelo (Var = phi * mu^2)
-
-tibble::tibble(
-  cantidad  = c("sd intercepto (fragilidad de máquina)", "sd pendiente (edad)", "dispersión φ"),
-  estimado  = round(c(rp$estimate[rp$term == "sd__(Intercept)"],
-                      rp$estimate[rp$term == "sd__edad_c"],
-                      phi_glmm), 3),
-  verdadero = round(c(verdad$sigma_intercepto_coste, verdad$sigma_pend, verdad$phi_coste), 3))
+#| label: u34-r2
+r2_pend <- performance::r2_nakagawa(g_pend)
+r2_pend
 ```
 
-Los tres se recuperan bien: el **intercepto** de máquina muy cerca de la verdad, la **pendiente**
-prácticamente en el clavo (con pocas averías por máquina esa varianza es difícil de precisar —lo que
-explica que su contraste quedara al filo—), y —lo esencial— el **parámetro de dispersión** $\hat\phi$
-**cae** de los $\approx 0.33$ inflados de la 3.1 a $\approx 0.17$, prácticamente el verdadero
-$0.167$. La razón es la que veníamos anunciando: la variabilidad **entre máquinas** ya no tiene que
-esconderse dentro de $\phi$, porque tiene su propio nivel. El círculo que abrimos en la 3.1 —$\hat\phi$
-inflada, intervalos demasiado estrechos, un control que salía «significativo» sin serlo— **se cierra
-aquí**.
+Del `r round(100 * r2_pend$R2_marginal)` % al `r round(100 * r2_pend$R2_conditional)` %: para
+anticipar el coste de una avería, saber **qué máquina es** pesa casi tanto como sus covariables.
 
-### Predicción: marginal y condicional {#sec-u34-prediccion}
+## 4.5 El historial en el coste anual {#sec-u34-anual}
+
+La misma idea vale para el **coste anual** de la [Unidad 3.3](#sec-u33), donde el diagnóstico de la
+Tweedie detectó que los años de una misma máquina se parecen entre sí. Le añadimos el intercepto
+aleatorio de máquina:
+
+$$
+S_{it}\sim\operatorname{Tw}_p(\mu_{it},\phi),\qquad
+\log\mu_{it}=x_{it}^{\top}\beta+\log e_{it}+b_i,\qquad b_i\sim\mathcal{N}(0,\sigma_u^{2}).
+$$
+
+```{r}
+#| label: u34-tw-mixto
+t_mix <- update(m_tw, . ~ . + (1 | id_maquina))
+lrt_tw <- anova(m_tw, t_mix)
+lrt_tw
+```
+
+El efecto de máquina es indudable también aquí ($p$ corregido
+$`r signif(lrt_tw$"Pr(>Chisq)"[2] / 2, 2)`$; el AIC baja `r round(AIC(m_tw) - AIC(t_mix))` puntos), y
+más grande que en la severidad: $\hat\sigma_u=$
+`r round(sqrt(glmmTMB::VarCorr(t_mix)$cond$id_maquina[1, 1]), 2)`. Tiene sentido: una máquina «mala»
+falla más **y** cuesta más de reparar, y el coste anual acumula las dos cosas. Y la cuenta pendiente
+de la 3.3, el `fabricante` que se colaba en el coste anual, se resuelve igual que en la severidad:
+
+```{r}
+#| label: u34-tw-fab
+t_mix2 <- update(t_mix, . ~ . - fabricante)
+lrt_tw_fab <- anova(t_mix2, t_mix)
+lrt_tw_fab
+```
+
+Quitarlo no empeora el modelo ($p=`r signif(lrt_tw_fab$"Pr(>Chisq)"[2], 2)`$), y lo retiramos. El
+modelo del coste anual con efecto de máquina es `t_mix2`. Su índice pasa a
+$\hat p=$ `r round(glmmTMB::family_params(t_mix2)[[1]], 2)`: parte de la variabilidad que antes
+absorbía la familia la recoge ahora la máquina.
+
+**Una advertencia sobre su diagnóstico.** El efecto aleatorio resuelve la **dependencia** entre los años
+de una máquina, que era lo que el diagnóstico de la 3.3 había detectado. No resuelve el exceso de
+dispersión **dentro** de cada máquina-año, que tiene otro origen: al sumar por año desaparece del
+predictor el **tipo de avería**, que mueve el importe de cada reparación y sigue en el dato aunque ya
+no esté en el modelo. Para presupuestar, que es para lo que sirve este modelo, no es un problema;
+para la [Unidad 3.5](#sec-u35), que dará márgenes al presupuesto, conviene recordarlo.
+
+## 4.6 Modelo validado y predicción {#sec-u34-prediccion}
+
+### Predicción marginal y condicional
 
 Un modelo mixto predice en **dos niveles**, y conviene no confundirlos:
 
-- La predicción **marginal** usa **solo los efectos fijos** (`re.form = NA`): responde por una máquina
-  *cualquiera* del perfil dado. Es la única que da un GLM (la predicción que conseguíamos en la [Unidad 3.1](#sec-u31)): no hay máquina
-  concreta que añadir.
-- La predicción **condicional** añade los **efectos aleatorios** de una máquina concreta —sus BLUP—
-  (`re.form = NULL`): responde por *esa* máquina. La @fig-u34-cond-marg pone las dos una al lado de la otra.
+- La predicción **marginal** usa **solo los efectos fijos** (`re.form = NA`): responde por una
+  máquina *cualquiera* del perfil dado. Es la única que da un GLM, la de la [Unidad 3.1](#sec-u31).
+- La predicción **condicional** añade los efectos aleatorios de una máquina concreta, sus BLUP
+  (`re.form = NULL`): responde por *esa* máquina. La @fig-u34-cond-marg pone las dos juntas.
 
 ```{r}
 #| label: fig-u34-cond-marg
 #| fig-width: 7.5
 #| fig-height: 4
-#| fig-cap: "Coste medio predicho frente a la edad. En negro, la predicción MARGINAL (población, re.form = NA); en color, las CONDICIONALES de seis máquinas concretas (con sus efectos aleatorios, re.form = NULL). Las condicionales se separan sobre todo en nivel —unas máquinas caras, otras baratas— y con pendientes algo distintas."
+#| fig-cap: "Coste medio de una avería frente a la edad. En negro, la predicción MARGINAL (población, re.form = NA); en color, las CONDICIONALES de seis máquinas concretas (con sus efectos aleatorios, re.form = NULL). Las condicionales se separan sobre todo en nivel —unas máquinas caras, otras baratas— y con pendientes algo distintas."
 media_edad <- mean(base$antiguedad_anios)
-rej <- tidyr::expand_grid(
+rej_edad <- tidyr::expand_grid(
   edad_c       = seq(min(base$edad_c), max(base$edad_c), length.out = 40),
   tipo_averia  = "Mecanica", criticidad = "Auxiliar",
   fase_proceso = "fase1",    carga      = mean(base$carga))
 
-marg <- rej
-marg$pred <- predict(m_final, newdata = rej, type = "response", re.form = NA)
+marg <- rej_edad
+marg$pred <- predict(g_pend, newdata = rej_edad, type = "response", re.form = NA)
 
 set.seed(7)
 seis <- sample(unique(base$id_maquina), 6)
-cond <- tidyr::expand_grid(rej, id_maquina = seis)
-cond$pred <- predict(m_final, newdata = cond, type = "response", re.form = NULL)
+cond <- tidyr::expand_grid(rej_edad, id_maquina = seis)
+cond$pred <- predict(g_pend, newdata = cond, type = "response", re.form = NULL)
 
 ggplot(marg, aes(edad_c + media_edad, pred)) +
   geom_line(data = cond, aes(colour = factor(id_maquina)), alpha = 0.7) +
@@ -513,45 +505,149 @@ ggplot(marg, aes(edad_c + media_edad, pred)) +
   labs(x = "edad de la máquina (años)", y = "coste medio predicho (€)", colour = "máquina")
 ```
 
-Añadir el efecto aleatorio **desplaza la curva** a la altura de cada máquina (y le da su pendiente): la
-marginal responde «¿cuánto cuesta reparar una máquina *cualquiera* de este perfil?»; la condicional,
-«¿cuánto costará reparar *esta* máquina?» —para decidir sobre una unidad concreta, p. ej. si conviene
-sustituirla—. Un GLM solo da la primera; el efecto aleatorio es lo que hace posible la segunda.
+La marginal responde «¿cuánto cuesta reparar una máquina *cualquiera* de este perfil?»; la
+condicional, «¿cuánto costará reparar *esta* máquina?». Un matiz al leerlas: con enlace log, la
+marginal $e^{x^\top\hat\beta}$ es la de la máquina **típica** (efecto aleatorio nulo), que por la
+asimetría es la **mediana**, no la **media** de la población de máquinas. Promediar sobre todas da
+algo mayor, un factor $e^{\sigma_u^2/2}$: aquí, un
+`r pct(glmmTMB::VarCorr(g_pend)$cond$id_maquina[1, 1] / 2)` % más. Para presupuestar la **flota
+entera**, como hará la [Unidad 3.5](#sec-u35), hay que tenerlo en cuenta.
 
-Dos matices importan al leer estas curvas. Primero, los efectos por máquina que suma la condicional son
-**BLUP**, estimaciones **encogidas** hacia la media: una máquina con **pocas averías** se acerca al
-comportamiento medio (menos datos, menos confianza en su nivel propio), y solo las que acumulan muchas se
-despegan del promedio —por eso las condicionales son **prudentes**, no exageradas—. Segundo, y aquí
-reaparece **Jensen** (como en la retransformación de la [Unidad 3.2](#sec-u32)): con enlace log, la
-predicción marginal $e^{x^\top\hat\beta}$ es la de la máquina **típica** (efecto aleatorio nulo), que por
-la asimetría es la **mediana**, no la **media poblacional**. Promediar el coste sobre *todas* las máquinas
-da algo **mayor** —un factor $e^{\sigma^2/2}$ con $\sigma^2$ la varianza del intercepto aleatorio; aquí,
-un ~7 % más—. Para presupuestar la **flota entera**, conviene tenerlo en cuenta.
+### ¿Qué máquinas son crónicamente caras? {#sec-u34-caras}
+
+Con el modelo del coste anual, el BLUP de cada máquina dice cuánto gasta **por encima o por debajo**
+de lo que su ficha predice, ya encogido según los años que la respaldan. Es la respuesta a la
+pregunta de la jefatura de planta (@fig-u34-caterpillar).
+
+```{r}
+#| label: fig-u34-caterpillar
+#| fig-width: 8
+#| fig-height: 4
+#| fig-cap: "Factor de gasto anual propio de cada máquina, exp(BLUP), con su intervalo al 95 %, ordenado de menor a mayor. Las máquinas cuyo intervalo queda entero por encima de 1 (rojo) gastan de forma sostenida más de lo que su ficha predice."
+re_tw <- as.data.frame(glmmTMB::ranef(t_mix2, condVar = TRUE))
+re_tw <- re_tw |>
+  dplyr::filter(grpvar == "id_maquina") |>
+  dplyr::transmute(id_maquina = as.character(grp), blup = condval, ee = condsd,
+                   factor = exp(blup), inf = exp(blup - 1.96 * ee), sup = exp(blup + 1.96 * ee),
+                   cara = inf > 1) |>
+  dplyr::arrange(blup) |>
+  dplyr::mutate(orden = dplyr::row_number())
+
+ggplot(re_tw, aes(orden, factor, colour = cara)) +
+  geom_hline(yintercept = 1, linetype = 2) +
+  geom_errorbar(aes(ymin = inf, ymax = sup), width = 0, alpha = 0.4) +
+  geom_point(size = 0.8) +
+  scale_y_log10() +
+  scale_colour_manual(values = c("grey50", "firebrick"), guide = "none") +
+  labs(x = "máquinas, ordenadas por su efecto", y = "factor de gasto propio, exp(BLUP)")
+```
+
+```{r}
+#| label: tbl-u34-caras
+#| tbl-cap: "Las máquinas crónicamente caras: aquellas cuyo factor de gasto propio tiene el intervalo al 95 % entero por encima de 1, con su plan de mantenimiento actual y los años observados. Son las candidatas a reforzar el mantenimiento."
+caras <- re_tw |>
+  dplyr::filter(cara) |>
+  dplyr::left_join(dplyr::summarise(pn, plan = dplyr::first(plan_mantenimiento),
+                                    intervalo = dplyr::first(intervalo_mant),
+                                    anios = round(sum(exposicion), 1), .by = id_maquina),
+                   by = "id_maquina") |>
+  dplyr::arrange(dplyr::desc(factor))
+caras |> dplyr::transmute(id_maquina, factor = round(factor, 2),
+                          ic95 = paste0("[", round(inf, 2), ", ", round(sup, 2), "]"),
+                          plan, intervalo, anios)
+```
+
+Son `r nrow(caras)` máquinas, de las que `r sum(caras$plan == "Correctivo")` están hoy en
+mantenimiento **correctivo**. Son las primeras candidatas a reforzar el mantenimiento: pasar a
+preventivo, o acortar su intervalo si ya lo tienen. Cuánto ahorraría hacerlo es una pregunta de
+**escenarios**, y la resuelve la [Unidad 3.5](#sec-u35).
+
+### El historial como tarifa {#sec-u34-historial}
+
+El BLUP resume el historial de cada máquina con toda la información del modelo. Una aseguradora lo
+resume de forma más simple, con una **clase** que sube con los partes y baja con los años limpios: el
+bonus-malus. Hacemos aquí lo mismo con las máquinas, para ver qué coeficiente le correspondería a
+cada clase.
+
+La clase de una máquina en el año $t$ es el número de averías que tuvo en el año **anterior**,
+$t-1$: 0, 1, o 2 o más. El **orden temporal** es lo importante: la clase se calcula con el pasado y
+se usa para el año siguiente, nunca para explicar las averías con las que se calculó. Por eso el
+primer año de cada máquina, que no tiene año anterior, queda fuera.
+
+```{r}
+#| label: tbl-u34-clase
+#| tbl-cap: "La clase de historial como factor de tarifa: el modelo Tweedie del coste anual, con la clase (averías del año anterior) añadida a la ficha. Factor de cada clase frente a la clase 0, con su intervalo al 95 %, y el factor propio medio (exp(BLUP)) de las máquinas en cada clase."
+hist_pn <- pn |>
+  dplyr::arrange(id_maquina, anio) |>
+  dplyr::mutate(n_prev = dplyr::lag(n_averias), .by = id_maquina) |>
+  dplyr::filter(!is.na(n_prev)) |>                       # el primer año no tiene historial
+  dplyr::mutate(clase = factor(pmin(n_prev, 2), labels = c("0", "1", "2+")))
+
+t_clase <- glmmTMB::glmmTMB(coste_total ~ edad + carga + proceso + criticidad + plan_mantenimiento +
+                              clase + offset(log(exposicion)),
+                            family = glmmTMB::tweedie, data = hist_pn)
+
+blup_clase <- hist_pn |>
+  dplyr::left_join(dplyr::select(re_tw, id_maquina, factor), by = "id_maquina") |>
+  dplyr::summarise(factor_blup_medio = mean(factor), n = dplyr::n(), .by = clase)
+
+broom.mixed::tidy(t_clase, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::filter(grepl("^clase", term)) |>
+  dplyr::transmute(clase = sub("clase", "", term), factor_tarifa = round(estimate, 2),
+                   ic95 = paste0("[", round(conf.low, 2), ", ", round(conf.high, 2), "]")) |>
+  dplyr::right_join(blup_clase, by = "clase") |>
+  dplyr::arrange(clase) |>
+  dplyr::mutate(factor_tarifa = dplyr::coalesce(factor_tarifa, 1),          # la clase 0 es la referencia
+                ic95 = dplyr::coalesce(ic95, "referencia"),
+                factor_blup_medio = round(factor_blup_medio, 2))
+```
+
+Una máquina que tuvo una avería el año anterior gasta, a igualdad de ficha, un
+`r pct(glmmTMB::fixef(t_clase)$cond[["clase1"]])` % más el año siguiente que una sin ninguna; con dos
+o más, un `r pct(glmmTMB::fixef(t_clase)$cond[["clase2+"]])` % más. Son los **coeficientes de la
+clase**, el equivalente de los del bonus-malus. Y van en la misma dirección que el factor propio medio
+de las máquinas en cada clase (@tbl-u34-clase): la clase de historial es una versión **gruesa** del
+BLUP. Gruesa porque mira un solo año y no tiene en cuenta cuánto historial la respalda; el BLUP usa
+todos los años y los pondera con su credibilidad.
 
 ::: {.callout-tip}
-## 🔧 En R. Predicción en un GLMM
-- **Predicción marginal** (solo efectos fijos, la máquina «típica»):
-  `predict(m, newdata, type = "response", re.form = NA)`.
-- **Predicción condicional** (añade los efectos aleatorios de cada máquina, sus BLUP):
-  `predict(m, newdata, type = "response", re.form = NULL)` —el `newdata` debe traer la columna de grupo
-  (`id_maquina`)—. Con `re.form = ~(1 | id_maquina)` se incluye **solo parte** de la estructura aleatoria.
-- **Los efectos por grupo**, si los quieres ver: `ranef(m)` (los BLUP) y `fixef(m)` (los fijos).
+## 🔧 En R. Efectos aleatorios, credibilidad e historial
+Con un modelo `m <- glmmTMB(y ~ x + (1 | grupo), family = ..., data = d)`:
+
+- **¿Hace falta el efecto aleatorio?** `anova(m_sin, m)` con `m_sin <- update(m, . ~ . - (1 | grupo))`;
+  el $p$ correcto es la **mitad** del que imprime (frontera). Pendiente sin correlación:
+  `(1 | grupo) + (0 + x | grupo)`.
+- **Componentes de varianza**: `glmmTMB::VarCorr(m)`, o `broom.mixed::tidy(m, effects = "ran_pars")`;
+  **efectos fijos**: `broom.mixed::tidy(m, effects = "fixed", conf.int = TRUE, exponentiate = TRUE)`.
+- **ICC y $R^2$**: `performance::icc(m)` y `performance::r2_nakagawa(m)`.
+- **Diagnóstico**: `DHARMa::simulateResiduals(m)`, como en un GLM; para la Gamma, `sigma(m)^2` es $\phi$.
+- **BLUP**: `glmmTMB::ranef(m)`; con su error, `as.data.frame(glmmTMB::ranef(m, condVar = TRUE))`
+  (columnas `condval` y `condsd`).
+- **Predicción**: marginal con `predict(m, newdata, type = "response", re.form = NA)`; condicional con
+  `re.form = NULL` y la columna de grupo en `newdata`.
+- **Clase de historial**: `dplyr::mutate(n_prev = dplyr::lag(n), .by = id)` sobre el panel ordenado
+  por periodo, y quitar el primer periodo de cada unidad.
 :::
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.4) · qué te llevas al estudio de caso
-El efecto aleatorio no es un adorno: en esta unidad ha resuelto una $\hat\phi$ inflada y un falso
-positivo. Esa es la herramienta que la cartera te va a pedir.
+Esta unidad resuelve la **pregunta 4** del [estudio de caso](#sec-u36-encargo): *¿qué coeficiente
+debe aplicar cada nivel de bonus-malus, y cuánto debe pesar el historial de un cliente?* Es la misma
+pregunta que aquí nos hemos hecho para una máquina: la clase de historial
+([Sección 4.6](#sec-u34-historial)) es tu bonus-malus, y el BLUP, la corrección cliente a cliente.
 
-- **[Propuesta 4 · ¿Hay agencias caras?](#sec-u36-p4)** *(unidad base)*. Un GLMM Gamma sobre
-  `coste_k` con `(1 | id_agencia)`, la misma estructura que aquí con `(1 | id_maquina)`. Ensaya aquí
-  las tres lecturas que allí necesitarás: el **contraste de frontera** para $\sigma_u$, los **BLUP**
-  con su *caterpillar*, y la diferencia entre predicción **condicional** y **marginal**.
-- **[Propuesta 1](#sec-u36-p1) y [Propuesta 7](#sec-u36-p7)**. En ambas los datos vienen agrupados
-  —varios partes por póliza, varios años por póliza—; ignorarlo produce los errores estándar
-  optimistas que esta unidad ha diagnosticado.
-
-**Aviso.** Antes de dar por hecho que un agrupamiento actúa sobre una respuesta, compruébalo: que
-`n_gestiones` tenga efecto de agencia no obliga a que `coste_k` lo tenga. Esa comprobación **es** la
-propuesta 4.
+- **Los coeficientes del bonus-malus.** Modela el coste del **último año observado** de cada póliza
+  con su ficha y `bonus_malus_prev` como factor: es el nivel con el que empezó ese año, calculado con
+  los años anteriores. Cuida el **orden temporal**, como aquí con la clase: las pólizas de un solo
+  año tienen `bonus_malus_prev` igual a `bonus_malus_act`, que ya incluye los partes de ese año, y
+  reintroducen la fuga. Decide qué haces con ellas.
+- **El historial cliente a cliente.** Añade un intercepto aleatorio de póliza al camino que
+  recomendaste en la pregunta 3, sobre todo el panel. Contrasta su varianza con la corrección de
+  frontera ([Sección 4.4](#sec-u34-inferencia)), y lee sus BLUP como credibilidad
+  ([Sección 4.3](#sec-u34-blup)).
+- **En qué pieza va el efecto.** Si tu camino tiene dos piezas —frecuencia y coste, o «¿hubo parte?» y
+  coste—, prueba el efecto aleatorio **en cada una** y decide con el contraste dónde hace falta. No lo
+  supongas: en la fábrica actuaba en las dos, y en tu cartera puede no ser así.
+- **Comparar.** El factor propio medio de las pólizas de cada nivel de bonus-malus frente a los
+  coeficientes que has estimado: ¿cuenta el bonus-malus la misma historia que el BLUP?
 :::

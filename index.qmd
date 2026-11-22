@@ -464,7 +464,7 @@ Los tres casos están **desarrollados y completos** en esta web, cada uno como u
 |:--|:--|
 | [**Caso 1 · ¿Ocurre el evento? ¿Y cuándo?**](caso1/caso1_binaria.qmd) | 1.1 Cuando la recta no llega · 1.2 Logística: ajuste e interpretación · 1.3 Más de dos categorías · 1.4 Sujetos agrupados (GLMM) · 1.5 ¿Y cuándo ocurre? Supervivencia · 1.6 Estudio de caso |
 | [**Caso 2 · ¿Cuántas veces y a qué ritmo?**](caso2/caso2_conteos.qmd) | 2.1 Poisson, tasas e IRR · 2.2 Log-lineales para tablas · 2.3 Sobredispersión · 2.4 Exceso de ceros · 2.5 Conteos agrupados · 2.6 Del conteo al reloj · 2.7 Estudio de caso |
-| [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 GLMM Gamma · 3.4 AFT: del coste al tiempo · 3.5 Cox: del tiempo al riesgo · 3.6 Las tres lentes · 3.7 Estudio de caso |
+| [**Caso 3 · ¿Cuánto y hasta cuándo?**](caso3/caso3_continuas_positivas.qmd) | 3.1 GLM Gamma · 3.2 Elegir familia y escala · 3.3 Tweedie y los tres caminos · 3.4 Efectos aleatorios y credibilidad · 3.5 Del modelo al presupuesto · 3.6 Estudio de caso |
 
 **El código viene plegado**, para que la narrativa se lea sin interrupciones. Tienes dos formas de desplegarlo:
 

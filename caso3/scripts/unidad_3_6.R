@@ -1,7 +1,7 @@
 # =============================================================================
-# Caso 3 · Unidad 3.8 — 8 · Estudio de caso: la cartera vuelve, con dos preguntas nuevas
+# Caso 3 · Unidad 3.6 — 6 · Estudio de caso: la tarifa completa y el presupuesto del año próximo
 # -----------------------------------------------------------------------------
-# Todos los chunks de código de la unidad, extraídos de _unidad_3_8.qmd.
+# Todos los chunks de código de la unidad, extraídos de _unidad_3_6.qmd.
 # Cada bloque va precedido de su LABEL y de la ruta de encabezados
 # (sección > subsección > apartado) en la que aparece dentro del documento.
 #
@@ -38,10 +38,9 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
   broom.mixed = "0.2.9.7", car = "3.1.5", emmeans = "2.0.3",
-  flexsurv = "2.3.2", glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  rsample = "1.3.2", sessioninfo = "1.2.4", survival = "3.8.6",
-  survminer = "0.5.2", tidyverse = "2.0.0")
+  rsample = "1.3.2", sessioninfo = "1.2.4", tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -58,11 +57,10 @@ if (length(.otra))
 rm(.falta, .instalada, .otra)
 
 # --- Preámbulo del caso (librerías y datos, como en el documento) ------------
-# Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
+# Núcleo del Caso 3 (respuestas continuas positivas + mixtos).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
-library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom)           # resultados ordenados de glm
 library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
@@ -76,10 +74,6 @@ library(lme4)            # lmer y glmer (mixtos)
 library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
 library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
-
-library(survival)        # Kaplan-Meier, Cox y datos start-stop
-library(survminer)       # representación gráfica de supervivencia
-library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
