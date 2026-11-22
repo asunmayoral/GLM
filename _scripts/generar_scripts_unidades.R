@@ -113,7 +113,7 @@ generar_scripts <- function(casos = NULL,
     patchwork = "1.3.2",
     performance = "0.17.0", pROC = "1.19.0.1", pscl = "1.5.9", purrr = "1.2.2",
     readr = "2.2.0", rsample = "1.3.2", scales = "1.4.0", see = "0.14.0",
-    sessioninfo = "1.2.4", sure = "0.2.0",
+    sessioninfo = "1.2.4", statmod = "1.5.2", sure = "0.2.0",
     survival = "3.8.6", survminer = "0.5.2", tibble = "3.3.1", tidyr = "1.3.2",
     tidyverse = "2.0.0", varTestnlme = "1.3.5", vcd = "1.4.13", vcdExtra = "0.9.6",
     yardstick = "1.4.0")

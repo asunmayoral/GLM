@@ -38,10 +38,10 @@ PROBADO_R <- "R 4.6.0 (2026-04-24) · x86_64-apple-darwin20 · medido el 2026-09
 PAQUETES  <- c(
   DHARMa = "0.5.0", MASS = "7.3.65", broom = "1.0.13",
   broom.mixed = "0.2.9.7", car = "3.1.5", dplyr = "1.2.1", emmeans = "2.0.3",
-  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1",
+  glmmTMB = "1.1.14", glmnet = "5.0", lme4 = "2.0.1", lmtest = "0.9.40",
   marginaleffects = "0.32.0", patchwork = "1.3.2", performance = "0.17.0",
-  rsample = "1.3.2", sessioninfo = "1.2.4", tibble = "3.3.1",
-  tidyverse = "2.0.0")
+  purrr = "1.2.2", rsample = "1.3.2", sessioninfo = "1.2.4",
+  statmod = "1.5.2", tibble = "3.3.1", tidyverse = "2.0.0")
 message("Material preparado con ", PROBADO_R)
 
 .falta <- names(PAQUETES)[!vapply(names(PAQUETES), requireNamespace, logical(1), quietly = TRUE)]
@@ -131,6 +131,35 @@ broom::tidy(m_ig, exponentiate = TRUE, conf.int = TRUE) |>
                    conf.low = round(conf.low, 3), conf.high = round(conf.high, 3))
 
 # -----------------------------------------------------------------------------
+# [tbl-u32-ig-dharma]
+#   2 · Elegir familia y escala
+#     > 2.2 Inversa gaussiana
+#       > Bondad de ajuste, selección, diagnóstico y predicción: el camino de la Gamma
+# -----------------------------------------------------------------------------
+set.seed(20252026)
+mu_ig  <- fitted(m_ig)
+phi_ig <- summary(m_ig)$dispersion
+sim_y  <- replicate(1000, statmod::rinvgauss(length(mu_ig), mean = mu_ig, dispersion = phi_ig))
+sim_ig <- DHARMa::createDHARMa(simulatedResponse = sim_y, observedResponse = base$coste_euros,
+                               fittedPredictedResponse = mu_ig, integerResponse = FALSE)
+sim_gm <- DHARMa::simulateResiduals(m_gam, n = 1000)
+
+alfa_gm <- 1 / summary(m_gam)$dispersion
+cubre <- function(inf, sup) mean(base$coste_euros > inf & base$coste_euros < sup)
+
+purrr::map_dfr(list(`Gamma` = sim_gm, `Inversa gaussiana` = sim_ig), \(s) tibble::tibble(
+  uniformidad = DHARMa::testUniformity(s, plot = FALSE)$p.value,
+  dispersion  = DHARMa::testDispersion(s, plot = FALSE)$p.value,
+  cuantiles   = DHARMa::testQuantiles(s, plot = FALSE)$p.value), .id = "familia") |>
+  dplyr::mutate(cobertura_ip95 = c(
+    cubre(qgamma(0.025, alfa_gm, scale = fitted(m_gam) / alfa_gm),
+          qgamma(0.975, alfa_gm, scale = fitted(m_gam) / alfa_gm)),
+    cubre(statmod::qinvgauss(0.025, mu_ig, dispersion = phi_ig),
+          statmod::qinvgauss(0.975, mu_ig, dispersion = phi_ig))),
+    dplyr::across(uniformidad:cuantiles, \(x) format.pval(x, digits = 2, eps = 0.001)),
+    cobertura_ip95 = round(cobertura_ip95, 3))
+
+# -----------------------------------------------------------------------------
 # [tbl-u32-lognormal]
 #   2 · Elegir familia y escala > 2.3 Lognormal y log-OLS
 # -----------------------------------------------------------------------------
@@ -143,7 +172,9 @@ broom::glance(m_ln) |>
 
 # -----------------------------------------------------------------------------
 # [tbl-u32-retransformacion]
-#   2 · Elegir familia y escala > 2.3 Lognormal y log-OLS
+#   2 · Elegir familia y escala
+#     > 2.3 Lognormal y log-OLS
+#       > Log-OLS y GLM-log no estiman lo mismo
 # -----------------------------------------------------------------------------
 y_obs    <- base$coste_euros
 naive    <- exp(fitted(m_ln))                 # retransformación ingenua
@@ -190,6 +221,37 @@ duan_ic <- perfiles |>
                    gamma      = exp(pg$fit),
                    ic_gamma   = ic(exp(pg$fit - tg * pg$se.fit), exp(pg$fit + tg * pg$se.fit)))
 duan_ic |> dplyr::mutate(duan = round(duan), gamma = round(gamma))
+
+# -----------------------------------------------------------------------------
+# [fig-u32-ln-diagnostico]
+#   2 · Elegir familia y escala
+#     > 2.3 Lognormal y log-OLS
+#       > Bondad de ajuste, selección, diagnóstico y predicción: el camino del modelo lineal
+# -----------------------------------------------------------------------------
+diag_ln <- tibble::tibble(ajustado = fitted(m_ln), residuo = resid(m_ln),
+                          estandarizado = rstandard(m_ln))
+patchwork::wrap_plots(
+  ggplot(diag_ln, aes(ajustado, residuo)) +
+    geom_point(alpha = 0.3, size = 0.8) + geom_hline(yintercept = 0, linetype = 2) +
+    geom_smooth(se = FALSE, colour = "firebrick") +
+    labs(x = "valor ajustado (log €)", y = "residuo"),
+  ggplot(diag_ln, aes(sample = estandarizado)) +
+    stat_qq(alpha = 0.3, size = 0.8) + stat_qq_line(colour = "firebrick") +
+    labs(x = "cuantil normal teórico", y = "residuo estandarizado"))
+
+# -----------------------------------------------------------------------------
+# [tbl-u32-ln-diagnostico]
+#   2 · Elegir familia y escala
+#     > 2.3 Lognormal y log-OLS
+#       > Bondad de ajuste, selección, diagnóstico y predicción: el camino del modelo lineal
+# -----------------------------------------------------------------------------
+ip_ln <- exp(predict(m_ln, interval = "prediction"))     # el intervalo, ya en euros
+diag_tests_ln <- tibble::tibble(
+  shapiro_p       = signif(shapiro.test(resid(m_ln))$p.value, 2),
+  breusch_pagan_p = signif(lmtest::bptest(m_ln)$p.value, 2),
+  cook_max        = round(max(cooks.distance(m_ln)), 3),
+  cobertura_ip95  = round(cubre(ip_ln[, "lwr"], ip_ln[, "upr"]), 3))
+diag_tests_ln
 
 # -----------------------------------------------------------------------------
 # [tbl-u32-aic]
