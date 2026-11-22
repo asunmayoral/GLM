@@ -26,11 +26,12 @@ editor:
 ---
 
 <!-- ============================================================================
-     Caso 3 (continuas positivas y vida útil). Datos vía R/dgp_averias.R:
+     Caso 3 resumido (continuas positivas). Datos vía R/dgp_averias.R:
        simular_averias() / cargar_averias() -> averías en una línea de fabricación
        de mobiliario (400 máquinas, 5 procesos, 4 años). Caché en caso3/datos.
-       Tablas: maquinas · averias (=costes) · intervalos (tiempos entre fallos) ·
-               seguimiento (start-stop mensual) · panel (máquina-año, Tweedie).
+       Tablas que se usan: maquinas · averias (=costes) · panel (máquina-año, Tweedie) ·
+               seguimiento (máquina-mes; solo para la edad por año en la 3.3).
+       El banco genera también `intervalos` (tiempos entre fallos), que esta versión no usa.
      Ver DISENO_BANCO_AVERIAS.md.
 ============================================================================ -->
 
@@ -38,11 +39,10 @@ editor:
 #| label: setup
 #| include: false
 
-# Núcleo del Caso 3 (respuestas continuas positivas + mixtos + supervivencia).
-# Cada unidad añadirá lo suyo cuando la desarrollemos (p. ej. glmmTMB::tweedie() en 3.4).
+# Núcleo del Caso 3 (respuestas continuas positivas + mixtos).
 library(MASS)            # se carga ANTES que tidyverse para que dplyr::select() no quede enmascarada
 library(tidyverse)       # manipulación, visualización y descriptivos
-library(broom)           # resultados ordenados de glm y modelos de supervivencia
+library(broom)           # resultados ordenados de glm
 library(broom.mixed)     # tidy() para modelos mixtos (glmmTMB, lme4)
 library(patchwork)       # combinación de gráficos
 
@@ -56,10 +56,6 @@ library(lme4)            # lmer y glmer (mixtos)
 library(glmmTMB)         # GLMM Gamma, y familia Tweedie (3.4)
 library(glmnet)          # regularización (en 3.7, como límite conceptual en Tweedie)
 library(rsample)         # validación cruzada AGRUPADA (group_vfold_cv por máquina)
-
-library(survival)        # Kaplan-Meier, Cox y datos start-stop
-library(survminer)       # representación gráfica de supervivencia
-library(flexsurv)        # modelos paramétricos de supervivencia (AFT)
 
 SEMILLA_CURSO <- 20252026L
 set.seed(SEMILLA_CURSO)
@@ -128,11 +124,11 @@ del Caso 2.
 
 | Unidad | Funciones y paquetes clave |
 |:--:|:-----------------------------------------------------------------------|
-| **3.1** | ajuste: [`glm(Gamma(link = "log"))`](#sec-u31-modelizacion) · interpretación: [`broom::tidy` · `emmeans::emmeans` · `marginaleffects::plot_predictions`](#sec-u31-interpretacion) · inferencia: [`anova(..., test = "F")` · `drop1` · `AIC`](#sec-u31-inferencia) · diagnóstico: [`DHARMa::simulateResiduals`](#sec-u31-diagnostico) |
+| **3.1** | ajuste: [`glm(Gamma(link = "log"))`](#sec-u31-modelizacion) · interpretación: [`broom::tidy` · `emmeans::emmeans` · `marginaleffects::plot_predictions`](#sec-u31-interpretacion) · selección: [`drop1(..., test = "F")` · `anova(..., test = "F")` · `AIC`](#sec-u31-f) · bondad de ajuste: [`deviance` · `df.residual`](#sec-u31-deviance) · predicción: [`predict(type = "link", se.fit = TRUE)` · `qgamma`](#sec-u31-prediccion) · diagnóstico: [`DHARMa::simulateResiduals`](#sec-u31-deviance) |
 | **3.2** | familias positivas: [`glm(inverse.gaussian)` · `quasi(variance = "mu^2")`](#sec-u32-contexto) · log-OLS: [`lm(log(y))` y el **smearing** de Duan](#sec-u32-lognormal) · comparar: [`AIC`/`logLik` con jacobiano](#sec-u32-elegir) |
 | **3.3** | la potencia $p$: [`dplyr::ntile` · la nube media-varianza en log-log](#sec-u33-mapa) · Tweedie: [`glmmTMB(family = tweedie)` · `family_params` ($p$) · `sigma` ($\phi$)](#sec-u33-ajuste) · los canales: [frecuencia y severidad a partir de $\hat p$ y $\hat\phi$](#sec-u33-canales) · los otros caminos: `glm(poisson)`/`MASS::glm.nb` con *offset* · `glm(binomial)` · `glm(Gamma)` |
 | **3.4** | ajuste: [`glmmTMB(... + (1 \| id_maquina))`](#sec-u34-modelo) · salida: [`broom.mixed::tidy`/`glance` · `glmmTMB::VarCorr`](#sec-u34-interpretacion) · diagnóstico: [`DHARMa::simulateResiduals` · `performance::icc`](#sec-u34-diagnostico) · predicción: [`predict(re.form = NA \| NULL)` · `ranef`/`fixef`](#sec-u34-prediccion) |
-| **3.5** | predicción: [`predict` con `vcov` para el intervalo de la media](#sec-u33-prediccion) · la predictiva: [simular averías y costes para el intervalo de predicción](#sec-u33-re-predictiva) |
+| **3.5** | predicción: `predict` con `vcov` para el intervalo de la media · la predictiva: simular averías y costes para el intervalo de predicción |
 | **3.6** | Quarto (`.qmd`) · `renv` · Git — reproducibilidad y comunicación |
 
 **Tres hilos atraviesan el bloque de arriba abajo**, y son lo que conviene llevarse de él.
@@ -227,7 +223,7 @@ aleatorio** de la [Unidad 3.4](#sec-u34), y es la que responde a la pregunta 4.
 
 ### Las tablas del banco
 
-Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
+Del mismo sistema se derivan cuatro tablas; cada unidad lee la que necesita.
 
 | Tabla | Una fila es… | Respuesta principal | Da soporte a |
 |---|---|---|---|
@@ -235,7 +231,6 @@ Del mismo sistema se derivan cinco tablas; cada unidad lee la que necesita.
 | `averias` (= `costes`) | una **avería** | `coste_euros` | 3.1 GLM Gamma · 3.2 familia y escala · 3.4 efectos aleatorios |
 | `panel` | una **máquina-año** | `coste_total` (con ceros) y `n_averias` | 3.3 Tweedie · 3.4 efectos aleatorios · 3.5 presupuesto |
 | `seguimiento` | una **máquina-mes** | — | solo para obtener la edad por año en la 3.3 |
-| `intervalos` | un **intervalo entre fallos** | `tiempo_entre`, `evento` | no se usa en esta versión del caso |
 
 ### Descripción detallada de las variables
 

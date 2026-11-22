@@ -6,7 +6,14 @@
      Caso 3 resumido (21-11-2026): sin validación contra el DGP (salió la antigua subsección de
      §1.7 (diagnóstico) con tbl-u31-verdad, tbl-u31-verdad-crit, tbl-u31-verdad-fab y sus dos callouts). La
      duda sobre `fabricante` y la phi inflada se resuelven en la 3.4 (efectos aleatorios).
-     Sesión 1 · pregunta P1 del estudio de caso. -->
+     Sesión 1 · pregunta P1 del estudio de caso.
+     Estructura (22-11-2026): 1.5 Interpretación (φ, efectos, Wald) · 1.6 Bondad de ajuste y
+     selección (deviance, coherencia de φ, DHARMa de m_gamma; F tipo II; ¿le falta algo?: fabricante
+     con residuos por fabricante, splines e interacciones, carga cuadrática; DHARMa y tests de m_final)
+     · 1.7 Modelo validado y predicción (m_final = m_gamma + fabricante + carga²; IC de la media, IP de
+     una avería, perfiles, implicaciones). La función de varianza pasó a la 3.2. La GoF por deviance no
+     se aplica como test: φ estimada (Dunn y Smyth 2018, §7.4–7.6). En el DGP la carga es lineal: su
+     curvatura y el fabricante quedan en cuarentena hasta la 3.4. -->
 
 # 1 · GLM Gamma {#sec-u31}
 
@@ -110,13 +117,14 @@ Lo comprobamos por tramos del coste ajustado:
 ```{r}
 #| label: tbl-u31-cv
 #| tbl-cap: "Media, desviación típica y coeficiente de variación del coste por tramos (quintiles del valor ajustado). La desviación típica crece con la media, pero el CV se mantiene mucho más estable: es la firma de la familia Gamma."
-base |>
+cv_tramos <- base |>   # se guarda: la §1.2 cita su rango de CV
   dplyr::mutate(tramo = dplyr::ntile(fitted(ols), 5)) |>
   dplyr::group_by(tramo) |>
   dplyr::summarise(n = dplyr::n(),
                    media = mean(coste_euros), sd = sd(coste_euros),
                    cv = sd / media, .groups = "drop") |>
   dplyr::mutate(dplyr::across(c(media, sd), \(x) round(x, 1)), cv = round(cv, 3))
+cv_tramos
 ```
 
 La desviación típica se multiplica varias veces del primer al último tramo, mientras el **CV se mueve
@@ -204,8 +212,13 @@ $$
 La **función de varianza** es $V(\mu)=\mu^{2}$: la varianza crece con el **cuadrado** de la media, y el
 CV depende solo de la forma $\alpha$, no de la media. Si todas las averías comparten la misma forma y
 difieren solo en su media —que es lo que hará el modelo, al dejar que $\mu$ dependa de las
-covariables—, el CV es el mismo en todos los tramos: lo que muestra la @tbl-u31-cv. Y el parámetro
-natural deja anunciado el **enlace canónico** de la Gamma, el inverso, al que volveremos en la
+covariables—, el CV es el mismo en todos los tramos: lo que muestra la @tbl-u31-cv.
+
+La Gamma, eso sí, **no fija cuánto vale** el CV: solo exige que no cambie con la media. $\phi$ es un
+parámetro libre que estimaremos con los datos. El caso $\phi=1$ ($\alpha=1$, CV $=1$) es la
+**exponencial**; los tramos de la @tbl-u31-cv apuntan a un CV menor, entre
+`r round(min(cv_tramos$cv), 2)` y `r round(max(cv_tramos$cv), 2)`, y por tanto a un $\phi$ por
+debajo de 1. Y el parámetro natural deja anunciado el **enlace canónico** de la Gamma, el inverso, al que volveremos en la
 [Sección 1.4](#sec-u31-modelizacion) para elegir otro.
 
 Fijada la media, la forma $\alpha$ es la que decide **cuánta cola** tiene la distribución. Lo vemos
@@ -305,7 +318,7 @@ Conviene ser honestos con este gráfico: coloreando por criticidad se ven **band
 separa las nubes—, pero las **pendientes marginales son suaves**, y la de la carga casi plana. Cuidado
 con concluir de ahí que no importan: es la vista *marginal*, que mezcla máquinas de toda criticidad y
 puede **enmascarar** el efecto de cada variable aislada —lo comprobaremos al ajustar el modelo
-([Sección 1.6](#sec-u31-inferencia))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
+([Sección 1.5](#sec-u31-interp-efectos))—. Lo que sí se intuye es la jerarquía: sobre el importe pesan **sobre todo** el
 tipo de avería y la criticidad, y **menos** la antigüedad y la carga. Estas dos, además, tienen su papel
 **más fuerte** en la **frecuencia** de fallo —las máquinas viejas o muy exigidas se averían antes—, la
 otra mitad del caso, que entrará con la Tweedie de la [Unidad 3.3](#sec-u33).
@@ -413,21 +426,17 @@ donde $TA$ es el tipo de avería, $CR$ la criticidad y $FP$ la fase del proceso,
 los niveles de cada factor **salvo el de referencia**, para el que no se estima coeficiente:
 $\mathcal{T}=\{\text{Eléctrica},\ \text{Hidráulica},\ \text{Electrónica}\}$ (referencia:
 **Mecánica**), $\mathcal{C}=\{\text{Importante},\ \text{Crítica}\}$ (referencia: **Auxiliar**) y, en la
-fase, la referencia es la **fase 1**. Son once coeficientes —los que lista la @tbl-u31-coef-ee, donde
-R nombra cada uno uniendo el factor y el nivel: `tipo_averiaElectrica` es $\beta^{TA}_{\text{Eléctrica}}$— y,
+fase, la referencia es la **fase 1**. Son once coeficientes —los que lista la @tbl-u31-inferencia,
+en la [Sección 1.5](#sec-u31-interpretacion), donde R nombra cada uno uniendo el factor y el nivel: `tipo_averiaElectrica` es $\beta^{TA}_{\text{Eléctrica}}$— y,
 aparte, la dispersión $\phi=1/\alpha$. La interacción hace que el efecto de la criticidad dependa de
 la fase: una máquina crítica multiplica el coste medio por $e^{\beta^{CR}_{\text{Crítica}}}$ en la
 fase 1, y por $e^{\beta^{CR}_{\text{Crítica}}+\beta^{CR\times FP}_{\text{Crítica}}}$ en la fase 2. Lo
 ajustamos:
 
 ```{r}
-#| label: tbl-u31-coef-ee
-#| tbl-cap: "Coeficientes estimados del GLM Gamma (escala log) y su error estándar. Es *solo* estimación: la significación, los intervalos y los factores se tratan más adelante."
+#| label: u31-ajuste
 m_gamma <- glm(coste_euros ~ tipo_averia + criticidad * fase_proceso + antiguedad_anios + carga,
                family = Gamma(link = "log"), data = base)
-
-broom::tidy(m_gamma) |>
-  dplyr::transmute(term, estimate = round(estimate, 3), std.error = round(std.error, 3))
 ```
 
 Sobre la **estimación**: los $\hat\beta$ se obtienen por máxima verosimilitud mediante IWLS. La novedad
@@ -437,13 +446,17 @@ $$\hat\phi=\frac{1}{n-p}\sum_i\frac{(y_i-\hat\mu_i)^2}{\hat\mu_i^{2}},$$
 más recomendable que la basada en la deviance cuando la forma de la Gamma es pequeña
 [@mccullagh1989, §8.3.6].
 
-La @tbl-u31-coef-ee muestra **solo** estimación: coeficiente y error estándar. La **significación** de
-cada uno —su estadístico de Wald, su intervalo de confianza y su $p$-valor— la reservamos para la
-[Sección 1.6](#sec-u31-inferencia), donde reunimos todo el aparato inferencial bajo una sola idea. Aquí
-nos quedamos con las estimaciones para pasar a **interpretarlas**.
+Las estimaciones —cada coeficiente con su error estándar, su contraste de Wald y su intervalo— las
+presentamos al interpretarlas, en la @tbl-u31-inferencia de la [Sección 1.5](#sec-u31-interpretacion).
+La **significación** de cada variable en su conjunto, con el contraste $F$, se trata en la
+[Sección 1.6](#sec-u31-bondad).
 
-Antes de interpretar los coeficientes conviene mirar ese $\hat\phi$, porque **fija la escala de la
-incertidumbre** de todo el modelo. Lo extraemos del `summary` y, a su lado, calculamos lo que de verdad
+## 1.5 Interpretación {#sec-u31-interpretacion}
+
+### La dispersión $\phi$ {#sec-u31-interp-phi}
+
+Antes de interpretar los coeficientes conviene mirar el $\hat\phi$ que estimamos en la
+[Sección 1.4](#sec-u31-modelizacion), porque **fija la escala de la incertidumbre** de todo el modelo. Lo extraemos del `summary` y, a su lado, calculamos lo que de verdad
 tiene sentido físico: el **coeficiente de variación implicado** $\sqrt{\hat\phi}$ —recuérdese que en la
 Gamma $\operatorname{Var}(Y)=\phi\,\mu^2$, de modo que $\sqrt{\phi}$ es la dispersión *relativa*, la
 misma en todos los niveles de coste—:
@@ -456,9 +469,11 @@ c(phi_pearson  = summary(m_gamma)$dispersion,
 
 El `cv_implicado` es la lectura útil: dice que, alrededor del coste medio que predice el modelo, una
 reparación cualquiera se desvía en ese porcentaje **con independencia de si es cara o barata** —la firma
-Gamma de CV constante que motivó la familia—. Conviene retener esta cifra: sale **más alta** de lo que
-le corresponde, y esa brecha no es ruido, sino la pista de que al modelo le falta algo —lo que
-comentamos a continuación—.
+Gamma de CV constante que motivó la familia—, y es coherente con los tramos de la @tbl-u31-cv.
+Conviene retener esta cifra, porque no toda esa dispersión es la variabilidad de una avería alrededor
+de su media: una parte se debe a que **unas máquinas son más caras que otras**, y el modelo, que no
+distingue máquinas, la carga a $\phi$. Lo veremos en la [Unidad 3.4](#sec-u34): al tener en cuenta la
+máquina, $\hat\phi$ baja.
 
 ::: {.callout-important}
 ## Estamos ignorando el agrupamiento (y se nota)
@@ -470,49 +485,134 @@ máquinas** que el modelo no incluye. Lo resolveremos con el **efecto aleatorio 
 [Unidad 3.4](#sec-u34).
 :::
 
-## 1.5 Interpretación {#sec-u31-interpretacion}
-
-Con enlace log, $\log\mu = \beta_0 + \beta_1 x_1 + \dots + \beta_p x_p$, así que la media es un
-**producto de factores**:
-$$\mu = e^{\beta_0}\, e^{\beta_1 x_1}\, e^{\beta_2 x_2}\cdots e^{\beta_p x_p}.$$
-Si el predictor $x_j$ aumenta en **una unidad** (con el resto fijo), la media se **multiplica** por
-$e^{\beta_j}$:
-
-$$\frac{\mu(x_j+1)}{\mu(x_j)} = \frac{e^{\beta_j (x_j+1)}}{e^{\beta_j x_j}} = e^{\beta_j}.$$
-Por eso $e^{\beta_j}$ es un **factor**: un $e^{\beta_j}=1{,}05$ significa «un 5 % más caro»; un $0{,}90$,
-«un 10 % más barato». Para un predictor **categórico**, $e^{\beta_j}$ compara ese nivel con el de
-referencia.
-
-**Una lectura rápida con los propios $\beta$.** Como los coeficientes de los predictores caen todos
-**entre 0 y 1** (el intercepto aparte), conviene una lectura de tanteo antes de la exacta. El desarrollo
-de Taylor de la exponencial en torno a cero, $e^{\beta}=1+\beta+\tfrac{\beta^{2}}{2}+\cdots$, se reduce
-para $\beta$ pequeño a $e^{\beta}\approx 1+\beta$: es decir, **el propio coeficiente es, aproximadamente,
-el incremento relativo** de la media ($\beta\times 100\,\%$), sin necesidad de exponenciar. Así, leyendo
-directamente los coeficientes de la @tbl-u31-coef-ee, un $\beta=0{,}03$ es «un 3 % más» ($e^{0.03}=1.03$)
-y un $\beta=0{,}11$, «un 11 % más» ($e^{0.11}=1.116$). La aproximación es excelente cerca de cero y se
-queda **corta** a medida que $\beta$ se acerca a 1: para $\beta=0{,}57$ daría $+57\,\%$, cuando el factor
-exacto es $e^{0{,}57}=1{,}77$ —el incremento real es del $77\,\%$—. Regla práctica: $\beta\times 100\,\%$
-como lectura mental de los efectos **pequeños**, y el factor exacto de la @tbl-u31-coeficientes para los
-**grandes**.
-
-La tabla da los factores ya calculados (columna `exp(beta)`):
+### Los efectos de las variables {#sec-u31-interp-efectos}
 
 ```{r}
-#| label: tbl-u31-coeficientes
-#| tbl-cap: "Coeficientes exponenciados, exp(β̂): el factor multiplicativo que cada predictor aplica sobre el coste medio. Es la escala en la que interpretamos (los intervalos y la significación, en la Sección 1.4)."
-broom::tidy(m_gamma, exponentiate = TRUE) |>
-  dplyr::transmute(term, `exp(beta)` = round(estimate, 3))
+#| label: u31-cifras-efectos
+#| include: false
+# Coeficientes, su lectura en % y sus contrastes de Wald: alimentan las cifras en línea de esta sección
+bg  <- coef(m_gamma)
+pct <- function(b) round(100 * (exp(b) - 1))   # incremento exacto de la media, en %
+wald <- summary(m_gamma)$coefficients   # contrastes de Wald: el texto cita sus valores
 ```
 
-Leemos los factores de la @tbl-u31-coeficientes (entre paréntesis, la lectura rápida $1+\beta$):
+Con enlace log, el predictor lineal es $\log\mu = \beta_0 + \beta_1 x_1 + \dots + \beta_p x_p$, así que la media es un
+**producto de factores**:
+$$\mu = e^{\beta_0}\, e^{\beta_1 x_1}\, e^{\beta_2 x_2}\cdots e^{\beta_p x_p}.$$
 
-- **Tipo de avería** (referencia `Mecanica`). Las **electrónicas** son, con diferencia, las más caras:
-  un **54 %** más que una mecánica ($e^{0{,}43}=1{,}54$); las hidráulicas, un **29 %** más; las
-  eléctricas, un **12 %**.
-- **Criticidad de la máquina.** Encarece mucho la reparación: en la fase 1, una máquina **crítica**
-  cuesta un **77 %** más que una auxiliar ($e^{0{,}57}$; lectura rápida $\approx +57\,\%$), y una
-  **importante**, ya un **29 %** más ($\approx +26\,\%$). Es, junto con el tipo de avería, el motor más
-  potente del coste.
+- Si el predictor es **contínuo** y $x_j$ aumenta en **una unidad** (con el resto fijo), la media se **multiplica** por $e^{\beta_j}$; un $e^{\beta_j}=1.05$ significa «un 5 % más caro»; un $0.90$,
+«un 10 % más barato»:
+
+$$\frac{\mu(x_j+1)}{\mu(x_j)} = \frac{e^{\beta_j (x_j+1)}}{e^{\beta_j x_j}} = e^{\beta_j}.$$
+
+- Para un predictor **categórico**, $e^{\beta_j}$ compara ese nivel con el de
+referencia.
+
+El **contraste de Wald**, basado en un estadístico $t$-Student, nos da el p-valor con el que concluir sobre el efecto de un predictor continuo, o la comparación con la referencia en un categórico. 
+
+::: {.callout-note collapse="true"}
+## Cómo se construye el estadístico $t$ de Wald
+Cada fila de la @tbl-u31-inferencia contrasta $H_0:\beta_j=0$ —el nivel $j$ no difiere de su
+referencia, o la pendiente es nula— frente a $H_1:\beta_j\neq 0$. El estadístico se construye en tres
+pasos.
+
+**1. El error estándar del coeficiente.** Sale de la matriz de covarianzas estimada de $\hat\beta$,
+que en un GLM es la inversa de la información de Fisher escalada por la dispersión:
+$$
+\widehat{\operatorname{Var}}(\hat\beta)=\hat\phi\,(X^{\top}\hat W X)^{-1},\qquad
+\operatorname{ee}(\hat\beta_j)=\sqrt{\big[\widehat{\operatorname{Var}}(\hat\beta)\big]_{jj}},
+$$
+donde $\hat W$ son los pesos de la última iteración del IWLS. Como $\hat\phi$ multiplica a toda la
+matriz, **una dispersión inflada infla todos los errores estándar**.
+
+**2. El cociente.** El coeficiente estimado, dividido por su error estándar:
+$$
+t_j=\frac{\hat\beta_j}{\operatorname{ee}(\hat\beta_j)} .
+$$
+
+**3. La referencia.** Como $\phi$ se estima, $t_j$ se compara con una $t$ de Student con $n-p$
+grados de libertad, y el $p$-valor bilateral es $2\,P(T_{n-p}>|t_j|)$.
+
+**Del contraste al intervalo.** Con el mismo cuantil $t_{n-p,\,0.975}$, el intervalo de confianza
+del coeficiente es $\hat\beta_j\pm t_{n-p,\,0.975}\,\operatorname{ee}(\hat\beta_j)$, y el del factor,
+el de sus extremos exponenciados. Por eso «$p<0.05$» y «el intervalo del factor no contiene el 1»
+son la misma afirmación.
+
+En R, `summary(m)$coefficients` devuelve las cuatro columnas
+(`Estimate`, `Std. Error`, `t value`, `Pr(>|t|)`), y `sqrt(diag(vcov(m)))` da los errores estándar.
+:::
+
+```{r}
+#| label: tbl-u31-inferencia
+#| tbl-cap: "Contraste de Wald de cada coeficiente (β̂, error estándar, t, p) junto al factor exp(β̂) y su intervalo de confianza al 95 %. Cada fila compara un nivel con su referencia (Mecánica, Auxiliar, fase 1) o mide una pendiente; el intervalo del factor que no contiene el 1 señala una diferencia significativa."
+broom::tidy(m_gamma, conf.int = TRUE) |>
+  dplyr::transmute(term,
+                   beta = round(estimate, 3), ee = round(std.error, 3),
+                   t = round(statistic, 2), p = signif(p.value, 3),
+                   `exp(beta)` = round(exp(estimate), 3),
+                   ic95 = paste0("[", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), "]"))
+```
+
+
+::: {.callout-tip collapse="true"}
+## Una lectura rápida con los propios $\beta$
+Los coeficientes de los predictores caen todos **entre 0 y 1** (el intercepto aparte), así que
+conviene una lectura de tanteo antes de la exacta. El desarrollo de Taylor de la exponencial en torno a
+cero, $e^{\beta}=1+\beta+\tfrac{\beta^{2}}{2}+\cdots$, se reduce para $\beta$ pequeño a
+$e^{\beta}\approx 1+\beta$: **el propio coeficiente es, aproximadamente, el incremento relativo** de la
+media, sin necesidad de exponenciar.
+
+Leyendo directamente la columna `beta` de la @tbl-u31-inferencia: el coeficiente de la antigüedad,
+$\beta=`r round(bg[["antiguedad_anios"]], 2)`$, es «un `r round(100 * bg[["antiguedad_anios"]])` % más»
+por año (el factor exacto es $e^{\beta}=`r round(exp(bg[["antiguedad_anios"]]), 3)`$), y el de las
+averías eléctricas, $\beta=`r round(bg[["tipo_averiaElectrica"]], 2)`$, «un
+`r round(100 * bg[["tipo_averiaElectrica"]])` % más» (exacto:
+$e^{\beta}=`r round(exp(bg[["tipo_averiaElectrica"]]), 3)`$). La aproximación es excelente cerca de cero y
+se queda **corta** a medida que $\beta$ crece: para la máquina crítica,
+$\beta=`r round(bg[["criticidadCritica"]], 2)`$ daría $+`r round(100 * bg[["criticidadCritica"]])`\,\%$,
+cuando el factor exacto es $e^{\beta}=`r round(exp(bg[["criticidadCritica"]]), 2)`$: el incremento real
+es del $`r pct(bg[["criticidadCritica"]])`\,\%$.
+
+> **Regla práctica.** Si el coeficiente es **pequeño** —en valor absoluto, menor que 0.1—, el efecto
+> sobre la media es de aproximadamente **$\beta\times 100\,\%$**: se lee de un vistazo y el error es de
+> unas décimas de punto. Para coeficientes **mayores**, usa el factor exacto $e^{\beta}$ de la
+> @tbl-u31-inferencia.
+:::
+
+La @tbl-u31-inferencia reúne los coeficientes con su estadístico de Wald (estimación, error estándar,
+$t$ y $p$-valor) y, pegada, su versión **exponenciada** —el factor multiplicativo que afecta a la media— con su intervalo de confianza al
+95 %. Leída fila a fila la tabla de estimaciones, tenemos:
+
+- **Tipo de avería** (referencia: Mecánica). Los tres tipos **difieren** de la avería mecánica. La
+  diferencia menos rotunda es la de las eléctricas ($p=`r signif(wald["tipo_averiaElectrica", "Pr(>|t|)"], 2)`$);
+  la de las electrónicas es abrumadora ($p=`r signif(wald["tipo_averiaElectronica", "Pr(>|t|)"], 2)`$).
+- **Criticidad** (referencia: Auxiliar, en la fase 1). Las máquinas importantes y las críticas
+  **difieren** de las auxiliares
+  ($p=`r signif(wald["criticidadImportante", "Pr(>|t|)"], 2)`$ y
+  $p=`r signif(wald["criticidadCritica", "Pr(>|t|)"], 2)`$).
+- **Fase** (referencia: fase 1). Su coeficiente compara la fase 2 con la fase 1 **en una máquina
+  auxiliar**, porque la auxiliar es la referencia de la criticidad. Ahí **no hay diferencia**
+  ($\hat\beta=`r round(bg[["fase_procesofase2"]], 2)`$,
+  $p=`r signif(wald["fase_procesofase2", "Pr(>|t|)"], 2)`$; el intervalo del factor contiene el 1): para
+  una máquina poco crítica, que su proceso sea inicial o final no cambia el coste de repararla.
+- **Interacción criticidad × fase.** Mide cuánto **más** cuesta ser crítica en la fase 2 que en la
+  fase 1. La diferencia es **significativa** y grande: un factor extra de
+  $e^{`r round(bg[["criticidadCritica:fase_procesofase2"]], 2)`}=`r round(exp(bg[["criticidadCritica:fase_procesofase2"]]), 2)`$
+  —casi el doble— sobre lo que ya cuesta ser crítica
+  ($p=`r signif(wald["criticidadCritica:fase_procesofase2", "Pr(>|t|)"], 2)`$).
+- **Antigüedad y carga.** Aquí no hay referencia: el contraste pregunta si la **pendiente** es distinta
+  de cero, y en las dos lo es. Merece subrayarse que sus pendientes parecían planas en el EDA
+  (@fig-u31-cont): la carga, en concreto, encarece la reparación un
+  `r pct(bg[["carga"]] * diff(range(base$carga)))` % de la máquina menos exigida a la más exigida. El
+  diagrama mostraba la relación *marginal* (máquinas de toda criticidad mezcladas), mientras el modelo
+  aísla el efecto *parcial*, con el resto fijo: un caso de manual de cómo la **confusión** puede
+  esconder un efecto real a la vista simple.
+
+Lo que Wald **no** dice es si una variable importa en su conjunto. Que el coeficiente de la fase no sea
+significativo **no** significa que la fase no importe: solo que no importa **en las máquinas
+auxiliares**. Esa otra pregunta es la del contraste $F$, en la [Sección 1.6](#sec-u31-f), donde resolvemos la selección de variables.
+
+### Interacciones y efecto marginal
 
 El factor de la criticidad, sin embargo, no cuenta toda la historia: como entra **en interacción con la
 fase del proceso**, su efecto no es un único número, sino que **depende de la fase**. Sumar a mano el
@@ -550,12 +650,12 @@ marginaleffects::plot_predictions(m_gamma,
 ## 🔧 En R. Tres herramientas para leer el modelo
 Hemos usado tres piezas del ecosistema, cada una para una tarea distinta de interpretación:
 
-- **`broom::tidy(m_gamma, exponentiate = TRUE)`** ordena los coeficientes en un *data frame* limpio (una
-  fila por término) y, con `exponentiate = TRUE`, los devuelve como $e^{\hat\beta}$: la escala del
-  **factor**. Encima, `dplyr::transmute()` **crea las columnas que queremos y descarta el resto** (a
-  diferencia de `mutate()`, que las añade): aquí, quedarnos solo con `term` y `exp(beta)`. La misma
-  función, añadiendo `conf.int = TRUE` y el estadístico de Wald, arma la **tabla integral** de la
-  [Sección 1.6](#sec-u31-inferencia).
+- **`broom::tidy(m_gamma)`** ordena los coeficientes en un *data frame* limpio (una fila por término);
+  `exp(estimate)` los lleva a la escala del **factor**, y con `exponentiate = TRUE` el propio `tidy`
+  los devolvería ya como $e^{\hat\beta}$. Encima, `dplyr::transmute()` **crea las columnas que queremos
+  y descarta el resto** (a diferencia de `mutate()`, que las añade): aquí, el término, el coeficiente,
+  su error estándar y el factor. La misma función, añadiendo `conf.int = TRUE` y el estadístico de
+  Wald, arma la tabla de contrastes de Wald de más abajo (@tbl-u31-inferencia).
 - **`emmeans::emmeans(m_gamma, ~ criticidad | fase_proceso, type = "response")`** calcula **medias
   marginales estimadas**: el coste predicho para cada nivel de criticidad *dentro de* cada fase (la barra
   `|` fija la fase). Hace por nosotros la suma «principal + interacción» y, con `type = "response"`,
@@ -570,171 +670,599 @@ La idea de fondo: `tidy` sirve para leer **coeficientes** (efectos en escala del
 términos). Con interacciones, casi siempre es más honesto interpretar sobre predicciones.
 :::
 
-## 1.6 Inferencia y selección {#sec-u31-inferencia}
 
-Toda la inferencia de este modelo comparte una **raíz común**: $\phi$ es **desconocida y se estima de
-los datos**. Eso desplaza las distribuciones de referencia respecto de Poisson o binomial —donde
-$\phi=1$ es conocida—, igual que en el modelo lineal cambia todo según trabajemos con $\sigma^2$ conocida
-o estimada. La consecuencia es que operamos con la familia **$t$/$F$** en vez de con normal/$\chi^2$. Con
-esa idea en la mano, la inferencia tiene **dos niveles**:
 
-- **Un coeficiente aislado** (¿es $\beta_j\neq 0$?): contraste de **Wald**, el cociente
-  $\hat\beta_j/\operatorname{ee}(\hat\beta_j)$ referido a una **$t$ de Student** con $n-p$ grados de
-  libertad. Lo leeremos en la **tabla integral** de más abajo; sirve para juzgar la significación de
-  cada término **uno a uno**.
-- **Un término completo o un modelo frente a otro anidado** (¿aporta la interacción?, ¿sobra
-  `fabricante`?): contraste **$F$**, cociente de deviances escaladas. Es el que necesitamos para
-  **decisiones de modelización**, porque un factor con varios niveles —o una interacción— no se juzga por
-  un único coeficiente, sino por el bloque entero.
 
-**Primer nivel: cada coeficiente.** Reunimos en una sola tabla los coeficientes con su estadístico de
-Wald (estimación, error estándar, $t$ y $p$-valor) y, pegada, su versión **exponenciada** —el factor—
-con su intervalo de confianza al 95 % (@tbl-u31-inferencia):
+## 1.6 Bondad de ajuste y selección {#sec-u31-bondad}
 
-```{r}
-#| label: tbl-u31-inferencia
-#| tbl-cap: "Tabla integral de coeficientes: estadístico de Wald (β̂, error estándar, t, p) junto al factor exp(β̂) y su intervalo de confianza al 95 %. El intervalo del factor que no contiene el 1 señala un efecto significativo."
-broom::tidy(m_gamma, conf.int = TRUE) |>
-  dplyr::transmute(term,
-                   beta = round(estimate, 3), ee = round(std.error, 3),
-                   t = round(statistic, 2), p = signif(p.value, 3),
-                   `exp(beta)` = round(exp(estimate), 3),
-                   ic95 = paste0("[", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), "]"))
-```
+La interpretación de la [Sección 1.5](#sec-u31-interpretacion) da por bueno el modelo. Toca preguntarse
+dos cosas: **si se ajusta a los datos** y **qué variables deben quedarse en él**. Las dos preguntas
+se responden con la misma herramienta, la **deviance**.
 
-**Casi todas las variables resultan significativas.** Los $p$-valores son pequeños en casi todos los
-términos y, en la escala del factor, sus intervalos de confianza **quedan por encima de 1** —el 1, «sin
-efecto», cae fuera—. Es la misma afirmación en dos escalas: «$\beta\neq 0$ en escala log» equivale a
-«$e^{\beta}\neq 1$». Merece subrayarse que **la antigüedad y la carga**, cuyas pendientes parecían planas
-en el EDA (@fig-u31-cont), **salen significativas** —y la **carga**, con un efecto nada pequeño (un ~32 %
-del menos al más exigido) pese a su pendiente marginal casi plana—: el diagrama mostraba la relación
-*marginal* (máquinas de toda criticidad mezcladas), mientras el modelo aísla el efecto *parcial*, con el
-resto fijo. Es un caso de manual de cómo la **confusión** puede esconder un efecto real a la vista simple. La
-**única excepción** es el efecto principal de la fase, y no es un defecto, sino justo lo que el diseño
-anticipaba.
+### Bondad de ajuste y diagnóstico {#sec-u31-deviance}
 
-**La fase, significativa solo en interacción con la criticidad.** El efecto **principal** de
-`fase_proceso` —comparar la fase 2 con la fase 1 en una máquina *auxiliar*— **no es significativo**
-($\hat\beta\approx 0{,}03$, $p\approx 0{,}6$; su factor ronda 1 y el intervalo cruza el 1): para una
-máquina poco crítica, que su proceso sea final o inicial **no cambia** el coste de repararla. Pero la
-**interacción `criticidad × fase2` sí es muy significativa**, y con un **tamaño de efecto grande**: al
-término de una avería crítica en la fase 2 le corresponde un factor extra $e^{0{,}69}\approx 1{,}99$
-—casi el doble— sobre lo que ya cuesta ser crítica. El matiz importa: el coeficiente **principal** de la
-fase la evalúa **solo en el nivel de referencia de la criticidad** (Auxiliar), donde no hay diferencia;
-el efecto de la fase «vive» en el **término de interacción**, que actúa sobre las máquinas importantes y
-críticas. Por eso sería un error retirar `fase_proceso` mirando únicamente su $p$-valor principal: un
-efecto principal no significativo **cuya interacción sí lo es** debe **mantenerse** (principio de
-**jerarquía** o *marginalidad*), pues la interacción no tiene sentido sin él.
+La **deviance** mide cuánto se aleja el modelo del **modelo saturado**, el que reproduciría cada
+observación exactamente ($\hat\mu_i=y_i$). Para la Gamma, cada observación aporta una **deviance
+unitaria** y la deviance del modelo es su suma [@dunnsmyth2018, cap. 11]:
 
-::: {.callout-warning}
-## Por qué $t$ y $F$, y no $z$ y $\chi^2$
-Es la misma causa en los dos niveles. En Poisson y binomial la dispersión es **conocida** ($\phi=1$): el
-estadístico de Wald es asintóticamente normal (`z value`) y la diferencia de deviances, $\chi^2$. En la
-Gamma, $\phi$ **se estima**, lo que añade incertidumbre; R lo tiene en cuenta refiriendo el cociente de
-Wald a una **$t$** y el de deviances escaladas a una **$F$** —como en el modelo lineal—. Por eso la tabla
-de coeficientes trae `t value`/`Pr(>|t|)` y en los contrastes de modelos pasamos `test = "F"`; usar
-`test = "Chisq"` produciría valores $p$ demasiado pequeños.
-:::
+$$
+D=\sum_{i=1}^{n} d(y_i,\hat\mu_i),\qquad
+d(y,\hat\mu)=2\left\{-\log\frac{y}{\hat\mu}+\frac{y-\hat\mu}{\hat\mu}\right\}.
+$$
 
-::: {.callout-tip}
-## 🔧 En R. Contrastar términos y comparar modelos
-Tres piezas, según lo que se pregunte:
+Dividida por la dispersión se obtiene la **deviance escalada**, $D^{*}=D/\phi$. Si el modelo es
+correcto, **$\phi$ es conocida y además pequeña** —para la Gamma, $\phi\le 1/3$ es el criterio
+práctico—, se cumple aproximadamente
 
-- **Un término dentro del modelo** — `anova(m_gamma, test = "F")` da la tabla de deviances término a
-  término. En la Gamma se pasa **`test = "F"`** (porque $\phi$ se estima); `test = "Chisq"` daría $p$
-  demasiado pequeños. `drop1(m, test = "F")` hace lo análogo quitando un término cada vez.
-- **Dos modelos anidados** (¿aporta la interacción?, ¿sobra `fabricante`?) — se ajusta el vecino y se
-  enfrentan con `anova(m_reducido, m_completo, test = "F")`. **`update(m, . ~ . + fabricante)`** construye
-  ese modelo vecino sin reescribir la fórmula entera.
-- **Modelos no anidados, misma respuesta y familia** — **`AIC(m1, m2, m3)`**; gana el menor. (Para comparar
-  entre respuestas en escalas distintas, cuidado con el jacobiano: [Unidad 3.2](#sec-u32).)
-:::
+$$
+D^{*}=\frac{D}{\phi}\;\overset{\cdot}{\sim}\;\chi^{2}_{\,n-p},
+$$
 
-**Segundo nivel: términos y modelos.** Pasamos de los coeficientes uno a uno a los bloques. La tabla de
-análisis de la deviance término a término:
+donde $p$ es el número de coeficientes [@dunnsmyth2018, §7.4–7.5]. Es la base del **test de bondad
+de ajuste** en Poisson o binomial, donde $\phi=1$: un $D^{*}$ mucho mayor que sus grados de libertad
+señala que el modelo deja sin explicar más variabilidad de la que su familia admite.
+
+**En la Gamma no hay un test así, y tampoco sirve una $F$.** La razón es instructiva. Cuando $\phi$ se
+desconoce, el contraste $F$ compara un modelo con **otro mayor** y divide por una estimación de $\phi$
+obtenida **de ese modelo mayor** [@dunnsmyth2018, §7.6.4]. En la bondad de ajuste, el modelo mayor es
+el saturado: tiene un parámetro por observación, **no le quedan grados de libertad** y no permite
+estimar $\phi$. Tampoco vale dividir por el $\hat\phi$ del propio modelo: numerador y denominador
+saldrían de los mismos residuos, y el cociente $D/\hat\phi$ queda cerca de $n-p$ casi por
+construcción.
+
+Con los datos de que disponemos, la bondad de ajuste se aborda por tres vías:
+
+1. **La coherencia de $\phi$** (@tbl-u31-deviance): que $\hat\phi$ cumpla la condición de
+   **dispersión pequeña** en la que se apoyan las aproximaciones $\chi^{2}$ y $F$, y que sus dos
+   estimaciones —la de **Pearson** y la de la **deviance**, $D/(n-p)$— no se separen, como tenderían a
+   hacer si el modelo estuviera mal especificado.
+2. **La comparación con modelos más flexibles**: si al modelo le falta algo —una curvatura, una
+   interacción—, añadírselo debería reducir la deviance de forma significativa. Es un contraste $F$
+   entre modelos anidados, y lo hacemos al final de esta sección, una vez elegido el modelo
+   ([¿Le falta algo al modelo?](#sec-u31-falta-ajuste)).
+3. **El test por simulación**: DHARMa simula respuestas del
+   modelo ajustado —con su $\hat\phi$— y contrasta que los residuos se comporten como deben. Es el
+   verdadero test de bondad de ajuste para la Gamma.
+
+En los tres casos se pregunta lo mismo: ¿hay en los datos algo que el modelo no recoge?
 
 ```{r}
-#| label: u31-anova-f
-anova(m_gamma, test = "F")
+#| label: tbl-u31-deviance
+#| tbl-cap: "Deviance del modelo, calculada con la fórmula de la deviance unitaria y por R (coinciden), sus grados de libertad, y las dos estimaciones de la dispersión: la de la deviance, D/(n − p), y la de Pearson que usa R."
+y_obs  <- base$coste_euros
+mu_hat <- fitted(m_gamma)
+bondad <- c(deviance_formula = 2 * sum(-log(y_obs / mu_hat) + (y_obs - mu_hat) / mu_hat),
+            deviance_R       = deviance(m_gamma),
+            gl               = df.residual(m_gamma),
+            phi_deviance     = deviance(m_gamma) / df.residual(m_gamma),
+            phi_pearson      = summary(m_gamma)$dispersion)
+tibble::enframe(round(bondad, 3), name = "cantidad", value = "valor")
 ```
 
-**¿Aporta la interacción?** Es la decisión de modelización clave. La contrastamos frente al modelo con
-solo los efectos principales (misma criticidad en las dos fases):
+Las dos estimaciones de $\phi$ apenas difieren
+(`r round(bondad[["phi_deviance"]], 3)` frente a `r round(bondad[["phi_pearson"]], 3)`), y las dos
+quedan en torno al umbral de $1/3$: las aproximaciones son razonables, aunque en el límite. Es una
+comprobación de **coherencia**, no una prueba de buen ajuste; las otras dos vías vienen después.
+
+**Los residuos.** La tercera vía, el test por simulación, necesita unos residuos adecuados. Los
+crudos, $y-\hat\mu$, no sirven en un GLM Gamma, porque su dispersión crece con $\hat\mu$. Los de
+**deviance** corrigen bastante, pero en respuestas muy asimétricas siguen mostrando patrones espurios.
+La herramienta adecuada son los **residuos cuantil aleatorizados** [@dunnsmyth1996]: si el modelo es
+correcto se distribuyen **uniformemente**, sea cual sea la familia. `DHARMa` los obtiene simulando
+respuestas del modelo ajustado y situando cada observación como un cuantil entre sus simulaciones. La
+@fig-u31-dharma los muestra para el modelo de la [Sección 1.4](#sec-u31-modelizacion).
 
 ```{r}
-#| label: u31-lrt-interaccion
-m_sin_int <- glm(coste_euros ~ tipo_averia + criticidad + fase_proceso + antiguedad_anios + carga,
-                 family = Gamma(link = "log"), data = base)
-anova(m_sin_int, m_gamma, test = "F")
+#| label: fig-u31-dharma
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Residuos cuantil simulados (DHARMa) del modelo de la Sección 1.4. Izquierda: QQ-plot uniforme con los contrastes de uniformidad (KS), dispersión y atípicos. Derecha: residuos frente al valor predicho; buscamos una nube sin estructura."
+sim_g <- DHARMa::simulateResiduals(m_gamma, n = 1000)   # se guarda: lo usan el texto y la figura por fabricante
+plot(sim_g)
 ```
 
-**¿Entra el `fabricante`?** Lo añadimos como candidato y dejamos que la evidencia decida. El contraste
-$F$ del bloque frente al modelo sin él:
+Ninguno de los tres contrastes señala un problema: uniformidad
+($p=`r signif(DHARMa::testUniformity(sim_g, plot = FALSE)$p.value, 2)`$), dispersión
+($p=`r signif(DHARMa::testDispersion(sim_g, plot = FALSE)$p.value, 2)`$) y atípicos
+($p=`r signif(DHARMa::testOutliers(sim_g, plot = FALSE)$p.value, 2)`$). La familia y la estructura de
+la media son, de entrada, razonables. Que no se vea ningún patrón no garantiza que no falte nada: lo
+comprobamos al final de la sección.
+
+### Selección de variables: el contraste $F$ {#sec-u31-f}
+
+La deviance sirve, sobre todo, para **comparar modelos anidados**. Supongamos dos modelos, $M_0$ con
+$p_0$ coeficientes y $M_1$ con $p_1>p_0$, tales que **$M_0$ está anidado en $M_1$** (esto es, $M_0$ es un caso
+particular de $M_1$, que resulta de imponer restricciones a sus coeficientes). Como $M_1$ es más flexible, su deviance nunca es mayor, y la
+diferencia $D_0-D_1$ mide lo que esa flexibilidad añade. Escalada por $\phi$, sigue aproximadamente una
+$\chi^{2}$ con $p_1-p_0$ grados de libertad. Como $\phi$ se desconoce, se sustituye por una estimación
+obtenida del **modelo mayor**, $M_1$ —el que no impone la restricción y, por tanto, la estima sin
+sesgo aunque $M_0$ sea falso—, y el cociente se refiere a una $F$ [@dunnsmyth2018, §7.6.4]:
+
+$$
+F=\frac{(D_0-D_1)/(p_1-p_0)}{\hat\phi_{1}}\;\overset{\cdot}{\sim}\;F_{\,p_1-p_0,\;n-p_1},
+\qquad \hat\phi_{1}\ \text{estimada con}\ M_1 .
+$$
+
+Cuando $M_0$ es $M_1$ sin un término, estamos contrastando la significatividad de ese término. Recordemos que un factor con varios niveles no se juzga por un coeficiente suelto, sino por el bloque
+de todos sus coeficientes.
+
+La tabla de análisis de la deviance lo calcula con `car::Anova(m_gamma, type = "II", test.statistic = "F")`
+(@tbl-u31-anova): contrasta cada término ajustado por todos los demás que **no lo contienen**. Para
+los términos que no forman parte de una interacción equivale a quitarlos del modelo completo, lo mismo
+que hace `drop1(m_gamma, test = "F")`; para la criticidad y la fase, que `drop1` no evalúa mientras su
+interacción esté en el modelo, da su efecto ajustado por el resto, sin la interacción.
+
+```{r}
+#| label: tbl-u31-anova
+#| tbl-cap: "Contraste F de cada término (tipo II): cada término, ajustado por todos los que no lo contienen. Para los términos sin interacción coincide con quitarlos del modelo completo (drop1); para la criticidad y la fase, da su efecto principal ajustado por el resto, sin la interacción."
+f_t2 <- car::Anova(m_gamma, type = "II", test.statistic = "F")
+
+tibble::tibble(term = rownames(f_t2)[-nrow(f_t2)],      # la última fila es el residuo
+               gl   = f_t2$Df[-nrow(f_t2)],
+               F    = round(f_t2$`F value`[-nrow(f_t2)], 1),
+               p    = signif(f_t2$`Pr(>F)`[-nrow(f_t2)], 3))
+```
+
+La tabla responde a «¿es significativa esta variable?»:
+
+- **Tipo de avería, antigüedad y carga** son significativas: quitar cualquiera de ellas empeora el
+  modelo ($p=`r signif(f_t2["tipo_averia", "Pr(>F)"], 2)`$,
+  $p=`r signif(f_t2["antiguedad_anios", "Pr(>F)"], 2)`$ y
+  $p=`r signif(f_t2["carga", "Pr(>F)"], 2)`$).
+- **La interacción criticidad × fase** es significativa
+  ($p=`r signif(f_t2["criticidad:fase_proceso", "Pr(>F)"], 2)`$). Es el contraste decisivo para la
+  criticidad y la fase: mientras la interacción esté en el modelo, las dos se quedan (principio de
+  **jerarquía** o *marginalidad*).
+- **La criticidad y la fase** salen también significativas
+  ($p=`r signif(f_t2["criticidad", "Pr(>F)"], 2)`$ y
+  $p=`r signif(f_t2["fase_proceso", "Pr(>F)"], 2)`$). Conviene leerlo bien: es su efecto **promediado**
+  sobre el resto, sin separar por la interacción. Que la fase importe en promedio no contradice que, en
+  las máquinas auxiliares, la fase 2 no difiera de la fase 1, que es lo que decía su contraste de Wald
+  (@tbl-u31-inferencia): la fase importa, pero **a través de las máquinas críticas**.
+
+>La función `anova(m_gamma, test = "F")` de R base, en cambio, es **secuencial**: añade los términos en
+el orden de la fórmula y juzga cada uno solo frente a los que le preceden, de modo que su resultado
+depende de ese orden. Por eso no la usamos para decidir qué variables entran.
+
+
+### ¿Le falta algo al modelo? {#sec-u31-falta-ajuste}
+
+La @tbl-u31-anova juzga los términos que el modelo **ya tiene**. Falta la otra mitad de la bondad de
+ajuste: comparar el modelo con otros **más flexibles**. Si le falta algo, añadírselo debería reducir la
+deviance más de lo que el azar explica. Puede faltarle una **variable** o una **forma** —una curvatura,
+una interacción—, y las dos se contrastan igual: con la $F$ entre modelos anidados.
+
+**¿Entra el `fabricante`?** Es la variable candidata que el modelo no incluye. Antes de contrastarla,
+miramos si los residuos del modelo actual la echan de menos: si el fabricante no importara, los
+residuos cuantil se repartirían igual en los tres (@fig-u31-res-fabricante).
+
+```{r}
+#| label: fig-u31-res-fabricante
+#| fig-width: 6
+#| fig-height: 3.6
+#| fig-cap: "Residuos cuantil del modelo de la Sección 1.4 por fabricante, con la media de cada grupo (rombo rojo). Si el modelo no echara de menos al fabricante, los tres grupos se centrarían en 0.5. Los residuos del fabricante C quedan algo por debajo: sus reparaciones salen más baratas de lo que el modelo predice."
+tibble::tibble(residuo = residuals(sim_g), fabricante = base$fabricante) |>
+  ggplot(aes(fabricante, residuo)) +
+  geom_boxplot(fill = "grey90", outlier.shape = NA) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, colour = "firebrick") +
+  geom_hline(yintercept = 0.5, linetype = 2) +
+  labs(x = "fabricante", y = "residuo cuantil (DHARMa)")
+```
+
+Los residuos del **C** quedan por debajo de los demás: el modelo sobrestima lo que cuestan sus
+reparaciones. Lo contrastamos añadiendo el fabricante al modelo, con la $F$ del bloque:
 
 ```{r}
 #| label: u31-control
 m_fab <- update(m_gamma, . ~ . + fabricante)
-anova(m_gamma, m_fab, test = "F")
+f_fab <- anova(m_gamma, m_fab, test = "F")
+f_fab
 ```
 
-El bloque resulta **significativo** —lo aporta sobre todo uno de sus tres niveles— y, como confirma el
+El bloque resulta **significativo** ($p=`r signif(f_fab$"Pr(>F)"[2], 2)`$) y, como confirma el
 **AIC** [@akaike1974] (comparable solo entre modelos sobre los mismos datos y la misma familia), añadir
 `fabricante` **reduce** el criterio (@tbl-u31-aic):
 
 ```{r}
 #| label: tbl-u31-aic
-#| tbl-cap: "Comparación por AIC: sin interacción, con interacción, y añadiendo fabricante. El menor AIC corresponde al modelo con fabricante."
-AIC(m_sin_int, m_gamma, m_fab) |> round(1)
+#| tbl-cap: "Comparación por AIC del modelo sin y con fabricante. El menor AIC corresponde al modelo con fabricante."
+AIC(m_gamma, m_fab) |> round(1)
 ```
 
-**El modelo que nos quedamos (de momento).** La **interacción criticidad × fase se mantiene** (el $F$ la
-respalda y el AIC baja al incluirla). Y `fabricante`, contra lo que cabría esperar de una simple etiqueta
-de catálogo, **también baja el AIC** y sale significativo; siguiendo la evidencia, lo **incluimos
-provisionalmente**, de modo que el modelo con el que seguimos es `m_fab`. Es una decisión que dejamos
-**en cuarentena**: un único nivel significativo y un efecto pequeño invitan a la cautela, y con el
-efecto aleatorio de máquina de la [Unidad 3.4](#sec-u34) veremos si ese efecto es real o un espejismo. Sobre
-`m_fab` hacemos el diagnóstico.
+Contra lo que cabría esperar de una simple etiqueta de catálogo, `fabricante` entra. Siguiendo la
+evidencia, lo **incluimos provisionalmente**, y el modelo con el que seguimos es `m_fab`. Es una
+decisión que dejamos **en cuarentena**: el efecto es pequeño y lo aporta un solo nivel, y con el efecto
+aleatorio de máquina de la [Unidad 3.4](#sec-u34) veremos si es real o un espejismo.
 
+**¿Y la forma?** Con `fabricante` dentro, probamos tres ampliaciones más (@tbl-u31-falta-ajuste):
+
+- que el efecto de la **antigüedad** no sea lineal en escala log —la sustituimos por un *spline*
+  natural con 4 grados de libertad—;
+- lo mismo para la **carga**;
+- que falten **interacciones** del tipo de avería con la criticidad y con la fase.
+
+::: {.callout-note collapse="true"}
+## Qué es un *spline* y cómo se ajusta
+Un ***spline*** es una curva flexible hecha **a trozos**: se divide el rango de la variable en
+intervalos, separados por unos puntos llamados **nodos**, y en cada intervalo se ajusta un polinomio
+—normalmente cúbico— con la condición de que los trozos empalmen **suavemente** en los nodos. Un
+*spline* **natural** añade una restricción: fuera de los nodos extremos es una recta, lo que evita que la
+curva se dispare en los bordes, donde hay pocos datos.
+
+En la práctica, el *spline* se escribe como una suma de **funciones base** $B_k(x)$, fijas y conocidas,
+con un coeficiente cada una:
+$$
+f(x)=\sum_{k=1}^{K}\gamma_k\,B_k(x).
+$$
+Así, dentro de un GLM no es más que **sustituir $x$ por $K$ columnas nuevas**, $B_1(x),\dots,B_K(x)$, y
+estimar sus coeficientes $\gamma_k$ como los de cualquier otra variable. En R, `splines::ns(x, df = 4)`
+construye esas columnas: `df` es el número de funciones base, y con él la flexibilidad de la curva. La
+@fig-u31-spline muestra las cuatro funciones base que usamos para la carga.
+
+```{r}
+#| label: fig-u31-spline
+#| fig-width: 6
+#| fig-height: 3.4
+#| fig-cap: "Las cuatro funciones base del spline natural de la carga, splines::ns(carga, df = 4). El modelo estima un coeficiente para cada una, y el efecto de la carga es su suma ponderada."
+rejilla_c <- seq(min(base$carga), max(base$carga), length.out = 200)
+base_ns   <- predict(splines::ns(base$carga, df = 4), rejilla_c)
+
+tibble::tibble(carga   = rep(rejilla_c, 4),
+               valor   = as.vector(base_ns),
+               funcion = rep(paste0("B", 1:4), each = length(rejilla_c))) |>
+  ggplot(aes(carga, valor, colour = funcion)) +
+  geom_line(linewidth = 0.8) +
+  labs(x = "carga", y = "valor de la función base", colour = NULL)
 ```
-coste_euros ~ tipo_averia + criticidad * fase_proceso + antiguedad_anios + carga + fabricante
+
+Un *spline* contrasta si hace falta curvatura **sin decidir de antemano qué forma** tiene: si el
+modelo con *spline* no mejora al lineal, la recta basta.
+:::
+
+```{r}
+#| label: tbl-u31-falta-ajuste
+#| tbl-cap: "Contrastes F de falta de ajuste: el modelo con fabricante frente a tres ampliaciones más flexibles. Un p-valor pequeño indica que la ampliación recoge algo que el modelo deja fuera."
+m_spl_edad  <- update(m_fab, . ~ . - antiguedad_anios + splines::ns(antiguedad_anios, 4))
+m_spl_carga <- update(m_fab, . ~ . - carga + splines::ns(carga, 4))
+m_int_extra <- update(m_fab, . ~ . + tipo_averia:criticidad + tipo_averia:fase_proceso)
+
+falta <- purrr::map_dfr(
+  list(`antigüedad no lineal` = m_spl_edad, `carga no lineal` = m_spl_carga,
+       `interacciones del tipo de avería` = m_int_extra),
+  \(m1) { a <- anova(m_fab, m1, test = "F")
+          tibble::tibble(gl = a$Df[2], F = round(a$F[2], 2), p = signif(a$`Pr(>F)`[2], 2)) },
+  .id = "ampliacion")
+falta
 ```
+
+Ni la curvatura en la antigüedad ($p=`r falta$p[1]`$) ni las interacciones adicionales
+($p=`r falta$p[3]`$) mejoran el modelo. La **carga** sí ($p=`r falta$p[2]`$): su efecto no parece
+lineal. Antes de quedarnos con un *spline*, probamos una curvatura más sencilla, un término
+**cuadrático**, $\beta^{CAR2}\,\text{carga}^2$, que añade un solo coeficiente:
+
+```{r}
+#| label: u31-carga-cuad
+m_final <- update(m_fab, . ~ . + I(carga^2))
+f_cuad  <- anova(m_fab, m_final, test = "F")
+f_cuad
+```
+
+El término cuadrático es **significativo** ($p=`r signif(f_cuad$"Pr(>F)"[2], 2)`$), y nos lo
+quedamos: es el modelo final, `m_final`. La @fig-u31-carga-formas compara las tres formas del efecto de
+la carga.
+
+```{r}
+#| label: fig-u31-carga-formas
+#| fig-width: 7
+#| fig-height: 3.8
+#| fig-cap: "Coste medio predicho frente a la carga con las tres formas del efecto —lineal, spline natural y cuadrática—, para una avería mecánica en una máquina auxiliar de la fase 1, del fabricante A y de edad media. Las marcas del eje inferior son las cargas observadas. La cuadrática recoge lo esencial del spline con un solo coeficiente más: el coste sube con la carga hasta un máximo y baja ligeramente en las máquinas más exigidas, donde hay pocos datos."
+perfil_c <- data.frame(tipo_averia = "Mecanica", criticidad = "Auxiliar", fase_proceso = "fase1",
+                       antiguedad_anios = mean(base$antiguedad_anios), fabricante = "A",
+                       carga = rejilla_c)
+purrr::map_dfr(list(lineal = m_fab, spline = m_spl_carga, `cuadrática` = m_final),
+               \(m) tibble::tibble(carga = rejilla_c,
+                                   coste = predict(m, perfil_c, type = "response")),
+               .id = "forma") |>
+  ggplot(aes(carga, coste, colour = forma)) +
+  geom_line(linewidth = 0.9) +
+  geom_rug(data = base, aes(x = carga), inherit.aes = FALSE, alpha = 0.2) +
+  labs(x = "carga", y = "coste medio predicho (€)", colour = NULL)
+```
+
+Dos cautelas acompañan a esta decisión:
+
+- La curvatura se apoya sobre todo en los **extremos**, donde hay pocos datos: apenas un 5 % de las
+  averías ocurre en máquinas con una carga por debajo de `r round(quantile(base$carga, 0.05), 2)`.
+- La carga es una característica **de la máquina**, constante para todas sus averías. Como el modelo
+  trata cada avería como independiente, cuenta la misma máquina varias veces y **exagera la evidencia**:
+  es el mismo mecanismo que puede estar detrás de `fabricante`.
+
+La curvatura de la carga queda, pues, en la misma **cuarentena** que el fabricante, para revisarla
+cuando la [Unidad 3.4](#sec-u34) tenga en cuenta la máquina.
+
+**La bondad de ajuste del modelo final.** Repetimos sobre `m_final` la comprobación de coherencia de
+la @tbl-u31-deviance (@tbl-u31-deviance-final):
+
+```{r}
+#| label: tbl-u31-deviance-final
+#| tbl-cap: "Deviance del modelo final, sus grados de libertad y las dos estimaciones de la dispersión: la de la deviance, D/(n − p), y la de Pearson."
+bondad_fin <- c(deviance     = deviance(m_final),
+                gl           = df.residual(m_final),
+                phi_deviance = deviance(m_final) / df.residual(m_final),
+                phi_pearson  = summary(m_final)$dispersion)
+tibble::enframe(round(bondad_fin, 3), name = "cantidad", value = "valor")
+```
+
+Las dos estimaciones de $\phi$ siguen siendo coherentes
+(`r round(bondad_fin[["phi_deviance"]], 3)` frente a `r round(bondad_fin[["phi_pearson"]], 3)`) y en el
+límite de la dispersión pequeña. Queda la prueba por simulación sobre el modelo final
+(@fig-u31-dharma-final y @tbl-u31-dharma-tests).
+
+```{r}
+#| label: fig-u31-dharma-final
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Residuos cuantil simulados (DHARMa) del modelo final. Izquierda: QQ-plot uniforme. Derecha: residuos frente al valor predicho."
+sim_f <- DHARMa::simulateResiduals(m_final, n = 1000)
+plot(sim_f)
+```
+
+```{r}
+#| label: tbl-u31-dharma-tests
+#| tbl-cap: "Contrastes de DHARMa sobre los residuos del modelo final. Uniformidad (Kolmogorov–Smirnov): ¿siguen los residuos la distribución que el modelo supone? Dispersión: ¿hay más o menos variabilidad de la que admite la Gamma con su φ? Atípicos: ¿hay más observaciones fuera del rango simulado de las esperables por azar?"
+tests_f <- tibble::tibble(
+  contraste = c("uniformidad (KS)", "dispersión", "atípicos"),
+  p         = c(DHARMa::testUniformity(sim_f, plot = FALSE)$p.value,
+                DHARMa::testDispersion(sim_f, plot = FALSE)$p.value,
+                DHARMa::testOutliers(sim_f, plot = FALSE)$p.value))
+tests_f |> dplyr::mutate(p = signif(p, 2))
+```
+
+Ninguno de los tres contrastes es significativo (el menor $p$ es
+`r signif(min(tests_f$p), 2)`), y el gráfico de la derecha no muestra abanico ni curvatura. **El modelo
+final es válido**: la Gamma describe bien la variabilidad del coste alrededor de su media, y no hemos
+encontrado nada que le falte —con las dos cautelas, el fabricante y la curvatura de la carga, que
+revisará la [Unidad 3.4](#sec-u34)—.
+
+::: {.callout-tip}
+## 🔧 En R. Bondad de ajuste, diagnóstico y selección
+Las funciones de esta sección, con un modelo genérico `m` ajustado con
+`glm(y ~ x, family = Gamma(link = "log"), data = d)`:
+
+- **Bondad de ajuste.** `deviance(m)` da la deviance $D$ y `df.residual(m)`, sus grados de libertad
+  $n-p$. Las dos estimaciones de la dispersión: `summary(m)$dispersion` (Pearson, la que usa R) y
+  `deviance(m) / df.residual(m)` (deviance).
+- **Diagnóstico con residuos cuantil.** `sim <- DHARMa::simulateResiduals(m, n = 1000)` genera `n`
+  réplicas de la respuesta bajo el modelo y sitúa cada observación como su **cuantil** entre ellas;
+  `plot(sim)` dibuja los dos paneles:
+  - **QQ uniforme:** los puntos deben seguir la diagonal;
+  - **residuos frente al predicho:** buscamos una nube **sin estructura**, ni abanico ni curvatura.
+
+  Los contrastes, por separado: `DHARMa::testUniformity(sim)`, `testDispersion(sim)` y
+  `testOutliers(sim)`; deben salir **no significativos**. `residuals(sim)` devuelve los residuos, para
+  dibujarlos frente a una variable candidata.
+- **Selección.**
+  - `car::Anova(m, type = "II", test.statistic = "F")` contrasta cada término ajustado por los que no
+    lo contienen: responde a «¿es significativa esta variable?». Para los términos sin interacción
+    equivale a `drop1(m, test = "F")`.
+  - `anova(m, test = "F")` es **secuencial**: añade los términos en el orden de la fórmula, y su
+    resultado depende de ese orden. No sirve para seleccionar.
+  - `anova(m0, m1, test = "F")` enfrenta dos modelos anidados; `update(m, . ~ . + x2)` construye el
+    vecino sin reescribir la fórmula.
+  - `AIC(m1, m2)` compara modelos sobre la misma respuesta y la misma familia; gana el menor.
+  - En la Gamma siempre `test = "F"`, porque $\phi$ se estima; `test = "Chisq"` daría $p$ demasiado
+    pequeños.
+- **Formas no lineales.** `splines::ns(x, df = 4)` sustituye `x` por un *spline* natural;
+  `I(x^2)` añade un término cuadrático (el `I()` es necesario para que `^` se lea como potencia).
+
+Volveremos a DHARMa en la [Unidad 3.4](#sec-u34), donde `simulateResiduals` sabe además respetar el
+**agrupamiento por máquina** del modelo mixto.
+:::
+
+## 1.7 Modelo validado y predicción {#sec-u31-prediccion}
+
+### El modelo final {#sec-u31-modelo-final}
+
+El modelo validado añade al de la [Sección 1.4](#sec-u31-modelizacion) el fabricante, con el A como
+referencia ($\mathcal{F}=\{\text{B},\ \text{C}\}$), y un término cuadrático en la carga:
+
+$$
+Y_i\sim\text{Gamma}(\mu_i,\alpha),\qquad \log\mu_i=\eta_i,
+$$
+
+$$
+\begin{aligned}
+\eta_i=\;&\beta_0
++\sum_{ta\in\mathcal{T}}\beta^{TA}_{ta}\,I(TA_i=ta)
++\sum_{cr\in\mathcal{C}}\beta^{CR}_{cr}\,I(CR_i=cr)
++\beta^{FP}\,I(FP_i=\text{fase 2})\\
+&+\beta^{ANT}\,\text{antigüedad}_i
++\beta^{CAR}\,\text{carga}_i+\beta^{CAR2}\,\text{carga}_i^{2} \\
+& \\
+&+\sum_{cr\in\mathcal{C}}\beta^{CR\times FP}_{cr}\,I(CR_i=cr)\,I(FP_i=\text{fase 2})
++\sum_{fa\in\mathcal{F}}\beta^{FAB}_{fa}\,I(FAB_i=fa).
+\end{aligned}
+$$
+
+La @tbl-u31-final da sus factores con su intervalo de confianza al 95 %.
+
+```{r}
+#| label: tbl-u31-final
+#| tbl-cap: "Modelo final: factor exp(β̂) de cada término, su intervalo de confianza al 95 % y el p-valor de Wald. Un factor mayor que 1 encarece la reparación frente a la referencia (Mecánica, Auxiliar, fase 1, fabricante A); menor que 1, la abarata. La carga entra con dos términos, lineal y cuadrático, y su efecto se lee en conjunto (Figura de las tres formas de la carga), no factor a factor."
+bf <- coef(m_final)                                 # coeficientes del modelo final (cifras en línea)
+wf <- summary(m_final)$coefficients
+
+broom::tidy(m_final, conf.int = TRUE) |>
+  dplyr::transmute(term,
+                   `exp(beta)` = round(exp(estimate), 3),
+                   ic95        = paste0("[", round(exp(conf.low), 2), ", ", round(exp(conf.high), 2), "]"),
+                   p           = signif(p.value, 3))
+```
+
+Los términos que ya estaban **apenas cambian**: los factores de la @tbl-u31-inferencia siguen valiendo,
+y su lectura de la [Sección 1.5](#sec-u31-interpretacion) no cambia. Por ejemplo, la avería
+electrónica pasa de un factor `r round(exp(bg[["tipo_averiaElectronica"]]), 2)` a
+`r round(exp(bf[["tipo_averiaElectronica"]]), 2)`, y la máquina crítica en la fase 1, de
+`r round(exp(bg[["criticidadCritica"]]), 2)` a `r round(exp(bf[["criticidadCritica"]]), 2)`. Lo nuevo es:
+
+- **El fabricante.** Las máquinas del **C** son algo más baratas de reparar que las del A, un
+  `r round(100 * (1 - exp(bf[["fabricanteC"]])))` % ($p=`r signif(wf["fabricanteC", "Pr(>|t|)"], 2)`$),
+  mientras que las del **B** no se distinguen de ellas
+  ($p=`r signif(wf["fabricanteB", "Pr(>|t|)"], 2)`$).
+- **La carga.** Con el término cuadrático, sus dos factores no se interpretan por separado: el efecto es
+  la curva de la @fig-u31-carga-formas, que sube con la carga hasta un máximo en torno a
+  `r round(-bf[["carga"]] / (2 * bf[["I(carga^2)"]]), 2)` y después baja ligeramente.
+
+Los dos efectos son los que dejamos en cuarentena.
+
+### Predicción
+
+Con el modelo validado queda la pregunta práctica: **¿cuánto costará una avería de un perfil dado?**
+Hay dos respuestas distintas, y conviene no confundirlas: el **coste medio** de las averías de ese
+perfil, y el **coste de una avería concreta**.
+
+#### El coste medio y su intervalo de confianza
+
+Para un perfil $x_0$, el modelo da el predictor lineal y, deshaciendo el enlace, la media en euros:
+
+$$
+\hat\eta_0=x_0^{\top}\hat\beta,\qquad \hat\mu_0=e^{\hat\eta_0}.
+$$
+
+La incertidumbre de $\hat\eta_0$ viene de la de los coeficientes. Con $\widehat{\operatorname{Var}}(\hat\beta)$,
+la matriz de covarianzas estimada —que incluye $\hat\phi$—,
+
+$$
+\operatorname{ee}(\hat\eta_0)=\sqrt{x_0^{\top}\,\widehat{\operatorname{Var}}(\hat\beta)\,x_0}.
+$$
+
+El intervalo se construye **en la escala del enlace**, donde la aproximación normal es buena, y se
+lleva a euros exponenciando sus extremos [@dunnsmyth2018, §7.6.3]:
+
+$$
+\text{IC}_{95\,\%}(\mu_0)=\Big[\,e^{\hat\eta_0-t\,\operatorname{ee}(\hat\eta_0)},\;
+e^{\hat\eta_0+t\,\operatorname{ee}(\hat\eta_0)}\,\Big],\qquad t=t_{\,n-p,\;0.975}.
+$$
+
+Así el intervalo es **asimétrico** —más largo hacia los costes altos, como la propia distribución— y
+nunca incluye valores negativos. Construirlo directamente en euros, como $\hat\mu_0\pm t\,\operatorname{ee}(\hat\mu_0)$,
+no garantiza ninguna de las dos cosas.
+
+#### El coste de una avería y su intervalo de predicción
+
+El intervalo anterior responde a *¿cuánto cuestan **en promedio** las averías de este perfil?* Pero
+una avería concreta varía alrededor de esa media según la propia Gamma de la
+[Sección 1.2](#sec-u31-gamma): $Y_0\sim\text{Gamma}(\mu_0,\alpha)$, con $\alpha=1/\phi$. Un **intervalo
+de predicción** al 95 % para una avería son sus cuantiles 2.5 % y 97.5 %, con $\hat\mu_0$ y
+$\hat\alpha=1/\hat\phi$:
+
+$$
+\text{IP}_{95\,\%}(Y_0)=\Big[\,q_{0.025}\big(\hat\mu_0,\hat\alpha\big),\;q_{0.975}\big(\hat\mu_0,\hat\alpha\big)\Big].
+$$
+
+Este intervalo ignora la incertidumbre de $\hat\mu_0$, que es pequeña frente a la variabilidad propia
+de cada avería.
+
+#### Predicciones para distintos perfiles de máquina
+
+La @tbl-u31-pred-perfiles aplica las dos fórmulas a ocho perfiles: avería mecánica o electrónica, en
+una máquina auxiliar o crítica, de la fase 1 o de la fase 2, con la edad y la carga en sus valores
+medios y el fabricante de referencia (A).
+
+```{r}
+#| label: tbl-u31-pred-perfiles
+#| tbl-cap: "Coste predicho por perfil de máquina: coste medio, su intervalo de confianza al 95 % y el intervalo de predicción al 95 % para una avería concreta. Edad y carga en sus valores medios; fabricante A. El intervalo de confianza es estrecho porque estima una media; el de predicción, ancho, porque recoge la variabilidad de cada avería."
+perfiles <- tidyr::expand_grid(
+  tipo_averia  = c("Mecanica", "Electronica"),
+  criticidad   = c("Auxiliar", "Critica"),
+  fase_proceso = c("fase1", "fase2"),
+  antiguedad_anios = mean(base$antiguedad_anios),
+  carga        = mean(base$carga),
+  fabricante   = "A")
+
+pr    <- predict(m_final, newdata = perfiles, type = "link", se.fit = TRUE)  # eta y su ee
+t_975 <- qt(0.975, df.residual(m_final))
+alfa  <- 1 / summary(m_final)$dispersion                                  # forma: alfa = 1/phi
+
+pred_perfiles <- perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   media    = exp(pr$fit),
+                   ic_inf   = exp(pr$fit - t_975 * pr$se.fit),
+                   ic_sup   = exp(pr$fit + t_975 * pr$se.fit),
+                   ip_inf   = qgamma(0.025, shape = alfa, scale = media / alfa),
+                   ip_sup   = qgamma(0.975, shape = alfa, scale = media / alfa))
+
+pred_perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   coste_medio = round(media),
+                   ic95_media  = paste0("[", round(ic_inf), ", ", round(ic_sup), "]"),
+                   ip95_averia = paste0("[", round(ip_inf), ", ", round(ip_sup), "]"))
+```
+
+Las dos columnas de intervalos dicen cosas muy distintas. En el punto caliente del sistema —una
+avería electrónica en una máquina crítica de la fase 2—, el coste **medio** se estima con bastante
+precisión, entre `r round(pred_perfiles$ic_inf[8])` y `r round(pred_perfiles$ic_sup[8])` €; pero
+una avería **concreta** de ese perfil puede costar desde `r round(pred_perfiles$ip_inf[8])` hasta
+`r round(pred_perfiles$ip_sup[8])` €. Para planificar repuestos o un presupuesto se usa la media; para
+dimensionar el peor caso razonable de una intervención, el intervalo de predicción.
+
+Son predicciones **marginales**: valen para una máquina *cualquiera* de ese perfil —la media de la
+población—. Es la única que un GLM puede dar, porque no distingue entre máquinas. En la
+[Unidad 3.4](#sec-u34), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda
+predicción, la **condicional**: cuánto costará reparar *esta* máquina en concreto. La diferencia entre
+ambas es, en una frase, lo que aportan los modelos mixtos.
 
 ### Implicaciones para el mantenimiento
 
-Con los efectos principales ya contrastados, conviene traducir los números a decisiones: cada
-coeficiente significativo es una **palanca** para la planta.
+Con el modelo final y sus predicciones, conviene traducir los números a decisiones: cada factor
+significativo de la @tbl-u31-final es una **palanca** para la planta.
 
 Lo primero que dice el modelo es **qué pesa en el coste de una reparación**.
 
-- Manda la **criticidad** —decenas de puntos porcentuales— y el **tipo de avería** (la más cara, una **electrónica**, un 54 % más que una mecánica).
-- Le sigue el **nivel de uso** (`carga`, un ~44 % por unidad; ~32 % del menos al más exigido).
-- La **antigüedad** pesa poco *por año* (~3 %), aunque a lo largo de la vida de una
-máquina se acumula hasta un sobrecoste apreciable (casi un 50 % entre la más nueva y la más vieja).
+- Manda la **criticidad** —decenas de puntos porcentuales— y el **tipo de avería** (la más cara, una
+  **electrónica**, un `r pct(bf[["tipo_averiaElectronica"]])` % más que una mecánica).
+- Le sigue el **nivel de uso**: el coste medio sube con la carga hasta en torno a
+  `r round(-bf[["carga"]] / (2 * bf[["I(carga^2)"]]), 2)` y luego baja ligeramente; de la máquina menos
+  exigida a la de carga en ese máximo, un
+  `r pct(bf[["carga"]] * (-bf[["carga"]] / (2 * bf[["I(carga^2)"]]) - min(base$carga)) + bf[["I(carga^2)"]] * ((-bf[["carga"]] / (2 * bf[["I(carga^2)"]]))^2 - min(base$carga)^2))` % más
+  (@fig-u31-carga-formas).
+- La **antigüedad** pesa poco *por año* (un `r pct(bf[["antiguedad_anios"]])` %), aunque a lo largo de
+  la vida de una máquina se acumula hasta un sobrecoste apreciable (un
+  `r pct(bf[["antiguedad_anios"]] * diff(range(base$antiguedad_anios)))` % entre la más nueva y la más
+  vieja).
 
 Para un responsable de mantenimiento, el grueso del gasto por intervención lo marcan la **naturaleza del
-fallo**, la **posición de la máquina en la línea** y **cuánto se le exige**, más que su edad. 
+fallo**, la **posición de la máquina en la línea** y **cuánto se le exige**, más que su edad.
 
 Lo segundo es una **jerarquía de severidad** muy concreta. Las averías **electrónicas** son las más
-caras de reparar (un 54 % sobre una mecánica): justifican mantener *stock* de repuestos electrónicos y
-personal cualificado, porque cuando ocurren, cuestan. Y por encima de todo está la **criticidad en los
-cuellos de botella**, que se dan en los últimos procesos de fabricación (ensamblado y acabado): una máquina crítica en Ensamblaje o Acabado no solo cuesta más de arreglar, sino
-que **detiene la línea**, y por eso su sobrecoste casi se duplica frente a la misma máquina en un proceso
-inicial. Es el hallazgo con más consecuencias prácticas del modelo: **si una de esas máquinas se avería,
-es la reparación más cara del sistema**. Sobre esa base, la prioridad de repuestos, tiempos de respuesta
-y redundancia empieza ahí.
+caras de reparar: justifican mantener *stock* de repuestos electrónicos y personal cualificado, porque
+cuando ocurren, cuestan. Y por encima de todo está la **criticidad en los cuellos de botella**, que se
+dan en los últimos procesos de fabricación (ensamblado y acabado): una máquina crítica en Ensamblaje o
+Acabado no solo cuesta más de arreglar, sino que **detiene la línea**, y por eso su sobrecoste se
+multiplica por `r sprintf("%.2f", exp(bf[["criticidadCritica:fase_procesofase2"]]))` frente a la misma máquina
+en un proceso inicial. La @tbl-u31-pred-perfiles lo pone en euros: una avería electrónica en una de esas
+máquinas cuesta de media `r round(pred_perfiles$media[8])` €, frente a `r round(pred_perfiles$media[5])` €
+en una auxiliar de la fase 1. Es el hallazgo con más consecuencias prácticas del modelo: **si una de
+esas máquinas se avería, es la reparación más cara del sistema**. Sobre esa base, la prioridad de
+repuestos, tiempos de respuesta y redundancia empieza ahí.
+
+Lo tercero es un matiz que evita una decisión equivocada, y que la interacción hace explícito: la fase
+del proceso **no** encarece las reparaciones «en general». Concentrar esfuerzo en las máquinas
+*auxiliares* de la fase 2 no evitaría ningún sobrecoste —para ellas, estar en un proceso final es
+indiferente al coste—. El sobrecoste de la fase 2 es **específico de las máquinas críticas** (y, en
+menor medida, de las importantes); leer el efecto principal aislado llevaría a repartir esfuerzo donde
+no rinde. Es la diferencia entre «mirar a la fase 2» y «mirar a las máquinas críticas de la fase 2».
+
+Lo cuarto es lo que el modelo **todavía no** permite decidir. El fabricante C sale algo más barato de
+reparar, y la carga parece dejar de encarecer las reparaciones en las máquinas más exigidas, pero los
+dos efectos están en cuarentena: no conviene trasladarlos a la compra de máquinas ni al reparto de la
+carga hasta comprobar en la [Unidad 3.4](#sec-u34) que no son un artefacto del agrupamiento.
 
 Conviene, eso sí, **no pedirle al modelo más de lo que dice**. Todo lo anterior es una lectura de
 **severidad** —*cuánto* cuesta una avería **si ocurre**—; no hemos modelado la **frecuencia** (cada
-cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo, el efecto del mantenimiento
-y el **presupuesto esperado = frecuencia × severidad** —donde la prevención se paga o no— se cierran con
-el enfoque Tweedie de la [Unidad 3.3](#sec-u33).
-
-Lo tercero es un matiz que evita una decisión equivocada, y que la interacción hace explícito: la fase del
-proceso **no** encarece las reparaciones «en general». Concentrar esfuerzo en las máquinas *auxiliares*
-de la fase 2 no evitaría ningún sobrecoste —para ellas, estar en un proceso final es indiferente al
-coste—. El sobrecoste de la fase 2 es **específico de las máquinas críticas** (y, en menor medida, de las
-importantes); leer el efecto principal aislado llevaría a repartir esfuerzo donde no rinde. Es la diferencia entre «mirar a la fase 2» y «mirar
-a las máquinas críticas de la fase 2».
+cuánto se avería una máquina) ni el **mantenimiento**. La frecuencia de fallo, el efecto del
+mantenimiento y el **presupuesto esperado = frecuencia × severidad** —donde la prevención se paga o
+no— se cierran con el enfoque Tweedie de la [Unidad 3.3](#sec-u33).
 
 Por último, un aviso que el propio ajuste desliza y que el caso irá a explotar: parte de la variabilidad
 del coste **no** la explican estas variables, sino la **máquina** en sí —algunas son crónicamente caras—.
@@ -742,123 +1270,48 @@ Es la fragilidad que infla el $\hat\phi$ y que, bien modelada, permite señalar 
 sustitución o vigilancia reforzada. De cómo estimarla —y de por qué mejora tanto la precisión— se ocupa
 la [Unidad 3.4](#sec-u34).
 
-## 1.7 Bondad de ajuste, diagnóstico y predicción {#sec-u31-diagnostico}
-
-### Residuos: cuáles usar
-
-Los residuos crudos $y-\hat\mu$ no sirven en un GLM Gamma (su dispersión crece con $\hat\mu$). Los de
-**deviance** corrigen bastante, pero en respuestas muy asimétricas siguen mostrando patrones espurios.
-La herramienta adecuada son los **residuos cuantil aleatorizados** [@dunnsmyth1996]: si el modelo es
-correcto se distribuyen **uniformemente**, sea cual sea la familia. Es lo que evalúa la
-@fig-u31-dharma.
-
-```{r}
-#| label: fig-u31-dharma
-#| fig-width: 9
-#| fig-height: 4
-#| fig-cap: "Diagnóstico con residuos cuantil simulados (DHARMa). Izquierda: QQ-plot uniforme con los contrastes de bondad de ajuste. Derecha: residuos frente a valores ajustados; buscamos una nube sin estructura."
-DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
-```
-
 ::: {.callout-tip}
-## 🔧 En R. Diagnóstico con residuos cuantil (DHARMa)
-Los residuos crudos y los de deviance engañan en un GLM Gamma; los **residuos cuantil aleatorizados**
-[@dunnsmyth1996] son **uniformes** si el modelo es correcto, sea cual sea la familia. **`DHARMa`** los
-obtiene por simulación:
+## 🔧 En R. Predicción
+Con un modelo genérico `m` ajustado con `glm(y ~ x, family = Gamma(link = "log"), data = d)` y un
+`data.frame` `newdata` con los perfiles que se quieren predecir:
 
-```r
-DHARMa::simulateResiduals(m_fab, n = 1000, plot = TRUE)
-```
-
-- **`simulateResiduals()`** genera `n` réplicas de la respuesta bajo el modelo y sitúa cada residuo como su
-  **cuantil** dentro de esa réplica simulada. Con `plot = TRUE` dibuja los dos paneles.
-- **Panel izquierdo (QQ uniforme):** los puntos deben seguir la diagonal, y los contrastes que superpone
-  —uniformidad (KS), dispersión y atípicos— salir **no significativos**.
-- **Panel derecho:** residuos frente a valor predicho; buscamos una nube **sin estructura** (ni abanico ni
-  curvatura).
-
-Volveremos a DHARMa en la [Unidad 3.4](#sec-u34), donde `simulateResiduals` sabe además respetar el
-**agrupamiento por máquina** del modelo mixto.
+- `predict(m, newdata, type = "link", se.fit = TRUE)` da $\hat\eta_0$ y su error estándar: el
+  intervalo de la media es `exp(fit ± qt(0.975, df.residual(m)) * se.fit)`.
+- `predict(m, newdata, type = "response")` da directamente la media en euros, $\hat\mu_0$.
+- `marginaleffects::predictions(m, newdata)` da la media con su intervalo, ya en euros (con el cuantil
+  de la normal en lugar del de la $t$, que con muchos datos coinciden).
+- El intervalo de predicción de una avería: `qgamma(c(0.025, 0.975), shape = 1 / phi, scale = mu * phi)`,
+  con `phi <- summary(m)$dispersion` y `mu` la media predicha.
 :::
-
-### ¿Es correcta la función de varianza?
-
-Es el supuesto central: contrastar cómo crece la varianza con la media. La familia postula
-$\operatorname{Var}(Y)=\phi\,\mu^{p}$, con $p=2$ para la Gamma, $p=1$ para Poisson y $p=3$ para la inversa
-gaussiana [@mccullagh1989, §12.6.2]. Esa relación es una potencia, incómoda de juzgar a ojo; pero
-**tomando logaritmos se vuelve una recta**:
-$$\log\operatorname{Var}(Y)=\log\phi + p\,\log\mu.$$
-En escala **log–log**, entonces, la nube de puntos (varianza frente a media, agrupando por valor
-ajustado) debe alinearse sobre una recta de **ordenada en el origen $\log\phi$** y **pendiente $p$**. Por
-eso ajustamos una recta a esos puntos y miramos su pendiente: si sale $\approx 2$, respalda la Gamma; un
-valor cercano a 1 apuntaría a Poisson y a 3, a la inversa gaussiana. La @fig-u31-varianza recoge esa
-nube y la recta ajustada.
-
-```{r}
-#| label: fig-u31-varianza
-#| fig-width: 6
-#| fig-height: 3.6
-#| fig-cap: "Relación media-varianza empírica en escala log-log. La pendiente estima la potencia p en Var(Y) ∝ μ^p: p ≈ 2 respalda la Gamma."
-mv <- base |>
-  dplyr::mutate(grupo = dplyr::ntile(fitted(m_fab), 12)) |>
-  dplyr::group_by(grupo) |>
-  dplyr::summarise(media = mean(coste_euros), varianza = var(coste_euros), .groups = "drop")
-
-pendiente <- coef(lm(log(varianza) ~ log(media), data = mv))[2]
-
-ggplot(mv, aes(media, varianza)) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = FALSE, colour = "firebrick") +
-  scale_x_log10() + scale_y_log10() +
-  labs(x = "media del grupo (€, log)", y = "varianza del grupo (log)",
-       subtitle = paste0("pendiente estimada p = ", round(pendiente, 2)))
-```
-
-### Predicción
-
-Predecir con un GLM Gamma-log es directo: el modelo da el **predictor lineal** $\hat\eta=x^{\top}\hat\beta$
-en escala log, y la media en euros es $\hat\mu=e^{\hat\eta}$. En R, `predict(m, newdata, type =
-"response")` hace la exponenciación; los **intervalos** se calculan en la escala del enlace —donde la
-Normal aproxima bien— y se exponencian, que es justo lo que devuelve `marginaleffects::predictions`. Por
-ejemplo, para una avería mecánica y una electrónica en una máquina **crítica de la fase 2** (el punto
-caliente del sistema), a edad y carga medias (@tbl-u31-pred-marginal):
-
-```{r}
-#| label: tbl-u31-pred-marginal
-#| tbl-cap: "Coste medio predicho (€) con IC al 95 %, para una avería mecánica y una electrónica en una máquina crítica de la fase 2 (edad y carga medias)."
-marginaleffects::predictions(
-  m_fab,
-  newdata = tidyr::expand_grid(
-    tipo_averia      = c("Mecanica", "Electronica"),
-    criticidad       = "Critica", fase_proceso = "fase2",
-    antiguedad_anios = mean(base$antiguedad_anios),
-    carga            = mean(base$carga), fabricante = "A")) |>
-  as.data.frame() |>          # predictions() devuelve una subclase sobre la que transmute() vacía el objeto
-  dplyr::transmute(tipo_averia,
-                   coste_predicho = round(estimate),
-                   ic95 = paste0("[", round(conf.low), ", ", round(conf.high), "]"))
-```
-
-Es una predicción **marginal**: vale para una máquina *cualquiera* de ese perfil —la media de la
-población—. Es la única que un GLM puede dar, porque no distingue entre máquinas. En la [Unidad
-3.4](#sec-u34), al añadir el **efecto aleatorio de máquina**, aparecerá una segunda predicción, la
-**condicional**: cuánto costará reparar *esta* máquina en concreto. La diferencia entre ambas es, en una
-frase, lo que aportan los modelos mixtos.
 
 ::: {.callout-important}
 ## Tarea del estudiante (3.1) · qué te llevas al estudio de caso
-Esta unidad te da la pieza central de la **severidad**: un GLM Gamma con enlace log sobre un importe
-individual. Es la **pregunta 1** del [estudio de caso](#sec-u36-encargo): *¿cuánto cuesta un parte, y
-de qué depende?* En tu cartera ese importe es `coste_k` de `siniestros.csv` —una fila por parte—, no
-`coste_medio` de la póliza.
+Esta unidad resuelve la **pregunta 1** del [estudio de caso](#sec-u36-encargo): *¿cuánto cuesta un
+parte, y de qué características del cliente y del vehículo depende? ¿Cuánto encarece cada una?* Es
+la misma pregunta que aquí nos hemos hecho para una avería, y se recorre con los mismos pasos.
 
-- **En clase.** Une `siniestros.csv` con `cartera.csv` por `id_poliza`, ajusta la Gamma con enlace
-  log sobre `coste_k` y lee cada coeficiente, exponenciado, como el factor por el que se multiplica
-  el coste medio de un parte. Recuerda que `sexo` no puede entrar en la tarifa.
-- **Para la pregunta 3.** El camino frecuencia × severidad necesitará la predicción del **coste
-  medio por parte** en la escala del euro, no del log. Practica aquí el paso de $\hat\eta$ a euros.
+- **Los datos.** La respuesta es `coste_k` de `siniestros.csv`, una fila por parte. Las covariables
+  están en `cartera.csv`: únelas por `id_poliza` (una póliza puede tener varios partes).
+- **Qué covariables.** Las del cliente y su vehículo (edad, antigüedad del carné, potencia, valor y
+  tipo de vehículo, uso, zona, kilómetros…). Hay más de las que necesitarás, y algunas son ruido.
+  **Fuera:** `sexo`, que no puede entrar en la tarifa; `bonus_malus_prev`/`_act`, que se calculan
+  con los propios partes; y `coste_total`, `coste_medio` o `n_siniestros`, que son la respuesta
+  agregada, no explicaciones.
+- **Los pasos**, en el orden de esta unidad:
+  1. **¿Es una Gamma?** Asimetría y CV por tramos ([Secciones 1.1](#sec-u31-contexto) y
+     [1.2](#sec-u31-gamma)).
+  2. **Ajuste** con enlace log ([Sección 1.4](#sec-u31-modelizacion)).
+  3. **Interpretación**: $\hat\phi$ y el CV implicado; cada factor $e^{\beta}$ como «un tanto por
+     ciento más caro», y Wald para decir qué niveles difieren de su referencia
+     ([Sección 1.5](#sec-u31-interpretacion)).
+  4. **Selección** con el contraste $F$ de tipo II (`car::Anova`) y comparación de modelos anidados, respetando la
+     jerarquía si pruebas interacciones ([Sección 1.6](#sec-u31-bondad)).
+  5. **Diagnóstico** con DHARMa, sobre el modelo de partida y sobre el final ([Sección 1.6](#sec-u31-deviance)).
+  6. **Predicción** del coste medio por parte, con su intervalo, para los clientes tipo de la
+     [Unidad 2.7](../caso2/caso2_conteos.qmd#tbl-u27-perfil) ([Sección 1.7](#sec-u31-prediccion)).
+- **Para la pregunta 3.** El camino frecuencia × severidad necesitará esa predicción **en euros**, no
+  en escala log.
 
-**Aviso.** En la cartera, `coste_medio` es `NA` cuando la póliza no tuvo partes y promedia un
-número distinto de siniestros en cada póliza: **no** es la respuesta de un modelo de severidad. La
-respuesta es `coste_k`.
+**Aviso.** `coste_medio` es `NA` cuando la póliza no tuvo partes y promedia un número distinto de
+siniestros en cada póliza: **no** es la respuesta de un modelo de severidad. La respuesta es `coste_k`.
 :::
