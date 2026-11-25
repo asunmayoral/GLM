@@ -13,7 +13,7 @@ paquetes <- c(
   # GLM: ajuste, interpretación e inferencia
   "broom", "broom.mixed", "marginaleffects", "emmeans", "car", "lmtest", "MASS", "MuMIn", "arm",
   # diagnóstico, bondad de ajuste y evaluación de clasificadores
-  "DHARMa", "statmod", "performance", "pROC", "generalhoslem", "sure", "Hmisc", "rsample", "yardstick",
+  "DHARMa", "statmod", "sandwich", "performance", "pROC", "generalhoslem", "sure", "Hmisc", "rsample", "yardstick",
   # separación y respuestas binarias, ordinales y nominales
   "logistf", "ordinal", "brant", "nnet",
   # efectos mixtos

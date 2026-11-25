@@ -48,6 +48,7 @@ y la familia queda determinada por la potencia $p$:
 | 1 | Poisson (cuasi) | desviación típica $\propto\sqrt{\mu}$ |
 | **2** | **Gamma** | desviación típica $\propto\mu$ → **CV constante** |
 | 3 | Inversa gaussiana | desviación típica $\propto\mu^{3/2}$ → colas más pesadas |
+| $p\le 0$ o $p\ge 1$ | Tweedie | la familia que contiene a todas las anteriores ($p=0$ normal, 1 Poisson, 2 Gamma, 3 inversa gaussiana); con $1<p<2$ admite **ceros exactos** y positivos a la vez. La trabajamos en la [Unidad 3.3](#sec-u33) |
 
 Elegir familia es, en buena medida, **elegir $p$**. Y $p$ no hay que adivinarlo: se **estima de los
 datos**, agrupando por valor ajustado y viendo cómo escala la varianza con la media
@@ -93,8 +94,10 @@ ggplot(mv, aes(media, varianza)) +
 ```
 
 La pendiente cae prácticamente sobre **2**. Antes de mirar un solo AIC ya tenemos una respuesta —y una
-que no depende de convenios de cálculo ni de correcciones de escala—. Aun así, ajustemos las
-alternativas: el objetivo de la unidad no es solo acertar, es **saber comparar**.
+que no depende de convenios de cálculo ni de correcciones de escala—: la varianza es cuadrática en la
+media, y la inversa gaussiana ($p=3$) queda descartada. Lo que la pendiente no puede hacer es separar la
+Gamma de la lognormal, que también tiene $p=2$ ([Sección 2.3](#sec-u32-lognormal)). Ajustemos, pues,
+las alternativas: el objetivo de la unidad no es solo acertar, es **saber comparar**.
 
 ::: {.callout-tip}
 ## 🔧 En R. Más allá de la Gamma — familias positivas (y a medida) en `glm()`
@@ -131,48 +134,322 @@ abordamos en la [Sección 2.3](#sec-u32-lognormal).
 
 La inversa gaussiana mantiene el soporte positivo y el enlace log, pero asume
 $\operatorname{Var}(Y)=\phi\,\mu^{3}$: la dispersión crece **más deprisa** con la media. Es la elección
-natural cuando la cola derecha es más pesada de lo que la Gamma puede acomodar. La @tbl-u32-ig recoge
-sus factores.
+natural cuando la cola derecha es más pesada de lo que la Gamma puede acomodar.
+
+### La inversa gaussiana en la familia exponencial {#sec-u32-ig-familia}
+
+Una $Y\sim\text{IG}(\mu,\lambda)$, con media $\mu>0$ y **forma** $\lambda>0$, tiene densidad
+
+$$
+f(y;\mu,\lambda)=\sqrt{\frac{\lambda}{2\pi y^{3}}}\;
+\exp\!\left\{-\frac{\lambda\,(y-\mu)^{2}}{2\mu^{2}y}\right\},\qquad y>0 .
+$$
+
+Como la Gamma de la [Sección 1.2](#sec-u31-gamma), encaja en la forma de la familia exponencial de
+dispersión:
+
+$$
+f(y;\theta,\phi)=\exp\!\left\{\frac{y\theta+\sqrt{-2\theta}}{\phi}+c(y,\phi)\right\},
+\qquad \theta=-\frac{1}{2\mu^{2}},\quad \phi=\frac{1}{\lambda},
+$$
+
+con las cuatro piezas de la @tbl-u32-ig-canonica.
+
+| Pieza | Inversa gaussiana |
+|:--|:--|
+| Parámetro natural $\theta$ | $-\dfrac{1}{2\mu^{2}}$  (el inverso del **cuadrado** de la media, con signo) |
+| Cumulante $b(\theta)$ | $-\sqrt{-2\theta}\;=\;-\dfrac{1}{\mu}$ |
+| Dispersión $a(\phi)$ | $\phi=\dfrac{1}{\lambda}$ |
+| Término $c(y,\phi)$ | $-\dfrac{1}{2}\left[\log\big(2\pi\phi\,y^{3}\big)+\dfrac{1}{\phi\,y}\right]$ |
+
+: Piezas de la forma canónica para la inversa gaussiana. Como en la Gamma, $a(\phi)=\phi$: hay un parámetro de dispersión libre que estimar. {#tbl-u32-ig-canonica}
+
+::: {.callout-note collapse="true"}
+## Desarrollo: de la densidad de la inversa gaussiana a la forma canónica
+Desarrollando el cuadrado del exponente,
+$$
+-\frac{\lambda(y-\mu)^{2}}{2\mu^{2}y}
+=-\lambda\left(\frac{y}{2\mu^{2}}-\frac{1}{\mu}+\frac{1}{2y}\right)
+=\frac{y\big(-\tfrac{1}{2\mu^{2}}\big)+\tfrac{1}{\mu}}{1/\lambda}-\frac{\lambda}{2y}.
+$$
+Lo que multiplica a $y$ es el parámetro natural, $\theta=-1/(2\mu^{2})$, y el denominador es la
+dispersión, $\phi=1/\lambda$. De $\theta$ se sigue $1/\mu=\sqrt{-2\theta}$, así que la cumulante es
+$b(\theta)=-\sqrt{-2\theta}$. El resto —el término $-\lambda/(2y)$ y el logaritmo de la raíz que
+precede a la exponencial— no depende de $\mu$ y forma $c(y,\phi)$.
+:::
+
+De esta forma se leen sus rasgos más relevantes [@mccullagh1989, cap. 8]:
+
+- **Media y varianza**: $\operatorname{E}(Y)=\mu$ y $\operatorname{Var}(Y)=\phi\,\mu^{3}$. La
+  **función de varianza** es $V(\mu)=\mu^{3}$.
+- **El CV crece con la media**: $\operatorname{CV}=\sqrt{\phi\,\mu}$. Es la diferencia de fondo con la
+  Gamma, cuyo CV es constante: en la inversa gaussiana, las averías caras son **relativamente** más
+  variables que las baratas.
+- **La asimetría es tres veces el CV**, $3\sqrt{\phi\mu}$: más asimétrica cuanto mayor es la media. Con
+  $\lambda\to\infty$ la distribución se concentra y se aproxima a una normal.
+- **El enlace canónico** es $1/\mu^{2}$, el que dicta $\theta$. Como en la Gamma, usamos el log, que da
+  la lectura multiplicativa y no restringe el signo del predictor.
+- **De dónde sale.** Es la distribución del **tiempo que tarda un proceso con deriva y ruido**
+  —un movimiento browniano— **en cruzar un umbral** por primera vez. Por eso es natural para
+  duraciones hasta que un desgaste acumulado llega a un límite, y menos para importes.
+
+Fijada la media, la forma $\lambda$ decide cuánta cola tiene la distribución. La @fig-u32-ig-densidades
+superpone al coste observado varias inversas gaussianas con su **misma media** y formas distintas,
+indicadas por el CV que implican en esa media, $\operatorname{CV}=\sqrt{\mu/\lambda}$, junto a la Gamma
+por momentos de la [Sección 1.2](#sec-u31-gamma).
+
+```{r}
+#| label: fig-u32-ig-densidades
+#| fig-width: 9
+#| fig-height: 4
+#| fig-cap: "Inversas gaussianas con la misma media que el coste observado y formas distintas, etiquetadas por el CV que implican (una de ellas, la de momentos). En trazo discontinuo, la Gamma por momentos. Izquierda: densidades sobre el histograma del coste (eje cortado en el percentil 99). Derecha: la cola, P(Y > y), en escala log; los puntos son la proporción observada."
+cv_ig     <- c(cv_c, 0.5, 0.35, 1.2)                     # CV implicado en la media
+lambda_ig <- media_c / cv_ig^2                           # forma: CV = sqrt(mu / lambda)
+etiq_ig   <- paste0("CV = ", round(cv_ig, 2), c(" (momentos)", "", "", ""))
+
+curvas_ig <- purrr::map2_dfr(lambda_ig, etiq_ig, \(l, e) tibble::tibble(
+  y = rejilla, forma = e,
+  densidad = statmod::dinvgauss(rejilla, mean = media_c, shape = l),
+  cola     = statmod::pinvgauss(rejilla, mean = media_c, shape = l, lower.tail = FALSE)))
+curvas_ig$forma <- factor(curvas_ig$forma, levels = etiq_ig)
+
+gamma_mom <- tibble::tibble(
+  y = rejilla,
+  densidad = dgamma(rejilla, shape = 1 / cv_c^2, scale = media_c * cv_c^2),
+  cola     = pgamma(rejilla, shape = 1 / cv_c^2, scale = media_c * cv_c^2, lower.tail = FALSE))
+
+p_dens_ig <- ggplot() +
+  geom_histogram(data = subset(base, coste_euros <= p99),
+                 aes(coste_euros, after_stat(density)), bins = 50, fill = "grey85") +
+  geom_line(data = subset(curvas_ig, y <= p99), aes(y, densidad, colour = forma), linewidth = 0.8) +
+  geom_line(data = subset(gamma_mom, y <= p99), aes(y, densidad), linetype = 2) +
+  labs(x = "coste de la avería (€)", y = "densidad", colour = NULL)
+
+p_cola_ig <- ggplot() +
+  geom_point(data = obs, aes(y, cola), size = 0.6, colour = "grey40") +
+  geom_line(data = curvas_ig, aes(y, cola, colour = forma), linewidth = 0.8) +
+  geom_line(data = gamma_mom, aes(y, cola), linetype = 2) +
+  scale_y_log10(limits = c(1e-4, 1)) +
+  labs(x = "coste de la avería (€)", y = "P(Y > y), escala log", colour = NULL)
+
+(p_dens_ig + p_cola_ig) + patchwork::plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+```
+
+Con el mismo CV, la inversa gaussiana pone más masa junto a su moda y una cola **más larga** que la
+Gamma: es lo que significa su asimetría, tres veces el CV frente a dos veces en la Gamma. Y aquí la de
+momentos acompaña al coste observado **mejor** que la Gamma de momentos, en el cuerpo y en la cola.
+Conviene no dejarse llevar por ello. Como en la @fig-u31-gammas, estamos ajustando una sola
+distribución a averías con medias muy distintas, y la mezcla de muchas Gammas con medias diferentes
+tiene más cola que cualquiera de ellas: se parece a una distribución más asimétrica. La forma del coste
+**en bloque** no decide la familia. Lo que la decide es cómo crece la varianza **cuando la media
+cambia**, comparando averías de media parecida, que es lo que mide la @fig-u32-potencia.
+
+### Modelización y estimación {#sec-u32-ig-modelo}
+
+El modelo tiene los mismos predictores que la Gamma de referencia, con la familia cambiada:
+
+$$
+Y_i\sim\text{IG}(\mu_i,\phi),\qquad \log\mu_i=x_i^{\top}\beta .
+$$
+
+Los coeficientes se estiman por **máxima verosimilitud**, con el mismo algoritmo que cualquier GLM:
+**mínimos cuadrados reponderados iterativamente** (IRLS, *scoring* de Fisher). Las ecuaciones de
+verosimilitud son
+$$
+\sum_{i}\frac{(y_i-\mu_i)}{\phi\,V(\mu_i)}\,\frac{\partial\mu_i}{\partial\beta}=0,
+$$
+y en cada iteración IRLS resuelve unos mínimos cuadrados con **pesos de trabajo**
+$w_i=\big(\partial\mu_i/\partial\eta_i\big)^{2}/V(\mu_i)$. Con enlace log,
+$\partial\mu/\partial\eta=\mu$, y los pesos dependen solo de la familia:
+
+$$
+\text{Gamma: } w_i=\frac{\mu_i^{2}}{\mu_i^{2}}=1,
+\qquad\qquad
+\text{inversa gaussiana: } w_i=\frac{\mu_i^{2}}{\mu_i^{3}}=\frac{1}{\mu_i}.
+$$
+
+La Gamma con enlace log pesa **igual** todas las averías; la inversa gaussiana pesa más las **baratas**
+y menos las caras, en proporción inversa a su media. Las ecuaciones no contienen $\phi$, que se
+cancela: $\hat\beta$ no depende de la dispersión, y $\phi$ se estima después
+([Sección 2.2](#sec-u32-ig-camino)).
 
 ```{r}
 #| label: tbl-u32-ig
-#| tbl-cap: "Coeficientes exponenciados (factores) del modelo con familia inversa gaussiana y enlace log, con su intervalo de confianza al 95 %. Compárense con los de la Gamma en la Unidad 3.1."
+#| tbl-cap: "Modelo inversa gaussiana con enlace log: coeficiente, error estándar, estadístico t y valor p de Wald, factor exp(β̂) e intervalo de Wald al 95 % del factor; en la última columna, el factor de la Gamma para comparar. Cada fila compara un nivel con su referencia (Mecánica, Auxiliar, fase 1, fabricante A) o mide una pendiente."
 m_ig <- glm(f_coste, family = inverse.gaussian(link = "log"), data = base)
 
-broom::tidy(m_ig, exponentiate = TRUE, conf.int = TRUE) |>
-  dplyr::transmute(term, `exp(beta)` = round(estimate, 3),
-                   conf.low = round(conf.low, 3), conf.high = round(conf.high, 3))
+t_ig <- qt(0.975, df.residual(m_ig))
+wald_ig <- broom::tidy(m_ig) |>
+  dplyr::mutate(factor = exp(estimate),
+                inf = exp(estimate - t_ig * std.error), sup = exp(estimate + t_ig * std.error),
+                factor_gamma = exp(coef(m_gam)[term]))
+wald_ig |>
+  dplyr::transmute(term, beta = round(estimate, 3), ee = round(std.error, 3),
+                   t = round(statistic, 2), p = signif(p.value, 2),
+                   `exp(beta)` = round(factor, 3),
+                   ic95 = paste0("[", round(inf, 2), ", ", round(sup, 2), "]"),
+                   `exp(beta) Gamma` = round(factor_gamma, 3))
 ```
 
-Los factores son **muy parecidos** a los de la Gamma, y no es casualidad: con el mismo enlace, ambas
-estiman la misma media y difieren solo en cómo **ponderan** las observaciones. La diferencia está en el
-peso de las averías caras: al asumir varianza $\propto\mu^{3}$, la inversa gaussiana confía menos en las
-predicciones grandes y les da menos influencia. Si la cola no es tan pesada como supone —y aquí, con
-$p\approx 2$, no lo es—, ese descuento sale caro en ajuste. Lo confirmaremos con el AIC.
+Los factores son **muy parecidos** a los de la Gamma (@tbl-u32-ig), y se leen igual, como un tanto por
+ciento sobre el coste medio. Una avería electrónica cuesta un
+`r pct(coef(m_ig)[["tipo_averiaElectronica"]])` % más que una mecánica; cada año de antigüedad, un
+`r pct(coef(m_ig)[["antiguedad_anios"]])` % más; y en la fase 1, una máquina crítica, un
+`r pct(coef(m_ig)[["criticidadCritica"]])` % más que una auxiliar —en la fase 2 hay que sumarle la
+interacción—. Con el mismo enlace, las dos familias estiman la misma media; difieren en los **pesos**
+con que llegan a ella, y esos pesos apenas mueven los coeficientes.
 
-### Bondad de ajuste, selección, diagnóstico y predicción: el camino de la Gamma {#sec-u32-ig-camino}
+**La validez de Wald.** Cada $t$ de la tabla es $\hat\beta_j/\widehat{ee}(\hat\beta_j)$, comparado con
+una $t$ de Student porque $\phi$ se estima, como en la
+[Sección 1.5](#sec-u31-interp-efectos). Para leerlo bien hay que tener presentes tres cosas:
 
-La inversa gaussiana es un GLM de la familia exponencial con $\phi$ desconocida, como la Gamma, así que
-todo el recorrido de la [Unidad 3.1](#sec-u31) se repite sin cambios de fondo:
+1. **Qué compara.** Cada fila contrasta un nivel **con su referencia**: «electrónica frente a
+   mecánica», no «electrónica frente a hidráulica». Esa otra comparación necesita la diferencia de dos
+   coeficientes y su covarianza. Y la pregunta «¿importa el tipo de avería?», con cuatro niveles, no
+   la responde ninguna fila suelta: la responde el contraste $F$ del factor entero
+   ([Sección 2.2](#sec-u32-ig-camino)).
+2. **La interacción.** Con `criticidad * fase_proceso` en el modelo, los coeficientes de criticidad
+   comparan los niveles **en la fase 1**; en la fase 2, el efecto es la suma con la interacción, y su
+   contraste necesita, de nuevo, la covarianza de los dos.
+3. **El error estándar depende de la familia.** $\widehat{ee}(\hat\beta)$ sale de suponer
+   $\operatorname{Var}(Y)=\phi\mu^{3}$. Si la varianza real crece como $\mu^{2}$ —lo que dice la
+   @fig-u32-potencia—, esos errores están mal calibrados, aunque los coeficientes sean razonables. Una
+   forma de comprobarlo es compararlos con los errores **robustos** (*sandwich*), que no suponen
+   ninguna función de varianza.
 
-- **Bondad de ajuste.** La deviance y $\hat\phi$ por Pearson; como $\phi$ se estima, tampoco aquí hay
-  contraste $\chi^2$ de bondad frente al saturado ([Sección 1.6](#sec-u31-deviance)). Ojo con la escala
-  de $\hat\phi$: con $\operatorname{Var}=\phi\mu^{3}$, su valor se mide en unidades de $1/\mu$ y **no
-  se compara** con el de la Gamma; el CV implicado es $\sqrt{\phi\mu}$, y crece con la media.
-- **Selección.** El contraste $F$ de tipo II con `car::Anova(m_ig, test.statistic = "F")`
-  ([Sección 1.6](#sec-u31-f)).
-- **Diagnóstico.** DHARMa, con un matiz práctico: `simulateResiduals()` simula de la inversa gaussiana
-  con el paquete `SuppDists`. Si no lo tienes, se simula con `statmod::rinvgauss()` y se pasan las
-  simulaciones a `DHARMa::createDHARMa()`, que es lo que hacemos aquí.
-- **Predicción.** El intervalo de confianza de la media, en escala log y exponenciado, igual que en la
-  Gamma; el de predicción de una avería, con los cuantiles de la inversa gaussiana,
-  `statmod::qinvgauss(c(0.025, 0.975), mean = mu, dispersion = phi)`.
+::: {.callout-note}
+## Errores estándar robustos: qué son y cómo se calculan
+El error estándar que da `summary()` sale de la matriz de covarianzas **del modelo**,
+$$
+\widehat{\operatorname{Var}}_{\text{modelo}}(\hat\beta)=\hat\phi\,\big(X^{\top}WX\big)^{-1},
+$$
+con $W$ la matriz diagonal de los pesos de trabajo de IRLS ([Sección 2.2](#sec-u32-ig-modelo)). Esa
+fórmula **da por buena** la función de varianza: supone que la varianza de cada avería es
+$\phi\,V(\mu_i)$.
+
+El **estimador robusto** (*sandwich*) conserva la matriz $\big(X^{\top}WX\big)^{-1}$ como «pan» y
+cambia el «relleno» por lo que se observa en los datos [@zeileis2004]:
+$$
+\widehat{\operatorname{Var}}_{\text{robusta}}(\hat\beta)=
+\big(X^{\top}WX\big)^{-1}\Big(\sum_{i}\psi_i\,\psi_i^{\top}\Big)\big(X^{\top}WX\big)^{-1},
+\qquad
+\psi_i=x_i\,\frac{y_i-\hat\mu_i}{V(\hat\mu_i)\,g'(\hat\mu_i)},
+$$
+donde $\psi_i$ es la contribución de la avería $i$ a las ecuaciones de verosimilitud. Con enlace log,
+$g'(\mu)=1/\mu$, y las dos familias quedan así:
+
+| | $W$ | $\psi_i$ |
+|:--|:--|:--|
+| Gamma | $I$ | $x_i\,\dfrac{y_i-\hat\mu_i}{\hat\mu_i}$ |
+| Inversa gaussiana | $\operatorname{diag}(1/\hat\mu_i)$ | $x_i\,\dfrac{y_i-\hat\mu_i}{\hat\mu_i^{2}}$ |
+
+La varianza de cada avería ya no se deduce de la familia: entra a través de su residuo observado,
+$(y_i-\hat\mu_i)^2$. Si la familia es la correcta, $\sum_i\psi_i\psi_i^{\top}$ se parece a
+$\hat\phi\,X^{\top}WX$ y las dos matrices coinciden; si no lo es, la robusta sigue siendo válida y la
+del modelo no. Por eso **comparar los dos errores comprueba la función de varianza**. Lo que el
+estimador robusto sí sigue suponiendo es que las averías son **independientes**; la dependencia entre
+las de una misma máquina es asunto de la [Unidad 3.4](#sec-u34).
+:::
+
+La @tbl-u32-ig-robusto hace esa comparación en las dos familias.
+
+```{r}
+#| label: tbl-u32-ig-robusto
+#| tbl-cap: "Error estándar de cada coeficiente según el modelo y robusto (sandwich, HC0), para la inversa gaussiana y para la Gamma. Si la función de varianza es la correcta, los dos se parecen."
+ee_comp <- tibble::tibble(
+  term       = names(coef(m_ig)),
+  ig_modelo  = sqrt(diag(vcov(m_ig))),
+  ig_robusto = sqrt(diag(sandwich::vcovHC(m_ig, type = "HC0"))),
+  gamma_modelo  = sqrt(diag(vcov(m_gam))),
+  gamma_robusto = sqrt(diag(sandwich::vcovHC(m_gam, type = "HC0"))))
+ee_comp |> dplyr::mutate(dplyr::across(-term, \(x) round(x, 3)))
+```
+
+En la Gamma, los errores del modelo y los robustos casi coinciden. En la inversa gaussiana se separan
+justo donde se esperaba, en las máquinas **críticas** y su interacción con la fase, que son las de
+coste medio más alto: el error del modelo de la interacción crítica × fase 2 es
+`r round(ee_comp$ig_modelo[ee_comp$term == "criticidadCritica:fase_procesofase2"], 3)`, frente a
+`r round(ee_comp$ig_robusto[ee_comp$term == "criticidadCritica:fase_procesofase2"], 3)` el robusto. Al
+suponer que la varianza crece como $\mu^{3}$, la inversa gaussiana exagera la incertidumbre de las
+averías caras, y sus Wald, ahí, son conservadores. En otros términos, como la fase 2, el error del modelo
+es **menor** que el robusto: la mala calibración no va siempre en la misma dirección.
+
+### Inferencia y predicción {#sec-u32-ig-camino}
+
+La inversa gaussiana es un GLM con $\phi$ desconocida, como la Gamma, así que su inferencia sigue el
+camino de la [Unidad 3.1](#sec-u31). Lo recorremos con sus fórmulas propias.
+
+#### Bondad de ajuste y dispersión
+
+La **deviance** de la inversa gaussiana es
+$$
+D=\sum_{i}\frac{(y_i-\hat\mu_i)^{2}}{\hat\mu_i^{2}\,y_i},
+$$
+y la **dispersión** se estima por Pearson, dividiendo por los grados de libertad residuales:
+$$
+\hat\phi=\frac{1}{n-k}\sum_{i}\frac{(y_i-\hat\mu_i)^{2}}{\hat\mu_i^{3}} .
+$$
+
+```{r}
+#| label: u32-ig-bondad
+y_ig  <- base$coste_euros
+mu_ig <- fitted(m_ig)
+bondad_ig <- c(deviance = sum((y_ig - mu_ig)^2 / (mu_ig^2 * y_ig)),
+               gl = df.residual(m_ig),
+               phi_pearson = sum((y_ig - mu_ig)^2 / mu_ig^3) / df.residual(m_ig))
+signif(bondad_ig, 3)
+```
+
+Como $\phi$ se estima, tampoco aquí hay un contraste $\chi^{2}$ de bondad frente al modelo saturado
+([Sección 1.6](#sec-u31-deviance)). Y $\hat\phi=`r signif(bondad_ig[["phi_pearson"]], 2)`$ **no se
+compara** con el de la Gamma: con $\operatorname{Var}=\phi\mu^{3}$, $\phi$ tiene unidades de $1/\mu$.
+Lo comparable es el CV que implica, $\sqrt{\hat\phi\,\hat\mu}$, que en este modelo va de
+`r round(min(sqrt(bondad_ig[["phi_pearson"]] * mu_ig)), 2)` en la avería más barata a
+`r round(max(sqrt(bondad_ig[["phi_pearson"]] * mu_ig)), 2)` en la más cara. La Gamma lo fija para
+todas.
+
+#### Selección
+
+Con $\phi$ desconocida, la diferencia de deviances de dos modelos anidados no sigue una $\chi^2$, porque
+depende de la escala. Se divide por $\hat\phi$ del modelo **mayor** $M_1$, que es el que la estima sin
+sesgo bajo las dos hipótesis, y se compara con una $F$:
+$$
+F=\frac{\big[D(M_0)-D(M_1)\big]/q}{\hat\phi_{1}}\;\sim\;F_{q,\;n-k_1},
+$$
+con $q$ los parámetros que $M_0$ retira y $k_1$ los de $M_1$. En el tipo II, $M_0$ es el modelo sin un
+término, con el resto dentro y respetando la jerarquía de la interacción (@tbl-u32-ig-anova).
+
+```{r}
+#| label: tbl-u32-ig-anova
+#| tbl-cap: "Contraste F de tipo II de cada término en la inversa gaussiana, con el valor p del mismo contraste en la Gamma."
+f_tipo2 <- function(m) {
+  a <- car::Anova(m, type = 2, test.statistic = "F")
+  tibble::tibble(termino = rownames(a), F = a$`F value`, gl = a$Df, p = a$`Pr(>F)`) |>
+    dplyr::filter(termino != "Residuals")
+}
+anova_ig <- f_tipo2(m_ig) |>
+  dplyr::left_join(dplyr::select(f_tipo2(m_gam), termino, p_gamma = p), by = "termino")
+anova_ig |> dplyr::mutate(F = round(F, 1), p = signif(p, 2), p_gamma = signif(p_gamma, 2))
+```
+
+Todos los términos son significativos en las dos familias, pero no con la misma fuerza. La diferencia
+más visible está en `fabricante`: en la inversa gaussiana su $p$ es
+`r signif(anova_ig$p[anova_ig$termino == "fabricante"], 2)`, frente a
+`r signif(anova_ig$p_gamma[anova_ig$termino == "fabricante"], 2)` en la Gamma. Como las dos familias
+pesan las averías de forma distinta, la selección de variables **depende de la familia**: es una razón
+más para elegirla bien antes de seleccionar.
+
+#### Diagnóstico
+
+Con los residuos cuantílicos de DHARMa, como en la Gamma: se simulan muchas respuestas del modelo
+ajustado, y cada avería se sitúa en la distribución de las suyas. Si el modelo es el correcto, esas
+posiciones son uniformes (@tbl-u32-ig-dharma).
 
 ```{r}
 #| label: tbl-u32-ig-dharma
 #| tbl-cap: "Diagnóstico DHARMa de la inversa gaussiana frente a la Gamma: valores p de los contrastes de uniformidad (KS), dispersión y cuantiles, y cobertura del intervalo de predicción al 95 % sobre las propias averías."
 set.seed(20252026)
-mu_ig  <- fitted(m_ig)
 phi_ig <- summary(m_ig)$dispersion
 sim_y  <- replicate(1000, statmod::rinvgauss(length(mu_ig), mean = mu_ig, dispersion = phi_ig))
 sim_ig <- DHARMa::createDHARMa(simulatedResponse = sim_y, observedResponse = base$coste_euros,
@@ -198,41 +475,254 @@ purrr::map_dfr(list(`Gamma` = sim_gm, `Inversa gaussiana` = sim_ig), \(s) tibble
 El diagnóstico dice lo mismo que la pendiente de la @fig-u32-potencia, por otra vía. La Gamma pasa los
 tres contrastes; la inversa gaussiana los suspende, y su intervalo de predicción al 95 % cubre solo el
 `r round(100 * cubre(statmod::qinvgauss(0.025, mu_ig, dispersion = phi_ig), statmod::qinvgauss(0.975, mu_ig, dispersion = phi_ig)), 1)` %
-de las averías: al suponer una cola más pesada de la que hay, reparte mal la incertidumbre entre las
-averías baratas y las caras.
+de las averías: al suponer que la variabilidad crece como $\mu^{3}$, reparte mal la incertidumbre entre
+las averías baratas y las caras.
+
+#### Predicción
+
+Para un perfil $x_0$, la media se predice como en la Gamma, en escala log:
+$$
+\hat\eta_0=x_0^{\top}\hat\beta,\qquad
+\widehat{ee}(\hat\eta_0)=\sqrt{x_0^{\top}\,\widehat{\operatorname{Var}}(\hat\beta)\,x_0},\qquad
+\hat\mu_0=e^{\hat\eta_0},
+$$
+y su **intervalo de confianza** al 95 % es
+$\big[\,e^{\hat\eta_0-t\,\widehat{ee}(\hat\eta_0)},\;e^{\hat\eta_0+t\,\widehat{ee}(\hat\eta_0)}\,\big]$,
+con $t$ el cuantil 0.975 de la $t$ de Student con $n-k$ grados de libertad. Para una **avería futura**,
+el intervalo de predicción lo dan los cuantiles de la propia distribución ajustada,
+$$
+\big[\,q_{0.025},\;q_{0.975}\,\big]\quad\text{de}\quad\text{IG}\big(\hat\mu_0,\ \hat\phi\big),
+$$
+que ignoran la incertidumbre de $\hat\mu_0$: es pequeña frente a la de una avería concreta
+(@tbl-u32-ig-pred).
+
+```{r}
+#| label: tbl-u32-ig-pred
+#| tbl-cap: "Predicción de la inversa gaussiana para los ocho perfiles de la @tbl-u31-pred-perfiles: coste medio con su intervalo de confianza al 95 %, intervalo de predicción al 95 % de una avería, y el de la Gamma para comparar (€)."
+ic    <- function(inf, sup) paste0("[", round(inf), ", ", round(sup), "]")
+pr_ig <- predict(m_ig, newdata = perfiles, type = "link", se.fit = TRUE)
+mu0   <- exp(pr_ig$fit)
+mu0_g <- exp(predict(m_gam, newdata = perfiles, type = "link"))
+
+pred_ig <- perfiles |>
+  dplyr::transmute(tipo_averia, criticidad, fase_proceso,
+                   media = round(mu0),
+                   ic95_media  = ic(exp(pr_ig$fit - t_ig * pr_ig$se.fit),
+                                    exp(pr_ig$fit + t_ig * pr_ig$se.fit)),
+                   ip95_averia = ic(statmod::qinvgauss(0.025, mu0, dispersion = phi_ig),
+                                    statmod::qinvgauss(0.975, mu0, dispersion = phi_ig)),
+                   ip95_gamma  = ic(qgamma(0.025, alfa_gm, scale = mu0_g / alfa_gm),
+                                    qgamma(0.975, alfa_gm, scale = mu0_g / alfa_gm)))
+pred_ig
+```
+
+Las medias y sus intervalos de confianza son casi los de la Gamma; los intervalos de predicción, no.
+En los perfiles **baratos**, el de la inversa gaussiana es más estrecho que el de la Gamma; en los
+**caros**, mucho más ancho por arriba: para el perfil más caro llega a
+`r sprintf("%.0f", statmod::qinvgauss(0.975, max(mu0), dispersion = phi_ig))` €, frente a
+`r sprintf("%.0f", qgamma(0.975, alfa_gm, scale = max(mu0_g) / alfa_gm))` € en la Gamma. Es el CV creciente con la
+media, convertido en euros. Y es precisamente lo que el diagnóstico rechaza: los datos no muestran esa
+variabilidad de más en las averías caras.
+
+::: {.callout-tip}
+## 🔧 En R. La inversa gaussiana
+Con la fórmula `f` y los datos `d`:
+
+- **Densidad, distribución, cuantiles y simulación**: `statmod::dinvgauss()`, `pinvgauss()`,
+  `qinvgauss()` y `rinvgauss()`, con `mean` y `shape` ($\lambda$) o `dispersion` ($\phi=1/\lambda$).
+- **Ajuste**: `m <- glm(f, family = inverse.gaussian(link = "log"), data = d)`; el enlace canónico es
+  `"1/mu^2"`.
+- **Wald**: `broom::tidy(m)` (coeficiente, error, $t$, $p$); el intervalo del factor,
+  `exp(estimate ± qt(0.975, df.residual(m)) * std.error)`. Errores robustos para comprobar la función
+  de varianza: `sqrt(diag(sandwich::vcovHC(m, type = "HC0")))`, frente a `sqrt(diag(vcov(m)))`.
+- **Deviance y dispersión**: `deviance(m)` y `summary(m)$dispersion` (Pearson).
+- **Selección**: `car::Anova(m, type = 2, test.statistic = "F")`, o `anova(m0, m1, test = "F")` entre
+  anidados.
+- **Diagnóstico**: `DHARMa::simulateResiduals(m)` necesita el paquete `SuppDists`. Sin él, se simulan
+  las respuestas con `replicate(1000, statmod::rinvgauss(n, mean = fitted(m), dispersion = phi))` y se
+  pasan a `DHARMa::createDHARMa(simulatedResponse, observedResponse, fittedPredictedResponse,
+  integerResponse = FALSE)`.
+- **Predicción**: `predict(m, newdata, type = "link", se.fit = TRUE)` para la media y su intervalo;
+  `statmod::qinvgauss(c(0.025, 0.975), mean = mu0, dispersion = phi)` para una avería futura.
+:::
 
 ## 2.3 Lognormal y log-OLS {#sec-u32-lognormal}
 
 La tercera vía es la más tentadora por familiar: si $\log Y$ parece normal —y en la @fig-u31-asimetria lo
-parecía—, ¿por qué no aplicar mínimos cuadrados a $\log Y$ y olvidarnos de los GLM? La
-@tbl-u32-lognormal resume ese ajuste.
+parecía—, ¿por qué no aplicar mínimos cuadrados a $\log Y$ y olvidarnos de los GLM?
+
+### Modelización y estimación {#sec-u32-ln-modelo}
+
+Es el **modelo lognormal**: un modelo lineal normal sobre el logaritmo del coste,
+$$
+\log Y_i=x_i^{\top}\beta+\varepsilon_i,\qquad \varepsilon_i\sim\mathcal{N}(0,\sigma^{2})\ \text{independientes}
+\qquad\Longleftrightarrow\qquad
+Y_i\sim\text{LN}\big(x_i^{\top}\beta,\ \sigma^{2}\big),
+$$
+con los mismos predictores que la Gamma. Sus coeficientes se estiman por **mínimos cuadrados
+ordinarios** sobre $\log Y$, que con errores normales es también el estimador de máxima verosimilitud,
+y $\sigma^{2}$ por la suma de cuadrados residual dividida por $n-k$. En la escala del coste, la
+lognormal tiene
+$$
+\operatorname{mediana}(Y_i)=e^{x_i^{\top}\beta},\qquad
+\operatorname{E}(Y_i)=e^{x_i^{\top}\beta+\sigma^{2}/2},\qquad
+\operatorname{Var}(Y_i)=\big(e^{\sigma^{2}}-1\big)\,\operatorname{E}(Y_i)^{2}.
+$$
+Dos consecuencias. La varianza crece con el **cuadrado** de la media y el CV,
+$\sqrt{e^{\sigma^{2}}-1}$, es constante: la misma función de varianza que la Gamma, $p=2$, así que la
+@fig-u32-potencia no distingue entre las dos. Y la lognormal **no** es un GLM sobre $Y$: su densidad no
+tiene la forma de la familia exponencial de dispersión en $y$, sino en $\log y$, y por eso se ajusta
+como un modelo lineal sobre el logaritmo.
+
+```{r}
+#| label: tbl-u32-ln-coef
+#| tbl-cap: "Modelo lognormal (OLS sobre log(coste)): coeficiente, error estándar, estadístico t y valor p, factor exp(β̂) sobre la MEDIANA del coste e intervalo al 95 % del factor; en la última columna, el factor de la Gamma sobre la media, para comparar."
+m_ln <- lm(update(f_coste, log(coste_euros) ~ .), data = base)   # mismos predictores que m_gam
+
+t_ln <- qt(0.975, df.residual(m_ln))
+broom::tidy(m_ln) |>
+  dplyr::transmute(term, beta = round(estimate, 3), ee = round(std.error, 3),
+                   t = round(statistic, 2), p = signif(p.value, 2),
+                   `exp(beta)` = round(exp(estimate), 3),
+                   ic95 = paste0("[", round(exp(estimate - t_ln * std.error), 2), ", ",
+                                 round(exp(estimate + t_ln * std.error), 2), "]"),
+                   `exp(beta) Gamma` = round(exp(coef(m_gam)[term]), 3))
+```
+
+Los coeficientes se leen como en la Gamma, con un matiz que importa. Cada $e^{\beta_j}$ es el factor
+por el que se multiplica la **mediana** del coste, no su media: una avería electrónica tiene una
+mediana un `r pct(coef(m_ln)[["tipo_averiaElectronica"]])` % mayor que una mecánica, y cada año de
+antigüedad la sube un `r pct(coef(m_ln)[["antiguedad_anios"]])` %. Si los errores tienen la misma
+varianza en todas las averías, la media es la mediana por una constante, $e^{\sigma^{2}/2}$, y el factor
+vale también para la media. Si no la tienen, deja de valer; lo comprobaremos en el diagnóstico. Los
+factores se parecen a los de la Gamma (@tbl-u32-ln-coef). La diferencia más visible está en la
+antigüedad: un `r pct(coef(m_ln)[["antiguedad_anios"]])` % por año sobre la mediana, frente a un
+`r pct(coef(m_gam)[["antiguedad_anios"]])` % sobre la media en la Gamma. Las dos cifras pueden ser
+correctas a la vez, porque no miden lo mismo: la dispersión de los residuos del log-OLS crece con la
+antigüedad, y con ella la media se separa de la mediana a medida que la máquina envejece.
+
+Los contrastes $t$ e intervalos de la tabla son los del modelo lineal clásico, **exactos** si los
+errores son normales y homocedásticos. Valen para ellos las mismas cautelas que en la
+[Sección 2.2](#sec-u32-ig-modelo): cada fila compara un nivel con su referencia, y los coeficientes de
+criticidad son los de la fase 1.
+
+### Inferencia y predicción {#sec-u32-ln-camino}
+
+El log-OLS es un **modelo lineal** sobre $\log Y$, y su inferencia es la del modelo lineal clásico. La
+predicción, en cambio, tiene una dificultad propia: la vuelta a euros.
+
+#### Bondad de ajuste
+
+En escala log, el ajuste se resume con el $R^{2}$, el $R^{2}$ ajustado y el error típico residual
+$\hat\sigma$ (@tbl-u32-lognormal).
 
 ```{r}
 #| label: tbl-u32-lognormal
-#| tbl-cap: "Bondad del ajuste OLS sobre log(coste): R², R² ajustado, estadístico F global y su p-valor, error típico residual (σ) y tamaño muestral. Un ajuste legítimo y muy significativo —que es justo lo que hace insidiosa la trampa de la retransformación—."
-m_ln <- lm(update(f_coste, log(coste_euros) ~ .), data = base)   # mismos predictores que m_gam
-
+#| tbl-cap: "Bondad del ajuste OLS sobre log(coste): R², R² ajustado, estadístico F global y su p-valor, error típico residual (σ) y tamaño muestral."
 broom::glance(m_ln) |>
   dplyr::transmute(R2 = round(r.squared, 3), R2_aj = round(adj.r.squared, 3),
                    `F` = round(statistic, 1), p_valor = signif(p.value, 3),
                    sigma = round(sigma, 3), n = nobs)
 ```
 
-Funciona: el $F$ global es **contundente** ($p$ minúsculo) y un $R^2\approx 0.31$ es lo razonable con
-tanta heterogeneidad entre máquinas. Nada en esa salida avisa del problema, y por eso es insidioso.
-Porque hay una diferencia conceptual que **no** es un tecnicismo.
+El $F$ global es **contundente** ($p$ minúsculo) y un $R^{2}\approx$
+`r round(summary(m_ln)$r.squared, 2)` es lo razonable con tanta heterogeneidad entre máquinas. El
+$\hat\sigma=$ `r round(summary(m_ln)$sigma, 3)` implica un CV de
+$\sqrt{e^{\hat\sigma^{2}}-1}=$ `r round(sqrt(exp(summary(m_ln)$sigma^2) - 1), 2)`, del mismo orden que
+el $\sqrt{\hat\phi}$ de la Gamma.
 
-### Log-OLS y GLM-log no estiman lo mismo {#sec-u32-ln-media}
+#### Selección
 
-El GLM con enlace log modela $\log \operatorname{E}[Y]$ —el logaritmo de la **media**—. El OLS sobre
-$\log Y$ modela $\operatorname{E}[\log Y]$ —la **media de los logaritmos**—. Por la desigualdad de
-Jensen, $\operatorname{E}[\log Y] \le \log\operatorname{E}[Y]$: no son la misma cantidad. El segundo
-estima algo próximo a la **mediana** de $Y$, no a su media.
+Con errores normales, el contraste entre dos modelos anidados es la $F$ de siempre,
+$$
+F=\frac{\big[SCR(M_0)-SCR(M_1)\big]/q}{SCR(M_1)/(n-k_1)}\;\sim\;F_{q,\;n-k_1},
+$$
+con $SCR$ la suma de cuadrados residual: la misma estructura que en los GLM con $\phi$ estimado, con
+$\hat\sigma^{2}$ del modelo mayor en el papel de $\hat\phi$, pero aquí **exacta** y no aproximada. En el
+tipo II, $M_0$ es el modelo sin un término (@tbl-u32-ln-anova).
 
-**De dónde sale el sesgo.** Escribe el modelo log-OLS como $\log Y_i = x_i^{\top}\beta+\varepsilon_i$.
-La media en la escala original es
-$$\operatorname{E}[Y_i \mid x_i]=e^{x_i^{\top}\beta}\,\operatorname{E}\!\left[e^{\varepsilon_i}\right],$$
-de modo que exponenciar el ajuste, $e^{x_i^{\top}\hat\beta}$, **olvida el factor**
+```{r}
+#| label: tbl-u32-ln-anova
+#| tbl-cap: "Contraste F de tipo II de cada término en el log-OLS, con el valor p del mismo contraste en la Gamma."
+anova_ln <- f_tipo2(m_ln) |>
+  dplyr::left_join(dplyr::select(f_tipo2(m_gam), termino, p_gamma = p), by = "termino")
+anova_ln |> dplyr::mutate(F = round(F, 1), p = signif(p, 2), p_gamma = signif(p_gamma, 2))
+```
+
+Todos los términos son significativos salvo `fabricante`
+($p=`r signif(anova_ln$p[anova_ln$termino == "fabricante"], 2)`$), que en la Gamma sí lo era
+($p=`r signif(anova_ln$p_gamma[anova_ln$termino == "fabricante"], 2)`$). Es lo mismo que vimos en la
+inversa gaussiana, ahora en sentido contrario: la selección de variables **depende del modelo**. El AIC
+sirve para comparar modelos log-OLS **entre sí**; frente a los GLM, solo con el jacobiano
+([Sección 2.4](#sec-u32-elegir)).
+
+#### Diagnóstico
+
+Los residuos del modelo lineal deberían ser **normales y homocedásticos**. Se miran con los residuos
+frente a los ajustados y el gráfico cuantil-cuantil normal (@fig-u32-ln-diagnostico), y se contrastan
+con Shapiro-Wilk (normalidad) y Breusch-Pagan (homocedasticidad); la influencia, con la distancia de
+Cook (@tbl-u32-ln-diagnostico).
+
+```{r}
+#| label: fig-u32-ln-diagnostico
+#| fig-width: 9
+#| fig-height: 3.8
+#| fig-cap: "Diagnóstico del log-OLS: residuos frente a valores ajustados (izquierda), con una suavización, y gráfico cuantil-cuantil normal de los residuos estandarizados (derecha)."
+diag_ln <- tibble::tibble(ajustado = fitted(m_ln), residuo = resid(m_ln),
+                          estandarizado = rstandard(m_ln))
+patchwork::wrap_plots(
+  ggplot(diag_ln, aes(ajustado, residuo)) +
+    geom_point(alpha = 0.3, size = 0.8) + geom_hline(yintercept = 0, linetype = 2) +
+    geom_smooth(se = FALSE, colour = "firebrick") +
+    labs(x = "valor ajustado (log €)", y = "residuo"),
+  ggplot(diag_ln, aes(sample = estandarizado)) +
+    stat_qq(alpha = 0.3, size = 0.8) + stat_qq_line(colour = "firebrick") +
+    labs(x = "cuantil normal teórico", y = "residuo estandarizado"))
+```
+
+```{r}
+#| label: tbl-u32-ln-diagnostico
+#| tbl-cap: "Contrastes del diagnóstico del log-OLS: normalidad (Shapiro-Wilk), homocedasticidad (Breusch-Pagan) e influencia (distancia de Cook máxima), y cobertura del intervalo de predicción al 95 % sobre las propias averías."
+ip_ln <- exp(predict(m_ln, interval = "prediction"))     # el intervalo, ya en euros
+diag_tests_ln <- tibble::tibble(
+  shapiro_p       = signif(shapiro.test(resid(m_ln))$p.value, 2),
+  breusch_pagan_p = signif(lmtest::bptest(m_ln)$p.value, 2),
+  cook_max        = round(max(cooks.distance(m_ln)), 3),
+  cobertura_ip95  = round(cubre(ip_ln[, "lwr"], ip_ln[, "upr"]), 3))
+diag_tests_ln
+```
+
+El modelo lineal no sale tan limpio como su $F$ hacía pensar. Los residuos se alejan de la normal
+(Shapiro-Wilk, $p=`r diag_tests_ln$shapiro_p`$) con una ligera **asimetría a la izquierda**: el logaritmo
+corrige de más la cola derecha del coste. Y no son homocedásticos (Breusch-Pagan,
+$p=`r diag_tests_ln$breusch_pagan_p`$). Ninguna observación es influyente. La heterocedasticidad es la
+que más pesa, porque afecta a la vuelta a euros de la media, como vemos ahora.
+
+#### Predicción
+
+Para un perfil $x_0$, el modelo predice en escala log $\hat\eta_0=x_0^{\top}\hat\beta$, con error
+estándar $\widehat{ee}(\hat\eta_0)=\sqrt{x_0^{\top}\widehat{\operatorname{Var}}(\hat\beta)\,x_0}$. La
+vuelta a euros depende de lo que se quiera predecir.
+
+**La mediana y los cuantiles: basta con exponenciar.** Como el logaritmo es monótono, los cuantiles
+pasan a euros sin sesgo: $e^{\hat\eta_0}$ estima la **mediana** del coste, y los intervalos se
+exponencian extremo a extremo,
+$$
+\text{IC 95 \% de la mediana: }\ \Big[e^{\hat\eta_0-t\,\widehat{ee}(\hat\eta_0)},\;e^{\hat\eta_0+t\,\widehat{ee}(\hat\eta_0)}\Big],
+\qquad
+\text{IP 95 \% de una avería: }\ \Big[e^{\hat\eta_0-t\,\hat s_p},\;e^{\hat\eta_0+t\,\hat s_p}\Big],
+$$
+con $\hat s_p=\sqrt{\hat\sigma^{2}+\widehat{ee}(\hat\eta_0)^{2}}$ y $t$ el cuantil 0.975 de la $t$ de
+Student con $n-k$ grados de libertad. El intervalo de predicción cubre el
+`r round(100 * diag_tests_ln$cobertura_ip95, 1)` % de las averías (@tbl-u32-ln-diagnostico): para dar
+**cuantiles**, el log-OLS sirve.
+
+**La media: exponenciar no basta.** El GLM con enlace log modela $\log \operatorname{E}[Y]$ —el
+logaritmo de la **media**—. El OLS sobre $\log Y$ modela $\operatorname{E}[\log Y]$ —la **media de los
+logaritmos**—. Por la desigualdad de Jensen, $\operatorname{E}[\log Y] \le \log\operatorname{E}[Y]$: no
+son la misma cantidad. La media en la escala original es
+$$\operatorname{E}[Y_0 \mid x_0]=e^{x_0^{\top}\beta}\,\operatorname{E}\!\left[e^{\varepsilon}\right],$$
+de modo que exponenciar la predicción, $e^{\hat\eta_0}$, **olvida el factor**
 $\operatorname{E}[e^{\varepsilon}]\ge 1$ (otra vez Jensen). Ese factor que falta es justamente el sesgo a
 la baja.
 
@@ -240,13 +730,15 @@ la baja.
 para el error: lo aproxima con la **media de los residuos exponenciados**, y multiplica por ella la
 predicción ingenua,
 $$\hat s=\frac{1}{n}\sum_{j=1}^{n} e^{\hat\varepsilon_j},\qquad
-  \widehat{\operatorname{E}}[Y_i\mid x_i]=e^{x_i^{\top}\hat\beta}\,\hat s .$$
+  \widehat{\operatorname{E}}[Y_0\mid x_0]=e^{\hat\eta_0}\,\hat s .$$
 Es **no paramétrico**: usa la distribución *empírica* de los residuos, no una fórmula cerrada. Si los
-errores fueran normales y homocedásticos, $\hat s$ tendería a $e^{\hat\sigma^{2}/2}$ —la corrección
-paramétrica clásica—, pero el *smearing* no lo exige y sigue siendo consistente cuando esa hipótesis
-falla. El GLM-log, en cambio, **no necesita nada de esto**: modela la media directamente.
+errores fueran normales, $\hat s$ tendería a $e^{\hat\sigma^{2}/2}$ —la corrección paramétrica clásica—,
+pero el *smearing* no lo exige. Sí exige, en cambio, que los errores tengan la **misma distribución** en
+todas las averías: si su varianza cambia con $x$, como dice el Breusch-Pagan, también cambia
+$\operatorname{E}[e^{\varepsilon}\mid x]$, y un único factor $\hat s$ para todas deja de ser exacto
+[@ainorton2000]. El GLM-log, en cambio, **no necesita nada de esto**: modela la media directamente.
 
-La consecuencia práctica aparece al volver a euros. Si uno exponencia sin más los valores ajustados,
+La consecuencia práctica se ve al volver a euros. Si uno exponencia sin más los valores ajustados,
 **subestima el coste medio de forma sistemática** (@tbl-u32-retransformacion):
 
 ```{r}
@@ -264,23 +756,13 @@ tibble::tibble(
 ```
 
 La retransformación ingenua se queda **muy por debajo** del coste medio real (aquí, más de un 15 %). La
-**corrección de Duan** —el factor $\hat s$— lo endereza casi por completo. Y el
-**GLM Gamma acierta sin necesitar corrección alguna**, porque modela la media directamente: nunca sale de
-la escala en la que queremos la respuesta.
+**corrección de Duan** lo endereza casi por completo. Y el **GLM Gamma acierta sin necesitar corrección
+alguna**, porque modela la media directamente: nunca sale de la escala en la que queremos la respuesta.
 
-::: {.callout-warning}
-## Por qué esto importa en un informe
-Un 15 % de sesgo sistemático en el coste medio no es un detalle académico: aplicado a un presupuesto
-anual de mantenimiento, es dinero real mal planificado —y **siempre a la baja**, que es la peor dirección
-para una previsión de gasto—. Además el error es **silencioso**: el modelo log-OLS tiene un $F$ contundente,
-y nada en su salida advierte de que sus predicciones en euros están sesgadas.
-:::
-
-### El intervalo de la media corregida {#sec-u32-duan-ic}
-
-El *smearing* corrige la media, pero una media sin su error está a medias. La @tbl-u32-duan-ic calcula
-el intervalo al 95 % del coste medio en los ocho perfiles de la @tbl-u31-pred-perfiles, por las dos vías
-que describe el callout siguiente, y lo compara con el del GLM Gamma.
+**El intervalo de la media corregida.** El *smearing* corrige la media, pero una media sin su error está
+a medias. El callout siguiente describe las dos formas de obtenerlo, y la @tbl-u32-duan-ic lo calcula
+para los ocho perfiles de la @tbl-u31-pred-perfiles, junto a la mediana, el intervalo de predicción y la
+media de la Gamma.
 
 ::: {.callout-note}
 ## Dos formas de obtener el intervalo de la media corregida: método delta y *bootstrap*
@@ -317,9 +799,10 @@ Si las dos vías coinciden, la covarianza que el método delta ignora no pesa y 
 
 ```{r}
 #| label: tbl-u32-duan-ic
-#| tbl-cap: "Coste medio por perfil de máquina (€) según el log-OLS con la corrección de Duan, con su intervalo al 95 % por el método delta y por bootstrap (1000 remuestras), frente al GLM Gamma con su intervalo de Wald. Mismos predictores en los dos modelos; edad y carga en sus valores medios, fabricante A."
+#| tbl-cap: "Predicción del log-OLS por perfil de máquina (€): mediana con su intervalo de predicción al 95 % para una avería; media corregida por Duan con su intervalo al 95 % por el método delta y por bootstrap (1000 remuestras); y la media de la Gamma con su intervalo de Wald. Edad y carga en sus valores medios, fabricante A."
 X_perf <- model.matrix(delete.response(terms(m_ln)), perfiles, xlev = m_ln$xlevels)
 eta_ln <- drop(X_perf %*% coef(m_ln))                     # x0' beta del log-OLS
+ip_perf <- exp(predict(m_ln, newdata = perfiles, interval = "prediction"))
 
 # Método delta: varianza de x0' beta más la de log(s)
 var_log_duan <- rowSums((X_perf %*% vcov(m_ln)) * X_perf) +
@@ -336,17 +819,19 @@ boot_duan <- replicate(1000, {
 
 pg <- predict(m_gam, newdata = perfiles, type = "link", se.fit = TRUE)
 tg <- qt(0.975, df.residual(m_gam))
-ic <- function(inf, sup) paste0("[", round(inf), ", ", round(sup), "]")
 
 duan_ic <- perfiles |>
   dplyr::transmute(tipo_averia, criticidad, fase_proceso,
-                   duan       = exp(eta_ln) * smearing,
-                   ic_delta   = ic(duan * exp(-1.96 * ee_log_duan), duan * exp(1.96 * ee_log_duan)),
+                   mediana    = round(exp(eta_ln)),
+                   ip95       = ic(ip_perf[, "lwr"], ip_perf[, "upr"]),
+                   media_duan = exp(eta_ln) * smearing,
+                   ic_delta   = ic(media_duan * exp(-1.96 * ee_log_duan),
+                                   media_duan * exp(1.96 * ee_log_duan)),
                    ic_boot    = ic(apply(boot_duan, 1, quantile, 0.025),
                                    apply(boot_duan, 1, quantile, 0.975)),
-                   gamma      = exp(pg$fit),
+                   media_gamma = exp(pg$fit),
                    ic_gamma   = ic(exp(pg$fit - tg * pg$se.fit), exp(pg$fit + tg * pg$se.fit)))
-duan_ic |> dplyr::mutate(duan = round(duan), gamma = round(gamma))
+duan_ic |> dplyr::mutate(media_duan = round(media_duan), media_gamma = round(media_gamma))
 ```
 
 Tres lecturas. El **método delta y el bootstrap coinciden**: con `r nrow(base)` averías, la
@@ -358,74 +843,40 @@ aporta es la de $\hat\beta$: el error estándar de $\log\hat s$ es de
 vez corregido, el log-OLS da **medias e intervalos muy parecidos** a los de la Gamma: el *smearing* no
 solo endereza el sesgo, también deja una estimación de precisión comparable. La diferencia es de
 procedimiento: la Gamma da la media y su error en un solo paso; el log-OLS necesita dos piezas y
-combinarlas.
+combinarlas, y la segunda descansa en una homocedasticidad que el diagnóstico no respalda.
 
 Un último aviso, común a los dos modelos: ambos tratan las averías como independientes, y las de una
 misma máquina no lo son. Un bootstrap que remuestree **máquinas** en lugar de filas daría intervalos
 más anchos, para el log-OLS y para la Gamma. Lo resolveremos en la [Unidad 3.4](#sec-u34).
 
-### Bondad de ajuste, selección, diagnóstico y predicción: el camino del modelo lineal {#sec-u32-ln-camino}
+::: {.callout-warning}
+## Por qué esto importa en un informe
+Un 15 % de sesgo sistemático en el coste medio no es un detalle académico: aplicado a un presupuesto
+anual de mantenimiento, es dinero real mal planificado —y **siempre a la baja**, que es la peor dirección
+para una previsión de gasto—. Además el error es **silencioso**: el modelo log-OLS tiene un $F$ contundente,
+y nada en su salida advierte de que sus predicciones en euros están sesgadas.
+:::
 
-El log-OLS no es un GLM, sino un **modelo lineal** sobre $\log Y$, y todo su recorrido es el del modelo
-lineal clásico. Un recordatorio rápido:
+::: {.callout-tip}
+## 🔧 En R. El log-OLS
+Con la fórmula `f` (respuesta `y`) y los datos `d`:
 
-- **Bondad de ajuste.** $R^2$, $R^2$ ajustado y el error típico residual $\hat\sigma$, en escala log
-  (@tbl-u32-lognormal).
-- **Selección.** El contraste $F$, exacto si los errores son normales: `car::Anova(m_ln)` (tipo II), o
-  `anova()` entre modelos anidados. El AIC sirve para comparar modelos log-OLS **entre sí**; frente a
-  los GLM, solo con el jacobiano ([Sección 2.4](#sec-u32-elegir)).
-- **Diagnóstico.** Los residuos del modelo lineal, que deberían ser **normales y homocedásticos**:
-  residuos frente a ajustados, gráfico cuantil-cuantil normal, y los contrastes de Shapiro-Wilk
-  (normalidad) y de Breusch-Pagan (homocedasticidad); las observaciones influyentes, con la distancia de
-  Cook.
-- **Predicción.** `predict(m_ln, interval = "confidence")` y `interval = "prediction"` dan los intervalos
-  en escala log. Al exponenciarlos, los **cuantiles** pasan a euros sin sesgo, porque el logaritmo es
-  monótono: $e^{\text{mediana de }\log Y}$ es la mediana de $Y$, y lo mismo los extremos del intervalo de
-  predicción. Lo único que no pasa así es la **media**, que necesita el *smearing*.
-
-```{r}
-#| label: fig-u32-ln-diagnostico
-#| fig-width: 9
-#| fig-height: 3.8
-#| fig-cap: "Diagnóstico del log-OLS: residuos frente a valores ajustados (izquierda), con una suavización, y gráfico cuantil-cuantil normal de los residuos estandarizados (derecha)."
-diag_ln <- tibble::tibble(ajustado = fitted(m_ln), residuo = resid(m_ln),
-                          estandarizado = rstandard(m_ln))
-patchwork::wrap_plots(
-  ggplot(diag_ln, aes(ajustado, residuo)) +
-    geom_point(alpha = 0.3, size = 0.8) + geom_hline(yintercept = 0, linetype = 2) +
-    geom_smooth(se = FALSE, colour = "firebrick") +
-    labs(x = "valor ajustado (log €)", y = "residuo"),
-  ggplot(diag_ln, aes(sample = estandarizado)) +
-    stat_qq(alpha = 0.3, size = 0.8) + stat_qq_line(colour = "firebrick") +
-    labs(x = "cuantil normal teórico", y = "residuo estandarizado"))
-```
-
-```{r}
-#| label: tbl-u32-ln-diagnostico
-#| tbl-cap: "Contrastes del diagnóstico del log-OLS: normalidad (Shapiro-Wilk), homocedasticidad (Breusch-Pagan) e influencia (distancia de Cook máxima), y cobertura del intervalo de predicción al 95 % sobre las propias averías."
-ip_ln <- exp(predict(m_ln, interval = "prediction"))     # el intervalo, ya en euros
-diag_tests_ln <- tibble::tibble(
-  shapiro_p       = signif(shapiro.test(resid(m_ln))$p.value, 2),
-  breusch_pagan_p = signif(lmtest::bptest(m_ln)$p.value, 2),
-  cook_max        = round(max(cooks.distance(m_ln)), 3),
-  cobertura_ip95  = round(cubre(ip_ln[, "lwr"], ip_ln[, "upr"]), 3))
-diag_tests_ln
-```
-
-El modelo lineal no sale tan limpio como su $F$ hacía pensar. Los residuos se alejan de la normal
-(Shapiro-Wilk, $p=`r diag_tests_ln$shapiro_p`$) con una ligera **asimetría a la izquierda**: el logaritmo
-corrige de más la cola derecha del coste. Y no son homocedásticos (Breusch-Pagan,
-$p=`r diag_tests_ln$breusch_pagan_p`$). Ninguna observación es influyente, y el intervalo de predicción
-cubre el `r round(100 * diag_tests_ln$cobertura_ip95, 1)` % de las averías: para dar **cuantiles**, el
-log-OLS sirve. Pero la heterocedasticidad toca a la **media**: si la varianza del error cambia con $x$,
-también cambia $\operatorname{E}[e^{\varepsilon}\mid x]$, y un único factor $\hat s$ para todas las
-averías deja de ser exacto [@ainorton2000]. Es otra razón para preferir un modelo que estime la media
-directamente.
-
-Una última diferencia con la Gamma, que conviene no pasar por alto: en el log-OLS `fabricante` **no**
-es significativo ($F$ de tipo II, $p=`r signif(car::Anova(m_ln)["fabricante", "Pr(>F)"], 2)`$), mientras
-que en la Gamma sí lo era. La selección de variables depende de la familia, porque cada una pondera las
-averías de forma distinta.
+- **Ajuste**: `m <- lm(update(f, log(y) ~ .), data = d)`; coeficientes, errores, $t$ y $p$ con
+  `broom::tidy(m)`, y el factor sobre la mediana con `exp(coef(m))`.
+- **Bondad de ajuste**: `broom::glance(m)` ($R^{2}$, $R^{2}$ ajustado, $F$ global, $\hat\sigma$).
+- **Selección**: `car::Anova(m)` ($F$ de tipo II) o `anova(m0, m1)` entre anidados; `AIC()` solo entre
+  modelos log-OLS.
+- **Diagnóstico**: `plot(m)` (residuos frente a ajustados, QQ normal, Cook); `shapiro.test(resid(m))`,
+  `lmtest::bptest(m)` y `cooks.distance(m)`.
+- **Mediana e intervalos**: `exp(predict(m, newdata, interval = "confidence"))` para la mediana y su
+  intervalo; `exp(predict(m, newdata, interval = "prediction"))` para una observación futura.
+- **Media corregida**: `s <- mean(exp(resid(m)))` y `exp(predict(m, newdata)) * s`.
+  - método delta: `X0 <- model.matrix(delete.response(terms(m)), newdata, xlev = m$xlevels)`,
+    `v <- rowSums((X0 %*% vcov(m)) * X0) + var(exp(resid(m))) / (nobs(m) * s^2)` y el intervalo
+    `media * exp(c(-1, 1) * 1.96 * sqrt(v))`;
+  - *bootstrap*: `replicate(1000, { i <- sample(nrow(d), replace = TRUE); mb <- lm(formula(m), d[i, ]);
+    exp(X0 %*% coef(mb)) * mean(exp(resid(mb))) })` y los percentiles 2.5 y 97.5.
+:::
 
 ## 2.4 Elegir, comparar y conectar {#sec-u32-elegir}
 
@@ -471,13 +922,16 @@ gaussiana** es la peor de las tres —coherente con la potencia estimada, mucho 
 Nótese de paso la magnitud del artefacto de escala: sin el jacobiano, la lognormal exhibía un AIC de otro
 orden por completo, y «habría ganado» por pura ilusión de cálculo.
 
-Las dos vías —el diagnóstico media-varianza y la comparación por AIC— **coinciden**: la familia es la
-Gamma. Que coincidan es tranquilizador, pero conviene fijar el orden de importancia:
+Las dos vías —el diagnóstico media-varianza y la comparación por AIC— **coinciden** y se
+complementan: la pendiente descarta la inversa gaussiana, y el AIC decide entre las dos familias con
+$p=2$ a favor de la Gamma. Que coincidan es tranquilizador, pero conviene fijar el orden de
+importancia:
 
 ::: {.callout-tip}
 ## El criterio, en orden
 1. **La función de varianza manda.** Es un diagnóstico de la *estructura* del problema y no depende de
-   convenios de cálculo. Si la potencia estimada está cerca de 2, la Gamma es la candidata natural.
+   convenios de cálculo. Si la potencia estimada está cerca de 2, la Gamma —o la lognormal, que
+   comparte esa potencia— es la candidata natural.
 2. **El AIC arbitra**, pero solo entre modelos ajustados sobre la **misma respuesta y la misma escala**.
    Comprueba siempre que la comparación sea legítima (el jacobiano) antes de leerla.
 3. **La interpretabilidad decide los empates.** Entre dos familias con ajuste equivalente, gana la que
@@ -501,19 +955,10 @@ Con una fórmula `f` (respuesta positiva `y` y covariables) y los datos `d`:
 - **Relación media-varianza**: `dplyr::ntile(fitted(m), k)` para agrupar por valor ajustado, media y
   varianza por grupo, y `lm(log(varianza) ~ log(media))`: la pendiente estima $p$.
 - **Gamma**: `glm(f, family = Gamma(link = "log"), data = d)`.
-- **Inversa gaussiana**: `glm(f, family = inverse.gaussian(link = "log"), data = d)`.
-  - dispersión: `summary(m)$dispersion`; selección: `car::Anova(m, test.statistic = "F")`;
-  - diagnóstico: `DHARMa::simulateResiduals(m)` (necesita `SuppDists`), o
-    `statmod::rinvgauss(n, mean = mu, dispersion = phi)` y `DHARMa::createDHARMa()`;
-  - predicción: `predict(m, newdata, type = "link", se.fit = TRUE)` para la media;
-    `statmod::qinvgauss(c(0.025, 0.975), mean = mu, dispersion = phi)` para una observación.
-- **Lognormal / log-OLS**: `lm(update(f, log(y) ~ .), data = d)`.
-  - bondad: `broom::glance(m)` ($R^2$, $\hat\sigma$, $F$); selección: `car::Anova(m)` o `anova(m0, m1)`;
-  - diagnóstico: `plot(m)` (residuos frente a ajustados, QQ normal, Cook), `shapiro.test(resid(m))`,
-    `lmtest::bptest(m)`, `cooks.distance(m)`;
-  - predicción: `exp(predict(m, newdata, interval = "prediction"))` para la mediana y los cuantiles;
-    la media, con el *smearing*: `exp(predict(m, newdata)) * mean(exp(resid(m)))`, y su intervalo por
-    el método delta o por *bootstrap* (`replicate()` sobre filas remuestreadas).
+- **Inversa gaussiana**: `glm(f, family = inverse.gaussian(link = "log"), data = d)`; el resto de su
+  recorrido, en el callout de la [Sección 2.2](#sec-u32-ig-camino).
+- **Lognormal / log-OLS**: `lm(update(f, log(y) ~ .), data = d)`; el resto de su recorrido, en el
+  callout de la [Sección 2.3](#sec-u32-ln-camino).
 - **Comparar las tres**. La Gamma y la inversa gaussiana, con `AIC()` directamente: las dos modelan
   $Y$ en euros. El log-OLS **no**: su `logLik` está en la escala de $\log Y$ y `AIC()` la toma tal cual.
   Hay que llevarla a euros a mano, con el jacobiano:

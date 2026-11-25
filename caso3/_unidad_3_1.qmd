@@ -479,9 +479,30 @@ máquina, $\hat\phi$ baja.
 ## Estamos ignorando el agrupamiento (y se nota)
 Cada máquina aporta **varias averías**, y las de una misma máquina se parecen entre sí: no son
 independientes. Aquí las tratamos como si lo fueran —un modelo de efectos fijos sobre todas las
-averías—. Esa simplificación tiene un precio visible: el $\hat\phi$ que acabamos de estimar sale
-**inflado** respecto de la dispersión «pura» de la Gamma, porque absorbe la variabilidad **entre
-máquinas** que el modelo no incluye. Lo resolveremos con el **efecto aleatorio de máquina** de la
+averías—, y esa simplificación se nota en $\hat\phi$. Para verlo basta con los residuos de Pearson
+del modelo, $r_i=(y_i-\hat\mu_i)/\hat\mu_i$, cuya media de cuadrados es justamente $\hat\phi$. Si la
+Gamma lo explicara todo, los residuos de una misma máquina no se parecerían más entre sí que los de
+máquinas distintas, y su dispersión **dentro** de cada máquina sería la misma $\hat\phi$.
+
+```{r}
+#| label: u31-agrupamiento
+res_p  <- residuals(m_gamma, type = "pearson")              # r_i = (y_i - mu_i) / mu_i
+an_maq <- anova(lm(res_p ~ factor(base$id_maquina)))        # ¿se parecen los de una máquina?
+agrupamiento <- c(
+  phi_pearson     = summary(m_gamma)$dispersion,            # todas las averías juntas
+  phi_dentro_maq  = an_maq$`Mean Sq`[2],                    # alrededor de la media de su máquina
+  F_maquina       = an_maq$`F value`[1],
+  p_maquina       = an_maq$`Pr(>F)`[1])
+signif(agrupamiento, 3)
+```
+
+No es así. Alrededor de la media de su propia máquina, los residuos varían bastante menos:
+`r round(agrupamiento[["phi_dentro_maq"]], 2)`, frente al $\hat\phi=$
+`r round(agrupamiento[["phi_pearson"]], 2)` de todas las averías juntas. Y los de una misma máquina se
+parecen entre sí mucho más de lo que permitiría el azar ($F=$ `r sprintf("%.1f", agrupamiento[["F_maquina"]])`,
+$p<0.001$): unas máquinas son sistemáticamente caras y otras baratas, por encima de lo que explican
+sus covariables. El modelo, que no distingue máquinas, carga esa variabilidad **entre máquinas** a
+$\hat\phi$, que sale **inflado**. Lo resolveremos con el **efecto aleatorio de máquina** de la
 [Unidad 3.4](#sec-u34).
 :::
 
@@ -977,8 +998,8 @@ Dos cautelas acompañan a esta decisión:
   trata cada avería como independiente, cuenta la misma máquina varias veces y **exagera la evidencia**:
   es el mismo mecanismo que puede estar detrás de `fabricante`.
 
-La curvatura de la carga queda, pues, en la misma **cuarentena** que el fabricante, para revisarla
-cuando la [Unidad 3.4](#sec-u34) tenga en cuenta la máquina.
+La curvatura de la carga queda, pues, en la misma **cuarentena** que el fabricante. Indagaremos más en
+las dos cuando la [Unidad 3.4](#sec-u34) tenga en cuenta el efecto de la máquina.
 
 **La bondad de ajuste del modelo final.** Repetimos sobre `m_final` la comprobación de coherencia de
 la @tbl-u31-deviance (@tbl-u31-deviance-final):
